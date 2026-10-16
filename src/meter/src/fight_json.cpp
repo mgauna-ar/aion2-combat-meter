@@ -63,6 +63,7 @@ JsonValue fight_to_json(const FightSummary& f) {
     boss["max_hp"] = f.boss.max_hp;
     boss["hp"] = f.boss.hp;
     boss["hp_known"] = f.boss.hp_known;
+    boss["hp_exact"] = f.boss.hp_exact;
     boss["is_boss"] = f.boss.is_boss;
     boss["killed"] = f.boss.killed;
     boss["damage_taken"] = f.boss.damage_taken;
@@ -117,6 +118,7 @@ std::optional<FightSummary> fight_from_json(const JsonValue& j) {
     f.boss.max_hp = u64(boss["max_hp"]);
     f.boss.hp = u64(boss["hp"]);
     f.boss.hp_known = boss["hp_known"].as_bool();
+    f.boss.hp_exact = boss["hp_exact"].as_bool();
     f.boss.is_boss = boss["is_boss"].as_bool();
     f.boss.killed = boss["killed"].as_bool();
     f.boss.damage_taken = u64(boss["damage_taken"]);

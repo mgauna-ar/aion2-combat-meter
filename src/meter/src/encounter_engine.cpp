@@ -53,8 +53,9 @@ void EncounterEngine::on_event(const proto::ParsedEvent& event) {
                 on_tick(e, ts);
             } else if constexpr (std::is_same_v<T, proto::PartyRoster>) {
                 m_registry.on_party(e);
+            } else if constexpr (std::is_same_v<T, proto::RemainingHp>) {
+                on_values(e, ts);
             }
-            // RemainingHp: layout not known yet; nothing reads it.
         },
         event.event);
 }
@@ -62,7 +63,7 @@ void EncounterEngine::on_event(const proto::ParsedEvent& event) {
 void EncounterEngine::on_damage(const proto::Damage& d, Micros ts) {
     if (d.actor == 0 || d.target == 0) return;
     m_registry.observe_hit(d.actor, d.target);
-    const uint64_t amount = d.total();
+    const uint64_t amount = d.amount;
     if (amount == 0) return;
     m_damage_since_spawn[m_registry.resolve(d.target)] += amount;
     credit(d.actor, d.target, amount, &d, ts);
@@ -112,6 +113,14 @@ void EncounterEngine::credit(EntityId actor, EntityId target, uint64_t amount, c
     fight.enemies[enemy] += amount;
     if (ts > fight.last_hit_ts) fight.last_hit_ts = ts;
     m_registry.on_revive(player);
+}
+
+void EncounterEngine::on_values(const proto::RemainingHp& v, Micros ts) {
+    if (v.self) m_registry.on_self_values(v.id);
+    if (!v.has_hp) return;
+    m_registry.on_hp(v.id, v.hp);
+    // HP reaching 0 is the death; 42 36 follows seconds later, with the corpse.
+    if (v.hp == 0) on_death(v.id, ts);
 }
 
 void EncounterEngine::on_death(EntityId id, Micros ts) {
@@ -210,7 +219,11 @@ BossSummary EncounterEngine::boss_of(const Fight& fight) const {
     if (const Actor* a = m_registry.find(best)) {
         b.npc_code = a->npc_code;
         b.killed = a->dead;
-        if (a->has_hp) {
+        if (a->has_live_hp) {
+            b.hp = a->live_hp;
+            b.hp_known = true;
+            b.hp_exact = true;
+        } else if (a->has_hp) {
             const auto seen = m_damage_since_spawn.find(best);
             const uint64_t taken = seen == m_damage_since_spawn.end() ? 0 : seen->second;
             b.hp = taken >= a->spawn_hp ? 0 : a->spawn_hp - taken;

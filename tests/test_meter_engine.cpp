@@ -128,6 +128,37 @@ TEST_CASE(Engine, BossKillEndsAfterGraceWithLateTicks) {
     TEST_ASSERT_FALSE(s.quality.partial);
 }
 
+TEST_CASE(Engine, ServerHpIsExactAndZeroIsTheKill) {
+    EncounterEngine e = setup();
+    e.on_event(ev(at_s(1), hit(kMe, kBoss, 1'000'000)));
+    // The server's figure wins over spawn HP less damage seen.
+    e.on_event(ev(at_s(1), hp(kBoss, 3'500'000)));
+    BossSummary b = e.current().boss;
+    TEST_ASSERT(b.hp_exact);
+    TEST_ASSERT_EQ(b.hp, uint64_t{3'500'000});
+
+    e.on_event(ev(at_s(9), hit(kAlly, kBoss, 3'500'000)));
+    e.on_event(ev(at_s(9), hp(kBoss, 0)));
+    // No 42 36 yet (it comes with the corpse): HP 0 alone is the kill.
+    e.tick(at_s(11));
+    TEST_ASSERT_FALSE(e.in_fight());
+    const FightSummary s = e.take_finished().at(0);
+    TEST_ASSERT(s.end_reason == EndReason::BossKilled);
+    TEST_ASSERT(s.boss.killed);
+    TEST_ASSERT_NEAR(s.duration_s, 8.0, 1e-9);
+}
+
+TEST_CASE(Engine, LocalPlayerFromSelfValues) {
+    EncounterEngine e;
+    e.on_event(ev(at_s(0), npc(kAdd, 50'000, 778)));
+    e.on_event(ev(at_s(0), self_values(6745)));
+    e.on_event(ev(at_s(1), hit(6745, kAdd, 100)));
+    const FightSummary s = e.current();
+    TEST_ASSERT_EQ(s.combatants.size(), size_t{1});
+    TEST_ASSERT(s.combatants[0].is_local);
+    TEST_ASSERT_EQ(s.combatants[0].name, std::string("You"));
+}
+
 TEST_CASE(Engine, KilledBossWithLittleDamageSeenIsPartial) {
     EncounterEngine e = setup();
     e.on_event(ev(at_s(1), hit(kMe, kBoss, 100'000)));

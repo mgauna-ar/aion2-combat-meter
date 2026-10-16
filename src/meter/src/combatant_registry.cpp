@@ -61,13 +61,40 @@ void CombatantRegistry::on_identity(const proto::Identity& identity) {
         a.owner = 0;
         a.inferred_side = Side::Unknown;
     }
-    if (identity.own) {
-        if (m_local != 0 && m_local != canonical) get_or_create(m_local).is_local = false;
-        m_local = canonical;
-        get_or_create(canonical).is_local = true;
-        get_or_create(identity.id).is_local = true;
-    }
+    if (identity.own) set_local(identity.id, canonical);
     settle_pending(identity.id);
+}
+
+void CombatantRegistry::set_local(EntityId id, EntityId canonical) {
+    if (m_local != 0 && m_local != canonical) get_or_create(m_local).is_local = false;
+    m_local = canonical;
+    get_or_create(canonical).is_local = true;
+    get_or_create(id).is_local = true;
+}
+
+void CombatantRegistry::on_self_values(EntityId id) {
+    if (id == 0) return;
+    const EntityId canonical = resolve(id);
+    if (canonical == m_local) return;
+    Actor& a = get_or_create(id);
+    // An NPC or a summon is never the local player.
+    if (a.spawned) return;
+    a.is_player = true;
+    a.inferred_side = Side::Unknown;
+    set_local(id, canonical);
+    settle_pending(id);
+}
+
+void CombatantRegistry::on_hp(EntityId id, uint64_t hp) {
+    if (id == 0) return;
+    // Not resolve(): a summon's HP is its own, not its owner's.
+    Actor& a = get_or_create(id);
+    a.has_live_hp = true;
+    a.live_hp = hp;
+    // Without a spawn (it came into view before the meter started), the most HP
+    // seen is the best lower bound on its max.
+    if (hp > a.max_hp) a.max_hp = hp;
+    if (hp > 0 && a.is_player) a.dead = false;
 }
 
 void CombatantRegistry::on_spawn(const proto::Spawn& spawn) {
@@ -81,6 +108,7 @@ void CombatantRegistry::on_spawn(const proto::Spawn& spawn) {
     a.npc_code = spawn.npc_code;
     a.dead = false;
     a.inferred_side = Side::Unknown;
+    a.has_live_hp = false;
     if (spawn.has_hp) {
         a.has_hp = true;
         a.spawn_hp = spawn.cur_hp;
@@ -93,7 +121,10 @@ void CombatantRegistry::on_spawn(const proto::Spawn& spawn) {
 }
 
 void CombatantRegistry::on_death(EntityId id) {
-    if (id != 0) get_or_create(resolve(id)).dead = true;
+    if (id == 0) return;
+    // Not resolve(): a summon dying leaves its owner alive.
+    if (const auto alias = m_alias.find(id); alias != m_alias.end()) id = alias->second;
+    get_or_create(id).dead = true;
 }
 
 void CombatantRegistry::on_revive(EntityId id) {
@@ -158,10 +189,35 @@ void CombatantRegistry::set_inferred(EntityId id, Side s) {
     get_or_create(id).inferred_side = s;
 }
 
+bool CombatantRegistry::known_npc(EntityId id) const {
+    const Actor* a = find(id);
+    return a != nullptr && a->spawned && side(id) == Side::Enemy;
+}
+
+void CombatantRegistry::make_player(EntityId id) {
+    const Actor* a = find(id);
+    // Identity and spawn packets outrank anything inferred.
+    if (a != nullptr && (a->is_player || a->spawned)) return;
+    if (side(id) == Side::Player) return;
+    get_or_create(id).inferred_side = Side::Player;
+    settle_pending(id);
+}
+
 void CombatantRegistry::observe_hit(EntityId actor, EntityId target) {
     const EntityId a = resolve(actor);
     const EntityId t = resolve(target);
     if (a == 0 || t == 0 || a == t) return;
+    // Mobs do not fight mobs, so the other end of a hit with a spawned NPC is a
+    // player, whatever was inferred before: 04 38 carries heals too, and a heal
+    // between two players makes one of them look like an enemy.
+    if (known_npc(t)) {
+        make_player(a);
+        return;
+    }
+    if (known_npc(a)) {
+        make_player(t);
+        return;
+    }
     const Side sa = side_or_guess(a);
     const Side st = side_or_guess(t);
     if (sa != Side::Unknown && st == Side::Unknown) {
@@ -214,6 +270,7 @@ std::string CombatantRegistry::display_name(EntityId id) const {
     const EntityId r = resolve(id);
     const Actor* a = find(r);
     if (a != nullptr && !a->name.empty()) return a->name;
+    if (r != 0 && r == m_local) return "You";
     return "#" + std::to_string(r);
 }
 

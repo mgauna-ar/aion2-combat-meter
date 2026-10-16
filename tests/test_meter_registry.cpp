@@ -29,6 +29,53 @@ TEST_CASE(Registry, SummonResolvesToOwner) {
     TEST_ASSERT(r.side(0x4201) == Side::Player);
 }
 
+TEST_CASE(Registry, SelfValuesNameTheLocalPlayer) {
+    CombatantRegistry r;
+    // The meter started after login: no 33 36, but 00 8D sends the player their own values.
+    r.on_self_values(6745);
+    TEST_ASSERT_EQ(r.local_player(), EntityId{6745});
+    TEST_ASSERT(r.side(6745) == Side::Player);
+    TEST_ASSERT(r.in_party(6745));
+    TEST_ASSERT_EQ(r.display_name(6745), std::string("You"));
+    r.on_identity(player(6745, "Ariel", true));
+    TEST_ASSERT_EQ(r.display_name(6745), std::string("Ariel"));
+
+    // An NPC or summon is never taken for the player.
+    r.on_spawn(npc(0x4100, 1000));
+    r.on_self_values(0x4100);
+    TEST_ASSERT_EQ(r.local_player(), EntityId{6745});
+}
+
+TEST_CASE(Registry, HitOnASpawnedNpcOverridesAHealInference) {
+    CombatantRegistry r;
+    r.on_spawn(npc(18024, 119'700));
+    // A heal between two players nobody knows yet, then a mob hits one of them.
+    r.observe_hit(12914, 50363);
+    r.observe_hit(18024, 50363);
+    TEST_ASSERT(r.side(50363) == Side::Player);
+    TEST_ASSERT(r.side(12914) == Side::Enemy);
+    // Hitting the mob settles it: only players do that.
+    r.observe_hit(12914, 18024);
+    TEST_ASSERT(r.side(12914) == Side::Player);
+}
+
+TEST_CASE(Registry, SummonDeathLeavesOwnerAlive) {
+    CombatantRegistry r;
+    r.on_identity(player(100, "Ariel", true));
+    r.on_spawn(summon(0x4200, 100));
+    r.on_death(0x4200);
+    TEST_ASSERT(r.find(0x4200)->dead);
+    TEST_ASSERT_FALSE(r.find(100)->dead);
+}
+
+TEST_CASE(Registry, LiveHpBoundsAnUnspawnedMax) {
+    CombatantRegistry r;
+    r.on_hp(0x4100, 114'988);
+    r.on_hp(0x4100, 98'613);
+    TEST_ASSERT_EQ(r.find(0x4100)->live_hp, uint64_t{98'613});
+    TEST_ASSERT_EQ(r.find(0x4100)->max_hp, uint64_t{114'988});
+}
+
 TEST_CASE(Registry, OwnerLoopIsBounded) {
     CombatantRegistry r;
     r.on_spawn(summon(0x4300, 0x4301));

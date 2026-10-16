@@ -204,10 +204,13 @@ struct SpawnSpec {
     uint64_t cur_hp{1'000'000};
     uint64_t max_hp{1'000'000};
     uint32_t owner{0};
+    /// 00 for a corpse coming into view.
+    uint8_t alive{0x01};
 };
 
 /// 41 36: id, mask (kind in its first byte), npc code, fields that vary by kind,
-/// the owner link for summons, the 00 00 02 marker, position, 01, HP.
+/// the owner link for summons, the 00 00 02 marker, position, heading, a u16, the
+/// alive byte, HP.
 inline Bytes spawn_body(const SpawnSpec& s) {
     Bytes b;
     put_varint(b, s.raw_id);
@@ -224,7 +227,9 @@ inline Bytes spawn_body(const SpawnSpec& s) {
     put_f32(b, 1024.5f);
     put_f32(b, -310.25f);
     put_f32(b, 88.0f);
-    b.push_back(0x01);
+    put_f32(b, 258.1f);  // heading
+    put_le16(b, 0xB786);
+    b.push_back(s.alive);
     put_varint(b, s.cur_hp);
     put_varint(b, s.max_hp);
     put_bytes(b, {0x99, 0x98});
@@ -243,11 +248,13 @@ struct DamageSpec {
     uint64_t amount{0};
     std::vector<uint64_t> extra_hits;
     bool pad{false};
+    /// Switch bit 0x08: a u32 follows the damage.
+    bool trailer{false};
 };
 
 inline void put_damage_record(Bytes& b, const DamageSpec& d) {
     put_varint(b, d.target);
-    put_varint(b, d.layout | (d.extra_hits.empty() ? 0u : 0x20u));
+    put_varint(b, d.layout | (d.extra_hits.empty() ? 0u : 0x20u) | (d.trailer ? 0x08u : 0u));
     put_varint(b, 0);  // flag
     put_varint(b, d.actor);
     put_le32(b, d.skill);
@@ -261,6 +268,7 @@ inline void put_damage_record(Bytes& b, const DamageSpec& d) {
     if (d.pad) b.push_back(0x00);
     put_varint(b, 100);  // scalar
     put_varint(b, d.amount);
+    if (d.trailer) put_le32(b, 100);
     if (!d.extra_hits.empty()) {
         put_varint(b, d.extra_hits.size());
         for (const uint64_t h : d.extra_hits) put_varint(b, h);
@@ -278,6 +286,28 @@ inline Bytes damage_body(std::initializer_list<DamageSpec> records) {
         first = false;
         put_damage_record(b, d);
     }
+    return b;
+}
+
+/// 00 8D for anyone but the local player: id, kind 2, one value, stat 0 (HP) as u64.
+inline Bytes hp_body(uint64_t id, uint64_t hp) {
+    Bytes b;
+    put_varint(b, id);
+    put_bytes(b, {0x02, 0x01, 0x00});
+    put_le32(b, static_cast<uint32_t>(hp));
+    put_le32(b, static_cast<uint32_t>(hp >> 32));
+    return b;
+}
+
+/// 00 8D for the local player: id, kind 1, then (stat, u32) pairs.
+inline Bytes self_values_body(uint64_t id) {
+    Bytes b;
+    put_varint(b, id);
+    put_bytes(b, {0x01, 0x02});
+    b.push_back(0x03);
+    put_le32(b, 127300);
+    b.push_back(0x06);
+    put_le32(b, 459500);
     return b;
 }
 

@@ -62,6 +62,8 @@ inline constexpr uint8_t Mechanic = 0x1C;
 [[nodiscard]] constexpr bool carries_owner(uint8_t kind) noexcept { return kind == Summon || kind == SummonAlt; }
 } // namespace spawn_kind
 
+/// 42 36. For a mob it comes about 4 s after its HP (00 8D) reaches 0: the corpse
+/// going, rather than the moment it died.
 struct Death {
     EntityId id{0};
 };
@@ -86,23 +88,17 @@ struct Damage {
     EntityId target{0};
     EntityId actor{0};
     uint32_t skill{0};
-    /// The switch's low four bits: 4..7.
+    /// The switch's low three bits: 4..7.
     uint8_t layout{0};
     bool crit{false};
-    /// hit_modifier bits.
+    /// hit_modifier bits. Only the long layouts (5..7) carry them.
     uint8_t modifiers{0};
     bool back_attack{false};
-    /// The main hit.
+    /// The hit: all of it. A real capture's HP updates (00 8D) fall by this alone.
     uint64_t amount{0};
-    /// The extra hits a multi-hit carries.
+    /// The values behind switch bit 0x20. Not damage: the target's HP does not fall
+    /// by them. Kept for --events while their meaning is unknown.
     std::vector<uint64_t> extra_hits;
-
-    /// The main hit and every extra one.
-    [[nodiscard]] uint64_t total() const noexcept {
-        uint64_t t = amount;
-        for (const uint64_t h : extra_hits) t += h;
-        return t;
-    }
 };
 
 /// A damage-over-time or heal-over-time tick.
@@ -124,9 +120,16 @@ struct PartyRoster {
     std::vector<PartyMember> members;
 };
 
-/// 00 8D, whose layout is not known yet: the bytes, for --unknown.
+/// 00 8D: an entity's current values, sent when they change.
 struct RemainingHp {
-    std::vector<uint8_t> raw;
+    EntityId id{0};
+    /// The local player's own values (resources, by stat codes not yet known). No
+    /// one else is sent these, so they name the local player when 33 36 was missed.
+    bool self{false};
+    /// Anyone else's current HP, exact: an NPC's falls with each hit and reaches 0
+    /// when it dies.
+    bool has_hp{false};
+    uint64_t hp{0};
 };
 
 using Event = std::variant<Heartbeat, Identity, Spawn, Death, MapLoad, Damage, Tick, PartyRoster, RemainingHp>;

@@ -47,6 +47,8 @@ public:
     static constexpr int kMaxDamageRecords = 32;
     /// Most party members believed (an alliance included).
     static constexpr uint64_t kMaxPartyMembers = 24;
+    /// Most values one 00 8D packet is believed to carry.
+    static constexpr uint8_t kMaxEntityValues = 16;
 
     /// Appends the events in `frame` to `out`.
     void parse(const Frame& frame, std::vector<ParsedEvent>& out);

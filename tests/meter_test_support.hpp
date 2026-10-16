@@ -72,6 +72,23 @@ inline constexpr Micros kT0 = 1'792'152'000'000'000ULL;
     return t;
 }
 
+/// 00 8D with someone's current HP.
+[[nodiscard]] inline proto::RemainingHp hp(EntityId id, uint64_t value) {
+    proto::RemainingHp v;
+    v.id = id;
+    v.has_hp = true;
+    v.hp = value;
+    return v;
+}
+
+/// 00 8D with the local player's own values.
+[[nodiscard]] inline proto::RemainingHp self_values(EntityId id) {
+    proto::RemainingHp v;
+    v.id = id;
+    v.self = true;
+    return v;
+}
+
 [[nodiscard]] inline proto::PartyRoster roster(std::initializer_list<const char*> names) {
     proto::PartyRoster r;
     for (const char* n : names) r.members.push_back(proto::PartyMember{n});

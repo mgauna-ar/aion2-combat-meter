@@ -35,15 +35,4 @@ inline std::string hex_dump(std::span<const uint8_t> bytes, const std::string& i
     return out;
 }
 
-/// `bytes` as one line of space-separated hex.
-inline std::string hex_line(std::span<const uint8_t> bytes) {
-    std::string out;
-    char buf[16];
-    for (size_t i = 0; i < bytes.size(); ++i) {
-        std::snprintf(buf, sizeof(buf), i == 0 ? "%02x" : " %02x", unsigned{bytes[i]});
-        out += buf;
-    }
-    return out;
-}
-
 } // namespace aion2::replay

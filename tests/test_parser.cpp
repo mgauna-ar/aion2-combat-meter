@@ -131,12 +131,27 @@ TEST_CASE(Parser, SpawnWithHpAndOwner) {
     TEST_ASSERT(summon.has_hp);
 }
 
+TEST_CASE(Parser, SpawnOfACorpse) {
+    PacketParser p;
+    SpawnSpec corpse;
+    corpse.alive = 0x00;
+    corpse.cur_hp = 0;
+    corpse.max_hp = 119'700;
+    const auto& s = only<Spawn>(parse_one(p, opcode::Spawn, spawn_body(corpse)));
+    TEST_ASSERT(s.has_hp);
+    TEST_ASSERT_EQ(s.cur_hp, uint64_t{0});
+    TEST_ASSERT_EQ(s.max_hp, uint64_t{119'700});
+}
+
 TEST_CASE(Parser, ShortDamageRecord) {
     PacketParser p;
     DamageSpec d;
     d.target = 16500;
     d.actor = 501;
     d.amount = 12345;
+    // The short block's first bytes are a hit id, not modifiers and a direction.
+    d.modifiers = 0x2E;
+    d.direction = 1;
     const auto& dmg = only<Damage>(parse_one(p, opcode::Damage, damage_body({d})));
     TEST_ASSERT_EQ(dmg.target, EntityId{16500});
     TEST_ASSERT_EQ(dmg.actor, EntityId{501});
@@ -145,6 +160,20 @@ TEST_CASE(Parser, ShortDamageRecord) {
     TEST_ASSERT_EQ(dmg.amount, uint64_t{12345});
     TEST_ASSERT_FALSE(dmg.crit);
     TEST_ASSERT_FALSE(dmg.back_attack);
+    TEST_ASSERT_EQ(dmg.modifiers, uint8_t{0});
+}
+
+TEST_CASE(Parser, SwitchBit08IsAFlagOverLayout4) {
+    PacketParser p;
+    DamageSpec d;
+    d.target = 16500;
+    d.actor = 501;
+    d.amount = 1058;
+    d.trailer = true;
+    const auto& dmg = only<Damage>(parse_one(p, opcode::Damage, damage_body({d})));
+    TEST_ASSERT_EQ(dmg.layout, uint8_t{4});
+    TEST_ASSERT_EQ(dmg.amount, uint64_t{1058});
+    TEST_ASSERT_EQ(p.stats().failed, uint64_t{0});
 }
 
 TEST_CASE(Parser, LongCritBackAttackWithPad) {
@@ -182,7 +211,8 @@ TEST_CASE(Parser, MultiRecordAndExtraHits) {
     const auto& second = std::get<Damage>(events[1].event);
     TEST_ASSERT_EQ(second.target, EntityId{16501});
     TEST_ASSERT_EQ(second.extra_hits.size(), size_t{2});
-    TEST_ASSERT_EQ(second.total(), uint64_t{270});
+    // The extra values are not damage: a real target's HP falls by the amount alone.
+    TEST_ASSERT_EQ(second.amount, uint64_t{200});
 }
 
 TEST_CASE(Parser, CastMarkerIsNotDamage) {
@@ -217,14 +247,37 @@ TEST_CASE(Parser, DotAndHotTicks) {
     TEST_ASSERT_EQ(p.stats().failed, uint64_t{1});
 }
 
-TEST_CASE(Parser, DeathMapAndRemainingHp) {
+TEST_CASE(Parser, DeathAndMap) {
     PacketParser p;
     TEST_ASSERT_EQ(only<Death>(parse_one(p, opcode::Death, death_body(16500))).id, EntityId{16500});
     const auto& map = only<MapLoad>(parse_one(p, opcode::MapLoad, map_load_body(3, 610010)));
     TEST_ASSERT_EQ(map.map_id, 610010u);
     TEST_ASSERT(map.is_instance());
-    const Bytes hp = {1, 2, 3};
-    TEST_ASSERT((only<RemainingHp>(parse_one(p, opcode::RemainingHp, hp)).raw == hp));
+}
+
+TEST_CASE(Parser, EntityValuesHpAndSelf) {
+    PacketParser p;
+    const auto& mob = only<RemainingHp>(parse_one(p, opcode::RemainingHp, hp_body(18024, 98'578)));
+    TEST_ASSERT_EQ(mob.id, EntityId{18024});
+    TEST_ASSERT_FALSE(mob.self);
+    TEST_ASSERT(mob.has_hp);
+    TEST_ASSERT_EQ(mob.hp, uint64_t{98'578});
+    const auto& big = only<RemainingHp>(parse_one(p, opcode::RemainingHp, hp_body(18024, 6'000'000'000ULL)));
+    TEST_ASSERT_EQ(big.hp, uint64_t{6'000'000'000ULL});
+
+    const auto& me = only<RemainingHp>(parse_one(p, opcode::RemainingHp, self_values_body(6745)));
+    TEST_ASSERT_EQ(me.id, EntityId{6745});
+    TEST_ASSERT(me.self);
+    TEST_ASSERT_FALSE(me.has_hp);
+    TEST_ASSERT_EQ(p.stats().failed, uint64_t{0});
+
+    Bytes odd_kind = hp_body(100, 5);  // a one-byte id: the kind is byte 1
+    odd_kind[1] = 0x03;
+    (void)parse_one(p, opcode::RemainingHp, odd_kind);
+    Bytes trailing = hp_body(100, 5);
+    trailing.push_back(0x00);
+    (void)parse_one(p, opcode::RemainingHp, trailing);
+    TEST_ASSERT_EQ(p.stats().failed, uint64_t{2});
 }
 
 TEST_CASE(Parser, PartyRosterNames) {

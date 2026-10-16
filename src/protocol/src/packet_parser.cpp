@@ -16,7 +16,12 @@ namespace {
 constexpr uint8_t kLayoutCastMarker = 0;
 constexpr uint8_t kLayoutShort = 4;
 constexpr uint8_t kLayoutLongest = 7;
+/// The switch's layout bits. Bit 0x08 is a flag over them (a u32 follows the
+/// damage), so 0x0C is layout 4.
+constexpr uint64_t kSwitchLayout = 0x07;
 constexpr uint64_t kSwitchExtraHits = 0x20;
+/// The short block is a hit id (u32) and a count (u32). The long one puts the
+/// modifiers, a byte and the direction in front of them.
 constexpr size_t kShortBlock = 8;
 constexpr size_t kLongBlock = 11;
 constexpr uint64_t kDamageTypeCrit = 3;
@@ -26,6 +31,10 @@ constexpr uint32_t kTickSkillScale = 100;
 /// Positions are world coordinates: anything beyond this is not a position.
 constexpr float kMaxCoordinate = 1.0e7f;
 constexpr size_t kPartyMemberPrefix = 10;  // mask, slot, account u64
+/// 00 8D kinds, and the stat that is current HP.
+constexpr uint8_t kValuesSelf = 1;
+constexpr uint8_t kValuesOther = 2;
+constexpr uint8_t kStatHp = 0;
 
 enum class Record : uint8_t { Damage, CastMarker, Failed };
 
@@ -33,7 +42,7 @@ Record read_damage_record(ByteReader& r, Damage& d) {
     d.target = normalize_entity_id(r.varint());
     const uint64_t sw = r.varint();
     if (!r.ok()) return Record::Failed;
-    d.layout = static_cast<uint8_t>(sw & 0x0F);
+    d.layout = static_cast<uint8_t>(sw & kSwitchLayout);
     if (d.layout == kLayoutCastMarker) return Record::CastMarker;
     if (d.layout < kLayoutShort || d.layout > kLayoutLongest) return Record::Failed;
 
@@ -44,8 +53,10 @@ Record read_damage_record(ByteReader& r, Damage& d) {
     d.crit = r.varint() == kDamageTypeCrit;
     const auto block = r.bytes(d.layout == kLayoutShort ? kShortBlock : kLongBlock);
     if (!r.ok()) return Record::Failed;
-    d.modifiers = block[0];
-    d.back_attack = block[2] == kDirectionBack;
+    if (d.layout != kLayoutShort) {
+        d.modifiers = block[0];
+        d.back_attack = block[2] == kDirectionBack;
+    }
 
     if (!r.at_end() && r.rest()[0] == 0x00) r.skip(1);  // optional pad
     (void)r.varint();  // scalar
@@ -99,18 +110,21 @@ std::optional<Spawn> read_spawn(std::span<const uint8_t> body) {
     if (!r.ok()) s.npc_code = 0;
 
     // Position and HP follow the marker 00 (00|40) 02, wherever the fields before
-    // it (which vary by kind) end. The first marker followed by a sane position, 01
-    // and two varints is taken.
+    // it (which vary by kind) end: x, y, z, a heading (f32), a u16, then a byte
+    // that is 01, or 00 for a corpse coming into view (current HP 0), and the
+    // current and max HP. The first marker followed by all of that, sane, is taken.
     for (size_t at = after_mask; at + 3 <= body.size(); ++at) {
         if (body[at] != 0x00 || (body[at + 1] != 0x00 && body[at + 1] != 0x40) || body[at + 2] != 0x02) continue;
         ByteReader p(body.subspan(at + 3));
         const float x = p.f32le();
         const float y = p.f32le();
         const float z = p.f32le();
-        const uint8_t one = p.u8();
+        (void)p.f32le();  // heading
+        (void)p.u16le();
+        const uint8_t alive = p.u8();
         const uint64_t cur = p.varint();
         const uint64_t max = p.varint();
-        if (!p.ok() || one != 0x01 || !plausible_coordinate(x) || !plausible_coordinate(y) ||
+        if (!p.ok() || alive > 0x01 || !plausible_coordinate(x) || !plausible_coordinate(y) ||
             !plausible_coordinate(z) || max == 0 || cur > max) {
             continue;
         }
@@ -134,6 +148,29 @@ std::optional<Spawn> read_spawn(std::span<const uint8_t> body) {
         }
     }
     return s;
+}
+
+/// 00 8D: id, a kind, a count, then that many (stat u8, value). The local player's
+/// own values are kind 1 with u32 values; anyone else's are kind 2 with u64
+/// values, of which stat 0 is current HP.
+std::optional<RemainingHp> read_entity_values(ByteReader& r) {
+    RemainingHp v;
+    v.id = normalize_entity_id(r.varint());
+    const uint8_t kind = r.u8();
+    const uint8_t count = r.u8();
+    if (!r.ok() || v.id == 0 || count == 0 || count > PacketParser::kMaxEntityValues) return std::nullopt;
+    if (kind != kValuesSelf && kind != kValuesOther) return std::nullopt;
+    v.self = kind == kValuesSelf;
+    for (uint8_t i = 0; i < count; ++i) {
+        const uint8_t stat = r.u8();
+        const uint64_t value = v.self ? r.u32le() : r.u64le();
+        if (!v.self && stat == kStatHp) {
+            v.has_hp = true;
+            v.hp = value;
+        }
+    }
+    if (!r.ok() || !r.at_end()) return std::nullopt;
+    return v;
 }
 
 std::optional<PartyRoster> read_party(std::span<const uint8_t> body) {
@@ -284,9 +321,12 @@ bool PacketParser::parse_known(const Frame& frame, std::vector<ParsedEvent>& out
             emit(std::move(*roster));
             return true;
         }
-        case opcode::RemainingHp:
-            emit(RemainingHp{std::vector<uint8_t>(frame.body.begin(), frame.body.end())});
+        case opcode::RemainingHp: {
+            const auto values = read_entity_values(r);
+            if (!values) return false;
+            emit(*values);
             return true;
+        }
         default:
             return false;
     }

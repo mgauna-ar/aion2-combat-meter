@@ -33,7 +33,12 @@ struct Actor {
     EntityId owner{0};
     bool has_hp{false};
     uint64_t spawn_hp{0};
+    /// From the spawn; else the most live HP seen, a lower bound.
     uint64_t max_hp{0};
+    /// The server's own figure (00 8D): exact, where spawn HP minus damage seen is
+    /// an estimate.
+    bool has_live_hp{false};
+    uint64_t live_hp{0};
     bool dead{false};
     /// Learned only from which side it trades damage with.
     Side inferred_side{Side::Unknown};
@@ -48,7 +53,9 @@ struct Actor {
  * its side from the hits it trades: PvE damage only crosses sides, so the other
  * end of a hit with a known side settles it. Hits between two unknowns are held
  * (up to kMaxPendingEdges) and settled when either end becomes known. With no
- * anchor at all, an id in the folded spawn range is taken as an enemy.
+ * anchor at all, an id in the folded spawn range is taken as an enemy. 04 38 also
+ * carries heals, so a hit with a spawned NPC, which only a player trades, overrides
+ * an earlier inference.
  *
  * Names outlive map changes, since they arrive only on loading screens; NPCs and
  * summons are per map and are dropped on one.
@@ -65,6 +72,11 @@ public:
     void on_death(EntityId id);
     void on_revive(EntityId id);
     void on_party(const proto::PartyRoster& roster);
+    /// 00 8D for the local player's own values: `id` is the local player, even if
+    /// the 33 36 that would have named them came before the meter started.
+    void on_self_values(EntityId id);
+    /// 00 8D with someone's current HP.
+    void on_hp(EntityId id, uint64_t hp);
     /// A hit from `actor` to `target`: settles an unknown side from a known one.
     void observe_hit(EntityId actor, EntityId target);
     /// A new map: NPCs, summons and inferred sides go; players and names stay.
@@ -84,14 +96,22 @@ public:
     /// In the party by the roster; the local player always. With no roster, every
     /// player is.
     [[nodiscard]] bool in_party(EntityId id) const;
-    /// The name, or "#id" while it is not known.
+    /// The name; "You" for the local player whose name has not been seen; "#id"
+    /// for anyone else whose name is not known.
     [[nodiscard]] std::string display_name(EntityId id) const;
     [[nodiscard]] size_t actor_count() const noexcept { return m_actors.size(); }
     [[nodiscard]] size_t pending_edges() const noexcept { return m_pending.size(); }
 
 private:
     Actor& get_or_create(EntityId id);
+    /// Makes `canonical` (and `id`, which an alias may map to it) the local player.
+    void set_local(EntityId id, EntityId canonical);
     void set_inferred(EntityId id, Side side);
+    /// Spawned, and on the enemy side: an NPC for certain, not by inference.
+    [[nodiscard]] bool known_npc(EntityId id) const;
+    /// Settles `id` as a player over any earlier inference; identity and spawn
+    /// packets still win.
+    void make_player(EntityId id);
     /// Settles held hits that touch a newly known id, and what that settles in turn.
     void settle_pending(EntityId known);
 

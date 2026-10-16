@@ -94,9 +94,11 @@ struct BossSummary {
     uint32_t npc_code{0};
     std::string label;
     uint64_t max_hp{0};
-    /// Spawn HP less the damage seen since; meaningful when hp_known.
+    /// Meaningful when hp_known: the server's own figure when hp_exact, else spawn
+    /// HP less the damage seen since.
     uint64_t hp{0};
     bool hp_known{false};
+    bool hp_exact{false};
     /// Max HP reaches boss_min_max_hp: the fight counts as a boss fight.
     bool is_boss{false};
     bool killed{false};

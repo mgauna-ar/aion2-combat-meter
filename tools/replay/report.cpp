@@ -88,9 +88,8 @@ void Report::on_frame(const proto::Frame& f, pipeline::FrameOutcome outcome) {
 
     if (m_opt.dump_all || m_opt.dump.count(f.opcode) != 0) {
         dump_frame(f, "");
-    } else if (m_opt.unknown && (outcome == pipeline::FrameOutcome::Failed ||
-                                 outcome == pipeline::FrameOutcome::Unknown ||
-                                 f.opcode == proto::opcode::RemainingHp)) {
+    } else if (m_opt.unknown &&
+               (outcome == pipeline::FrameOutcome::Failed || outcome == pipeline::FrameOutcome::Unknown)) {
         dump_frame(f, outcome == pipeline::FrameOutcome::Failed ? "FAILED" : "");
     }
 }
@@ -119,7 +118,7 @@ void Report::on_event(const proto::ParsedEvent& pe, const meter::CombatantRegist
                             e.is_instance() ? " instance" : "");
             } else if constexpr (std::is_same_v<T, proto::Damage>) {
                 std::printf("%+.3f  damage    %s -> %s %" PRIu64, t, who(e.actor, reg).c_str(),
-                            who(e.target, reg).c_str(), e.total());
+                            who(e.target, reg).c_str(), e.amount);
                 if (!e.extra_hits.empty()) std::printf(" (%zu extra)", e.extra_hits.size());
                 std::printf("%s skill %u layout %u\n", modifiers(e.modifiers, e.crit, e.back_attack).c_str(), e.skill,
                             unsigned{e.layout});
@@ -134,7 +133,11 @@ void Report::on_event(const proto::ParsedEvent& pe, const meter::CombatantRegist
                 }
                 std::printf("\n");
             } else if constexpr (std::is_same_v<T, proto::RemainingHp>) {
-                std::printf("%+.3f  hp?       %s\n", t, hex_line(e.raw).c_str());
+                if (e.self) {
+                    std::printf("%+.3f  self      %s\n", t, who(e.id, reg).c_str());
+                } else if (e.has_hp) {
+                    std::printf("%+.3f  hp        %s %" PRIu64 "\n", t, who(e.id, reg).c_str(), e.hp);
+                }
             }
         },
         pe.event);
@@ -148,7 +151,7 @@ void Report::on_fight(const meter::FightSummary& f) {
     if (f.boss.present()) {
         std::printf("  target %s  max hp %" PRIu64 "%s%s", f.boss.label.c_str(), f.boss.max_hp,
                     f.boss.is_boss ? "  boss" : "", f.boss.killed ? "  killed" : "");
-        if (f.boss.hp_known && !f.boss.killed) std::printf("  hp ~%" PRIu64, f.boss.hp);
+        if (f.boss.hp_known && !f.boss.killed) std::printf("  hp %s%" PRIu64, f.boss.hp_exact ? "" : "~", f.boss.hp);
         std::printf("\n");
     }
     std::printf("  total %" PRIu64 " damage, %.1f dps\n", f.total_damage, f.total_dps);

@@ -135,7 +135,7 @@ void draw_boss(const meter::FightSummary& f, float scale) {
     ImGui::TextUnformatted(label.c_str());
     if (b.hp_known) {
         char overlay[64];
-        std::snprintf(overlay, sizeof(overlay), "%s%s / %s", b.killed ? "" : "~", format_amount(b.hp).c_str(),
+        std::snprintf(overlay, sizeof(overlay), "%s%s / %s", b.killed || b.hp_exact ? "" : "~", format_amount(b.hp).c_str(),
                       format_amount(b.max_hp).c_str());
         ImGui::PushStyleColor(ImGuiCol_PlotHistogram, rgba(colors::BossHp, 0.85f));
         ImGui::PushStyleColor(ImGuiCol_FrameBg, rgba(colors::Background, 0.9f));

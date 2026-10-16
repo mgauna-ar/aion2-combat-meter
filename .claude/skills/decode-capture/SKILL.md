@@ -1,12 +1,13 @@
 ---
 name: decode-capture
-description: Check and fix the AION 2 decoder against a real capture. Use when a .pcap/.pcapng recorded from the game is available, when replay shows parse failures, resyncs or wrong numbers, or when filling in unknowns (class codes, the 00 8D HP packet, npc codes, boss_min_max_hp) - including any work on src/protocol/src/packet_parser.cpp, src/protocol/include/protocol/opcodes.hpp or src/meter/src/class_codes.cpp.
+description: Check and fix the AION 2 decoder against a real capture. Use when a .pcap/.pcapng recorded from the game is available, when replay shows parse failures, resyncs or wrong numbers, or when filling in unknowns (class codes, the damage scale, npc codes, boss_min_max_hp) - including any work on src/protocol/src/packet_parser.cpp, src/protocol/include/protocol/opcodes.hpp or src/meter/src/class_codes.cpp.
 ---
 
 # Decode a real capture
 
-The decoder was written from the community's protocol notes and has been tested only on
-made-up captures. A real one is the ground truth. Captures hold character names: keep
+The decoder was written from the community's protocol notes and checked against one real
+capture (AGENTS.md, "Protocol", lists what that settled and what is still open). A real
+capture is the ground truth. Captures hold character names: keep
 them in `tests/fixtures/local/` (gitignored) and never paste names into commits,
 issues or logs. `--anonymize` prints `#id` instead.
 
@@ -65,9 +66,13 @@ make replay
 - **Failures:** `parsed ...: N failed` names each opcode that failed. Fix those before
   trusting any total.
 
-`--unknown` dumps every unread opcode, `00 8D` included. Line those up with the boss's
-HP to decode it. Once decoded, give `RemainingHp` real fields, and feed them to the
-boss HP in `encounter_engine.cpp` in place of the `~` estimate.
+**Check damage against the server's HP.** `--events` prints an `hp` line (00 8D) after
+each hit on a mob: the target's exact HP. Each drop should match the damage records
+since the last line. In the first capture it was a steady multiple of the damage instead
+(4.5 for one player), and extra-hit values never counted. Recheck this on every capture.
+Comparing whole fights works too: a mob that dies took its max HP.
+
+`--unknown` dumps every opcode the parser does not read.
 
 ## 4. Pin the result
 

@@ -23,18 +23,18 @@ them.
 
 ## 🚧 Status
 
-Version 0.1. The decoder follows the community's notes on the Global client's protocol
-and is tested against made-up captures built from those notes. **It has not yet been
-checked against a real capture.** The first job is to record one and replay it
-(`.claude/skills/decode-capture`). Until then, expect the parser to need fixes, and
-these to be missing:
+Version 0.1. The decoder started from the community's notes on the Global client's
+protocol and has been checked against one real capture: 30 seconds of open-world mobs.
+That capture fixed the spawn and damage layouts and decoded the game's HP packet. More
+captures are needed (`.claude/skills/decode-capture`), and these are still open:
 
+- **Damage scale:** a mob's HP falls by a steady multiple of the damage number the meter
+  reads (4.5 for one player, about 10.6 for others). Which of the two the game shows as
+  your hits is not settled yet, so totals may be off by that factor.
 - **Class names:** players show without a class, because the wire codes for the classes
-  are not in the notes yet.
-- **Exact boss HP:** the boss bar is the HP at spawn minus the damage the meter saw,
-  marked with `~`, until the game's own HP packet is decoded.
+  are not known yet.
 - **Boss threshold:** an enemy with 1,000,000 max HP or more counts as a boss. That
-  number is a guess (`meter.boss_min_max_hp`).
+  number is a guess (`meter.boss_min_max_hp`); open-world mobs have about 120,000.
 
 ## ⚠️ Account safety
 
@@ -179,7 +179,8 @@ Use Borderless Windowed. If it is hidden, press Ctrl+Alt+H.
 
 **My party shows as #12345 instead of names**
 The game sends names mostly on loading screens. Start the meter before you log in or
-teleport, and the names will appear after the next loading screen.
+teleport, and the names will appear after the next loading screen. Until then your own
+row shows as **You**.
 
 **The boss fight says "partial data"**
 On crowded world bosses the server stops sending most players' hits, so the meter

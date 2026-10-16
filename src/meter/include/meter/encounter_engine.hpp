@@ -82,6 +82,8 @@ private:
 
     void on_damage(const proto::Damage& d, Micros ts);
     void on_tick(const proto::Tick& t, Micros ts);
+    /// 00 8D: the local player's id, and HP, whose 0 is a death.
+    void on_values(const proto::RemainingHp& v, Micros ts);
     void on_death(EntityId id, Micros ts);
     void on_map(const proto::MapLoad& m, Micros ts);
     /// A hit from the player side on an enemy, credited to its resolved player.

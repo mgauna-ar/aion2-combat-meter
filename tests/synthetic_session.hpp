@@ -133,17 +133,22 @@ inline Session boss_session() {
         d.amount = amount;
         d.crit = crit;
         d.direction = back ? 1 : 2;
-        d.layout = crit ? 5 : 4;
+        // Only the long layouts carry a direction, as in a real capture.
+        d.layout = back ? 6 : crit ? 5 : 4;
         const Bytes frame = opcode_frame(Damage, damage_body({d}));
         script.emplace_back(t, bundled ? bundle_frame(frame) : frame);
         truth.damage[credit_to] += amount;
         if (truth.first_hit_s == 0) truth.first_hit_s = t;
         truth.last_hit_s = t;
         boss_taken += amount;
-        if (boss_taken >= kBossHp) {
+        // The server sends the boss's HP after each hit; 0 is the kill, and the
+        // despawn (42 36) follows about 4 s later.
+        const uint64_t hp = boss_taken >= kBossHp ? 0 : kBossHp - boss_taken;
+        script.emplace_back(t + 0.001, opcode_frame(proto::opcode::RemainingHp, hp_body(boss, hp)));
+        if (hp == 0) {
             dead = true;
             truth.death_s = t;
-            script.emplace_back(t + 0.001, opcode_frame(proto::opcode::Death, death_body(boss)));
+            script.emplace_back(t + 4.1, opcode_frame(proto::opcode::Death, death_body(boss)));
         }
     };
 
