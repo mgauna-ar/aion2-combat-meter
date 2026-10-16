@@ -1,0 +1,8 @@
+# LF everywhere, Windows checkouts included: CI diffs the replay tool's output
+# against tests/golden byte for byte.
+* text=auto eol=lf
+
+*.png binary
+*.ico binary
+*.pcap binary
+*.pcapng binary

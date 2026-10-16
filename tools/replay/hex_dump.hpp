@@ -11,7 +11,7 @@ namespace aion2::replay {
 /// starting with `indent`.
 inline std::string hex_dump(std::span<const uint8_t> bytes, const std::string& indent = "    ") {
     std::string out;
-    char buf[16];
+    char buf[32];
     for (size_t line = 0; line < bytes.size(); line += 16) {
         std::snprintf(buf, sizeof(buf), "%04zx  ", line);
         out += indent;
@@ -38,7 +38,7 @@ inline std::string hex_dump(std::span<const uint8_t> bytes, const std::string& i
 /// `bytes` as one line of space-separated hex.
 inline std::string hex_line(std::span<const uint8_t> bytes) {
     std::string out;
-    char buf[4];
+    char buf[16];
     for (size_t i = 0; i < bytes.size(); ++i) {
         std::snprintf(buf, sizeof(buf), i == 0 ? "%02x" : " %02x", unsigned{bytes[i]});
         out += buf;

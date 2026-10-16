@@ -45,7 +45,9 @@ struct HistorySettings {
 struct AppSettings {
     CaptureSettings capture;
     OverlaySettings overlay;
-    meter::MeterSettings meter;
+    /// Spelled from aion2:: because GCC rejects a member named `meter` after an
+    /// unqualified `meter::` in the same class ("changes meaning").
+    aion2::meter::MeterSettings meter;
     HistorySettings history;
 };
 

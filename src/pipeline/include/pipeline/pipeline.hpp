@@ -29,7 +29,9 @@ enum class FrameOutcome : uint8_t {
 
 struct PipelineOptions {
     DemuxOptions demux;
-    meter::MeterSettings meter;
+    /// Spelled from aion2:: because GCC rejects a member named `meter` after an
+    /// unqualified `meter::` in the same class ("changes meaning").
+    aion2::meter::MeterSettings meter;
 };
 
 /// Where the capture stands, for the overlay's status line.
