@@ -1,0 +1,38 @@
+#include <windows.h>
+#include "aion2/version.hpp"
+
+// 1. Application icon: tray, taskbar and Explorer (tools/gen_app_icon.py draws it).
+101 ICON "app.ico"
+
+// 2. Manifest: Per-Monitor V2 DPI awareness, Windows 10/11, runs as the invoker.
+1 RT_MANIFEST "app.manifest"
+
+// 3. Version information.
+VS_VERSION_INFO VERSIONINFO
+FILEVERSION     AION2_VERSION_MAJOR,AION2_VERSION_MINOR,AION2_VERSION_PATCH,0
+PRODUCTVERSION  AION2_VERSION_MAJOR,AION2_VERSION_MINOR,AION2_VERSION_PATCH,0
+FILEFLAGSMASK   0x3fL
+FILEFLAGS       0x0L
+FILEOS          VOS_NT_WINDOWS32
+FILETYPE        VFT_APP
+FILESUBTYPE     VFT2_UNKNOWN
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904b0"
+        BEGIN
+            VALUE "CompanyName",      "aion2-combat-meter contributors\0"
+            VALUE "FileDescription",  "AION 2 Combat Meter (passive, read-only)\0"
+            VALUE "FileVersion",      AION2_VERSION_STRING
+            VALUE "InternalName",     "aion2-combat-meter\0"
+            VALUE "LegalCopyright",   "Copyright (C) 2026 aion2-combat-meter contributors, MIT License\0"
+            VALUE "OriginalFilename", "aion2-combat-meter.exe\0"
+            VALUE "ProductName",      "AION 2 Combat Meter\0"
+            VALUE "ProductVersion",   AION2_VERSION_STRING
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 1200
+    END
+END

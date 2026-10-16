@@ -1,0 +1,184 @@
+name: CI & Release
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*.*.*' ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+# Read-only by default; only the release job may write to the repository.
+permissions:
+  contents: read
+
+# A newer push to the same branch or pull request cancels the run it supersedes. Tag
+# runs build and publish a release, so they are never cancelled.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+jobs:
+  build-linux:
+    name: Linux ${{ matrix.cxx }} Build & Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        cxx: [ clang++, g++ ]
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v7
+
+      - name: Show Compiler
+        run: ${{ matrix.cxx }} --version
+
+      # Unit tests with -Werror, the header and UI syntax checks, the forbidden-API
+      # check and the replay smoke test against tests/golden.
+      - name: Build & Test (make)
+        run: make -j"$(nproc)" CXX=${{ matrix.cxx }} test
+
+  # The CMake build off Windows, the non-MSVC branch of aion2_warnings included,
+  # which the Makefile jobs never configure.
+  build-linux-cmake:
+    name: Linux CMake Build & Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v7
+
+      - name: Configure CMake
+        run: >
+          cmake -B build -S .
+          -DCMAKE_CXX_COMPILER=clang++
+          -DCMAKE_BUILD_TYPE=Release
+          -DBUILD_TESTS=ON
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Run Unit Tests (CTest)
+        run: ctest --test-dir build --output-on-failure
+
+  sanitizers:
+    name: Linux ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: ThreadSanitizer
+            target: tsan
+          - name: AddressSanitizer + UBSan
+            target: asan
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v7
+
+      # The runner's 32-bit mmap ASLR entropy breaks the LLVM sanitizer runtimes'
+      # shadow memory mapping ("unexpected memory mapping").
+      - name: Lower mmap ASLR Entropy
+        run: sudo sysctl -w vm.mmap_rnd_bits=28
+
+      - name: Build & Test (make ${{ matrix.target }})
+        run: make -j"$(nproc)" CXX=clang++ ${{ matrix.target }}
+
+  build-windows:
+    name: Windows MSVC Build, Test & Package
+    runs-on: windows-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v7
+
+      - name: Configure CMake
+        run: >
+          cmake -B build -S .
+          -A x64
+          -DBUILD_TESTS=ON
+
+      - name: Build All Targets (Release)
+        run: cmake --build build --config Release --parallel
+
+      - name: Run Unit Tests (CTest)
+        run: ctest --test-dir build -C Release --output-on-failure
+
+      # The replay tool on the made-up boss fight, as `make replay-smoke` does.
+      - name: Replay Smoke Test
+        shell: bash
+        run: |
+          ./build/bin/Release/aion2meter-synth.exe build/synthetic.pcapng
+          ./build/bin/Release/aion2meter-replay.exe build/synthetic.pcapng --fights --quiet | tr -d '\r' > build/fights.txt
+          diff -u tests/golden/synthetic_fights.txt build/fights.txt
+
+      # The archive's contents are the install() rules in CMakeLists.txt.
+      - name: Package (CPack)
+        run: cpack --config build/CPackConfig.cmake -G ZIP -C Release -B dist
+
+      - name: SHA-256 of the Package
+        shell: bash
+        run: sha256sum dist/aion2-combat-meter-windows-x64.zip | tee dist/SHA256SUMS.txt
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: aion2-combat-meter-windows-x64
+          path: |
+            build/bin/Release/aion2-combat-meter.exe
+            build/bin/Release/aion2meter-replay.exe
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload Release Package
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/upload-artifact@v7
+        with:
+          name: aion2-combat-meter-release
+          path: |
+            dist/aion2-combat-meter-windows-x64.zip
+            dist/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 1
+
+  release:
+    name: Publish GitHub Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [ build-windows, build-linux, build-linux-cmake, sanitizers ]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v7
+
+      # include/aion2/version.hpp is the one place the version is written; a tag that
+      # disagrees would publish binaries reporting another version.
+      - name: Check Tag Matches Version
+        run: |
+          version=$(sed -n 's/^#define AION2_VERSION_STRING "\(.*\)"$/\1/p' include/aion2/version.hpp)
+          if [ "${GITHUB_REF_NAME#v}" != "$version" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match AION2_VERSION_STRING \"$version\" in include/aion2/version.hpp"
+            exit 1
+          fi
+
+      - name: Download Release Package
+        uses: actions/download-artifact@v8
+        with:
+          name: aion2-combat-meter-release
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          files: |
+            aion2-combat-meter-windows-x64.zip
+            SHA256SUMS.txt
+          generate_release_notes: true

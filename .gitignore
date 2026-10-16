@@ -1,0 +1,39 @@
+# Build outputs
+build/
+bin/
+out/
+*.exe
+*.dll
+*.so
+*.dylib
+*.pdb
+*.ilk
+*.exp
+*.lib
+*.a
+*.o
+*.obj
+
+# Runners
+aion2_test_runner
+aion2meter-replay
+
+# Captures hold character names: never commit one, anywhere.
+*.pcap
+*.pcapng
+tests/fixtures/local/
+
+# IDE & OS
+.DS_Store
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+
+# Local artifacts
+*.log
+*.prev.log
+
+# AI Agent Working Files
+.plans/

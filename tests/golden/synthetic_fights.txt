@@ -1,0 +1,9 @@
+
+fight 1  map 610010  at +5.00 s  47.60 s  end boss_killed
+  target NPC #662316  max hp 3000000  boss  killed
+  total 3005385 damage, 63138.3 dps
+  #  name             cls        damage        dps  share   hits  crit%  back%   max hit
+  1  Lumiel           ?         1180680    24804.2  39.3%     96   20.8    0.0     13968
+  2  Ariel            ?          950720    19973.1  31.6%     96   25.0   33.3     10998  (you)
+  3  Zikel            ?          873985    18361.0  29.1%    143    0.0   33.6      8479
+  capture clean: 0 gap bytes, 0 resyncs, 0 bundle errors
