@@ -5,6 +5,7 @@
 #include "protocol/opcodes.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <optional>
 #include <string>
@@ -20,10 +21,11 @@ constexpr uint8_t kLayoutLongest = 7;
 /// damage), so 0x0C is layout 4.
 constexpr uint64_t kSwitchLayout = 0x07;
 constexpr uint64_t kSwitchExtraHits = 0x20;
-/// The short block is a hit id (u32) and a count (u32). The long one puts the
-/// modifiers, a byte and the direction in front of them.
-constexpr size_t kShortBlock = 8;
-constexpr size_t kLongBlock = 11;
+/// The block after the damage type, by layout 4..7. Layout 4's is a hit id (u32)
+/// and a count (u32); the longer ones put the modifiers, a byte and the direction
+/// in front. Layout 6's was seen in a real capture, followed by the 00 pad; 5 and 7
+/// are as NOIA2, a maintained public meter, reads them.
+constexpr std::array<size_t, 4> kBlockSize{8, 12, 10, 14};
 constexpr uint64_t kDamageTypeCrit = 3;
 constexpr uint8_t kDirectionBack = 1;
 /// The skill code of a tick is the skill id times this.
@@ -51,7 +53,7 @@ Record read_damage_record(ByteReader& r, Damage& d) {
     d.skill = r.u32le();
     (void)r.u8();  // hit uid
     d.crit = r.varint() == kDamageTypeCrit;
-    const auto block = r.bytes(d.layout == kLayoutShort ? kShortBlock : kLongBlock);
+    const auto block = r.bytes(kBlockSize[d.layout - kLayoutShort]);
     if (!r.ok()) return Record::Failed;
     if (d.layout != kLayoutShort) {
         d.modifiers = block[0];

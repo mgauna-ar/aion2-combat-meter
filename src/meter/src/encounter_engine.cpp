@@ -43,6 +43,7 @@ void EncounterEngine::on_event(const proto::ParsedEvent& event) {
             } else if constexpr (std::is_same_v<T, proto::Spawn>) {
                 m_registry.on_spawn(e);
                 m_damage_since_spawn.erase(e.id);
+                m_hp_loss[e.id] = HpLoss{e.has_hp, e.cur_hp, false, 0, 0};
             } else if constexpr (std::is_same_v<T, proto::Death>) {
                 on_death(e.id, ts);
             } else if constexpr (std::is_same_v<T, proto::MapLoad>) {
@@ -60,8 +61,11 @@ void EncounterEngine::on_event(const proto::ParsedEvent& event) {
         event.event);
 }
 
+void EncounterEngine::note_hit_on(EntityId target) { m_hp_loss[target].hit_since = true; }
+
 void EncounterEngine::on_damage(const proto::Damage& d, Micros ts) {
     if (d.actor == 0 || d.target == 0) return;
+    note_hit_on(d.target);
     m_registry.observe_hit(d.actor, d.target);
     const uint64_t amount = d.amount;
     if (amount == 0) return;
@@ -71,6 +75,7 @@ void EncounterEngine::on_damage(const proto::Damage& d, Micros ts) {
 
 void EncounterEngine::on_tick(const proto::Tick& t, Micros ts) {
     if (t.heal || t.amount == 0 || t.actor == 0 || t.target == 0) return;
+    note_hit_on(t.target);
     m_registry.observe_hit(t.actor, t.target);
     m_damage_since_spawn[m_registry.resolve(t.target)] += t.amount;
     credit(t.actor, t.target, t.amount, nullptr, ts);
@@ -119,6 +124,14 @@ void EncounterEngine::on_values(const proto::RemainingHp& v, Micros ts) {
     if (v.self) m_registry.on_self_values(v.id);
     if (!v.has_hp) return;
     m_registry.on_hp(v.id, v.hp);
+    HpLoss& loss = m_hp_loss[v.id];
+    if (loss.known && v.hp < loss.last) {
+        loss.lost += loss.last - v.hp;
+        if (!loss.hit_since) loss.lost_unseen += loss.last - v.hp;
+    }
+    loss.known = true;
+    loss.last = v.hp;
+    loss.hit_since = false;
     // HP reaching 0 is the death; 42 36 follows seconds later, with the corpse.
     if (v.hp == 0) on_death(v.id, ts);
 }
@@ -145,6 +158,7 @@ void EncounterEngine::on_map(const proto::MapLoad& m, Micros ts) {
     m_map_id = m.map_id;
     m_registry.on_map_change();
     m_damage_since_spawn.clear();
+    m_hp_loss.clear();
 }
 
 bool EncounterEngine::party_wiped(const Fight& fight) const {
@@ -279,12 +293,13 @@ FightSummary EncounterEngine::summarize(const Fight& fight, bool live, EndReason
     s.quality.resyncs = grew(m_counters.resyncs, a.resyncs);
     s.quality.bundle_errors = grew(m_counters.bundle_errors, a.bundle_errors);
     s.quality.dropped_packets = grew(m_counters.dropped_packets, a.dropped_packets);
+    // Not spawn HP against damage seen: HP falls by several times the damage
+    // records' numbers, so that would call every boss partial.
     if (s.boss.killed && s.boss.is_boss) {
-        if (const Actor* boss = m_registry.find(s.boss.id); boss != nullptr && boss->has_hp && boss->spawn_hp > 0) {
-            const auto seen = m_damage_since_spawn.find(s.boss.id);
-            const uint64_t taken = seen == m_damage_since_spawn.end() ? 0 : seen->second;
-            s.quality.partial = static_cast<double>(taken) <
-                                m_settings.partial_damage_ratio * static_cast<double>(boss->spawn_hp);
+        if (const auto loss = m_hp_loss.find(s.boss.id); loss != m_hp_loss.end() && loss->second.lost > 0) {
+            const auto& l = loss->second;
+            const auto seen = static_cast<double>(l.lost - l.lost_unseen);
+            s.quality.partial = seen < m_settings.partial_damage_ratio * static_cast<double>(l.lost);
         }
     }
     return s;

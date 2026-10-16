@@ -159,14 +159,34 @@ TEST_CASE(Engine, LocalPlayerFromSelfValues) {
     TEST_ASSERT_EQ(s.combatants[0].name, std::string("You"));
 }
 
-TEST_CASE(Engine, KilledBossWithLittleDamageSeenIsPartial) {
+TEST_CASE(Engine, HpLostWithoutHitsSeenIsPartial) {
     EncounterEngine e = setup();
     e.on_event(ev(at_s(1), hit(kMe, kBoss, 100'000)));
-    e.on_event(ev(at_s(5), proto::Death{kBoss}));
+    e.on_event(ev(at_s(1), hp(kBoss, 4'000'000)));
+    // The server sends the boss's HP falling, but not the hits that did it.
+    e.on_event(ev(at_s(2), hp(kBoss, 2'000'000)));
+    e.on_event(ev(at_s(3), hp(kBoss, 500'000)));
+    e.on_event(ev(at_s(4), hit(kMe, kBoss, 100'000)));
+    e.on_event(ev(at_s(4), hp(kBoss, 0)));
     e.tick(at_s(10));
     const FightSummary s = e.take_finished().at(0);
     TEST_ASSERT(s.quality.partial);
     TEST_ASSERT_FALSE(s.quality.clean());
+}
+
+TEST_CASE(Engine, HpFallingByAMultipleOfDamageIsNotPartial) {
+    // As in a real capture: every HP drop follows a hit, and is 4.5 times it.
+    EncounterEngine e = setup();
+    uint64_t hp_left = kBossHp;
+    for (int i = 1; hp_left > 0; ++i) {
+        e.on_event(ev(at_s(i), hit(kMe, kBoss, 100'000)));
+        hp_left = hp_left > 450'000 ? hp_left - 450'000 : 0;
+        e.on_event(ev(at_s(i), hp(kBoss, hp_left)));
+    }
+    e.tick(at_s(30));
+    const FightSummary s = e.take_finished().at(0);
+    TEST_ASSERT(s.boss.killed);
+    TEST_ASSERT_FALSE(s.quality.partial);
 }
 
 TEST_CASE(Engine, MapChangeEndsFightButTeleportDoesNot) {

@@ -159,9 +159,13 @@ All of it lives in `src/protocol`. `opcodes.hpp` is the one place opcodes are sp
     list follows.
   - **Damage type:** 3 is a crit.
   - **Block:** layout 4 has 8 bytes: a hit id (u32, counting up) and a count (u32).
-    Layouts 5–7 put 3 more bytes in front: the modifiers (0x02 parry, 0x04 perfect,
-    0x08 double, 0x20 heavy; 0x80 seen, meaning unknown), a byte, and the direction
-    (1 back, 2 front, 0 none). Layout 4 carries no modifiers or direction.
+    Layouts 5, 6 and 7 have 12, 10 and 14 bytes (6 seen in a capture; 5 and 7 as
+    NOIA2 reads them), starting with the modifiers (0x02 parry, 0x04 perfect, 0x08
+    double, 0x20 heavy; 0x80 seen, meaning unknown), a byte, and the direction (1
+    back, 2 front, 0 none). Layout 4 carries no modifiers or direction.
+    waffle_meter reads the flag byte as rotated by a 2026-07 patch, and says a
+    lifesteal varint of 1–3 bytes can come before the direction; neither is
+    confirmed here.
   - **Damage:** an optional 00 pad, then a scalar varint (about 10,000: 10,000 for a
     mob, 10,250 or 10,910 for players), then the damage varint.
   - **Tail:** with 0x20, a count and that many varints. They are not damage: the
@@ -169,10 +173,11 @@ All of it lives in `src/protocol`. `opcodes.hpp` is the one place opcodes are sp
     that `01 00` as "another record follows", and no capture has shown one yet.
   - **It carries heals too:** a support skill on an ally looks like any hit, and the
     ally's HP rises. Side inference must not trust a record between two players.
-  - **Scale, unsettled:** a mob's HP (00 8D) falls by a steady multiple of the damage
-    varint: exactly 4.5 for one player, about 10.6 for two others, 1 for a mob hitting
-    a player. The multiple is not anywhere in the record. Whether the game shows the
-    varint or the HP drop as the hit decides which the meter should count.
+  - **Scale:** a mob's HP (00 8D) falls by a steady multiple of the damage varint:
+    exactly 4.5 for one player, about 10.6 for two others, 1 for a mob hitting a
+    player. The multiple is not anywhere in the record. The public meters (NOIA2,
+    waffle_meter) count the varint unscaled and add no extra-hit values, as we do.
+    Never compare damage with HP: compare HP with HP.
 - **Tick `05 38`:** target varint, effect u8, actor varint, a varint of unknown meaning,
   skill u32 (×100), amount varint.
   - Effects 02 and 0A are damage; 01, 09 and 0B are heals.
@@ -204,7 +209,8 @@ All of it lives in `src/protocol`. `opcodes.hpp` is the one place opcodes are sp
 - whether the "optional 00 pad" can be confused with a scalar of 0;
 - whether `npc_code` is the u24 right after the spawn mask: every open-world mob in the
   first capture read 8206, and they may all have been one kind of mob;
-- the damage scale (above): ask what the game shows, or compare with its own meter;
+- the damage scale (above): the varint is what the public meters count; the game's own
+  meter has not been compared yet;
 - the layout of `33 36`: the first capture started after login, so it had none;
 - multi-record `04 38` packets;
 - the class codes (`meter/class_codes.cpp` is empty);
@@ -246,8 +252,9 @@ All of it lives in `src/protocol`. `opcodes.hpp` is the one place opcodes are sp
     HP minus all damage seen since the spawn, shown with `~`.
   - A mob that spawned before the meter started has no max HP; the most 00 8D HP seen
     stands in for it.
-  - **Partial:** a killed boss that took less than `partial_damage_ratio` of its spawn HP
-    in seen damage marks the fight partial.
+  - **Partial:** a killed boss that lost less than `partial_damage_ratio` of its HP (by
+    00 8D) with a hit seen since the HP figure before marks the fight partial. It is
+    HP against HP: damage and HP are not in the same units.
 - **History:**
   - What is saved: boss fights, and fights of at least `min_saved_duration_s`.
   - Each fight is one JSON file (`"v":1`), written atomically, plus a line appended to

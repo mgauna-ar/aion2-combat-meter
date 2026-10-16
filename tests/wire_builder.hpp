@@ -260,11 +260,14 @@ inline void put_damage_record(Bytes& b, const DamageSpec& d) {
     put_le32(b, d.skill);
     b.push_back(0x07);  // hit uid
     put_varint(b, d.crit ? 3 : 1);
-    const size_t block = d.layout == 4 ? 8 : 11;
+    // Layouts 4..7. The filler is not zero, so a parser reading the wrong size
+    // takes it for the pad, the scalar or the damage and gets the amount wrong.
+    constexpr size_t kBlockSize[] = {8, 12, 10, 14};
+    const size_t block = kBlockSize[d.layout - 4];
     b.push_back(d.modifiers);
     b.push_back(0x00);
     b.push_back(d.direction);
-    for (size_t i = 3; i < block; ++i) b.push_back(0x00);
+    for (size_t i = 3; i < block; ++i) b.push_back(0x5A);
     if (d.pad) b.push_back(0x00);
     put_varint(b, 100);  // scalar
     put_varint(b, d.amount);

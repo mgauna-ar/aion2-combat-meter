@@ -22,8 +22,8 @@ struct MeterSettings {
     uint64_t boss_min_max_hp{1'000'000};
     /// Fights without a boss are saved when at least this long.
     double min_saved_duration_s{20.0};
-    /// A killed boss that took less than this share of its HP in damage we saw
-    /// makes the fight's data partial.
+    /// A killed boss that lost less than this share of its HP (by the server's HP
+    /// figures) with hits we saw makes the fight's data partial.
     double partial_damage_ratio{0.7};
     /// End the fight when every party member has died. Off until captures show
     /// how revives look on the wire.

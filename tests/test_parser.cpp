@@ -194,6 +194,25 @@ TEST_CASE(Parser, LongCritBackAttackWithPad) {
     TEST_ASSERT_EQ(dmg.amount, uint64_t{99999});
 }
 
+TEST_CASE(Parser, EachLayoutHasItsBlockSize) {
+    for (const uint8_t layout : {uint8_t{4}, uint8_t{5}, uint8_t{6}, uint8_t{7}}) {
+        for (const bool pad : {false, true}) {
+            PacketParser p;
+            DamageSpec d;
+            d.target = 16500;
+            d.actor = 502;
+            d.layout = layout;
+            d.direction = 1;
+            d.amount = 3646;
+            d.pad = pad;
+            const auto& dmg = only<Damage>(parse_one(p, opcode::Damage, damage_body({d})));
+            TEST_ASSERT_EQ(dmg.layout, layout);
+            TEST_ASSERT_EQ(dmg.amount, uint64_t{3646});
+            TEST_ASSERT_EQ(dmg.back_attack, layout != 4);
+        }
+    }
+}
+
 TEST_CASE(Parser, MultiRecordAndExtraHits) {
     PacketParser p;
     DamageSpec a;

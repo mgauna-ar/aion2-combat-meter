@@ -106,6 +106,20 @@ private:
     /// Damage seen landing on each entity since its spawn, from anyone: the boss's
     /// HP estimate subtracts it from the spawn HP.
     std::unordered_map<EntityId, uint64_t> m_damage_since_spawn;
+    /// What the server's HP figures (00 8D) say an entity lost, and how much of it
+    /// came with no hit seen since the figure before. Those amounts are in HP, which
+    /// falls by a steady multiple of the damage records' numbers, so the share that
+    /// came with hits is the one comparison that holds without knowing the multiple.
+    struct HpLoss {
+        bool known{false};
+        uint64_t last{0};
+        bool hit_since{false};
+        uint64_t lost{0};
+        uint64_t lost_unseen{0};
+    };
+    std::unordered_map<EntityId, HpLoss> m_hp_loss;
+    /// A hit (or heal) on `target` was seen: the next HP change is accounted for.
+    void note_hit_on(EntityId target);
     std::vector<FightSummary> m_finished;
     std::deque<FightSummary> m_recent;
     uint64_t m_recent_revision{0};

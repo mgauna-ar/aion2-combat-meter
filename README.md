@@ -29,8 +29,9 @@ That capture fixed the spawn and damage layouts and decoded the game's HP packet
 captures are needed (`.claude/skills/decode-capture`), and these are still open:
 
 - **Damage scale:** a mob's HP falls by a steady multiple of the damage number the meter
-  reads (4.5 for one player, about 10.6 for others). Which of the two the game shows as
-  your hits is not settled yet, so totals may be off by that factor.
+  reads (4.5 for one player, about 10.6 for others). The public meters count the same
+  number with no multiple, so the totals match theirs; a check against the game's own
+  meter is still to do.
 - **Class names:** players show without a class, because the wire codes for the classes
   are not known yet.
 - **Boss threshold:** an enemy with 1,000,000 max HP or more counts as a boss. That
@@ -142,7 +143,7 @@ overlay. Edit it while the meter is closed. Out-of-range values are clamped.
 | `kill_grace_s` | 2 | Hits after the boss dies still count for this long. |
 | `boss_min_max_hp` | 1000000 | Max HP that makes an enemy a boss. A guess until real captures calibrate it. |
 | `min_saved_duration_s` | 20 | A fight with no boss is saved if it lasts at least this long. |
-| `partial_damage_ratio` | 0.7 | A boss that dies having taken less than this share of its HP in seen damage marks the fight "partial data". |
+| `partial_damage_ratio` | 0.7 | A boss that dies having lost less than this share of its HP with hits the meter saw (by the game's own HP updates) marks the fight "partial data". |
 | `wipe_detection` | false | End the fight when every party member is dead. Off until real captures show how revives look on the wire. |
 | `memory_history` | 10 | Finished fights kept in memory. |
 

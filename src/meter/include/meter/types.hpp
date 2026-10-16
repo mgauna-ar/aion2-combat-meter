@@ -118,7 +118,7 @@ struct CaptureQuality {
     uint64_t resyncs{0};
     uint64_t bundle_errors{0};
     uint64_t dropped_packets{0};
-    /// The boss died having taken far less damage than it had HP: the server did
+    /// The boss died having lost much of its HP with no hits seen: the server did
     /// not send everyone's hits (crowded world bosses do this).
     bool partial{false};
 
