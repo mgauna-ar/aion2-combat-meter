@@ -91,8 +91,8 @@ src/protocol/    aion2::proto
     byte_reader, lz4_block, frame_decoder, opcodes.hpp, events.hpp, entity_id, identity,
     packet_parser
 src/meter/       aion2::meter
-    types, class_codes, combatant_registry, encounter_engine, meter_settings,
-    fight_json, history_store
+    types, class_codes, skill_names (data/skills.tsv → skill_table.inc), combatant_registry,
+    encounter_engine, meter_settings, fight_json, history_store
 src/pipeline/    aion2::pipeline   stream_demux (flows -> frames), pipeline (all of it)
 src/app/         aion2::app
     app_settings, app_runtime (threads, history, recording), display_format,
@@ -102,6 +102,7 @@ tools/replay/    aion2meter-replay (every platform)
 tools/synth/     aion2meter-synth: writes the tests' made-up boss fight as a pcapng
 tools/screenshots/  renders docs/images from overlay_view (software rasterizer from ffxiv-hub)
 tools/check_forbidden_apis.sh, tools/gen_app_icon.py
+tools/gen_skill_table.py         skills.tsv → skill_table.inc (`make test` checks they agree)
 tests/           TEST_CASE framework (ported), one test_<concern>.cpp per area
 ```
 
@@ -182,6 +183,16 @@ All of it lives in `src/protocol`. `opcodes.hpp` is the one place opcodes are sp
     player. The multiple is not anywhere in the record. The public meters (NOIA2,
     waffle_meter) count the varint unscaled and add no extra-hit values, as we do.
     Never compare damage with HP: compare HP with HP.
+- **Skill codes** (in 04 38 and 05 38):
+  - 8 digits. The first two are the class: 11 Gladiator, 12 Templar, 13 Assassin,
+    14 Ranger, 15 Sorcerer, 16 Elementalist (the enum's Spiritmaster), 17 Cleric,
+    18 Chanter, 19 Brawler.
+  - `code / 10000` is the skill; the low four digits are a variant (12240340 and
+    12240347 are both Judgment).
+  - A spirit's attacks (1699xxxx) carry its summoner's class digits and have no name.
+  - Names come from `src/meter/data/skills.tsv`, taken from aion2.app's skill
+    database. Checked against the first capture: every Templar and Elementalist code
+    resolved to that class.
 - **Tick `05 38`:** target varint, effect u8, actor varint, a varint of unknown meaning,
   skill u32 (×100), amount varint.
   - Effects 02 and 0A are damage; 01, 09 and 0B are heals.
@@ -218,7 +229,8 @@ All of it lives in `src/protocol`. `opcodes.hpp` is the one place opcodes are sp
   meter has not been compared yet;
 - the layout of `33 36`: the first capture started after login, so it had none;
 - multi-record `04 38` packets;
-- the class codes (`meter/class_codes.cpp` is empty);
+- the class codes in 33 36 / 45 36 (`meter/class_codes.cpp` is empty; skill codes
+  give the class instead);
 - the right `boss_min_max_hp`;
 - whether the folded id range means anything: in the first capture NPC and player ids
   were all small numbers, side by side, none folded;

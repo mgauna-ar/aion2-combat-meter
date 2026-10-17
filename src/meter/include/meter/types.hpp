@@ -22,6 +22,8 @@ enum class AionClass : uint8_t {
     Spiritmaster,
     Cleric,
     Chanter,
+    /// Skill codes 19xxxxxx: listed by the skill database, not yet seen on Global.
+    Brawler,
 };
 
 [[nodiscard]] std::string_view class_name(AionClass c) noexcept;

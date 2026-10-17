@@ -15,6 +15,7 @@ Rgb class_color(meter::AionClass cls) noexcept {
         case meter::AionClass::Spiritmaster: return {0.80f, 0.45f, 0.75f};
         case meter::AionClass::Cleric: return {0.95f, 0.88f, 0.55f};
         case meter::AionClass::Chanter: return {0.30f, 0.80f, 0.75f};
+        case meter::AionClass::Brawler: return {0.88f, 0.36f, 0.32f};
         case meter::AionClass::Unknown: break;
     }
     return colors::Unknown;

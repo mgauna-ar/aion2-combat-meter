@@ -13,16 +13,18 @@ struct ClassNames {
     std::string_view shorthand;
 };
 
-constexpr std::array<ClassNames, 9> kClassNames{{
+/// Spiritmaster's display name is the one the skill data uses for codes 16xxxxxx.
+constexpr std::array<ClassNames, 10> kClassNames{{
     {AionClass::Unknown, "Unknown", "?"},
     {AionClass::Gladiator, "Gladiator", "GLA"},
     {AionClass::Templar, "Templar", "TEM"},
     {AionClass::Assassin, "Assassin", "ASN"},
     {AionClass::Ranger, "Ranger", "RAN"},
     {AionClass::Sorcerer, "Sorcerer", "SOR"},
-    {AionClass::Spiritmaster, "Spiritmaster", "SPM"},
+    {AionClass::Spiritmaster, "Elementalist", "ELE"},
     {AionClass::Cleric, "Cleric", "CLR"},
     {AionClass::Chanter, "Chanter", "CHN"},
+    {AionClass::Brawler, "Brawler", "BRW"},
 }};
 
 constexpr std::array<std::pair<EndReason, std::string_view>, 7> kEndReasons{{
@@ -55,6 +57,7 @@ AionClass class_from_name(std::string_view name) noexcept {
     for (const auto& n : kClassNames) {
         if (n.name == name) return n.cls;
     }
+    if (name == "Spiritmaster") return AionClass::Spiritmaster;
     return AionClass::Unknown;
 }
 
