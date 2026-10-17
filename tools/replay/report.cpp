@@ -2,6 +2,7 @@
 
 #include "hex_dump.hpp"
 
+#include "meter/skill_names.hpp"
 #include "protocol/opcodes.hpp"
 
 #include <algorithm>
@@ -24,14 +25,15 @@ const char* role_name(pipeline::FlowRole role) {
     return "?";
 }
 
-std::string modifiers(uint8_t m, bool crit, bool back) {
+std::string modifiers(uint8_t m, bool crit, uint8_t direction) {
     std::string out;
     const auto add = [&out](const char* s) {
         if (!out.empty()) out += ',';
         out += s;
     };
     if (crit) add("crit");
-    if (back) add("back");
+    if (direction == proto::hit_direction::Back) add("back");
+    if (direction == proto::hit_direction::Front) add("front");
     if ((m & proto::hit_modifier::Parry) != 0) add("parry");
     if ((m & proto::hit_modifier::Perfect) != 0) add("perfect");
     if ((m & proto::hit_modifier::Double) != 0) add("double");
@@ -120,7 +122,7 @@ void Report::on_event(const proto::ParsedEvent& pe, const meter::CombatantRegist
                 std::printf("%+.3f  damage    %s -> %s %" PRIu64, t, who(e.actor, reg).c_str(),
                             who(e.target, reg).c_str(), e.amount);
                 if (!e.extra_hits.empty()) std::printf(" (%zu extra)", e.extra_hits.size());
-                std::printf("%s skill %u layout %u\n", modifiers(e.modifiers, e.crit, e.back_attack).c_str(), e.skill,
+                std::printf("%s skill %u layout %u\n", modifiers(e.modifiers, e.crit, e.direction).c_str(), e.skill,
                             unsigned{e.layout});
             } else if constexpr (std::is_same_v<T, proto::Tick>) {
                 std::printf("%+.3f  %s %s -> %s %" PRIu64 " skill %u effect %02x\n", t, e.heal ? "hot      " : "dot      ",
@@ -164,10 +166,47 @@ void Report::on_fight(const meter::FightSummary& f) {
                     std::string(meter::class_short(c.cls)).c_str(), c.damage, c.dps, 100.0 * c.share, c.hits.hits,
                     100.0 * c.crit_rate(), 100.0 * c.back_rate(), c.max_hit, c.is_local ? "  (you)" : "");
     }
+    if (m_opt.skills) {
+        for (const auto& c : f.combatants) print_breakdown(c);
+    }
     const auto& q = f.quality;
     std::printf("  capture %s: %" PRIu64 " gap bytes, %" PRIu64 " resyncs, %" PRIu64 " bundle errors%s\n",
                 q.clean() ? "clean" : "lossy", q.gap_bytes, q.resyncs, q.bundle_errors,
                 q.partial ? ", partial (server sent only some players' hits)" : "");
+}
+
+void Report::print_breakdown(const meter::CombatantTotals& c) const {
+    const std::string who = name(c.name.starts_with('#') ? std::string() : c.name, c.id);
+    std::printf("  %s: %s\n", who.c_str(), std::string(meter::class_name(c.cls)).c_str());
+    if (!c.skills.empty()) {
+        std::printf("    %-26s %9s %6s %5s %5s %6s %6s %6s %6s %6s %8s\n", "skill", "damage", "share", "hits", "ticks",
+                    "crit%", "perf%", "dbl%", "back%", "frnt%", "max");
+    }
+    for (const auto& s : c.skills) {
+        const double share = c.damage == 0 ? 0.0 : 100.0 * static_cast<double>(s.damage) / static_cast<double>(c.damage);
+        std::printf("    %-26.26s %9" PRIu64 " %5.1f%% %5" PRIu64 " %5" PRIu64 " %6.1f %6.1f %6.1f %6.1f %6.1f %8" PRIu64
+                    "\n",
+                    meter::skill_label(s.code).c_str(), s.damage, share, s.hits.hits, s.ticks,
+                    100.0 * s.hits.rate(&meter::HitCounts::crits), 100.0 * s.hits.rate(&meter::HitCounts::perfect),
+                    100.0 * s.hits.rate(&meter::HitCounts::doubles), 100.0 * s.hits.rate(&meter::HitCounts::back),
+                    100.0 * s.hits.rate(&meter::HitCounts::front), s.max_hit);
+    }
+    if (c.healing > 0) {
+        std::printf("    healing %" PRIu64 " (%.1f hps, %" PRIu64 " heals)\n", c.healing, c.hps, c.heal_hits);
+        for (const auto& s : c.heal_skills) {
+            std::printf("      %-26.26s %9" PRIu64 " %5" PRIu64 " heals\n", meter::skill_label(s.code).c_str(), s.amount,
+                        s.hits);
+        }
+    }
+    if (c.damage_taken > 0) {
+        std::printf("    taken %" PRIu64 " (%" PRIu64 " hits, %.1f%% crit)\n", c.damage_taken, c.taken.hits,
+                    100.0 * c.taken.rate(&meter::HitCounts::crits));
+        for (const auto& s : c.taken_by) {
+            const std::string from = s.source_npc != 0 ? "NPC #" + std::to_string(s.source_npc) : std::string("?");
+            std::printf("      %-26.26s %-12s %9" PRIu64 " %5" PRIu64 " hits\n", meter::skill_label(s.code).c_str(),
+                        from.c_str(), s.amount, s.hits);
+        }
+    }
 }
 
 void Report::print_flows(const pipeline::StreamDemux& demux) const {

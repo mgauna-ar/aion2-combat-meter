@@ -79,6 +79,9 @@ public:
     void on_hp(EntityId id, uint64_t hp);
     /// A hit from `actor` to `target`: settles an unknown side from a known one.
     void observe_hit(EntityId actor, EntityId target);
+    /// `player` used a skill of class `cls` (class_of_skill): their class, when no
+    /// identity has named it. Summons use their owner's class digits.
+    void on_skill_class(EntityId player, AionClass cls);
     /// A new map: NPCs, summons and inferred sides go; players and names stay.
     void on_map_change();
 

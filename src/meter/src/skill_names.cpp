@@ -32,6 +32,8 @@ uint32_t skill_base(uint32_t code) noexcept {
     return code - code % 10'000;
 }
 
+uint32_t skill_key(uint32_t code) noexcept { return find(code) != nullptr ? code : skill_base(code); }
+
 std::string_view skill_name(uint32_t code) noexcept {
     if (const char* name = find(code)) return name;
     if (const char* name = find(skill_base(code))) return name;

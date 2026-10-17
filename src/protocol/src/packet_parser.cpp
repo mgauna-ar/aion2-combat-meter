@@ -27,7 +27,6 @@ constexpr uint64_t kSwitchExtraHits = 0x20;
 /// are as NOIA2, a maintained public meter, reads them.
 constexpr std::array<size_t, 4> kBlockSize{8, 12, 10, 14};
 constexpr uint64_t kDamageTypeCrit = 3;
-constexpr uint8_t kDirectionBack = 1;
 /// The skill code of a tick is the skill id times this.
 constexpr uint32_t kTickSkillScale = 100;
 /// Positions are world coordinates: anything beyond this is not a position.
@@ -57,7 +56,7 @@ Record read_damage_record(ByteReader& r, Damage& d) {
     if (!r.ok()) return Record::Failed;
     if (d.layout != kLayoutShort) {
         d.modifiers = block[0];
-        d.back_attack = block[2] == kDirectionBack;
+        d.direction = block[2];
     }
 
     if (!r.at_end() && r.rest()[0] == 0x00) r.skip(1);  // optional pad

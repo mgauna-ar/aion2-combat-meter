@@ -21,6 +21,8 @@ struct ReportOptions {
     bool opcodes{false};
     bool events{false};
     bool fights{false};
+    /// Each player's skills, healing and damage taken under their fight's table.
+    bool skills{false};
     bool unknown{false};
     bool anonymize{false};
     bool dump_all{false};
@@ -38,6 +40,8 @@ public:
     void on_frame(const proto::Frame& frame, pipeline::FrameOutcome outcome);
     void on_event(const proto::ParsedEvent& event, const meter::CombatantRegistry& registry);
     void on_fight(const meter::FightSummary& fight);
+    /// One player's skills, healing and damage taken (--skills).
+    void print_breakdown(const meter::CombatantTotals& c) const;
 
     void print_flows(const pipeline::StreamDemux& demux) const;
     void print_parse(const proto::ParseStats& stats) const;

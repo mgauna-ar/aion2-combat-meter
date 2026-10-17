@@ -58,7 +58,8 @@ void CombatantRegistry::on_identity(const proto::Identity& identity) {
             a.name = identity.name;
             a.server = identity.server;
             a.class_code = identity.class_code;
-            a.cls = class_from_code(identity.class_code);
+            // An unknown code keeps the class the player's skills gave.
+            if (const AionClass cls = class_from_code(identity.class_code); cls != AionClass::Unknown) a.cls = cls;
         }
         a.spawned = false;
         a.owner = 0;
@@ -66,6 +67,14 @@ void CombatantRegistry::on_identity(const proto::Identity& identity) {
     }
     if (identity.own) set_local(identity.id, canonical);
     settle_pending(identity.id);
+}
+
+void CombatantRegistry::on_skill_class(EntityId player, AionClass cls) {
+    if (player == 0 || cls == AionClass::Unknown) return;
+    for (const EntityId id : {player, follow_alias(player)}) {
+        const auto it = m_actors.find(id);
+        if (it != m_actors.end() && it->second.cls == AionClass::Unknown) it->second.cls = cls;
+    }
 }
 
 void CombatantRegistry::set_local(EntityId id, EntityId canonical) {

@@ -38,6 +38,8 @@ void usage() {
                  "aion2meter-replay %s\n"
                  "usage: aion2meter-replay <capture.pcapng|.pcap> [options]\n"
                  "  --fights          a table per fight: damage, DPS, crits, boss, end reason\n"
+                 "  --skills          --fights, and each player's skills, healing and damage\n"
+                 "                    taken\n"
                  "  --events          every decoded event but heartbeats, one per line\n"
                  "  --opcodes         count, body sizes and parse failures per opcode\n"
                  "  --unknown         hex dump frames the parser does not read or failed on\n"
@@ -79,6 +81,9 @@ bool parse_args(int argc, char** argv, Options& opt) {
         };
         if (arg == "--fights") {
             opt.report.fights = true;
+        } else if (arg == "--skills") {
+            opt.report.fights = true;
+            opt.report.skills = true;
         } else if (arg == "--events") {
             opt.report.events = true;
         } else if (arg == "--opcodes") {

@@ -23,6 +23,13 @@ TEST_CASE(SkillNames, AVariantWithItsOwnRowKeepsIt) {
     TEST_ASSERT_EQ(std::string(skill_name(16290000)), std::string("Dismiss: Fire Spirit"));
 }
 
+TEST_CASE(SkillNames, BreakdownsFileVariantsUnderTheirSkill) {
+    TEST_ASSERT_EQ(skill_key(12240347), uint32_t{12240000});
+    TEST_ASSERT_EQ(skill_key(16290002), uint32_t{16290002});
+    TEST_ASSERT_EQ(skill_key(16990004), uint32_t{16990000});
+    TEST_ASSERT_EQ(skill_key(100032), uint32_t{100032});
+}
+
 TEST_CASE(SkillNames, UnlistedCodesHaveALabel) {
     // A spirit's own attacks are not in the skill data.
     TEST_ASSERT(skill_name(16990004).empty());

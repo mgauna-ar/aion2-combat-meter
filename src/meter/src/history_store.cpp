@@ -16,10 +16,7 @@ using config::JsonValue;
 
 namespace {
 
-[[nodiscard]] uint64_t u64(const JsonValue& v) {
-    const double d = v.as_double(0.0);
-    return d <= 0.0 ? 0 : static_cast<uint64_t>(d);
-}
+[[nodiscard]] uint64_t u64(const JsonValue& v) { return json_u64(v); }
 
 JsonValue entry_to_json(const HistoryEntry& e) {
     JsonValue j;
@@ -27,11 +24,13 @@ JsonValue entry_to_json(const HistoryEntry& e) {
     j["file"] = e.file;
     j["id"] = e.id;
     j["map_id"] = e.map_id;
+    j["visit_ts"] = e.visit_ts;
     j["start_ts"] = e.start_ts;
     j["duration_s"] = e.duration_s;
     j["boss"] = e.boss_label;
     j["is_boss"] = e.is_boss;
     j["killed"] = e.killed;
+    if (e.boss_hp_known) j["boss_hp_left"] = e.boss_hp_left;
     j["partial"] = e.partial;
     j["total_damage"] = e.total_damage;
     j["total_dps"] = e.total_dps;
@@ -41,16 +40,21 @@ JsonValue entry_to_json(const HistoryEntry& e) {
 }
 
 std::optional<HistoryEntry> entry_from_json(const JsonValue& j) {
-    if (!j.is_object() || j["v"].as_int(0) != kFightRecordVersion || !j["file"].is_string()) return std::nullopt;
+    if (!j.is_object() || !readable_version(j) || !j["file"].is_string()) return std::nullopt;
     HistoryEntry e;
     e.file = j["file"].as_string();
     e.id = u64(j["id"]);
     e.map_id = static_cast<uint32_t>(u64(j["map_id"]));
+    e.visit_ts = u64(j["visit_ts"]);
     e.start_ts = u64(j["start_ts"]);
     e.duration_s = j["duration_s"].as_double(0.0);
     e.boss_label = j["boss"].as_string();
     e.is_boss = j["is_boss"].as_bool();
     e.killed = j["killed"].as_bool();
+    if (j["boss_hp_left"].is_number()) {
+        e.boss_hp_known = true;
+        e.boss_hp_left = std::clamp(j["boss_hp_left"].as_double(0.0), 0.0, 1.0);
+    }
     e.partial = j["partial"].as_bool();
     e.total_damage = u64(j["total_damage"]);
     e.total_dps = j["total_dps"].as_double(0.0);
@@ -64,11 +68,16 @@ HistoryEntry entry_for(const FightSummary& f, std::string file) {
     e.file = std::move(file);
     e.id = f.id;
     e.map_id = f.map_id;
+    e.visit_ts = f.visit_ts;
     e.start_ts = f.start_ts;
     e.duration_s = f.duration_s;
     e.boss_label = f.boss.present() ? f.boss.label : std::string();
     e.is_boss = f.boss.is_boss;
     e.killed = f.boss.killed;
+    if (f.boss.present() && f.boss.hp_known && !f.boss.killed && f.boss.max_hp > 0) {
+        e.boss_hp_known = true;
+        e.boss_hp_left = std::clamp(f.boss.hp_fraction(), 0.0, 1.0);
+    }
     e.partial = f.quality.partial;
     e.total_damage = f.total_damage;
     e.total_dps = f.total_dps;
@@ -181,6 +190,23 @@ size_t HistoryStore::prune(size_t keep) {
     entries.erase(entries.begin(), entries.begin() + static_cast<std::ptrdiff_t>(drop));
     (void)write_index(entries);
     return drop;
+}
+
+size_t HistoryStore::clear() {
+    size_t removed = 0;
+    std::error_code ec;
+    std::vector<std::filesystem::path> fights;
+    for (const auto& item : std::filesystem::directory_iterator(m_dir, ec)) {
+        if (!item.is_regular_file() || item.path().extension() != ".json") continue;
+        // Only fight records: whatever else the user keeps here stays.
+        const auto json = config::read_json_file(item.path());
+        if (json && fight_from_json(*json)) fights.push_back(item.path());
+    }
+    for (const auto& path : fights) {
+        if (std::filesystem::remove(path, ec)) ++removed;
+    }
+    std::filesystem::remove(index_path(), ec);
+    return removed;
 }
 
 } // namespace aion2::meter

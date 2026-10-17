@@ -32,8 +32,9 @@ captures are needed (`.claude/skills/decode-capture`), and these are still open:
   reads (4.5 for one player, about 10.6 for others). The public meters count the same
   number with no multiple, so the totals match theirs; a check against the game's own
   meter is still to do.
-- **Class names:** players show without a class, because the wire codes for the classes
-  are not known yet.
+- **Classes and skill names:** both come from the skill codes, with names from a public
+  skill database (`src/meter/data/skills.tsv`). They have been checked against one
+  capture, a Templar and an Elementalist.
 - **Boss threshold:** an enemy with 1,000,000 max HP or more counts as a boss. That
   number is a guess (`meter.boss_min_max_hp`); open-world mobs have about 120,000.
 
@@ -258,6 +259,7 @@ aion2-combat-meter.exe --replay fight.pcapng --speed 1
 | Option | Prints |
 |---|---|
 | `--fights` | A table per fight. |
+| `--skills` | The fight tables, and each player's skills, healing and damage taken. |
 | `--events` | Every decoded event. |
 | `--opcodes` | Counts and sizes per opcode. |
 | `--unknown` | Hex dumps of anything the parser does not read or failed on. |

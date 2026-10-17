@@ -59,8 +59,29 @@ inline constexpr Micros kT0 = 1'792'152'000'000'000ULL;
     d.layout = 4;
     d.amount = amount;
     d.crit = crit;
-    d.back_attack = back;
+    d.direction = back ? proto::hit_direction::Back : proto::hit_direction::None;
     return d;
+}
+
+/// `d` with a skill code, and the long layout's modifiers and direction.
+[[nodiscard]] inline proto::Damage skilled(proto::Damage d, uint32_t skill, uint8_t direction = 0,
+                                           uint8_t modifiers = 0) {
+    d.skill = skill;
+    if (direction != 0 || modifiers != 0) d.layout = 6;
+    if (direction != 0) d.direction = direction;
+    d.modifiers = modifiers;
+    return d;
+}
+
+[[nodiscard]] inline proto::Tick heal_tick(EntityId actor, EntityId target, uint64_t amount, uint32_t skill = 0) {
+    proto::Tick t;
+    t.actor = actor;
+    t.target = target;
+    t.effect = 0x09;
+    t.heal = true;
+    t.skill = skill;
+    t.amount = amount;
+    return t;
 }
 
 [[nodiscard]] inline proto::Tick dot(EntityId actor, EntityId target, uint64_t amount) {

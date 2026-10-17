@@ -1,5 +1,7 @@
 #include "meter/encounter_engine.hpp"
 
+#include "meter/skill_names.hpp"
+
 #include <algorithm>
 #include <cstdio>
 #include <type_traits>
@@ -18,10 +20,57 @@ void add(HitCounts& into, const HitCounts& h) noexcept {
     into.hits += h.hits;
     into.crits += h.crits;
     into.back += h.back;
+    into.front += h.front;
     into.parry += h.parry;
     into.perfect += h.perfect;
     into.doubles += h.doubles;
     into.heavy += h.heavy;
+}
+
+/// One direct hit's crit, modifiers and direction.
+void count(HitCounts& h, const proto::Damage& d) noexcept {
+    ++h.hits;
+    if (d.crit) ++h.crits;
+    if (d.back()) ++h.back;
+    if (d.front()) ++h.front;
+    if ((d.modifiers & proto::hit_modifier::Parry) != 0) ++h.parry;
+    if ((d.modifiers & proto::hit_modifier::Perfect) != 0) ++h.perfect;
+    if ((d.modifiers & proto::hit_modifier::Double) != 0) ++h.doubles;
+    if ((d.modifiers & proto::hit_modifier::Heavy) != 0) ++h.heavy;
+}
+
+void add(SkillTotals& into, const SkillTotals& s) noexcept {
+    if (s.hits.hits > 0) into.min_hit = into.hits.hits == 0 ? s.min_hit : std::min(into.min_hit, s.min_hit);
+    into.max_hit = std::max(into.max_hit, s.max_hit);
+    into.damage += s.damage;
+    into.tick_damage += s.tick_damage;
+    into.ticks += s.ticks;
+    add(into.hits, s.hits);
+}
+
+void add(SkillAmount& into, const SkillAmount& s) noexcept {
+    into.amount += s.amount;
+    into.hits += s.hits;
+    into.max = std::max(into.max, s.max);
+}
+
+void book(SkillAmount& s, uint64_t amount) noexcept {
+    s.amount += amount;
+    ++s.hits;
+    s.max = std::max(s.max, amount);
+}
+
+/// The map's values, most `amount` first (ties by code, for a stable order).
+template <typename Map, typename Amount>
+auto sorted_values(const Map& map, Amount amount) {
+    std::vector<typename Map::mapped_type> out;
+    out.reserve(map.size());
+    for (const auto& [key, value] : map) out.push_back(value);
+    std::sort(out.begin(), out.end(), [&](const auto& a, const auto& b) {
+        if (amount(a) != amount(b)) return amount(a) > amount(b);
+        return a.code < b.code;
+    });
+    return out;
 }
 
 [[nodiscard]] std::string npc_label(uint32_t npc_code, EntityId id) {
@@ -37,6 +86,33 @@ void add(HitCounts& into, const HitCounts& h) noexcept {
 } // namespace
 
 EncounterEngine::EncounterEngine(MeterSettings settings) : m_settings(settings) {}
+
+void EncounterEngine::Accum::merge(const Accum& o) {
+    damage += o.damage;
+    dot_damage += o.dot_damage;
+    max_hit = std::max(max_hit, o.max_hit);
+    add(hits, o.hits);
+    for (const auto& [key, s] : o.skills) {
+        SkillTotals& into = skills[key];
+        into.code = s.code;
+        add(into, s);
+    }
+    healing += o.healing;
+    heal_hits += o.heal_hits;
+    for (const auto& [key, s] : o.heals) {
+        SkillAmount& into = heals[key];
+        into.code = s.code;
+        add(into, s);
+    }
+    taken += o.taken;
+    add(taken_hits, o.taken_hits);
+    for (const auto& [key, s] : o.taken_by) {
+        SkillAmount& into = taken_by[key];
+        into.code = s.code;
+        into.source_npc = s.source_npc;
+        add(into, s);
+    }
+}
 
 void EncounterEngine::on_event(const proto::ParsedEvent& event) {
     const Micros ts = event.ts;
@@ -94,30 +170,86 @@ void EncounterEngine::on_damage(const proto::Damage& d, Micros ts) {
     const uint64_t amount = d.amount;
     if (amount == 0) return;
     m_damage_since_spawn[m_registry.resolve(d.target)] += amount;
-    credit(d.actor, d.target, amount, &d, ts);
+    credit(d.actor, d.target, amount, d.skill, &d, ts);
+    book_heal(d.actor, d.target, amount, d.skill, true);
+    book_taken(d.actor, d.target, amount, d.skill, &d);
 }
 
 void EncounterEngine::on_tick(const proto::Tick& t, Micros ts) {
-    if (t.heal || t.amount == 0 || t.actor == 0 || t.target == 0) return;
+    if (t.amount == 0 || t.actor == 0 || t.target == 0) return;
+    // A heal settles no side: healers and their targets are on one.
+    if (t.heal) {
+        book_heal(t.actor, t.target, t.amount, t.skill, false);
+        return;
+    }
     note_hit_on(t.target);
     m_registry.observe_hit(t.actor, t.target);
     m_damage_since_spawn[m_registry.resolve(t.target)] += t.amount;
-    credit(t.actor, t.target, t.amount, nullptr, ts);
+    credit(t.actor, t.target, t.amount, t.skill, nullptr, ts);
+    book_taken(t.actor, t.target, t.amount, t.skill, nullptr);
 }
 
-void EncounterEngine::credit(EntityId actor, EntityId target, uint64_t amount, const proto::Damage* direct,
-                             Micros ts) {
+bool EncounterEngine::counts_in_fight(EntityId player) const {
+    if (!m_fight || !m_registry.in_party(player)) return false;
+    if (m_registry.has_roster() || player == m_registry.local_player()) return true;
+    return m_fight->players.contains(player);
+}
+
+void EncounterEngine::book_heal(EntityId actor, EntityId target, uint64_t amount, uint32_t skill, bool record) {
+    if (!m_fight) return;
+    const EntityId healer = m_registry.resolve(actor);
+    if (m_registry.side(healer) != Side::Player || m_registry.side(m_registry.resolve(target)) != Side::Player) return;
+    // Not a summon's record: a spirit's to itself, as it spawned, carried 100,000.
+    if (record && m_registry.follow_alias(actor) != healer) return;
+    if (!counts_in_fight(healer)) return;
+    m_registry.on_skill_class(healer, class_of_skill(skill));
+    Accum& acc = m_fight->players[healer];
+    acc.healing += amount;
+    ++acc.heal_hits;
+    const uint32_t key = skill_key(skill);
+    SkillAmount& s = acc.heals[key];
+    s.code = key;
+    book(s, amount);
+}
+
+void EncounterEngine::book_taken(EntityId actor, EntityId target, uint64_t amount, uint32_t skill,
+                                 const proto::Damage* direct) {
+    if (!m_fight) return;
+    // A summon's HP is its own, not its owner's.
+    const EntityId victim = m_registry.follow_alias(target);
+    if (m_registry.resolve(target) != victim || m_registry.side(victim) != Side::Player) return;
+    const EntityId attacker = m_registry.resolve(actor);
+    if (m_registry.side_or_guess(attacker) != Side::Enemy) return;
+    if (!counts_in_fight(victim)) return;
+    Accum& acc = m_fight->players[victim];
+    acc.taken += amount;
+    if (direct != nullptr) count(acc.taken_hits, *direct);
+    const Actor* a = m_registry.find(attacker);
+    const uint32_t npc = a != nullptr ? a->npc_code : 0;
+    const uint32_t key = skill_key(skill);
+    SkillAmount& s = acc.taken_by[(static_cast<uint64_t>(key) << 32) | npc];
+    s.code = key;
+    s.source_npc = npc;
+    book(s, amount);
+}
+
+void EncounterEngine::credit(EntityId actor, EntityId target, uint64_t amount, uint32_t skill,
+                             const proto::Damage* direct, Micros ts) {
     const EntityId player = m_registry.resolve(actor);
     const EntityId enemy = m_registry.resolve(target);
     if (m_registry.side(player) != Side::Player || m_registry.side_or_guess(enemy) != Side::Enemy) return;
+    m_registry.on_skill_class(player, class_of_skill(skill));
     // Out of a party, every player counts; in one, only its members do.
     if (!m_registry.in_party(player)) return;
 
     if (!m_fight) {
         if (direct == nullptr) return;  // a tick alone never starts a fight
+        // The meter started mid-visit: its first fight opens one.
+        if (m_visit_ts == 0) m_visit_ts = ts;
         Fight f;
         f.id = m_next_fight_id++;
         f.map_id = m_map_id;
+        f.visit_ts = m_visit_ts;
         f.start_ts = ts;
         f.counters_at_start = m_counters;
         m_fight = std::move(f);
@@ -127,17 +259,19 @@ void EncounterEngine::credit(EntityId actor, EntityId target, uint64_t amount, c
     Accum& acc = fight.players[player];
     acc.damage += amount;
     acc.max_hit = std::max(acc.max_hit, amount);
+    const uint32_t key = skill_key(skill);
+    SkillTotals& sk = acc.skills[key];
+    sk.code = key;
+    sk.damage += amount;
     if (direct != nullptr) {
-        HitCounts& h = acc.hits;
-        ++h.hits;
-        if (direct->crit) ++h.crits;
-        if (direct->back_attack) ++h.back;
-        if ((direct->modifiers & proto::hit_modifier::Parry) != 0) ++h.parry;
-        if ((direct->modifiers & proto::hit_modifier::Perfect) != 0) ++h.perfect;
-        if ((direct->modifiers & proto::hit_modifier::Double) != 0) ++h.doubles;
-        if ((direct->modifiers & proto::hit_modifier::Heavy) != 0) ++h.heavy;
+        count(acc.hits, *direct);
+        sk.min_hit = sk.hits.hits == 0 ? amount : std::min(sk.min_hit, amount);
+        sk.max_hit = std::max(sk.max_hit, amount);
+        count(sk.hits, *direct);
     } else {
         acc.dot_damage += amount;
+        sk.tick_damage += amount;
+        ++sk.ticks;
     }
     fight.enemies[enemy] += amount;
     if (ts > fight.last_hit_ts) fight.last_hit_ts = ts;
@@ -175,6 +309,7 @@ void EncounterEngine::on_map(const proto::MapLoad& m, Micros ts) {
     if (m.map_id == m_map_id) return;
     if (m_fight) finish(EndReason::MapChange, ts);
     m_map_id = m.map_id;
+    m_visit_ts = ts;
     m_registry.on_map_change();
     m_damage_since_spawn.clear();
     m_hp_loss.clear();
@@ -277,6 +412,7 @@ FightSummary EncounterEngine::summarize(const Fight& fight, bool live, EndReason
     FightSummary s;
     s.id = fight.id;
     s.map_id = fight.map_id;
+    s.visit_ts = fight.visit_ts;
     s.start_ts = fight.start_ts;
     s.end_ts = fight.last_hit_ts;
     s.live = live;
@@ -288,13 +424,7 @@ FightSummary EncounterEngine::summarize(const Fight& fight, bool live, EndReason
     // By the player each row resolves to now: a row may predate the alias that
     // joined two ids of one player.
     std::unordered_map<EntityId, Accum> players;
-    for (const auto& [id, acc] : fight.players) {
-        Accum& into = players[m_registry.resolve(id)];
-        into.damage += acc.damage;
-        into.dot_damage += acc.dot_damage;
-        into.max_hit = std::max(into.max_hit, acc.max_hit);
-        add(into.hits, acc.hits);
-    }
+    for (const auto& [id, acc] : fight.players) players[m_registry.resolve(id)].merge(acc);
     for (const auto& [id, acc] : players) {
         CombatantTotals row;
         row.id = id;
@@ -310,7 +440,16 @@ FightSummary EncounterEngine::summarize(const Fight& fight, bool live, EndReason
         row.max_hit = acc.max_hit;
         row.hits = acc.hits;
         row.dps = static_cast<double>(acc.damage) / s.duration_s;
+        row.skills = sorted_values(acc.skills, [](const SkillTotals& k) { return k.damage; });
+        row.healing = acc.healing;
+        row.heal_hits = acc.heal_hits;
+        row.hps = static_cast<double>(acc.healing) / s.duration_s;
+        row.heal_skills = sorted_values(acc.heals, [](const SkillAmount& k) { return k.amount; });
+        row.damage_taken = acc.taken;
+        row.taken = acc.taken_hits;
+        row.taken_by = sorted_values(acc.taken_by, [](const SkillAmount& k) { return k.amount; });
         s.total_damage += acc.damage;
+        s.total_healing += acc.healing;
         s.combatants.push_back(std::move(row));
     }
     for (auto& row : s.combatants) {

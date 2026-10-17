@@ -167,7 +167,7 @@ TEST_CASE(Parser, ShortDamageRecord) {
     TEST_ASSERT_EQ(dmg.layout, uint8_t{4});
     TEST_ASSERT_EQ(dmg.amount, uint64_t{12345});
     TEST_ASSERT_FALSE(dmg.crit);
-    TEST_ASSERT_FALSE(dmg.back_attack);
+    TEST_ASSERT_EQ(dmg.direction, uint8_t{hit_direction::None});
     TEST_ASSERT_EQ(dmg.modifiers, uint8_t{0});
 }
 
@@ -197,9 +197,22 @@ TEST_CASE(Parser, LongCritBackAttackWithPad) {
     d.pad = true;
     const auto& dmg = only<Damage>(parse_one(p, opcode::Damage, damage_body({d})));
     TEST_ASSERT(dmg.crit);
-    TEST_ASSERT(dmg.back_attack);
+    TEST_ASSERT(dmg.back());
     TEST_ASSERT_EQ(dmg.modifiers, uint8_t{hit_modifier::Perfect | hit_modifier::Heavy});
     TEST_ASSERT_EQ(dmg.amount, uint64_t{99999});
+}
+
+TEST_CASE(Parser, FrontHitKeepsItsDirection) {
+    PacketParser p;
+    DamageSpec d;
+    d.target = 16500;
+    d.actor = 502;
+    d.layout = 6;
+    d.direction = 2;
+    d.amount = 1200;
+    const auto& dmg = only<Damage>(parse_one(p, opcode::Damage, damage_body({d})));
+    TEST_ASSERT(dmg.front());
+    TEST_ASSERT_FALSE(dmg.back());
 }
 
 TEST_CASE(Parser, EachLayoutHasItsBlockSize) {
@@ -216,7 +229,7 @@ TEST_CASE(Parser, EachLayoutHasItsBlockSize) {
             const auto& dmg = only<Damage>(parse_one(p, opcode::Damage, damage_body({d})));
             TEST_ASSERT_EQ(dmg.layout, layout);
             TEST_ASSERT_EQ(dmg.amount, uint64_t{3646});
-            TEST_ASSERT_EQ(dmg.back_attack, layout != 4);
+            TEST_ASSERT_EQ(dmg.back(), layout != 4);
         }
     }
 }

@@ -64,11 +64,23 @@ private:
         uint64_t dot_damage{0};
         uint64_t max_hit{0};
         HitCounts hits;
+        /// By skill_key().
+        std::unordered_map<uint32_t, SkillTotals> skills;
+        uint64_t healing{0};
+        uint64_t heal_hits{0};
+        std::unordered_map<uint32_t, SkillAmount> heals;
+        uint64_t taken{0};
+        HitCounts taken_hits;
+        /// By skill_key() << 32 | the attacker's NPC code.
+        std::unordered_map<uint64_t, SkillAmount> taken_by;
+
+        void merge(const Accum& other);
     };
 
     struct Fight {
         uint64_t id{0};
         uint32_t map_id{0};
+        Micros visit_ts{0};
         Micros start_ts{0};
         Micros last_hit_ts{0};
         /// By the player a hit resolves to.
@@ -88,7 +100,17 @@ private:
     void on_death(EntityId id, Micros ts);
     void on_map(const proto::MapLoad& m, Micros ts);
     /// A hit from the player side on an enemy, credited to its resolved player.
-    void credit(EntityId actor, EntityId target, uint64_t amount, const proto::Damage* direct, Micros ts);
+    void credit(EntityId actor, EntityId target, uint64_t amount, uint32_t skill, const proto::Damage* direct,
+                Micros ts);
+    /// A heal tick, or a 04 38 `record` from a player to the player side, during a
+    /// fight: healing for the resolved healer. Never starts a fight.
+    void book_heal(EntityId actor, EntityId target, uint64_t amount, uint32_t skill, bool record);
+    /// An enemy's hit or tick on a player during a fight: damage that player took.
+    void book_taken(EntityId actor, EntityId target, uint64_t amount, uint32_t skill, const proto::Damage* direct);
+    /// A player whose healing and damage taken a live fight books: a party member by
+    /// the roster, the local player, or with no roster one already in the fight,
+    /// so strangers healing each other nearby stay out.
+    [[nodiscard]] bool counts_in_fight(EntityId player) const;
     /// Ends the fight if its time is up at `now`.
     void check_end(Micros now);
     void finish(EndReason reason, Micros now);
@@ -101,6 +123,8 @@ private:
     std::optional<Fight> m_fight;
     uint64_t m_next_fight_id{1};
     uint32_t m_map_id{0};
+    /// The current map visit's start; 0 until a map load or the first fight.
+    Micros m_visit_ts{0};
     Micros m_last_event_ts{0};
     uint64_t m_last_server_ms{0};
     CaptureQuality m_counters;

@@ -3,6 +3,8 @@
 
 #include "meter/encounter_engine.hpp"
 
+#include <algorithm>
+
 using namespace aion2;
 using namespace aion2::meter;
 using namespace aion2::test::meter_support;
@@ -372,4 +374,150 @@ TEST_CASE(Engine, BiggerBossHitDuringTheGraceKeepsTheFight) {
     e.tick(at_s(23));
     TEST_ASSERT_FALSE(e.in_fight());
     TEST_ASSERT(e.take_finished().at(0).end_reason == EndReason::BossKilled);
+}
+
+namespace {
+
+const CombatantTotals& row_of(const FightSummary& s, EntityId id) {
+    const auto it = std::find_if(s.combatants.begin(), s.combatants.end(),
+                                 [id](const CombatantTotals& c) { return c.id == id; });
+    TEST_ASSERT(it != s.combatants.end());
+    return *it;
+}
+
+} // namespace
+
+TEST_CASE(Engine, SkillsCollectTheirVariantsHitsAndTicks) {
+    EncounterEngine e = setup();
+    using proto::hit_direction::Back;
+    using proto::hit_direction::Front;
+    // Judgment twice, as two variants; Pummel once; a tick of Judgment.
+    e.on_event(ev(at_s(1), skilled(hit(kMe, kBoss, 8000, true), 12240340, Front, proto::hit_modifier::Perfect)));
+    e.on_event(ev(at_s(2), skilled(hit(kMe, kBoss, 4000), 12240347, Back)));
+    e.on_event(ev(at_s(3), skilled(hit(kMe, kBoss, 1500), 12040230, Back, proto::hit_modifier::Double)));
+    proto::Tick t = dot(kMe, kBoss, 300);
+    t.skill = 12240340;
+    e.on_event(ev(at_s(4), t));
+
+    const FightSummary s = e.current();
+    const CombatantTotals& me = row_of(s, kMe);
+    TEST_ASSERT(me.cls == AionClass::Templar);
+    TEST_ASSERT_EQ(me.skills.size(), size_t{2});
+    const SkillTotals& judgment = me.skills[0];
+    TEST_ASSERT_EQ(judgment.code, uint32_t{12240000});
+    TEST_ASSERT_EQ(judgment.damage, uint64_t{12300});
+    TEST_ASSERT_EQ(judgment.tick_damage, uint64_t{300});
+    TEST_ASSERT_EQ(judgment.ticks, uint64_t{1});
+    TEST_ASSERT_EQ(judgment.hits.hits, uint64_t{2});
+    TEST_ASSERT_EQ(judgment.min_hit, uint64_t{4000});
+    TEST_ASSERT_EQ(judgment.max_hit, uint64_t{8000});
+    TEST_ASSERT_EQ(judgment.hits.crits, uint64_t{1});
+    TEST_ASSERT_EQ(judgment.hits.perfect, uint64_t{1});
+    TEST_ASSERT_EQ(judgment.hits.front, uint64_t{1});
+    TEST_ASSERT_EQ(judgment.hits.back, uint64_t{1});
+    TEST_ASSERT_EQ(me.skills[1].code, uint32_t{12040000});
+    TEST_ASSERT_EQ(me.skills[1].hits.doubles, uint64_t{1});
+    TEST_ASSERT_EQ(me.hits.front, uint64_t{1});
+    TEST_ASSERT_EQ(me.hits.back, uint64_t{2});
+}
+
+TEST_CASE(Engine, AnIdentityWithAnUnknownClassKeepsTheSkillsClass) {
+    EncounterEngine e = setup();
+    e.on_event(ev(at_s(1), skilled(hit(kAlly, kBoss, 100), 16040020)));
+    e.on_event(ev(at_s(2), player(kAlly, "Lumiel")));
+    const FightSummary s = e.current();
+    TEST_ASSERT(row_of(s, kAlly).cls == AionClass::Spiritmaster);
+}
+
+TEST_CASE(Engine, HealingCountsOnlyDuringAFight) {
+    EncounterEngine e = setup();
+    e.on_event(ev(at_s(1), heal_tick(kAlly, kMe, 500, 17080000)));
+    TEST_ASSERT_FALSE(e.in_fight());
+
+    e.on_event(ev(at_s(2), hit(kMe, kBoss, 1000)));
+    e.on_event(ev(at_s(3), hit(kAlly, kBoss, 1000)));
+    e.on_event(ev(at_s(4), heal_tick(kAlly, kMe, 700, 17080000)));
+    // A 04 38 record from a player to a player is a heal too.
+    e.on_event(ev(at_s(5), skilled(hit(kAlly, kAlly, 300), 17010000)));
+    const FightSummary s = e.current();
+    const CombatantTotals& ally = row_of(s, kAlly);
+    TEST_ASSERT_EQ(ally.healing, uint64_t{1000});
+    TEST_ASSERT_EQ(ally.heal_hits, uint64_t{2});
+    TEST_ASSERT(ally.cls == AionClass::Cleric);
+    TEST_ASSERT_EQ(ally.heal_skills.size(), size_t{2});
+    TEST_ASSERT_EQ(ally.heal_skills[0].code, uint32_t{17080000});
+    TEST_ASSERT_EQ(ally.heal_skills[0].amount, uint64_t{700});
+    // Healing is not damage, and the fight's clock stops at the last hit.
+    TEST_ASSERT_EQ(ally.damage, uint64_t{1000});
+    TEST_ASSERT_EQ(s.total_healing, uint64_t{1000});
+    TEST_ASSERT_NEAR(s.duration_s, 1.0, 1e-9);
+}
+
+TEST_CASE(Engine, ASummonsRecordToItselfIsNoHeal) {
+    EncounterEngine e = setup();
+    e.on_event(ev(at_s(0), summon(0x4200, kMe)));
+    e.on_event(ev(at_s(1), hit(kMe, kBoss, 1000)));
+    // A spirit's record to itself as it spawned carried 100,000.
+    e.on_event(ev(at_s(2), skilled(hit(0x4200, 0x4200, 100'000), 16990004)));
+    const FightSummary s = e.current();
+    TEST_ASSERT_EQ(row_of(s, kMe).healing, uint64_t{0});
+}
+
+TEST_CASE(Engine, DamageTakenIsByAttackingSkillAndNpc) {
+    EncounterEngine e = setup();
+    e.on_event(ev(at_s(1), hit(kMe, kBoss, 1000)));
+    e.on_event(ev(at_s(2), skilled(hit(kBoss, kMe, 400, true), 900100, proto::hit_direction::Front)));
+    e.on_event(ev(at_s(3), skilled(hit(kBoss, kMe, 600), 900100)));
+    e.on_event(ev(at_s(4), dot(kAdd, kMe, 50)));
+    const FightSummary s = e.current();
+    const CombatantTotals& me = row_of(s, kMe);
+    TEST_ASSERT_EQ(me.damage_taken, uint64_t{1050});
+    TEST_ASSERT_EQ(me.taken.hits, uint64_t{2});
+    TEST_ASSERT_EQ(me.taken.crits, uint64_t{1});
+    TEST_ASSERT_EQ(me.taken.front, uint64_t{1});
+    TEST_ASSERT_EQ(me.taken_by.size(), size_t{2});
+    TEST_ASSERT_EQ(me.taken_by[0].code, uint32_t{900100});
+    TEST_ASSERT_EQ(me.taken_by[0].source_npc, uint32_t{777});
+    TEST_ASSERT_EQ(me.taken_by[0].amount, uint64_t{1000});
+    TEST_ASSERT_EQ(me.taken_by[0].max, uint64_t{600});
+    TEST_ASSERT_EQ(me.taken_by[1].source_npc, uint32_t{778});
+}
+
+TEST_CASE(Engine, StrangersHealingOrHitNearbyGetNoRow) {
+    EncounterEngine e = setup();
+    constexpr EntityId kStranger = 300;
+    e.on_event(ev(at_s(0), player(kStranger, "Zikel")));
+    e.on_event(ev(at_s(1), hit(kMe, kBoss, 1000)));
+    e.on_event(ev(at_s(2), heal_tick(kStranger, kStranger, 900)));
+    e.on_event(ev(at_s(3), hit(kAdd, kStranger, 900)));
+    TEST_ASSERT_EQ(e.current().combatants.size(), size_t{1});
+    // A summon's own HP is not its owner's.
+    e.on_event(ev(at_s(0), summon(0x4200, kMe)));
+    e.on_event(ev(at_s(4), hit(kBoss, 0x4200, 500)));
+    const FightSummary after = e.current();
+    TEST_ASSERT_EQ(row_of(after, kMe).damage_taken, uint64_t{0});
+}
+
+TEST_CASE(Engine, FightsCarryTheirMapVisit) {
+    EncounterEngine e = setup();
+    e.on_event(ev(at_s(10), hit(kMe, kAdd, 100)));
+    e.end_fight(EndReason::Manual, at_s(11));
+    e.on_event(ev(at_s(20), hit(kMe, kAdd, 100)));
+    e.end_fight(EndReason::Manual, at_s(21));
+    // Started mid-visit: the first fight opens it.
+    TEST_ASSERT_EQ(e.recent()[0].visit_ts, at_s(10));
+    TEST_ASSERT_EQ(e.recent()[1].visit_ts, at_s(10));
+
+    proto::MapLoad map;
+    map.map_id = 610010;
+    e.on_event(ev(at_s(30), map));
+    e.on_event(ev(at_s(31), npc(kBoss, kBossHp, 777)));
+    e.on_event(ev(at_s(40), hit(kMe, kBoss, 100)));
+    e.end_fight(EndReason::Manual, at_s(41));
+    // Loading the same map again is a teleport within the visit.
+    e.on_event(ev(at_s(50), map));
+    e.on_event(ev(at_s(60), hit(kMe, kBoss, 100)));
+    e.end_fight(EndReason::Manual, at_s(61));
+    TEST_ASSERT_EQ(e.recent()[2].visit_ts, at_s(30));
+    TEST_ASSERT_EQ(e.recent()[3].visit_ts, at_s(30));
 }

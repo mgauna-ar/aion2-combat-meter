@@ -178,6 +178,12 @@ All of it lives in `src/protocol`. `opcodes.hpp` is the one place opcodes are sp
     that `01 00` as "another record follows", and no capture has shown one yet.
   - **It carries heals too:** a support skill on an ally looks like any hit, and the
     ally's HP rises. Side inference must not trust a record between two players.
+    In the first capture these were layout 4 records, to the caster itself (Siphon,
+    Warding Strike) or to an ally or spirit (Spirit Communion). A spirit's record to
+    itself as it spawned carried 100,000, and is no heal.
+  - **Not decoded yet:** whether a hit missed, was blocked, or set off the target's
+    endurance, regeneration or invincibility, all of which the game's own window
+    counts; and multi-hit, which may be the 0x20 tail.
   - **Scale:** a mob's HP (00 8D) falls by a steady multiple of the damage varint:
     exactly 4.5 for one player, about 10.6 for two others, 1 for a mob hitting a
     player. The multiple is not anywhere in the record. The public meters (NOIA2,
@@ -229,6 +235,8 @@ All of it lives in `src/protocol`. `opcodes.hpp` is the one place opcodes are sp
   meter has not been compared yet;
 - the layout of `33 36`: the first capture started after login, so it had none;
 - multi-record `04 38` packets;
+- misses, blocks, multi-hit, and the target's endurance, regeneration and
+  invincibility (above);
 - the class codes in 33 36 / 45 36 (`meter/class_codes.cpp` is empty; skill codes
   give the class instead);
 - the right `boss_min_max_hp`;
@@ -257,8 +265,19 @@ All of it lives in `src/protocol`. `opcodes.hpp` is the one place opcodes are sp
     when the name arrives mid-fight.
   - A scanned identity never turns a spawned NPC or summon into a player.
   - A map change drops NPCs, summons and inferred sides. Players and names stay.
+- **Classes:** from the skill codes a player uses (their summons' count too), unless an
+  identity packet's class code names one.
 - **Party:** with no roster, every player counts. With one, only roster names do.
   Non-party hits still lower the boss's HP estimate.
+- **Healing and damage taken** count only during a fight, and never start or extend
+  one.
+  - Healing: heal ticks, and 04 38 records from a player (not a summon) to anyone on
+    the player side. It is the total, like the game's: no overheal split.
+  - Damage taken: an enemy's hits and ticks on a player. A summon's HP is its own.
+  - Both are booked for party members by the roster and the local player; with no
+    roster, for players already in the fight, so strangers nearby stay out.
+- **Skills:** each player's damage, healing and damage taken are kept per skill, keyed
+  by `skill_key()`: variants of one skill share a row.
 - **Fight start:** a direct hit that lands, from the player side on an enemy. A DoT tick
   never starts a fight.
 - **Fight end:** the boss's death (00 8D HP 0 or 42 36, after `kill_grace_s`, unless a
@@ -281,8 +300,10 @@ All of it lives in `src/protocol`. `opcodes.hpp` is the one place opcodes are sp
     and spawns again keeps the loss counted so far; its spawn HP is one more figure.
 - **History:**
   - What is saved: boss fights, and fights of at least `min_saved_duration_s`.
-  - Each fight is one JSON file (`"v":1`), written atomically, plus a line appended to
-    `index.jsonl`.
+  - Each fight is one JSON file (`"v":2`; version 1 files still load, without the
+    breakdowns), written atomically, plus a line appended to `index.jsonl`.
+  - Fights are grouped by map visit (`visit_ts`): a map load starts one, and so does
+    the first fight after the meter starts. A reload of the same map does not.
   - A cut-off index line is skipped. A missing index is rebuilt from the files.
   - Pruning keeps `history.max_fights`, in batches of 50.
 

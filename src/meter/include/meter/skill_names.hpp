@@ -12,6 +12,11 @@ namespace aion2::meter {
 /// (12240347 → 12240000). Other codes are their own skill.
 [[nodiscard]] uint32_t skill_base(uint32_t code) noexcept;
 
+/// The code a breakdown files a hit under: the code itself when the table names it,
+/// else its base skill. Variants of one skill share a row; one with its own name
+/// (Dismiss: Earth Spirit) keeps it.
+[[nodiscard]] uint32_t skill_key(uint32_t code) noexcept;
+
 /// The skill's English name, from src/meter/data/skills.tsv: the code's own row,
 /// else its base skill's. Empty when neither is listed, such as a spirit's attacks.
 [[nodiscard]] std::string_view skill_name(uint32_t code) noexcept;

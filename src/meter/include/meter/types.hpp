@@ -57,12 +57,47 @@ struct HitCounts {
     uint64_t hits{0};
     uint64_t crits{0};
     uint64_t back{0};
+    uint64_t front{0};
     uint64_t parry{0};
     uint64_t perfect{0};
     uint64_t doubles{0};
     uint64_t heavy{0};
 
     [[nodiscard]] bool operator==(const HitCounts&) const = default;
+
+    /// Of the hits, 0..1.
+    [[nodiscard]] double rate(uint64_t HitCounts::*count) const noexcept {
+        return hits == 0 ? 0.0 : static_cast<double>(this->*count) / static_cast<double>(hits);
+    }
+};
+
+/// One skill's damage in a player's breakdown: its direct hits and its ticks.
+struct SkillTotals {
+    /// skill_key(): the code's own row in the skill table, else its base skill.
+    uint32_t code{0};
+    /// Direct hits and ticks.
+    uint64_t damage{0};
+    uint64_t tick_damage{0};
+    uint64_t ticks{0};
+    /// Of the direct hits.
+    uint64_t min_hit{0};
+    uint64_t max_hit{0};
+    /// Direct hits only: ticks carry no crit, modifiers or direction.
+    HitCounts hits;
+
+    [[nodiscard]] bool operator==(const SkillTotals&) const = default;
+};
+
+/// Healing, or damage taken, from one skill.
+struct SkillAmount {
+    uint32_t code{0};
+    /// Damage taken only: the attacker's NPC code, 0 when its spawn was not seen.
+    uint32_t source_npc{0};
+    uint64_t amount{0};
+    uint64_t hits{0};
+    uint64_t max{0};
+
+    [[nodiscard]] bool operator==(const SkillAmount&) const = default;
 };
 
 /// One player's line in a fight: their damage and their summons'.
@@ -82,12 +117,26 @@ struct CombatantTotals {
     /// Of the fight's total, 0..1.
     double share{0.0};
 
-    [[nodiscard]] double crit_rate() const noexcept {
-        return hits.hits == 0 ? 0.0 : static_cast<double>(hits.crits) / static_cast<double>(hits.hits);
-    }
-    [[nodiscard]] double back_rate() const noexcept {
-        return hits.hits == 0 ? 0.0 : static_cast<double>(hits.back) / static_cast<double>(hits.hits);
-    }
+    /// Most damage first.
+    std::vector<SkillTotals> skills;
+
+    /// Heal ticks, and 04 38 records from this player to one on the player side.
+    /// The total, as the game's Combat Analysis counts it: no overheal split.
+    uint64_t healing{0};
+    uint64_t heal_hits{0};
+    double hps{0.0};
+    /// Most healing first.
+    std::vector<SkillAmount> heal_skills;
+
+    /// Hits and ticks from enemies landing on this player.
+    uint64_t damage_taken{0};
+    /// The direct hits among them, with their crits, modifiers and directions.
+    HitCounts taken;
+    /// By attacking skill and NPC, most damage first.
+    std::vector<SkillAmount> taken_by;
+
+    [[nodiscard]] double crit_rate() const noexcept { return hits.rate(&HitCounts::crits); }
+    [[nodiscard]] double back_rate() const noexcept { return hits.rate(&HitCounts::back); }
 };
 
 /// The enemy a fight is fought against: the damaged one with the most max HP.
@@ -133,6 +182,9 @@ struct CaptureQuality {
 struct FightSummary {
     uint64_t id{0};
     uint32_t map_id{0};
+    /// When the map visit this fight belongs to began: its map load, or the first
+    /// fight since the meter started. The history groups and numbers fights by it.
+    Micros visit_ts{0};
     Micros start_ts{0};
     /// The last landed hit: idle time after it never dilutes DPS.
     Micros end_ts{0};
@@ -144,6 +196,7 @@ struct FightSummary {
     std::vector<CombatantTotals> combatants;
     uint64_t total_damage{0};
     double total_dps{0.0};
+    uint64_t total_healing{0};
     CaptureQuality quality;
 };
 

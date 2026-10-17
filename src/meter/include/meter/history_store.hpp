@@ -18,11 +18,16 @@ struct HistoryEntry {
     std::string file;
     uint64_t id{0};
     uint32_t map_id{0};
+    /// The fight's map visit (FightSummary::visit_ts); 0 in a version 1 record.
+    Micros visit_ts{0};
     Micros start_ts{0};
     double duration_s{0.0};
     std::string boss_label;
     bool is_boss{false};
     bool killed{false};
+    /// The boss's HP left at the end, 0..1, when it lived and its HP was known.
+    bool boss_hp_known{false};
+    double boss_hp_left{0.0};
     bool partial{false};
     uint64_t total_damage{0};
     double total_dps{0.0};
@@ -56,6 +61,9 @@ public:
     [[nodiscard]] std::optional<FightSummary> load(const std::string& file) const;
     /// Deletes all but the newest `keep` fights. The number deleted.
     size_t prune(size_t keep);
+    /// Deletes every fight record in the folder and the index; other files stay.
+    /// The number of fights deleted.
+    size_t clear();
 
     [[nodiscard]] const std::filesystem::path& dir() const noexcept { return m_dir; }
     [[nodiscard]] std::filesystem::path index_path() const { return m_dir / "index.jsonl"; }

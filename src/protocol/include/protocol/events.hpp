@@ -76,6 +76,13 @@ struct MapLoad {
     [[nodiscard]] bool is_instance() const noexcept { return map_id >= 600000 && map_id < 700000; }
 };
 
+/// Where a long-layout hit (5..7) landed relative to its target.
+namespace hit_direction {
+inline constexpr uint8_t None = 0;
+inline constexpr uint8_t Back = 1;
+inline constexpr uint8_t Front = 2;
+} // namespace hit_direction
+
 namespace hit_modifier {
 inline constexpr uint8_t Parry = 0x02;
 inline constexpr uint8_t Perfect = 0x04;
@@ -93,12 +100,16 @@ struct Damage {
     bool crit{false};
     /// hit_modifier bits. Only the long layouts (5..7) carry them.
     uint8_t modifiers{0};
-    bool back_attack{false};
+    /// hit_direction, as the wire has it. Layout 4 carries none.
+    uint8_t direction{hit_direction::None};
     /// The hit: all of it. A real capture's HP updates (00 8D) fall by this alone.
     uint64_t amount{0};
     /// The values behind switch bit 0x20. Not damage: the target's HP does not fall
     /// by them. Kept for --events while their meaning is unknown.
     std::vector<uint64_t> extra_hits;
+
+    [[nodiscard]] bool back() const noexcept { return direction == hit_direction::Back; }
+    [[nodiscard]] bool front() const noexcept { return direction == hit_direction::Front; }
 };
 
 /// A damage-over-time or heal-over-time tick.
