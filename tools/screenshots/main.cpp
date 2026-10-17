@@ -283,7 +283,10 @@ int main(int argc, char** argv) {
     if (!setup_imgui(font)) return 1;
 
     const auto session = test::synthetic::boss_session();
+    // Locked, as it is in play: no header buttons and no resize grip, which only an
+    // unlocked overlay draws.
     app::OverlaySettings settings;
+    settings.locked = true;
 
     Scene live{"overlay-live.png", 430.0f, 215.0f, replay_until(session, 30.0, nullptr)};
 
