@@ -52,9 +52,10 @@ std::string Report::name(const std::string& real, uint32_t id) const {
 
 std::string Report::who(uint32_t id, const meter::CombatantRegistry& registry) const {
     const meter::Actor* a = registry.find(id);
+    const meter::Character* c = registry.character(registry.character_of(id));
     std::string label;
-    if (a != nullptr && !a->name.empty()) {
-        label = name(a->name, id);
+    if (c != nullptr) {
+        label = name(c->name, id);
     } else if (a != nullptr && a->npc_code != 0) {
         label = "NPC #" + std::to_string(a->npc_code);
     } else {

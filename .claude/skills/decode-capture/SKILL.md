@@ -62,6 +62,10 @@ make replay
   - If the amounts are off by a field, look at `read_damage_record`: the "optional 00
     pad" and the scalar varint are the likeliest culprits.
   - `--dump 0438 --limit 10` shows raw bodies next to `--events` output by time.
+- **Ids across maps:** around each `map` event, note the party's ids before and after,
+  and whether their identities come after it. Does a player keep their id? Does an old
+  id come back as someone else, or as an NPC? AGENTS.md's Sides rules assume ids can
+  move and be reused; confirm that, or simplify them.
 - **Spawn:** a boss spawn's `hp` should be its max HP. The `npc` field should be stable
   across sightings of the same boss. If it is not, the u24 after the mask is the wrong
   place for the npc code.

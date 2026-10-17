@@ -192,7 +192,7 @@ void EncounterEngine::on_tick(const proto::Tick& t, Micros ts) {
 bool EncounterEngine::counts_in_fight(EntityId player) const {
     if (!m_fight || !m_registry.in_party(player)) return false;
     if (m_registry.has_roster() || player == m_registry.local_player()) return true;
-    return m_fight->players.contains(player);
+    return m_fight->players.contains(row_key(player));
 }
 
 void EncounterEngine::book_heal(EntityId actor, EntityId target, uint64_t amount, uint32_t skill, bool record) {
@@ -200,10 +200,10 @@ void EncounterEngine::book_heal(EntityId actor, EntityId target, uint64_t amount
     const EntityId healer = m_registry.resolve(actor);
     if (m_registry.side(healer) != Side::Player || m_registry.side(m_registry.resolve(target)) != Side::Player) return;
     // Not a summon's record: a spirit's to itself, as it spawned, carried 100,000.
-    if (record && m_registry.follow_alias(actor) != healer) return;
+    if (record && actor != healer) return;
     if (!counts_in_fight(healer)) return;
     m_registry.on_skill_class(healer, class_of_skill(skill));
-    Accum& acc = m_fight->players[healer];
+    Accum& acc = m_fight->players[row_key(healer)];
     acc.healing += amount;
     ++acc.heal_hits;
     const uint32_t key = skill_key(skill);
@@ -216,12 +216,12 @@ void EncounterEngine::book_taken(EntityId actor, EntityId target, uint64_t amoun
                                  const proto::Damage* direct) {
     if (!m_fight) return;
     // A summon's HP is its own, not its owner's.
-    const EntityId victim = m_registry.follow_alias(target);
-    if (m_registry.resolve(target) != victim || m_registry.side(victim) != Side::Player) return;
+    const EntityId victim = target;
+    if (m_registry.resolve(victim) != victim || m_registry.side(victim) != Side::Player) return;
     const EntityId attacker = m_registry.resolve(actor);
     if (m_registry.side_or_guess(attacker) != Side::Enemy) return;
     if (!counts_in_fight(victim)) return;
-    Accum& acc = m_fight->players[victim];
+    Accum& acc = m_fight->players[row_key(victim)];
     acc.taken += amount;
     if (direct != nullptr) count(acc.taken_hits, *direct);
     const Actor* a = m_registry.find(attacker);
@@ -256,7 +256,7 @@ void EncounterEngine::credit(EntityId actor, EntityId target, uint64_t amount, u
     }
 
     Fight& fight = *m_fight;
-    Accum& acc = fight.players[player];
+    Accum& acc = fight.players[row_key(player)];
     acc.damage += amount;
     acc.max_hit = std::max(acc.max_hit, amount);
     const uint32_t key = skill_key(skill);
@@ -277,7 +277,7 @@ void EncounterEngine::credit(EntityId actor, EntityId target, uint64_t amount, u
     if (ts > fight.last_hit_ts) fight.last_hit_ts = ts;
     // Only the player's own hand proves them alive: their DoTs and summons keep
     // going after they die.
-    if (direct != nullptr && m_registry.follow_alias(actor) == player) m_registry.on_revive(player);
+    if (direct != nullptr && actor == player) m_registry.on_revive(player);
 }
 
 void EncounterEngine::on_values(const proto::RemainingHp& v, Micros ts) {
@@ -305,8 +305,12 @@ void EncounterEngine::on_death(EntityId id, Micros ts) {
 }
 
 void EncounterEngine::on_map(const proto::MapLoad& m, Micros ts) {
-    // Loading the map you are on is a teleport within it.
-    if (m.map_id == m_map_id) return;
+    // Loading the map you are on is a teleport within it, or a new instance of
+    // it: the fight and the visit go on, but players may have new ids.
+    if (m.map_id == m_map_id) {
+        m_registry.on_map_reload();
+        return;
+    }
     if (m_fight) finish(EndReason::MapChange, ts);
     m_map_id = m.map_id;
     m_visit_ts = ts;
@@ -317,9 +321,10 @@ void EncounterEngine::on_map(const proto::MapLoad& m, Micros ts) {
 
 bool EncounterEngine::party_wiped(const Fight& fight) const {
     bool any = false;
-    for (const auto& [id, acc] : fight.players) {
-        // resolve(): a row may predate the alias that joined it to another id.
-        const Actor* a = m_registry.find(m_registry.resolve(id));
+    for (const auto& [key, acc] : fight.players) {
+        // An id that has since become someone else says nothing of this row.
+        if (key.who != 0 && m_registry.character_of(key.id) != key.who) continue;
+        const Actor* a = m_registry.find(key.id);
         if (a == nullptr || !a->dead) return false;
         any = true;
     }
@@ -421,20 +426,41 @@ FightSummary EncounterEngine::summarize(const Fight& fight, bool live, EndReason
     s.duration_s = std::max(span, kMinDurationSeconds);
     s.boss = boss_of(fight);
 
-    // By the player each row resolves to now: a row may predate the alias that
-    // joined two ids of one player.
-    std::unordered_map<EntityId, Accum> players;
-    for (const auto& [id, acc] : fight.players) players[m_registry.resolve(id)].merge(acc);
-    for (const auto& [id, acc] : players) {
+    // One row per character, whatever ids it had; an id named after it hit joins
+    // its character. Unnamed ids stay apart.
+    struct Group {
+        EntityId id{0};
+        CharacterId who{0};
+        bool local{false};
+        Accum acc;
+    };
+    std::unordered_map<uint64_t, Group> groups;
+    for (const auto& [key, acc] : fight.players) {
+        const CharacterId who = key.who != 0 ? key.who : m_registry.character_of(key.id);
+        const uint64_t group_key = who != 0 ? (uint64_t{1} << 32) | who : key.id;
+        Group& g = groups.try_emplace(group_key, Group{key.id, who, false, {}}).first->second;
+        // The lowest id, so a row keeps its id from one snapshot to the next.
+        g.id = std::min(g.id, key.id);
+        g.local = g.local || key.id == m_registry.local_player();
+        g.acc.merge(acc);
+    }
+    for (const auto& [group_key, g] : groups) {
+        const EntityId id = g.id;
+        const Accum& acc = g.acc;
         CombatantTotals row;
         row.id = id;
-        row.name = m_registry.display_name(id);
-        if (const Actor* a = m_registry.find(id)) {
-            row.cls = a->cls;
-            row.class_code = a->class_code;
+        if (const Character* c = m_registry.character(g.who)) {
+            row.name = c->name;
+            row.class_code = c->class_code;
+            row.cls = c->cls != AionClass::Unknown ? c->cls : m_registry.class_of(id);
+            row.is_local = g.local || g.who == m_registry.local_character();
+            row.in_party = m_registry.character_in_party(g.who);
+        } else {
+            row.name = m_registry.display_name(id);
+            row.cls = m_registry.class_of(id);
+            row.is_local = g.local;
+            row.in_party = m_registry.in_party(id);
         }
-        row.is_local = id == m_registry.local_player() && id != 0;
-        row.in_party = m_registry.in_party(id);
         row.damage = acc.damage;
         row.dot_damage = acc.dot_damage;
         row.max_hit = acc.max_hit;

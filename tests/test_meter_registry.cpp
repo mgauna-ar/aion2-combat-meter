@@ -113,14 +113,72 @@ TEST_CASE(Registry, FoldedRangeGuessIsAnEnemy) {
     TEST_ASSERT(r.side(77) == Side::Player);
 }
 
-TEST_CASE(Registry, SameNameOnTwoIdsIsOnePlayer) {
+TEST_CASE(Registry, SameNameOnTwoIdsIsOneCharacter) {
     CombatantRegistry r;
     r.on_identity(player(100, "Ariel", true));
     r.on_identity(player(140, "Ariel", false));
-    TEST_ASSERT_EQ(r.resolve(140), EntityId{100});
+    TEST_ASSERT(r.character_of(140) != 0);
+    TEST_ASSERT_EQ(r.character_of(140), r.character_of(100));
+    // Never joined as ids: each stays its own.
+    TEST_ASSERT_EQ(r.resolve(140), EntityId{140});
     // A different server is a different character.
     r.on_identity(player(150, "Ariel", false, 0x0999));
-    TEST_ASSERT_EQ(r.resolve(150), EntityId{150});
+    TEST_ASSERT(r.character_of(150) != r.character_of(100));
+}
+
+TEST_CASE(Registry, AnIdNamedAgainIsTheNewCharacter) {
+    CombatantRegistry r;
+    r.on_identity(player(301, "Rhea"));
+    r.on_skill_class(301, AionClass::Ranger);
+    r.on_identity(player(301, "Kaisinel"));
+    TEST_ASSERT_EQ(r.display_name(301), std::string("Kaisinel"));
+    // The Ranger's skills were Rhea's, not Kaisinel's.
+    TEST_ASSERT(r.class_of(301) == AionClass::Unknown);
+}
+
+TEST_CASE(Registry, ANameOnANewIdLeavesItsIdFromAnEarlierMap) {
+    CombatantRegistry r;
+    r.on_identity(player(301, "Rhea"));
+    r.on_identity(player(302, "Kaisinel"));
+    r.on_map_change();
+    // Still named until something says otherwise: ids may outlive the map.
+    TEST_ASSERT_EQ(r.display_name(301), std::string("Rhea"));
+    r.on_identity(player(305, "Rhea"));
+    TEST_ASSERT_EQ(r.display_name(305), std::string("Rhea"));
+    TEST_ASSERT(r.find(301) == nullptr);
+    // On the same map, both ids keep the name: they may both be in use.
+    r.on_identity(player(306, "Rhea"));
+    TEST_ASSERT_EQ(r.display_name(305), std::string("Rhea"));
+    TEST_ASSERT_EQ(r.display_name(306), std::string("Rhea"));
+}
+
+TEST_CASE(Registry, AStaleIdGivesWayToASpawn) {
+    CombatantRegistry r;
+    r.on_identity(player(301, "Rhea"));
+    // On the map it was named on, a spawn is the player coming into view.
+    r.on_spawn(npc(301, 1000));
+    TEST_ASSERT(r.side(301) == Side::Player);
+    r.on_map_reload();
+    r.on_spawn(npc(301, 1000));
+    TEST_ASSERT(r.side(301) == Side::Enemy);
+    TEST_ASSERT_EQ(r.display_name(301), std::string("#301"));
+}
+
+TEST_CASE(Registry, TheLocalPlayersNameFollowsThemToANewId) {
+    CombatantRegistry r;
+    r.on_identity(player(100, "Ariel", true));
+    r.on_map_change();
+    r.on_self_values(130);
+    TEST_ASSERT_EQ(r.local_player(), EntityId{130});
+    TEST_ASSERT_EQ(r.display_name(130), std::string("Ariel"));
+    TEST_ASSERT(r.find(100) == nullptr);
+    // Their old id, given to a spawn on the next map, is the spawn's.
+    r.on_identity(player(140, "Lumiel"));
+    r.on_map_change();
+    r.on_spawn(npc(130, 1000));
+    TEST_ASSERT_EQ(r.local_player(), EntityId{0});
+    r.on_self_values(150);
+    TEST_ASSERT_EQ(r.display_name(150), std::string("Ariel"));
 }
 
 TEST_CASE(Registry, MapChangeKeepsPlayersDropsNpcs) {
@@ -170,7 +228,27 @@ TEST_CASE(Registry, ScannedIdentityNeverTurnsAnNpcIntoAPlayer) {
     TEST_ASSERT_EQ(r.display_name(0x4100), std::string("#16640"));
 }
 
-TEST_CASE(Registry, NamelessOwnIdentityFollowsTheAlias) {
+TEST_CASE(Registry, ScannedIdentityNeverRenamesOrMovesAPlayer) {
+    CombatantRegistry r;
+    r.on_identity(player(301, "Rhea"));
+    r.on_identity(player(302, "Kaisinel"));
+    // A scan may misread the id in front of a name.
+    proto::Identity rename = player(301, "Kaisinel");
+    rename.scanned = true;
+    r.on_identity(rename);
+    TEST_ASSERT_EQ(r.display_name(301), std::string("Rhea"));
+    proto::Identity elsewhere = player(777, "Rhea");
+    elsewhere.scanned = true;
+    r.on_identity(elsewhere);
+    TEST_ASSERT(r.find(777) == nullptr);
+    // A name nobody holds can still be found by one.
+    proto::Identity fresh = player(778, "Lumiel");
+    fresh.scanned = true;
+    r.on_identity(fresh);
+    TEST_ASSERT_EQ(r.display_name(778), std::string("Lumiel"));
+}
+
+TEST_CASE(Registry, NamelessOwnIdentityKeepsTheIdsName) {
     CombatantRegistry r;
     r.on_identity(player(100, "Ariel"));
     r.on_identity(player(140, "Ariel"));
@@ -178,6 +256,7 @@ TEST_CASE(Registry, NamelessOwnIdentityFollowsTheAlias) {
     own.id = 140;
     own.own = true;
     r.on_identity(own);
-    TEST_ASSERT_EQ(r.local_player(), EntityId{100});
+    TEST_ASSERT_EQ(r.local_player(), EntityId{140});
+    TEST_ASSERT_EQ(r.display_name(140), std::string("Ariel"));
     TEST_ASSERT(r.in_party(140));
 }

@@ -248,7 +248,11 @@ All of it lives in `src/protocol`. `opcodes.hpp` is the one place opcodes are sp
 - the right `boss_min_max_hp`;
 - whether the folded id range means anything: in the first capture NPC and player ids
   were all small numbers, side by side, none folded;
-- the game's executable name (`Aion2.exe` is reported by third-party guides).
+- the game's executable name (`Aion2.exe` is reported by third-party guides);
+- whether ids change on a map load, and whether the server hands a player's old id to
+  someone else. A party whose Ranger and Elementalist shared one row, the name
+  switching from pull to pull, points to both, but no capture has shown a map load
+  yet. The meter assumes both can happen (Meter rules, Sides).
 
 ---
 
@@ -267,10 +271,23 @@ All of it lives in `src/protocol`. `opcodes.hpp` is the one place opcodes are sp
     inference: mobs do not fight mobs, and 04 38 also carries heals between players.
   - 00 8D's own values make the local player, shown as "You" until 33 36 names them.
   - With no anchor at all, an id in the folded range is guessed to be an enemy.
-  - Two ids with the same name@server are one player (aliases). Their rows merge even
-    when the name arrives mid-fight.
-  - A scanned identity never turns a spawned NPC or summon into a player.
-  - A map change drops NPCs, summons and inferred sides. Players and names stay.
+  - **Ids belong to the map, and the server hands them out again.** A player's id on
+    one map can be another player's, or an NPC's, on the next. So rows belong to
+    characters (name@server), not ids:
+    - an id is one character at a time: the last identity for it says which;
+    - a hit goes to its id's row for the character the id was then, and the summary
+      joins a character's rows. An id named after it hit joins its character. Ids are
+      never joined to each other, so two characters never share a row;
+    - a map load, or a reload of the same map (a teleport, or a new instance of it),
+      leaves players stale rather than dropping them, since their names may have come
+      before it. A spawn on a stale id makes it the spawn, and a character named on a
+      new id leaves its stale one. On the map they were named on, two ids can share a
+      name;
+    - the local player's name follows 00 8D's own values to their new id.
+  - A scanned identity may have misread the id before the name. It never turns a
+    spawned NPC or summon into a player, renames a player, or takes a name that an
+    identity gave another id on this map.
+  - A map change drops NPCs, summons and inferred sides.
 - **Classes:** from the skill codes a player uses (their summons' count too), unless an
   identity packet's class code names one.
 - **Party:** with no roster, every player counts. With one, only roster names do.
@@ -287,8 +304,8 @@ All of it lives in `src/protocol`. `opcodes.hpp` is the one place opcodes are sp
 - **Fight start:** a direct hit that lands, from the player side on an enemy. A DoT tick
   never starts a fight.
 - **Fight end:** the boss's death (00 8D HP 0 or 42 36, after `kill_grace_s`, unless a
-  bigger boss was hit during the grace), a map change (not a reload of the same map,
-  which is a teleport), idle time with no party hit (`idle_timeout_s`, or
+  bigger boss was hit during the grace), a map change (not a reload of the same map:
+  a teleport, or a new instance of it), idle time with no party hit (`idle_timeout_s`, or
   `boss_idle_timeout_s` while a boss stands), no traffic (`capture_lost_s`), a wipe
   (when enabled) or by hand.
   - A dead player stays dead for the wipe check while their DoTs and summons keep

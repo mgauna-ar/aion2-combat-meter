@@ -4,6 +4,8 @@
 #include "meter/encounter_engine.hpp"
 
 #include <algorithm>
+#include <optional>
+#include <string>
 
 using namespace aion2;
 using namespace aion2::meter;
@@ -520,4 +522,85 @@ TEST_CASE(Engine, FightsCarryTheirMapVisit) {
     e.end_fight(EndReason::Manual, at_s(61));
     TEST_ASSERT_EQ(e.recent()[2].visit_ts, at_s(30));
     TEST_ASSERT_EQ(e.recent()[3].visit_ts, at_s(30));
+}
+
+namespace {
+
+/// The damage on the row named `name`, or nullopt with no such row.
+std::optional<uint64_t> damage_by_name(const FightSummary& s, const std::string& name) {
+    const auto it = std::find_if(s.combatants.begin(), s.combatants.end(),
+                                 [&](const CombatantTotals& c) { return c.name == name; });
+    if (it == s.combatants.end()) return std::nullopt;
+    return it->damage;
+}
+
+} // namespace
+
+TEST_CASE(Engine, IdsHandedToOtherPlayersOnANewMapKeepThemApart) {
+    // Ids are the server's per map, and it reuses them: on the second map the
+    // Ranger has the Elementalist's old id, and on the third they swap back.
+    EncounterEngine e = setup();
+    e.on_event(ev(at_s(0), roster({"Ariel", "Lumiel", "Rhea", "Kaisinel"})));
+    e.on_event(ev(at_s(0), proto::MapLoad{1, 610010}));
+    e.on_event(ev(at_s(0), player(301, "Rhea")));
+    e.on_event(ev(at_s(0), player(302, "Kaisinel")));
+    e.on_event(ev(at_s(0), npc(kBoss, kBossHp, 777)));
+    e.on_event(ev(at_s(1), hit(301, kBoss, 100)));
+    e.on_event(ev(at_s(1), hit(302, kBoss, 200)));
+
+    e.on_event(ev(at_s(10), proto::MapLoad{2, 620020}));
+    e.on_event(ev(at_s(10), player(302, "Rhea")));
+    e.on_event(ev(at_s(10), player(305, "Kaisinel")));
+    e.on_event(ev(at_s(10), npc(0x4200, kBossHp, 888)));
+    e.on_event(ev(at_s(11), hit(302, 0x4200, 1000)));
+    e.on_event(ev(at_s(11), hit(305, 0x4200, 500)));
+    FightSummary s = e.current();
+    TEST_ASSERT_EQ(s.combatants.size(), size_t{2});
+    TEST_ASSERT_EQ(damage_by_name(s, "Rhea"), std::optional<uint64_t>{1000});
+    TEST_ASSERT_EQ(damage_by_name(s, "Kaisinel"), std::optional<uint64_t>{500});
+
+    e.on_event(ev(at_s(20), proto::MapLoad{3, 630030}));
+    e.on_event(ev(at_s(20), player(305, "Rhea")));
+    e.on_event(ev(at_s(20), player(302, "Kaisinel")));
+    e.on_event(ev(at_s(20), npc(0x4300, kBossHp, 999)));
+    e.on_event(ev(at_s(21), hit(305, 0x4300, 700)));
+    e.on_event(ev(at_s(21), hit(302, 0x4300, 300)));
+    s = e.current();
+    TEST_ASSERT_EQ(s.combatants.size(), size_t{2});
+    TEST_ASSERT_EQ(damage_by_name(s, "Rhea"), std::optional<uint64_t>{700});
+    TEST_ASSERT_EQ(damage_by_name(s, "Kaisinel"), std::optional<uint64_t>{300});
+}
+
+TEST_CASE(Engine, AnOldPlayersIdCanBeTheNextMapsBoss) {
+    EncounterEngine e = setup();
+    e.on_event(ev(at_s(0), player(301, "Rhea")));
+    e.on_event(ev(at_s(10), proto::MapLoad{2, 620020}));
+    e.on_event(ev(at_s(10), npc(301, kBossHp, 999)));
+    e.on_event(ev(at_s(11), hit(kMe, 301, 1000)));
+    const FightSummary s = e.current();
+    TEST_ASSERT(e.in_fight());
+    TEST_ASSERT_EQ(s.total_damage, uint64_t{1000});
+    TEST_ASSERT_EQ(s.boss.id, EntityId{301});
+    TEST_ASSERT(s.boss.is_boss);
+}
+
+TEST_CASE(Engine, ANewInstanceOfTheSameMapKeepsTheFightAndItsPlayersApart) {
+    EncounterEngine e = setup();
+    e.on_event(ev(at_s(0), proto::MapLoad{1, 610010}));
+    e.on_event(ev(at_s(0), player(301, "Rhea")));
+    e.on_event(ev(at_s(0), player(302, "Kaisinel")));
+    e.on_event(ev(at_s(0), npc(kBoss, kBossHp, 777)));
+    e.on_event(ev(at_s(1), hit(301, kBoss, 100)));
+    e.on_event(ev(at_s(1), hit(302, kBoss, 200)));
+    // The same map again: the fight goes on, with new ids.
+    e.on_event(ev(at_s(5), proto::MapLoad{2, 610010}));
+    e.on_event(ev(at_s(5), player(302, "Rhea")));
+    e.on_event(ev(at_s(5), player(305, "Kaisinel")));
+    e.on_event(ev(at_s(6), hit(302, kBoss, 1000)));
+    e.on_event(ev(at_s(6), hit(305, kBoss, 500)));
+    TEST_ASSERT(e.in_fight());
+    const FightSummary s = e.current();
+    TEST_ASSERT_EQ(s.combatants.size(), size_t{2});
+    TEST_ASSERT_EQ(damage_by_name(s, "Rhea"), std::optional<uint64_t>{1100});
+    TEST_ASSERT_EQ(damage_by_name(s, "Kaisinel"), std::optional<uint64_t>{700});
 }

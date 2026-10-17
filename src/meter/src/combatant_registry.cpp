@@ -36,64 +36,136 @@ const Actor* CombatantRegistry::find(EntityId id) const {
     return it == m_actors.end() ? nullptr : &it->second;
 }
 
+Actor* CombatantRegistry::find_mut(EntityId id) {
+    const auto it = m_actors.find(id);
+    return it == m_actors.end() ? nullptr : &it->second;
+}
+
+CharacterId CombatantRegistry::character_of(EntityId id) const {
+    const Actor* a = find(id);
+    return a == nullptr ? 0 : a->character;
+}
+
+const Character* CombatantRegistry::character(CharacterId who) const {
+    return who == 0 || who > m_characters.size() ? nullptr : &m_characters[who - 1];
+}
+
+CharacterId CombatantRegistry::character_for(const proto::Identity& identity) {
+    const auto [it, inserted] = m_by_name.try_emplace(name_key(identity.name, identity.server), 0);
+    if (inserted) {
+        m_characters.push_back(Character{identity.name, identity.server});
+        it->second = static_cast<CharacterId>(m_characters.size());
+    }
+    return it->second;
+}
+
+void CombatantRegistry::forget(EntityId id) {
+    if (id == m_local) m_local = 0;
+    m_actors.erase(id);
+}
+
+void CombatantRegistry::bind(Actor& a, CharacterId who) {
+    Character& c = m_characters[who - 1];
+    // Its id from an earlier map may be anyone's by now.
+    if (c.id != 0 && c.id != a.id) {
+        if (const Actor* old = find(c.id); old != nullptr && old->character == who && old->stale) {
+            const bool was_local = c.id == m_local;
+            forget(c.id);
+            if (was_local) {
+                m_local = a.id;
+                a.is_local = true;
+            }
+        }
+    }
+    a.character = who;
+    c.id = a.id;
+    if (a.id == m_local) m_local_character = who;
+    // Skills seen before the name.
+    if (c.cls == AionClass::Unknown) c.cls = a.cls;
+}
+
+bool CombatantRegistry::scan_can_name(const proto::Identity& identity) const {
+    if (identity.name.empty()) return false;
+    const auto named = m_by_name.find(name_key(identity.name, identity.server));
+    const CharacterId who = named == m_by_name.end() ? 0 : named->second;
+    // Not a spawned NPC or summon, nor a player an identity named on this map.
+    if (const Actor* a = find(identity.id); a != nullptr) {
+        if (a->spawned) return false;
+        if (a->character != 0 && a->character != who && !a->stale) return false;
+    }
+    // Nor a name an identity gave another id on this map.
+    if (const Character* c = character(who); c != nullptr && c->id != 0 && c->id != identity.id) {
+        const Actor* holder = find(c->id);
+        if (holder != nullptr && holder->character == who && !holder->stale) return false;
+    }
+    return true;
+}
+
 void CombatantRegistry::on_identity(const proto::Identity& identity) {
     if (identity.id == 0) return;
-    // A scan's look-alike never turns a spawned NPC or summon into a player.
-    if (const Actor* known = find(identity.id); identity.scanned && known != nullptr && known->spawned) return;
-    // With no name to go by, an id already known as another's alias stays theirs.
-    EntityId canonical = identity.name.empty() ? follow_alias(identity.id) : identity.id;
-    if (!identity.name.empty()) {
-        const std::string key = name_key(identity.name, identity.server);
-        const auto [it, inserted] = m_by_name.try_emplace(key, identity.id);
-        if (!inserted && it->second != identity.id) {
-            canonical = it->second;
-            m_alias[identity.id] = canonical;
-        }
+    // A scan's look-alike may have misread the id in front of the name.
+    if (identity.scanned && !scan_can_name(identity)) return;
+    const CharacterId who = identity.name.empty() ? 0 : character_for(identity);
+    Actor& a = get_or_create(identity.id);
+    // A spawn's id, or another character's: the server has handed it on, and
+    // nothing known about it holds any more.
+    if (a.spawned || (who != 0 && a.character != 0 && a.character != who)) {
+        if (identity.id == m_local && !identity.own) m_local = 0;
+        a = Actor{};
+        a.id = identity.id;
     }
-
-    for (const EntityId id : {identity.id, canonical}) {
-        Actor& a = get_or_create(id);
-        a.is_player = true;
-        if (!identity.name.empty()) {
-            a.name = identity.name;
-            a.server = identity.server;
-            a.class_code = identity.class_code;
-            // An unknown code keeps the class the player's skills gave.
-            if (const AionClass cls = class_from_code(identity.class_code); cls != AionClass::Unknown) a.cls = cls;
-        }
-        a.spawned = false;
-        a.owner = 0;
-        a.inferred_side = Side::Unknown;
+    a.is_player = true;
+    a.inferred_side = Side::Unknown;
+    if (who != 0) {
+        a.stale = false;
+        bind(a, who);
+        Character& c = m_characters[who - 1];
+        c.class_code = identity.class_code;
+        // An unknown code keeps the class the player's skills gave.
+        if (const AionClass cls = class_from_code(identity.class_code); cls != AionClass::Unknown) c.cls = cls;
     }
-    if (identity.own) set_local(identity.id, canonical);
+    if (identity.own) set_local(identity.id);
     settle_pending(identity.id);
 }
 
 void CombatantRegistry::on_skill_class(EntityId player, AionClass cls) {
     if (player == 0 || cls == AionClass::Unknown) return;
-    for (const EntityId id : {player, follow_alias(player)}) {
-        const auto it = m_actors.find(id);
-        if (it != m_actors.end() && it->second.cls == AionClass::Unknown) it->second.cls = cls;
+    Actor* a = find_mut(player);
+    if (a == nullptr) return;
+    if (a->cls == AionClass::Unknown) a->cls = cls;
+    // A stale id's skills may be whoever has it now.
+    if (a->character != 0 && !a->stale) {
+        Character& c = m_characters[a->character - 1];
+        if (c.cls == AionClass::Unknown) c.cls = cls;
     }
 }
 
-void CombatantRegistry::set_local(EntityId id, EntityId canonical) {
-    if (m_local != 0 && m_local != canonical) get_or_create(m_local).is_local = false;
-    m_local = canonical;
-    get_or_create(canonical).is_local = true;
-    get_or_create(id).is_local = true;
+void CombatantRegistry::set_local(EntityId id) {
+    if (m_local != 0 && m_local != id) {
+        if (Actor* before = find_mut(m_local)) before->is_local = false;
+    }
+    m_local = id;
+    Actor& a = get_or_create(id);
+    a.is_local = true;
+    if (a.character != 0) {
+        m_local_character = a.character;
+    } else if (m_local_character != 0) {
+        // One character, on a new id: their name moves with them.
+        bind(a, m_local_character);
+    }
 }
 
 void CombatantRegistry::on_self_values(EntityId id) {
     if (id == 0) return;
-    const EntityId canonical = resolve(id);
-    if (canonical == m_local) return;
     Actor& a = get_or_create(id);
     // An NPC or a summon is never the local player.
     if (a.spawned) return;
+    // Only the local player gets these: the id is theirs on this map.
+    a.stale = false;
+    if (id == m_local) return;
     a.is_player = true;
     a.inferred_side = Side::Unknown;
-    set_local(id, canonical);
+    set_local(id);
     settle_pending(id);
 }
 
@@ -112,9 +184,15 @@ void CombatantRegistry::on_hp(EntityId id, uint64_t hp) {
 void CombatantRegistry::on_spawn(const proto::Spawn& spawn) {
     if (spawn.id == 0) return;
     Actor& a = get_or_create(spawn.id);
-    // A spawn for an id an identity packet named is a player appearing in view;
-    // it says nothing about their side.
-    if (a.is_player) return;
+    // A spawn for an id an identity named on this map is a player appearing in
+    // view; it says nothing about their side. One named on an earlier map has
+    // been handed on.
+    if (a.is_player && !a.stale) return;
+    if (a.is_player) {
+        if (spawn.id == m_local) m_local = 0;
+        a = Actor{};
+        a.id = spawn.id;
+    }
     a.spawned = true;
     a.spawn_kind = spawn.kind;
     a.npc_code = spawn.npc_code;
@@ -137,17 +215,22 @@ void CombatantRegistry::on_spawn(const proto::Spawn& spawn) {
 void CombatantRegistry::on_death(EntityId id) {
     if (id == 0) return;
     // Not resolve(): a summon dying leaves its owner alive.
-    get_or_create(follow_alias(id)).dead = true;
+    get_or_create(id).dead = true;
 }
 
 void CombatantRegistry::on_revive(EntityId id) {
-    const auto it = m_actors.find(follow_alias(id));
-    if (it != m_actors.end()) it->second.dead = false;
+    if (Actor* a = find_mut(id)) a->dead = false;
 }
 
 void CombatantRegistry::on_party(const proto::PartyRoster& roster) {
     m_roster.clear();
     for (const auto& member : roster.members) m_roster.insert(member.name);
+}
+
+void CombatantRegistry::mark_players_stale() {
+    for (auto& [id, a] : m_actors) {
+        if (a.is_player) a.stale = true;
+    }
 }
 
 void CombatantRegistry::on_map_change() {
@@ -159,12 +242,14 @@ void CombatantRegistry::on_map_change() {
             it = m_actors.erase(it);
         }
     }
+    mark_players_stale();
     m_pending.clear();
 }
 
+void CombatantRegistry::on_map_reload() { mark_players_stale(); }
+
 EntityId CombatantRegistry::resolve(EntityId id) const {
     for (int hop = 0; hop < kMaxOwnerHops; ++hop) {
-        if (const auto alias = m_alias.find(id); alias != m_alias.end()) id = alias->second;
         const Actor* a = find(id);
         if (a == nullptr || a->owner == 0) return id;
         id = a->owner;
@@ -172,15 +257,9 @@ EntityId CombatantRegistry::resolve(EntityId id) const {
     return id;
 }
 
-EntityId CombatantRegistry::follow_alias(EntityId id) const {
-    const auto alias = m_alias.find(id);
-    return alias == m_alias.end() ? id : alias->second;
-}
-
 Side CombatantRegistry::side(EntityId id) const {
     if (id == 0) return Side::Unknown;
     for (int hop = 0; hop < kMaxOwnerHops; ++hop) {
-        if (const auto alias = m_alias.find(id); alias != m_alias.end()) id = alias->second;
         const Actor* a = find(id);
         if (a == nullptr) return Side::Unknown;
         if (a->is_player) return Side::Player;
@@ -280,14 +359,26 @@ bool CombatantRegistry::in_party(EntityId id) const {
     if (id == m_local) return true;
     if (side(id) != Side::Player) return false;
     if (!has_roster()) return true;
+    const Character* c = character(character_of(id));
+    return c != nullptr && m_roster.count(c->name) != 0;
+}
+
+bool CombatantRegistry::character_in_party(CharacterId who) const {
+    const Character* c = character(who);
+    if (c == nullptr) return false;
+    return who == m_local_character || !has_roster() || m_roster.count(c->name) != 0;
+}
+
+AionClass CombatantRegistry::class_of(EntityId id) const {
     const Actor* a = find(id);
-    return a != nullptr && !a->name.empty() && m_roster.count(a->name) != 0;
+    if (a == nullptr) return AionClass::Unknown;
+    if (const Character* c = character(a->character); c != nullptr && c->cls != AionClass::Unknown) return c->cls;
+    return a->cls;
 }
 
 std::string CombatantRegistry::display_name(EntityId id) const {
     const EntityId r = resolve(id);
-    const Actor* a = find(r);
-    if (a != nullptr && !a->name.empty()) return a->name;
+    if (const Character* c = character(character_of(r))) return c->name;
     if (r != 0 && r == m_local) return "You";
     return "#" + std::to_string(r);
 }

@@ -7,7 +7,9 @@
 #include "protocol/events.hpp"
 
 #include <cstdint>
+#include <cstddef>
 #include <deque>
+#include <functional>
 #include <optional>
 #include <unordered_map>
 #include <vector>
@@ -77,14 +79,28 @@ private:
         void merge(const Accum& other);
     };
 
+    /// A row: an id, and the character it was when it hit. The server gives a
+    /// player a new id on each map and hands old ones on, so an id can be two
+    /// players in turn; the summary joins a character's rows.
+    struct RowKey {
+        EntityId id{0};
+        CharacterId who{0};
+        bool operator==(const RowKey&) const = default;
+    };
+    struct RowKeyHash {
+        size_t operator()(const RowKey& k) const noexcept {
+            return std::hash<uint64_t>{}((static_cast<uint64_t>(k.who) << 32) | k.id);
+        }
+    };
+
     struct Fight {
         uint64_t id{0};
         uint32_t map_id{0};
         Micros visit_ts{0};
         Micros start_ts{0};
         Micros last_hit_ts{0};
-        /// By the player a hit resolves to.
-        std::unordered_map<EntityId, Accum> players;
+        /// By the player a hit resolves to, and their character then.
+        std::unordered_map<RowKey, Accum, RowKeyHash> players;
         /// Damage each enemy took from the player side.
         std::unordered_map<EntityId, uint64_t> enemies;
         CaptureQuality counters_at_start;
@@ -111,6 +127,7 @@ private:
     /// the roster, the local player, or with no roster one already in the fight,
     /// so strangers healing each other nearby stay out.
     [[nodiscard]] bool counts_in_fight(EntityId player) const;
+    [[nodiscard]] RowKey row_key(EntityId player) const { return RowKey{player, m_registry.character_of(player)}; }
     /// Ends the fight if its time is up at `now`.
     void check_end(Micros now);
     void finish(EndReason reason, Micros now);
