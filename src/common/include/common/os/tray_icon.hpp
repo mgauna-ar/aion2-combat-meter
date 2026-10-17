@@ -32,7 +32,8 @@ public:
     TrayIcon& operator=(const TrayIcon&) = delete;
 
     /// `icon_resource` is the ICON id in app.rc. `activation_message` is the
-    /// registered message a second instance broadcasts; it acts as a click.
+    /// registered message a second instance posts to this icon's window; it acts as
+    /// a click.
     bool create(uint32_t icon_resource, uint32_t activation_message = 0);
     void destroy();
 

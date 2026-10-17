@@ -6,6 +6,7 @@
 #include "common/config/json.hpp"
 #include "common/config/json_file.hpp"
 #include "common/config/key_table.hpp"
+#include "common/os/auto_start.hpp"
 #include "common/snapshot_slot.hpp"
 
 #include <array>
@@ -143,4 +144,11 @@ TEST_CASE(SnapshotSlot, PublishReplacesAndCountsRevisions) {
     TEST_ASSERT_EQ(*first, std::string("one"));
     TEST_ASSERT_EQ(*slot.get(), std::string("two"));
     TEST_ASSERT_EQ(slot.revision(), uint64_t{2});
+}
+
+TEST_CASE(AutoStart, MockKeepsTheSetting) {
+    TEST_ASSERT(aion2::os::set_auto_start(true));
+    TEST_ASSERT(aion2::os::auto_start_enabled());
+    TEST_ASSERT(aion2::os::set_auto_start(false));
+    TEST_ASSERT_FALSE(aion2::os::auto_start_enabled());
 }

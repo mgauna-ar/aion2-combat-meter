@@ -84,8 +84,9 @@ bool SingleInstance::try_acquire() {
 
 void SingleInstance::notify_existing_instance() {
 #ifdef _WIN32
-    if (m_activation_msg_id != 0) {
-        PostMessageW(HWND_BROADCAST, m_activation_msg_id, 0, 0);
+    if (m_activation_msg_id == 0) return;
+    if (HWND tray = FindWindowW(ACTIVATION_WINDOW_CLASS, nullptr); tray != nullptr) {
+        PostMessageW(tray, m_activation_msg_id, 0, 0);
     }
 #endif
 }

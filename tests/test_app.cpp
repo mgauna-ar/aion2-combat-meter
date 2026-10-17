@@ -68,7 +68,13 @@ TEST_CASE(AppSettings, RoundTripAndSanitize) {
     s.overlay.x = 120;
     s.meter.boss_min_max_hp = 2'500'000;
     s.history.max_fights = 42;
+    s.window.close_to_tray = false;
+    s.window.x = -1200;
+    s.window.width = 1280;
     const AppSettings back = settings_from_json(settings_to_json(s));
+    TEST_ASSERT_FALSE(back.window.close_to_tray);
+    TEST_ASSERT_EQ(back.window.x, -1200);
+    TEST_ASSERT_EQ(back.window.width, 1280);
     TEST_ASSERT_EQ(back.capture.game_process, std::string("Aion2Test.exe"));
     TEST_ASSERT_NEAR(back.overlay.opacity, 0.5f, 1e-6f);
     TEST_ASSERT_EQ(back.overlay.x, 120);
@@ -241,4 +247,62 @@ TEST_CASE(AppRuntime, MissingCaptureFileFailsToStart) {
     std::string error;
     TEST_ASSERT_FALSE(runtime.start(std::make_unique<capture::FileSource>(dir.path / "none.pcapng", 1.0), error));
     TEST_ASSERT_FALSE(runtime.source_status().empty());
+}
+
+namespace {
+
+/// The synthetic boss fight written to `dir` as a capture.
+std::filesystem::path write_session(const std::filesystem::path& dir) {
+    const auto session = test::synthetic::boss_session();
+    const auto file = dir / "synthetic.pcapng";
+    std::ofstream out(file, std::ios::binary);
+    out.write(reinterpret_cast<const char*>(session.pcapng.data()), static_cast<std::streamsize>(session.pcapng.size()));
+    return file;
+}
+
+/// Waits, up to 10 s, for `done`.
+template <typename F>
+bool wait_for(F done) {
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+    while (!done()) {
+        if (std::chrono::steady_clock::now() >= deadline) return false;
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    return true;
+}
+
+} // namespace
+
+TEST_CASE(AppRuntime, ClearsTheHistoryOnTheEngineThread) {
+    ScratchDir dir("aion2_test_runtime_clear");
+    AppRuntime runtime(AppSettings{}, dir.path / "data");
+    std::string error;
+    TEST_ASSERT(runtime.start(std::make_unique<capture::FileSource>(write_session(dir.path), 0.0), error));
+    TEST_ASSERT(wait_for([&] { return runtime.source_finished() && !runtime.history().empty(); }));
+    const uint64_t revision = runtime.history_revision();
+    runtime.request_clear_history();
+    TEST_ASSERT(wait_for([&] { return runtime.history_revision() != revision; }));
+    runtime.stop();
+    TEST_ASSERT(runtime.history().empty());
+    TEST_ASSERT(meter::HistoryStore(runtime.history_dir()).load_index().empty());
+}
+
+TEST_CASE(AppRuntime, NewSettingsReachTheEngine) {
+    ScratchDir dir("aion2_test_runtime_settings");
+    AppRuntime runtime(AppSettings{}, dir.path / "data");
+    // No boss, and no fight long enough to keep: nothing is saved.
+    meter::MeterSettings meter;
+    meter.boss_min_max_hp = UINT64_MAX;
+    meter.min_saved_duration_s = 3600.0;
+    runtime.update_settings(meter, HistorySettings{});
+    std::string error;
+    TEST_ASSERT(runtime.start(std::make_unique<capture::FileSource>(write_session(dir.path), 0.0), error));
+    TEST_ASSERT(wait_for([&] { return runtime.source_finished(); }));
+    runtime.request_end_fight();
+    TEST_ASSERT(wait_for([&] {
+        const auto snap = runtime.snapshot();
+        return snap != nullptr && !snap->recent.empty();
+    }));
+    runtime.stop();
+    TEST_ASSERT(runtime.history().empty());
 }

@@ -16,6 +16,8 @@
 #include <functional>
 #include <string>
 
+struct ImGuiContext;
+
 namespace aion2::app::win32 {
 
 /// The global hotkeys, registered on the overlay window.
@@ -35,7 +37,9 @@ enum class Hotkey : int {
  * clicks through to the game. Moving and resizing are Windows' own, through the
  * hit test: the header's empty space answers HTCAPTION and the corner grip
  * HTBOTTOMRIGHT. It is a separate window: nothing is drawn inside the game, which
- * needs borderless windowed mode for the overlay to show on top of it.
+ * needs borderless windowed mode for the overlay to show on top of it. It has its
+ * own ImGui context, made current before every message and frame, beside the app
+ * window's.
  */
 class OverlayWindow {
 public:
@@ -52,6 +56,7 @@ public:
 
     void set_locked(bool locked);
     void set_visible(bool visible);
+    [[nodiscard]] bool locked() const noexcept { return m_locked; }
     [[nodiscard]] bool visible() const noexcept { return m_visible; }
     /// Re-asserts topmost: a game going fullscreen-borderless can push it down.
     void keep_on_top();
@@ -78,11 +83,11 @@ private:
     void register_hotkeys();
 
     HWND m_hwnd{nullptr};
+    ImGuiContext* m_imgui{nullptr};
     Microsoft::WRL::ComPtr<ID3D11Device> m_device;
     Microsoft::WRL::ComPtr<ID3D11DeviceContext> m_context;
     Microsoft::WRL::ComPtr<IDXGISwapChain> m_swap_chain;
     Microsoft::WRL::ComPtr<ID3D11RenderTargetView> m_render_target;
-    bool m_imgui_ready{false};
     bool m_locked{false};
     bool m_visible{true};
     float m_font_scale{0.0f};

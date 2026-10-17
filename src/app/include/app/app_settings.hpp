@@ -42,7 +42,24 @@ struct HistorySettings {
     int max_fights{500};
 };
 
+/// The desktop window, and how the app behaves around it. Start with Windows is
+/// not here: the registry's Run key is its only record (os/auto_start.hpp).
+struct WindowSettings {
+    /// Open the window when the meter starts; else it starts in the tray.
+    bool open_at_start{true};
+    /// Closing the window hides it to the tray; the tray's Exit quits.
+    bool close_to_tray{true};
+    /// Tray notifications: a capture that failed to start, a recording started.
+    bool notifications{true};
+    /// Screen position and size; x and y of -1 centre it on the main monitor.
+    int x{-1};
+    int y{-1};
+    int width{1100};
+    int height{700};
+};
+
 struct AppSettings {
+    WindowSettings window;
     CaptureSettings capture;
     OverlaySettings overlay;
     /// Spelled from aion2:: because GCC rejects a member named `meter` after an
@@ -73,6 +90,16 @@ inline constexpr std::array<config::ConfigKey<OverlaySettings>, 12> kOverlayKeys
 
 inline constexpr std::array<config::ConfigKey<HistorySettings>, 1> kHistoryKeys{{
     config::field<HistorySettings, &HistorySettings::max_fights>("max_fights"),
+}};
+
+inline constexpr std::array<config::ConfigKey<WindowSettings>, 7> kWindowKeys{{
+    config::field<WindowSettings, &WindowSettings::open_at_start>("open_window_at_start"),
+    config::field<WindowSettings, &WindowSettings::close_to_tray>("close_to_tray"),
+    config::field<WindowSettings, &WindowSettings::notifications>("notifications"),
+    config::field<WindowSettings, &WindowSettings::x>("window_x"),
+    config::field<WindowSettings, &WindowSettings::y>("window_y"),
+    config::field<WindowSettings, &WindowSettings::width>("window_width"),
+    config::field<WindowSettings, &WindowSettings::height>("window_height"),
 }};
 
 /// Clamps every value a hand-edited file could put out of range.

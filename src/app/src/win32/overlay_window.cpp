@@ -93,14 +93,14 @@ bool OverlayWindow::create(const OverlaySettings& settings, std::string& error) 
     }
 
     IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
+    m_imgui = ImGui::CreateContext();
+    ImGui::SetCurrentContext(m_imgui);
     ImGuiIO& io = ImGui::GetIO();
     io.IniFilename = nullptr;  // the meter keeps its own geometry in config.json
     io.LogFilename = nullptr;
     ImGui::StyleColorsDark();
     ImGui_ImplWin32_Init(m_hwnd);
     ImGui_ImplDX11_Init(m_device.Get(), m_context.Get());
-    m_imgui_ready = true;
     rebuild_fonts(settings.scale * dpi_scale());
 
     register_hotkeys();
@@ -109,11 +109,14 @@ bool OverlayWindow::create(const OverlaySettings& settings, std::string& error) 
 }
 
 void OverlayWindow::destroy() {
-    if (m_imgui_ready) {
+    if (m_imgui != nullptr) {
+        ImGuiContext* previous = ImGui::GetCurrentContext();
+        ImGui::SetCurrentContext(m_imgui);
         ImGui_ImplDX11_Shutdown();
         ImGui_ImplWin32_Shutdown();
-        ImGui::DestroyContext();
-        m_imgui_ready = false;
+        ImGui::DestroyContext(m_imgui);
+        ImGui::SetCurrentContext(previous == m_imgui ? nullptr : previous);
+        m_imgui = nullptr;
     }
     m_render_target.Reset();
     m_swap_chain.Reset();
@@ -225,7 +228,10 @@ void OverlayWindow::set_locked(bool locked) {
     if (m_hwnd == nullptr) return;
     // A click-through window gets no more mouse messages, so ImGui would keep the
     // last position and its hover (a tooltip) for good.
-    if (locked && m_imgui_ready) ImGui::GetIO().AddMousePosEvent(-FLT_MAX, -FLT_MAX);
+    if (locked && m_imgui != nullptr) {
+        ImGui::SetCurrentContext(m_imgui);
+        ImGui::GetIO().AddMousePosEvent(-FLT_MAX, -FLT_MAX);
+    }
     SetWindowLongPtrW(m_hwnd, GWL_EXSTYLE, static_cast<LONG_PTR>(ex_style(locked)));
     SetWindowPos(m_hwnd, HWND_TOPMOST, 0, 0, 0, 0,
                  SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_FRAMECHANGED | SWP_NOOWNERZORDER);
@@ -253,7 +259,8 @@ float OverlayWindow::dpi_scale() const {
 }
 
 OverlayActions OverlayWindow::render(OverlayFrameInput input, OverlayViewState& state) {
-    if (!m_imgui_ready) return {};
+    if (m_imgui == nullptr) return {};
+    ImGui::SetCurrentContext(m_imgui);
     if (m_resize_width != 0 && m_resize_height != 0) {
         m_render_target.Reset();
         m_swap_chain->ResizeBuffers(0, m_resize_width, m_resize_height, DXGI_FORMAT_UNKNOWN, 0);
@@ -286,7 +293,10 @@ OverlayActions OverlayWindow::render(OverlayFrameInput input, OverlayViewState& 
 }
 
 LRESULT OverlayWindow::handle_message(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
-    if (m_imgui_ready && ImGui_ImplWin32_WndProcHandler(hwnd, msg, wparam, lparam)) return 1;
+    if (m_imgui != nullptr) {
+        ImGui::SetCurrentContext(m_imgui);
+        if (ImGui_ImplWin32_WndProcHandler(hwnd, msg, wparam, lparam)) return 1;
+    }
 
     switch (msg) {
         case WM_NCHITTEST: {

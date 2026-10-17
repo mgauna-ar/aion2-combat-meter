@@ -8,6 +8,7 @@ namespace aion2::app {
 
 namespace {
 
+constexpr const char* kWindow = "app";
 constexpr const char* kCapture = "capture";
 constexpr const char* kOverlay = "overlay";
 constexpr const char* kMeter = "meter";
@@ -40,10 +41,15 @@ void sanitize(AppSettings& s) {
     s.meter.partial_damage_ratio = std::clamp(s.meter.partial_damage_ratio, 0.0, 1.0);
     s.meter.memory_history = std::clamp(s.meter.memory_history, 1, 100);
     s.history.max_fights = std::clamp(s.history.max_fights, 1, 100000);
+    s.window.width = std::clamp(s.window.width, 640, 8000);
+    s.window.height = std::clamp(s.window.height, 400, 8000);
 }
 
 config::JsonValue settings_to_json(const AppSettings& s) {
     config::JsonValue root;
+    config::JsonValue window;
+    config::write_keys<WindowSettings>(kWindowKeys, s.window, window);
+    root[kWindow] = std::move(window);
     config::JsonValue capture;
     config::write_keys<CaptureSettings>(kCaptureKeys, s.capture, capture);
     capture["game_process"] = s.capture.game_process;
@@ -62,6 +68,7 @@ config::JsonValue settings_to_json(const AppSettings& s) {
 
 AppSettings settings_from_json(const config::JsonValue& json) {
     AppSettings s;
+    config::read_keys<WindowSettings>(kWindowKeys, json[kWindow], s.window);
     config::read_keys<CaptureSettings>(kCaptureKeys, json[kCapture], s.capture);
     if (json[kCapture]["game_process"].is_string()) s.capture.game_process = json[kCapture]["game_process"].as_string();
     config::read_keys<OverlaySettings>(kOverlayKeys, json[kOverlay], s.overlay);

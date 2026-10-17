@@ -108,8 +108,9 @@ if(AION2_WINDOWS)
     endif()
 endif()
 
-# The app less its wWinMain and window: what the tests link.
-file(GLOB AION2_APP_SOURCES CONFIGURE_DEPENDS src/app/src/*.cpp)
+# The app less its wWinMain and windows: what the tests link. src/app/src/ui holds the
+# desktop window's pages, which draw only where ImGui is built.
+file(GLOB AION2_APP_SOURCES CONFIGURE_DEPENDS src/app/src/*.cpp src/app/src/ui/*.cpp)
 add_library(aion2_app_core STATIC ${AION2_APP_SOURCES})
 target_include_directories(aion2_app_core PUBLIC src/app/include)
 target_link_libraries(aion2_app_core PUBLIC aion2_pipeline PRIVATE aion2_warnings)
@@ -138,6 +139,7 @@ endif()
 if(AION2_WINDOWS)
     add_executable(aion2-combat-meter WIN32
         src/app/src/win32/main.cpp
+        src/app/src/win32/app_window.cpp
         src/app/src/win32/overlay_window.cpp
         src/app/resources/app.rc
     )

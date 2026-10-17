@@ -74,6 +74,7 @@ void AppRuntime::run() {
             last_packet = now;
         }
 
+        apply_requests();
         const bool ended = m_end_fight_requested.exchange(false);
         if (ended) m_pipeline.end_fight(meter::EndReason::Manual, now);
 
@@ -122,6 +123,38 @@ void AppRuntime::handle_recording(Micros now) {
     }
 }
 
+void AppRuntime::update_settings(const meter::MeterSettings& meter, const HistorySettings& history) {
+    std::lock_guard<std::mutex> lock(m_mutex);
+    m_pending_settings.emplace(meter, history);
+}
+
+void AppRuntime::apply_requests() {
+    std::optional<std::pair<meter::MeterSettings, HistorySettings>> pending;
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        pending.swap(m_pending_settings);
+    }
+    if (pending) {
+        m_settings.meter = pending->first;
+        m_settings.history = pending->second;
+        m_pipeline.set_meter_settings(m_settings.meter);
+    }
+    if (m_clear_history_requested.exchange(false)) {
+        const size_t removed = m_store.clear();
+        os::Logger::info("history cleared: " + std::to_string(removed) + " fights deleted");
+        reload_history();
+    }
+}
+
+void AppRuntime::reload_history() {
+    auto index = m_store.load_index();
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        m_history = std::move(index);
+    }
+    ++m_history_revision;
+}
+
 void AppRuntime::save_finished() {
     bool saved_any = false;
     for (const auto& fight : m_pipeline.take_finished()) {
@@ -135,17 +168,9 @@ void AppRuntime::save_finished() {
     }
     if (!saved_any) return;
 
-    auto index = m_store.load_index();
     const auto keep = static_cast<size_t>(m_settings.history.max_fights);
-    if (index.size() > keep + static_cast<size_t>(kPruneSlack)) {
-        m_store.prune(keep);
-        index = m_store.load_index();
-    }
-    {
-        std::lock_guard<std::mutex> lock(m_mutex);
-        m_history = std::move(index);
-    }
-    ++m_history_revision;
+    if (m_store.load_index().size() > keep + static_cast<size_t>(kPruneSlack)) m_store.prune(keep);
+    reload_history();
 }
 
 std::vector<meter::HistoryEntry> AppRuntime::history() const {

@@ -82,7 +82,8 @@ the code is ours.
 include/aion2/version.hpp        the one place the version is written (CMake, app.rc, CI tag check)
 src/common/      aion2::config, aion2::os, aion2::common
     config/      json (ported), key_table (ported), json_file (atomic write)
-    os/          logger, paths, single_instance, unique_handle, local_time (ported), tray_icon
+    os/          logger, paths, single_instance, unique_handle, local_time (ported), tray_icon,
+                 auto_start (the Run key)
     bounded_queue.hpp, snapshot_slot.hpp, micros.hpp, time_format
 src/capture/     aion2::capture
     capture_file (pcap + pcapng reader), pcapng_writer, packet_headers, tcp_reassembler,
@@ -96,12 +97,14 @@ src/meter/       aion2::meter
 src/pipeline/    aion2::pipeline   stream_demux (flows -> frames), pipeline (all of it)
 src/app/         aion2::app
     app_settings, app_runtime (threads, history, recording), display_format,
-    overlay_view (ImGui, behind HAVE_IMGUI)
-    src/win32/   main.cpp, overlay_window: Windows only
+    overlay_view (ImGui, behind HAVE_IMGUI), app_frame (the app window's contents)
+    src/ui/      the app window's pages, theme, widgets and Lucide icons (ported from
+                 ffxiv-hub; ImGui, behind HAVE_IMGUI)
+    src/win32/   main.cpp, app_window, overlay_window: Windows only
 tools/replay/    aion2meter-replay (every platform)
 tools/synth/     aion2meter-synth: writes the tests' made-up boss fight as a pcapng
 tools/screenshots/  renders docs/images from overlay_view (software rasterizer from ffxiv-hub)
-tools/check_forbidden_apis.sh, tools/gen_app_icon.py
+tools/check_forbidden_apis.sh, tools/gen_app_icon.py, tools/embed_icon_font.py
 tools/gen_skill_table.py         skills.tsv → skill_table.inc (`make test` checks they agree)
 tests/           TEST_CASE framework (ported), one test_<concern>.cpp per area
 ```
@@ -121,7 +124,7 @@ capture + meter ← pipeline ← app.
 | Capture (one per Npcap adapter, or the FileSource thread) | its pcap handle | `BoundedQueue<OwnedPacket>` (8192), `try_push` only. A full queue drops and counts, and the drop shows up as a TCP gap. |
 | Npcap watcher | the loopback filter text | a mutex plus an atomic generation counter. Each capture thread applies a new filter itself between `pcap_next_ex` calls, because a pcap handle is not shared. |
 | Engine (`AppRuntime::run`) | `Pipeline`, `HistoryStore` writes, the recorder | publishes `LiveSnapshot` into a `SnapshotSlot` every 200 ms of capture time, and whenever the queue runs dry. |
-| UI (`wWinMain`) | the window, ImGui, the tray, `AppSettings` | reads snapshots and the history index (copied under a mutex). Requests go to the engine as atomics: end fight, recording on/off. |
+| UI (`wWinMain`) | both windows (the app window and the overlay, each with its own ImGui context), the tray, `AppSettings` | reads snapshots and the history index (copied under a mutex). Requests go to the engine as atomics: end fight, recording on/off, clear history. New meter and history settings go through `AppRuntime::update_settings`, under the mutex; the engine applies them on its next pass. |
 
 `make tsan` runs the suite under ThreadSanitizer. The `AppRuntime` tests drive real
 threads with a FileSource.

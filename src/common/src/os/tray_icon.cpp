@@ -8,6 +8,7 @@
 #include <shellapi.h>
 
 #include "common/os/paths.hpp"
+#include "common/os/single_instance.hpp"
 
 namespace aion2::os {
 
@@ -15,7 +16,7 @@ namespace {
 
 constexpr UINT kTrayMessage = WM_APP + 1;
 constexpr UINT kTrayId = 1;
-constexpr const wchar_t* kTrayClass = L"Aion2CombatMeterTray";
+constexpr const wchar_t* kTrayClass = SingleInstance::ACTIVATION_WINDOW_CLASS;
 
 TrayIcon* tray_of(HWND hwnd) { return reinterpret_cast<TrayIcon*>(GetWindowLongPtrW(hwnd, GWLP_USERDATA)); }
 
@@ -72,8 +73,8 @@ bool TrayIcon::create(uint32_t icon_resource, uint32_t activation_message) {
     wc.lpszClassName = kTrayClass;
     RegisterClassExW(&wc);
 
-    // A hidden top-level window rather than a message-only one: a second
-    // instance's broadcast activation message reaches top-level windows only.
+    // A hidden top-level window rather than a message-only one: a second instance
+    // finds it by class with FindWindowW, which sees top-level windows only.
     HWND hwnd = CreateWindowExW(WS_EX_TOOLWINDOW, kTrayClass, L"AION 2 Combat Meter", WS_POPUP, 0, 0, 0, 0,
                                 nullptr, nullptr, inst, this);
     if (hwnd == nullptr) return false;

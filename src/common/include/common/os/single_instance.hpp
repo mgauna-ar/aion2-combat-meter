@@ -13,6 +13,9 @@ class SingleInstance {
 public:
     static constexpr const char* DEFAULT_MUTEX_NAME = "Aion2CombatMeterSingleInstanceMutex";
     static constexpr const wchar_t* ACTIVATION_MESSAGE_NAME = L"AION2_COMBAT_METER_ACTIVATE";
+    /// The running instance's tray window class (TrayIcon): the one window the
+    /// activation message goes to.
+    static constexpr const wchar_t* ACTIVATION_WINDOW_CLASS = L"Aion2CombatMeterTray";
 
     explicit SingleInstance(std::string mutex_name = DEFAULT_MUTEX_NAME);
     ~SingleInstance();
@@ -28,7 +31,9 @@ public:
     /// Returns whether this instance holds the primary lock.
     [[nodiscard]] bool is_primary() const noexcept { return m_is_primary; }
 
-    /// Sends activation message to existing instance to unhide/bring forward.
+    /// Posts the activation message to the running instance's tray window, which
+    /// opens its window. Posted to that window alone, never broadcast: a broadcast
+    /// reaches every top-level window, the game's too.
     void notify_existing_instance();
 
     /// Releases the mutex handle.

@@ -1,6 +1,8 @@
-// aion2-combat-meter.exe: the tray icon, the overlay window and the frame loop.
-// Everything that is not Win32 lives in AppRuntime and the layers under it.
+// aion2-combat-meter.exe: the tray icon, the app window, the overlay and the frame
+// loop. Everything that is not Win32 lives in AppRuntime, draw_app, draw_overlay and
+// the layers under them.
 
+#include "app_window.hpp"
 #include "overlay_window.hpp"
 
 #include "aion2/version.hpp"
@@ -8,6 +10,7 @@
 #include "app/app_settings.hpp"
 #include "capture/file_source.hpp"
 #include "capture/os/npcap_source.hpp"
+#include "common/os/auto_start.hpp"
 #include "common/os/logger.hpp"
 #include "common/os/paths.hpp"
 #include "common/os/single_instance.hpp"
@@ -34,7 +37,8 @@ constexpr auto kHiddenFrame = std::chrono::milliseconds(100);
 constexpr auto kHousekeeping = std::chrono::seconds(2);
 
 enum TrayCommand : uint32_t {
-    kShowHide = 1000,
+    kOpenApp = 1000,
+    kShowHide,
     kLock,
     kEndFight,
     kRecord,
@@ -123,7 +127,14 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
         runtime.stop();
         return 1;
     }
+    // The app window is a convenience: without it the overlay and the tray still work.
+    app::win32::AppWindow app_window;
+    std::string app_error;
+    const bool have_app = app_window.create(settings.window, app::win32::OverlayWindow::kIconResource, app_error);
+    if (!have_app) os::Logger::error(app_error);
+    if (have_app && settings.window.open_at_start) app_window.show();
 
+    os::TrayIcon tray;
     bool running = true;
     bool settings_dirty = false;
     const auto save_now = [&] {
@@ -144,6 +155,37 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     const auto toggle_recording = [&] {
         runtime.request_recording(!runtime.recording());
     };
+    const auto notify = [&](const std::string& title, const std::string& text) {
+        if (settings.window.notifications) tray.notify(title, text);
+    };
+    const auto open_app = [&] {
+        if (have_app) app_window.show();
+    };
+    const auto open_target = [&](app::OpenTarget target) {
+        std::error_code dir_ec;
+        switch (target) {
+            case app::OpenTarget::DataFolder: os::open_with_default_app(data); break;
+            case app::OpenTarget::History:
+                std::filesystem::create_directories(runtime.history_dir(), dir_ec);
+                os::open_with_default_app(runtime.history_dir());
+                break;
+            case app::OpenTarget::Recordings:
+                std::filesystem::create_directories(runtime.captures_dir(), dir_ec);
+                os::open_with_default_app(runtime.captures_dir());
+                break;
+            case app::OpenTarget::Config:
+                if (settings_dirty) save_now();
+                os::open_with_default_app(config_path);
+                break;
+            case app::OpenTarget::Log: os::open_with_default_app(os::Logger::log_file_path()); break;
+            case app::OpenTarget::None: break;
+        }
+    };
+    // The overlay window follows its settings, which the app window edits in place.
+    const auto apply_overlay = [&] {
+        if (window.locked() != settings.overlay.locked) window.set_locked(settings.overlay.locked);
+        if (window.visible() != settings.overlay.visible) window.set_visible(settings.overlay.visible);
+    };
 
     window.on_hotkey = [&](app::win32::Hotkey key) {
         switch (key) {
@@ -161,10 +203,11 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
         settings_dirty = true;
     };
 
-    os::TrayIcon tray;
     tray.create(app::win32::OverlayWindow::kIconResource, instance.activation_message_id());
     tray.set_menu_builder([&] {
         std::vector<os::TrayMenuItem> items;
+        items.push_back({kOpenApp, "Open AION 2 Combat Meter", false, have_app});
+        items.push_back({0, "", false, true, true});
         items.push_back({kShowHide, settings.overlay.visible ? "Hide overlay\tCtrl+Alt+H" : "Show overlay\tCtrl+Alt+H"});
         items.push_back({kLock, "Lock (click-through)\tCtrl+Alt+L", settings.overlay.locked});
         items.push_back({kEndFight, "End current fight\tCtrl+Alt+R"});
@@ -178,33 +221,51 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
         items.push_back({kExit, "Exit"});
         return items;
     });
-    tray.set_on_activate([&] { set_visible(true); });
+    // A click on the icon, or a second launch, opens the app window.
+    tray.set_on_activate([&] {
+        if (have_app) {
+            open_app();
+        } else {
+            set_visible(true);
+        }
+    });
+    app_window.on_close = [&] {
+        if (settings.window.close_to_tray) {
+            app_window.hide();
+        } else {
+            running = false;
+        }
+    };
+    app_window.on_geometry_changed = [&] {
+        const RECT r = app_window.screen_rect();
+        settings.window.x = r.left;
+        settings.window.y = r.top;
+        settings.window.width = r.right - r.left;
+        settings.window.height = r.bottom - r.top;
+        settings_dirty = true;
+    };
     tray.set_on_command([&](uint32_t id) {
         switch (id) {
+            case kOpenApp: open_app(); break;
             case kShowHide: set_visible(!settings.overlay.visible); break;
             case kLock: set_locked(!settings.overlay.locked); break;
             case kEndFight: runtime.request_end_fight(); break;
             case kRecord: toggle_recording(); break;
-            case kOpenHistory:
-                std::filesystem::create_directories(runtime.history_dir(), ec);
-                os::open_with_default_app(runtime.history_dir());
-                break;
-            case kOpenRecordings:
-                std::filesystem::create_directories(runtime.captures_dir(), ec);
-                os::open_with_default_app(runtime.captures_dir());
-                break;
-            case kOpenConfig:
-                if (settings_dirty) save_now();
-                os::open_with_default_app(config_path);
-                break;
-            case kOpenLog: os::open_with_default_app(os::Logger::log_file_path()); break;
+            case kOpenHistory: open_target(app::OpenTarget::History); break;
+            case kOpenRecordings: open_target(app::OpenTarget::Recordings); break;
+            case kOpenConfig: open_target(app::OpenTarget::Config); break;
+            case kOpenLog: open_target(app::OpenTarget::Log); break;
             case kExit: running = false; break;
             default: break;
         }
     });
-    if (!capturing) tray.notify("AION 2 Combat Meter", capture_error);
+    if (!capturing) notify("AION 2 Combat Meter", capture_error);
 
     app::OverlayViewState view;
+    app::AppViewState app_view;
+    bool start_with_windows = os::auto_start_enabled();
+    const std::string data_utf8 = os::to_utf8(data);
+    const std::string log_utf8 = os::to_utf8(os::Logger::log_file_path());
     std::vector<meter::HistoryEntry> history;
     uint64_t history_revision = 0;
     bool was_recording = false;
@@ -220,14 +281,55 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
         if (!running) break;
         const auto frame_start = Clock::now();
 
-        if (window.visible()) {
-            // The revision before the list: a save in between then shows next frame
-            // instead of being taken as seen.
+        const bool show_app = have_app && app_window.visible();
+        // The revision before the list: a save in between then shows next frame
+        // instead of being taken as seen.
+        if (window.visible() || show_app) {
             if (const uint64_t revision = runtime.history_revision(); revision != history_revision) {
                 history = runtime.history();
                 history_revision = revision;
             }
-            const auto snapshot = runtime.snapshot();
+        }
+        const auto snapshot = runtime.snapshot();
+
+        if (show_app) {
+            app::AppFrameInput input;
+            input.snapshot = snapshot.get();
+            input.history = &history;
+            input.source_status = runtime.source_status();
+            input.recording = runtime.recording();
+            input.recording_path = runtime.recording_path();
+            input.settings = &settings;
+            input.start_with_windows = start_with_windows;
+            input.data_dir = data_utf8;
+            input.log_path = log_utf8;
+            const app::AppActions actions = app_window.render(input, app_view);
+
+            if (actions.overlay_changed) apply_overlay();
+            if (actions.meter_changed) runtime.update_settings(settings.meter, settings.history);
+            if (actions.save_settings) {
+                save_now();
+            } else if (actions.settings_changed) {
+                settings_dirty = true;
+            }
+            if (actions.start_with_windows) {
+                if (os::set_auto_start(*actions.start_with_windows)) {
+                    start_with_windows = *actions.start_with_windows;
+                } else {
+                    os::Logger::warn("cannot change Start with Windows");
+                }
+            }
+            if (actions.end_fight) runtime.request_end_fight();
+            if (actions.toggle_recording) toggle_recording();
+            if (actions.clear_history) runtime.request_clear_history();
+            open_target(actions.open);
+            if (!actions.load_file.empty()) {
+                app_view.selected_file = actions.load_file;
+                app_view.selected_fight = runtime.load_fight(actions.load_file);
+            }
+        }
+
+        if (window.visible()) {
             app::OverlayFrameInput input;
             input.snapshot = snapshot.get();
             input.history = &history;
@@ -256,19 +358,19 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
             if (!status.empty()) tip += "\n" + status;
             tray.set_tooltip(tip.substr(0, 120));
             const bool recording = runtime.recording();
-            if (recording && !was_recording) tray.notify("Recording", "Saving the game's traffic to " +
-                                                                          runtime.recording_path());
+            if (recording && !was_recording) notify("Recording", "Saving the game's traffic to " + runtime.recording_path());
             was_recording = recording;
             if (settings_dirty) save_now();
         }
 
-        const auto budget = window.visible() ? kVisibleFrame : kHiddenFrame;
+        const auto budget = window.visible() || (have_app && app_window.visible()) ? kVisibleFrame : kHiddenFrame;
         const auto spent = Clock::now() - frame_start;
         if (spent < budget) std::this_thread::sleep_for(budget - spent);
     }
 
     if (settings_dirty) save_now();
     runtime.stop();
+    app_window.destroy();
     window.destroy();
     tray.destroy();
     os::Logger::info("exit");

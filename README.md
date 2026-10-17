@@ -91,8 +91,16 @@ SHA-256 is published with it.
 - Use the header buttons: **End**, **Rec** (record a capture), **History** and **Lock**.
 - Hover a row for that player's hits, crit and back-attack rates, and max hit.
 
-The tray icon's menu does all of the above, and also opens the history and recordings
-folders, `config.json` and the log.
+**The app window** opens at start, and from the tray icon. Its sidebar has three pages:
+- **Dashboard:** what the capture sees, recording, and the meter's files.
+- **Combat Meter:** the live fight and the saved ones.
+- **Settings:** the window, Start with Windows, notifications and the capture.
+
+Changes are saved as you make them. Closing the window hides it to the tray (or quits,
+with *Close to tray* off); starting the meter again while it runs opens it.
+
+The tray icon's menu opens the window, does all of the above, and also opens the
+history and recordings folders, `config.json` and the log.
 
 **How fights are cut:**
 - **Start:** a fight starts on the party's first hit on an enemy.
@@ -111,9 +119,21 @@ folders, `config.json` and the log.
 
 ## ⚙️ Configuration
 
-The settings live in `%APPDATA%\aion2-combat-meter\config.json`. The file is written
-with defaults on first run and saved whenever you move, resize, lock or hide the
-overlay. Edit it while the meter is closed. Out-of-range values are clamped.
+The settings live in `%APPDATA%\aion2-combat-meter\config.json`. The app window's
+Settings pages edit them and save as you go; the file is written with defaults on
+first run, and is also saved when you move, resize, lock or hide the overlay. Edit it
+by hand only while the meter is closed. Out-of-range values are clamped.
+
+**app**
+
+| Key | Default | Meaning |
+|---|---|---|
+| `open_window_at_start` | true | Open the app window when the meter starts; off, it starts in the tray. |
+| `close_to_tray` | true | Closing the app window hides it to the tray. Off, closing it quits. |
+| `notifications` | true | Tray notifications: a capture that failed to start, a recording started. |
+| `window_x`, `window_y`, `window_width`, `window_height` | -1, -1, 1100, 700 | The app window's position and size in screen pixels; -1, -1 centres it. |
+
+*Start with Windows* is not in the file: Windows' Run key for your user is its only record.
 
 **capture**
 

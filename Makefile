@@ -41,8 +41,9 @@ CAPTURE_SRCS = $(wildcard src/capture/src/*.cpp) $(wildcard src/capture/src/os/*
 PROTOCOL_SRCS = $(wildcard src/protocol/src/*.cpp)
 METER_SRCS = $(wildcard src/meter/src/*.cpp)
 PIPELINE_SRCS = $(wildcard src/pipeline/src/*.cpp)
-# src/app/src/win32 (WinMain, the overlay window, hotkeys) only builds on Windows.
-APP_SRCS = $(wildcard src/app/src/*.cpp)
+# src/app/src/win32 (WinMain, the windows, hotkeys) only builds on Windows; src/app/src/ui
+# is the desktop window's ImGui pages, which build everywhere.
+APP_SRCS = $(wildcard src/app/src/*.cpp) $(wildcard src/app/src/ui/*.cpp)
 LIB_SRCS = $(COMMON_SRCS) $(CAPTURE_SRCS) $(PROTOCOL_SRCS) $(METER_SRCS) $(PIPELINE_SRCS) $(APP_SRCS)
 
 TEST_SRCS = $(wildcard tests/*.cpp)

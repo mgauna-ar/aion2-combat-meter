@@ -28,7 +28,8 @@ namespace aion2::app {
  * engine thread owns the Pipeline, the history store and the recorder, and
  * publishes a LiveSnapshot about five times a second; the UI thread reads that
  * snapshot and the history index, and posts requests (end the fight, start or stop
- * recording) as atomics the engine thread picks up. Nothing here touches Win32, so
+ * recording, clear the history) as atomics, and new settings under the mutex, for
+ * the engine thread to pick up. Nothing here touches Win32, so
  * the whole runtime runs in the tests on the Mac with a FileSource.
  */
 class AppRuntime {
@@ -53,6 +54,11 @@ public:
     [[nodiscard]] uint64_t snapshot_revision() const { return m_snapshot.revision(); }
 
     void request_end_fight() noexcept { m_end_fight_requested = true; }
+    /// New fight-tracking and history settings, from the settings page. The engine
+    /// thread applies them on its next pass; a fight under way keeps going under them.
+    void update_settings(const meter::MeterSettings& meter, const HistorySettings& history);
+    /// Deletes every saved fight. The history revision moves once it is done.
+    void request_clear_history() noexcept { m_clear_history_requested = true; }
     /// Starts or stops writing everything captured to a pcapng in captures_dir().
     void request_recording(bool on) noexcept { m_recording_request = on ? 1 : 0; }
     [[nodiscard]] bool recording() const noexcept { return m_recording.load(); }
@@ -66,7 +72,6 @@ public:
     /// What the capture source says it is doing, or why it could not start.
     [[nodiscard]] std::string source_status() const;
     [[nodiscard]] bool source_finished() const;
-    [[nodiscard]] const AppSettings& settings() const noexcept { return m_settings; }
     [[nodiscard]] std::filesystem::path history_dir() const { return m_data_dir / "history"; }
     [[nodiscard]] std::filesystem::path captures_dir() const { return m_data_dir / "captures"; }
 
@@ -74,9 +79,13 @@ private:
     void run();
     void handle_recording(Micros now);
     void save_finished();
+    /// Engine thread: settings from update_settings(), and a clear request.
+    void apply_requests();
+    void reload_history();
     void publish(Micros now);
     void set_status(std::string status);
 
+    /// Engine thread only, after the constructor.
     AppSettings m_settings;
     std::filesystem::path m_data_dir;
     common::BoundedQueue<capture::OwnedPacket> m_queue{kQueueCapacity};
@@ -86,6 +95,7 @@ private:
     std::atomic<bool> m_stop{false};
 
     std::atomic<bool> m_end_fight_requested{false};
+    std::atomic<bool> m_clear_history_requested{false};
     /// -1 none, 0 stop, 1 start.
     std::atomic<int> m_recording_request{-1};
     std::atomic<bool> m_recording{false};
@@ -100,6 +110,8 @@ private:
     std::atomic<uint64_t> m_history_revision{0};
     std::string m_status;
     std::string m_recording_path;
+    /// From update_settings(), until the engine thread takes them.
+    std::optional<std::pair<meter::MeterSettings, HistorySettings>> m_pending_settings;
 };
 
 } // namespace aion2::app
