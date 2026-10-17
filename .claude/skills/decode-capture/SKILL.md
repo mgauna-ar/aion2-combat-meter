@@ -19,7 +19,9 @@ teleport. Ask for the facts that make it checkable:
 - the character's name and class;
 - a few hit numbers seen on screen;
 - the boss's name and roughly when it died;
-- the game's own personal DPS meter reading for that fight, if possible.
+- the game's own Combat Analysis window (Ctrl+X) for that fight, ideally a screenshot of
+  its Detailed Mode: time, DPS, total damage, Total Heal, and per skill HIT, ACC, CRI,
+  PERF, DOUB, FRNT, BACK, MULT, BLOC, IMMU, ENDR and RSTO.
 
 Put it in `tests/fixtures/local/<name>.pcapng`.
 
@@ -71,6 +73,16 @@ each hit on a mob: the target's exact HP. Each drop should match the damage reco
 since the last line. In the first capture it was a steady multiple of the damage instead
 (4.5 for one player), and extra-hit values never counted. Recheck this on every capture.
 Comparing whole fights works too: a mob that dies took its max HP.
+
+**Check the breakdowns against the game's window.** `aion2meter-replay --skills` prints
+each player's skills, healing and damage taken. For the local player, its skill rows
+should match the Ctrl+X window's: names, hits, and the CRI, PERF, DOUB, BACK and FRNT
+shares. Then look for what the meter cannot show yet, since the game's window counts it:
+- **ACC (misses):** a damage record with amount 0, or a damage type other than 3 (crit).
+- **MULT (multi-hit):** the switch-0x20 tail. Do its counts match MULT?
+- **BLOC, IMMU, ENDR, RSTO:** the target's defensive outcomes, likely in the damage
+  type or the block's unknown bytes.
+Whatever is found goes into `parse_damage`, `HitCounts`, the tables and AGENTS.md.
 
 `--unknown` dumps every opcode the parser does not read.
 

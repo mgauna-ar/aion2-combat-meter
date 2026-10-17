@@ -7,10 +7,15 @@
 
 **A party DPS meter for AION 2 that draws on top of the game, without touching it.**
 
-It reads the game's own network traffic as it reaches your PC, works out who hit what
-for how much, and shows your party's damage, the boss's HP and the fight timer in a
-small see-through window over the game. Boss fights are saved so you can look back at
-them.
+It reads the game's own network traffic as it reaches your PC and works out who hit
+what, with which skill, for how much. It shows what the game's own Combat Analysis
+window (Ctrl+X) shows, but for every party member:
+
+- **An overlay** over the game with the live fight: the party ranked by DPS, the boss's
+  HP and the fight timer. It can show only in combat.
+- **An app window** with the details: damage, hit counts, crit, perfect, double, back
+  and front rates for each player and each of their skills; healing; damage taken; and
+  every saved fight, grouped by visit to a map. Every setting is there too.
 
 ![The overlay during a boss fight: three players ranked by DPS, the boss's HP bar and the fight timer](docs/images/overlay-live.png)
 
@@ -70,8 +75,8 @@ telemetry.
    check it against `SHA256SUMS.txt`, and unzip it anywhere.
 3. **Set the game to Borderless Windowed.** An exclusive fullscreen game hides every
    other window, this one included.
-4. **Run `aion2-combat-meter.exe`.** It sits in the tray, and the overlay shows up in
-   the top-left corner. Hit something.
+4. **Run `aion2-combat-meter.exe`.** The app window opens, the overlay shows up in the
+   top-left corner, and the meter sits in the tray. Hit something.
 
 The exe is not code-signed, so SmartScreen or antivirus software may warn about it.
 Capture tools often get flagged. CI builds every release from source, and the zip's
@@ -124,7 +129,9 @@ history and recordings folders, `config.json` and the log.
 - Out of a party, every player hitting enemies is listed.
 - In a party, only its members are listed. Pets and summons count for their owner.
 
-![The History tab: saved fights above, the selected fight's ranking below](docs/images/overlay-history.png)
+![The app window's Combat Meter page: saved fights by map visit on the left, the selected fight's ranking with the in-game window's hit columns, and one player's skills below](docs/images/app-damage.png)
+
+![The Combat Meter page's Settings tab: the overlay, its visibility, fight tracking and saved fights](docs/images/app-settings.png)
 
 ## ⚙️ Configuration
 
@@ -212,7 +219,9 @@ run the meter as administrator.
   and run `aion2meter-replay` on it. It lists every flow it decoded as the game.
 
 **I can't see the overlay in game**
-Use Borderless Windowed. If it is hidden, press Ctrl+Alt+H.
+Use Borderless Windowed. If it is hidden, press Ctrl+Alt+H. Shown only in combat, or
+hidden while the game is not in front (its Visibility settings), a locked overlay
+stays out of sight until those allow it; unlock it (Ctrl+Alt+L) to see it at once.
 
 **My party shows as #12345 instead of names**
 The game sends names mostly on loading screens. Start the meter before you log in or
@@ -263,7 +272,7 @@ Other targets:
 | `make asan` | The tests under AddressSanitizer and UBSan. |
 | `make replay` | Builds `./aion2meter-replay`. |
 | `make fixtures` | Replays your own captures in `tests/fixtures/local/` and diffs each against its `.expected.txt`. |
-| `make screenshots` | Re-renders `docs/images` from the overlay's own drawing code. Needs zlib; set `SHOTS_FONT` off macOS. |
+| `make screenshots` | Re-renders `docs/images` from the overlay's and the app window's own drawing code. Needs zlib; set `SHOTS_FONT` and `SHOTS_BOLD_FONT` off macOS. |
 | `make golden` | Rewrites the replay smoke test's reference after an intended change. |
 
 **Windows (the app):** Visual Studio 2022 and CMake 3.22 or newer.
@@ -322,5 +331,8 @@ the GPL meters.
 
 ## License
 
-MIT, see [LICENSE](LICENSE). Dear ImGui is MIT (`src/third_party/imgui/LICENSE.txt`).
+MIT, see [LICENSE](LICENSE). Dear ImGui is MIT (`src/third_party/imgui/LICENSE.txt`). The
+app window's icons are a subset of [Lucide](https://lucide.dev) (ISC), embedded in
+`src/app/include/app/ui/icons_font.inl` by `tools/embed_icon_font.py`. Skill names come
+from aion2.app's skill database (see `src/meter/data/skills.tsv`).
 AION 2 is a trademark of NCSOFT. This project is not affiliated with NCSOFT.
