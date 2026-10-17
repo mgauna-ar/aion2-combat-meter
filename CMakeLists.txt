@@ -62,7 +62,8 @@ add_library(aion2_common STATIC ${AION2_COMMON_SOURCES})
 target_include_directories(aion2_common PUBLIC include src/common/include)
 target_link_libraries(aion2_common PUBLIC Threads::Threads PRIVATE aion2_warnings)
 if(AION2_WINDOWS)
-    target_link_libraries(aion2_common PUBLIC shell32)
+    # winhttp: the updater's requests to GitHub (os/http_client.cpp), the only network access.
+    target_link_libraries(aion2_common PUBLIC shell32 winhttp)
 endif()
 
 file(GLOB_RECURSE AION2_CAPTURE_SOURCES CONFIGURE_DEPENDS src/capture/src/*.cpp)
@@ -154,7 +155,9 @@ if(AION2_WINDOWS)
 endif()
 
 # -----------------------------------------------------------------------------
-# Packaging (CPack): the release zip, binaries at its root.
+# Packaging (CPack): the release zip, binaries at its root. Every installed copy's
+# updater looks for this name with the two executables at the root
+# (RELEASE_ASSET_NAME and UPDATE_FILES in src/app/include/app/update_check.hpp).
 # -----------------------------------------------------------------------------
 set(CPACK_PACKAGE_NAME "aion2-combat-meter")
 set(CPACK_PACKAGE_VENDOR "aion2-combat-meter contributors")

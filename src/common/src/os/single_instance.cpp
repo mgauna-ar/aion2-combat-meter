@@ -10,6 +10,8 @@
 #include <mutex>
 #endif
 
+#include <thread>
+
 namespace aion2::os {
 
 #ifndef _WIN32
@@ -80,6 +82,16 @@ bool SingleInstance::try_acquire() {
     m_is_primary = true;
     return true;
 #endif
+}
+
+bool SingleInstance::acquire_within(std::chrono::milliseconds timeout) {
+    constexpr std::chrono::milliseconds kRetryEvery{100};
+    const auto deadline = std::chrono::steady_clock::now() + timeout;
+    while (!try_acquire()) {
+        if (std::chrono::steady_clock::now() >= deadline) return false;
+        std::this_thread::sleep_for(kRetryEvery);
+    }
+    return true;
 }
 
 void SingleInstance::notify_existing_instance() {

@@ -109,8 +109,8 @@ void safety_card() {
     begin_settings_card("##dash_safety", ICON_SHIELD, "PASSIVE ONLY", colors::Success);
     ImGui::PushTextWrapPos(0.0f);
     text_muted("The meter reads the game's traffic as it reaches this PC and draws its own windows.");
-    text_dim("It never opens the game's process, reads its memory, injects or hooks anything, sends packets "
-             "or input, or talks to any server.");
+    text_dim("It never opens the game's process, reads its memory, injects or hooks anything, or sends packets "
+             "or input. Its one connection is the update check, to GitHub, which Settings can turn off.");
     ImGui::PopTextWrapPos();
     end_settings_card();
 }

@@ -9,12 +9,15 @@
 #include "app/app_runtime.hpp"
 #include "app/app_settings.hpp"
 #include "app/overlay_visibility.hpp"
+#include "app/updater.hpp"
 #include "capture/file_source.hpp"
 #include "capture/os/connection_finder.hpp"
 #include "capture/os/npcap_source.hpp"
 #include "common/os/auto_start.hpp"
+#include "common/os/http_client.hpp"
 #include "common/os/logger.hpp"
 #include "common/os/paths.hpp"
+#include "common/os/process_launch.hpp"
 #include "common/os/single_instance.hpp"
 #include "common/os/tray_icon.hpp"
 #include "meter/map_names.hpp"
@@ -39,6 +42,8 @@ using Clock = std::chrono::steady_clock;
 constexpr auto kVisibleFrame = std::chrono::milliseconds(33);
 constexpr auto kHiddenFrame = std::chrono::milliseconds(100);
 constexpr auto kHousekeeping = std::chrono::seconds(2);
+/// How long an updated build waits for the one that installed it to exit.
+constexpr auto kRelaunchWait = std::chrono::seconds(15);
 
 enum TrayCommand : uint32_t {
     kOpenApp = 1000,
@@ -56,6 +61,8 @@ enum TrayCommand : uint32_t {
 struct CommandLine {
     std::optional<std::filesystem::path> replay;
     double speed{1.0};
+    /// Started by the updater (app::RELAUNCH_ARG).
+    bool updated{false};
 };
 
 CommandLine parse_command_line() {
@@ -63,9 +70,12 @@ CommandLine parse_command_line() {
     int argc = 0;
     LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &argc);
     if (argv == nullptr) return cl;
+    const std::wstring relaunch_arg(app::RELAUNCH_ARG.begin(), app::RELAUNCH_ARG.end());
     for (int i = 1; i < argc; ++i) {
         const std::wstring arg = argv[i];
-        if (arg == L"--replay" && i + 1 < argc) {
+        if (arg == relaunch_arg) {
+            cl.updated = true;
+        } else if (arg == L"--replay" && i + 1 < argc) {
             cl.replay = std::filesystem::path(argv[++i]);
         } else if (arg == L"--speed" && i + 1 < argc) {
             const double s = _wtof(argv[++i]);
@@ -105,7 +115,9 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     // Before the log: opening it starts it afresh, which would wipe the running
     // instance's.
     os::SingleInstance instance;
-    if (!instance.try_acquire()) {
+    // An updated build waits for the one that installed it: its lock frees as it exits.
+    const bool primary = cl.updated ? instance.acquire_within(kRelaunchWait) : instance.try_acquire();
+    if (!primary) {
         // The running one shows its overlay.
         instance.notify_existing_instance();
         return 0;
@@ -113,6 +125,8 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
 
     os::Logger::init(data / "meter.log");
     os::Logger::info(std::string("AION 2 Combat Meter ") + VERSION_STRING);
+    // After the lock, so the build that left them has exited.
+    app::remove_update_leftovers(os::executable_dir());
 
     const std::filesystem::path config_path = data / "config.json";
     app::AppSettings settings = app::load_settings(config_path);
@@ -276,6 +290,10 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
         }
     });
     if (!capturing) notify("AION 2 Combat Meter", capture_error);
+    if (cl.updated) notify("AION 2 Combat Meter", std::string("Updated to version ") + VERSION_STRING + ".");
+
+    app::Updater updater(os::executable_dir());
+    app::UpdateNotifier update_notifier;
 
     app::AppViewState app_view;
     // The overlay's hide conditions: when a fight was last seen live, and the game's
@@ -300,6 +318,22 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
         if (!running) break;
         const auto frame_start = Clock::now();
 
+        updater.tick(frame_start, os::http_supported() && settings.window.check_for_updates);
+        const app::UpdateStatus update = updater.status();
+        if (update.state == app::UpdateState::Available && update.release) {
+            if (const auto notice = update_notifier.update(update.release->version)) {
+                notify(notice->title, notice->message);
+            }
+        }
+        if (update.state == app::UpdateState::Ready && updater.apply_staged()) {
+            const std::filesystem::path exe = updater.install_dir() / app::UPDATE_EXE_NAME;
+            if (os::launch_detached(exe, {std::string(app::RELAUNCH_ARG)})) {
+                os::Logger::info("restarting into the update");
+                break;
+            }
+            os::Logger::warn("cannot start the updated meter; restart it to finish updating");
+        }
+
         const bool show_app = have_app && app_window.visible();
         // The revision before the list: a save in between then shows next frame
         // instead of being taken as seen.
@@ -322,6 +356,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
             input.start_with_windows = start_with_windows;
             input.data_dir = data_utf8;
             input.log_path = log_utf8;
+            input.update = update;
             const app::AppActions actions = app_window.render(input, app_view);
 
             if (actions.overlay_changed) apply_overlay();
@@ -348,6 +383,9 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
                 save_now();
             }
             open_target(actions.open);
+            if (actions.check_updates) updater.check_now();
+            if (actions.install_update) updater.install();
+            if (actions.open_release_notes && update.release) os::open_url(update.release->page_url);
             if (!actions.load_file.empty()) {
                 app_view.selected_file = actions.load_file;
                 app_view.selected_fight = runtime.load_fight(actions.load_file);
@@ -402,6 +440,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     }
 
     if (settings_dirty) save_now();
+    updater.stop();
     runtime.stop();
     app_window.destroy();
     window.destroy();

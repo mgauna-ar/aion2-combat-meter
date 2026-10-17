@@ -67,8 +67,11 @@ struct WindowSettings {
     bool open_at_start{true};
     /// Closing the window hides it to the tray; the tray's Exit quits.
     bool close_to_tray{true};
-    /// Tray notifications: a capture that failed to start, a recording started.
+    /// Tray notifications: a capture that failed to start, a recording started, a
+    /// new version.
     bool notifications{true};
+    /// Ask GitHub for a newer release once, soon after the meter starts (Updater).
+    bool check_for_updates{true};
     /// Screen position and size; x and y of -1 centre it on the main monitor.
     int x{-1};
     int y{-1};
@@ -121,10 +124,11 @@ inline constexpr std::array<config::ConfigKey<HistorySettings>, 1> kHistoryKeys{
     config::field<HistorySettings, &HistorySettings::max_fights>("max_fights"),
 }};
 
-inline constexpr std::array<config::ConfigKey<WindowSettings>, 7> kWindowKeys{{
+inline constexpr std::array<config::ConfigKey<WindowSettings>, 8> kWindowKeys{{
     config::field<WindowSettings, &WindowSettings::open_at_start>("open_window_at_start"),
     config::field<WindowSettings, &WindowSettings::close_to_tray>("close_to_tray"),
     config::field<WindowSettings, &WindowSettings::notifications>("notifications"),
+    config::field<WindowSettings, &WindowSettings::check_for_updates>("check_for_updates"),
     config::field<WindowSettings, &WindowSettings::x>("window_x"),
     config::field<WindowSettings, &WindowSettings::y>("window_y"),
     config::field<WindowSettings, &WindowSettings::width>("window_width"),

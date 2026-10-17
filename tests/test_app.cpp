@@ -72,10 +72,12 @@ TEST_CASE(AppSettings, RoundTripAndSanitize) {
     s.meter.boss_min_max_hp = 2'500'000;
     s.history.max_fights = 42;
     s.window.close_to_tray = false;
+    s.window.check_for_updates = false;
     s.window.x = -1200;
     s.window.width = 1280;
     const AppSettings back = settings_from_json(settings_to_json(s));
     TEST_ASSERT_FALSE(back.window.close_to_tray);
+    TEST_ASSERT_FALSE(back.window.check_for_updates);
     TEST_ASSERT_EQ(back.window.x, -1200);
     TEST_ASSERT_EQ(back.window.width, 1280);
     TEST_ASSERT_EQ(back.capture.game_process, std::string("Aion2Test.exe"));
@@ -98,6 +100,7 @@ TEST_CASE(AppSettings, MissingFileGivesDefaults) {
     const AppSettings s = load_settings("/nonexistent/aion2/config.json");
     TEST_ASSERT_EQ(s.capture.server_port, 13328);
     TEST_ASSERT(s.overlay.visible);
+    TEST_ASSERT(s.window.check_for_updates);
 }
 
 TEST_CASE(TimeFormat, StampsAndClocks) {

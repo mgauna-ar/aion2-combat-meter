@@ -1,6 +1,7 @@
 #pragma once
 
 #include "common/os/unique_handle.hpp"
+#include <chrono>
 #include <string>
 #include <cstdint>
 
@@ -27,6 +28,12 @@ public:
 
     /// Attempts to acquire the single-instance lock. Returns true if this is the primary instance.
     bool try_acquire();
+
+    /// try_acquire() every 100 ms until it succeeds or `timeout` has passed. An
+    /// updated meter waits this way for the one that launched it to exit: the mutex
+    /// frees when it does, and waiting on the process itself would open a handle to
+    /// another process (AGENTS.md, "Passive only").
+    bool acquire_within(std::chrono::milliseconds timeout);
 
     /// Returns whether this instance holds the primary lock.
     [[nodiscard]] bool is_primary() const noexcept { return m_is_primary; }

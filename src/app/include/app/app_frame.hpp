@@ -7,6 +7,7 @@
 // small and the screenshot tool can draw it on the Mac.
 
 #include "app/app_settings.hpp"
+#include "app/updater.hpp"
 #include "meter/history_store.hpp"
 #include "meter/types.hpp"
 #include "pipeline/pipeline.hpp"
@@ -48,6 +49,8 @@ struct AppFrameInput {
     /// Shown on the dashboard, in UTF-8.
     std::string data_dir;
     std::string log_path;
+    /// The updater's state; unset where there is none (the screenshots).
+    std::optional<UpdateStatus> update;
 };
 
 /// Files and folders the window asks to open.
@@ -71,6 +74,10 @@ struct AppActions {
     OpenTarget open{OpenTarget::None};
     /// A saved fight to load into AppViewState::selected_fight.
     std::string load_file;
+    /// Updates: check now, download and install the release found, open its page.
+    bool check_updates{false};
+    bool install_update{false};
+    bool open_release_notes{false};
 };
 
 /// Draws the window's contents filling the display. A no-op where ImGui is not

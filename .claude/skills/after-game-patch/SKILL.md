@@ -90,4 +90,5 @@ A patch can add monsters and NPCs. Ones the meter cannot name read "NPC #2345678
 2. Run `make test`. If layouts moved, update `tests/wire_builder.hpp` and the protocol
    section of `AGENTS.md`.
 3. Bump the patch version in `include/aion2/version.hpp`.
-4. Tag `vX.Y.Z` to release.
+4. Tag `vX.Y.Z` to release (skill `release`). Installed copies pick the fix up through
+   their update check.

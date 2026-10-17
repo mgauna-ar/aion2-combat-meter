@@ -78,6 +78,29 @@ Badge capture_badge(const AppFrameInput& in) {
     return {"Waiting for the game", colors::TextDim};
 }
 
+/// A pill under the branding once a newer release is found, which opens Settings,
+/// where it is installed. Nothing without one, so the README pictures stay as they are.
+void update_pill(const AppFrameInput& in, AppViewState& state) {
+    if (!in.update || !in.update->release) return;
+    const UpdateState s = in.update->state;
+    const char* label = "Update available";
+    if (s == UpdateState::Downloading || s == UpdateState::Ready) {
+        label = "Updating";
+    } else if (s == UpdateState::RestartPending) {
+        label = "Restart to update";
+    }
+    ImGui::Indent(m(6.0f));
+    pill(label, colors::AccentHover);
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+        ImGui::SetTooltip("Version %s is available. Click to open Settings.",
+                          in.update->release->version.to_string().c_str());
+    }
+    if (ImGui::IsItemClicked()) state.page = AppPage::Settings;
+    ImGui::Unindent(m(6.0f));
+    ImGui::Dummy(ImVec2(0.0f, m(8.0f)));
+}
+
 void render_sidebar(const AppFrameInput& in, AppViewState& state) {
     const float sidebar_width = m(metrics::SidebarW);
     const ImVec2 panel_min = ImGui::GetCursorScreenPos();
@@ -110,6 +133,7 @@ void render_sidebar(const AppFrameInput& in, AppViewState& state) {
     ImGui::EndGroup();
     ImGui::Unindent(m(6.0f));
     ImGui::Dummy(ImVec2(0.0f, m(12.0f)));
+    update_pill(in, state);
 
     for (const NavItem& item : kNavItems) {
         if (nav_item(item, state.page == item.page)) state.page = item.page;

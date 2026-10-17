@@ -7,6 +7,7 @@
 #include "common/config/json_file.hpp"
 #include "common/config/key_table.hpp"
 #include "common/os/auto_start.hpp"
+#include "common/os/single_instance.hpp"
 #include "common/snapshot_slot.hpp"
 
 #include <array>
@@ -151,4 +152,22 @@ TEST_CASE(AutoStart, MockKeepsTheSetting) {
     TEST_ASSERT(aion2::os::auto_start_enabled());
     TEST_ASSERT(aion2::os::set_auto_start(false));
     TEST_ASSERT_FALSE(aion2::os::auto_start_enabled());
+}
+
+TEST_CASE(SingleInstance, AcquireWithinWaitsForTheHolder) {
+    // An updated build waits for the one that launched it to exit and free the lock.
+    aion2::os::SingleInstance running("Aion2TestRelaunchMutex");
+    TEST_ASSERT(running.try_acquire());
+    aion2::os::SingleInstance updated("Aion2TestRelaunchMutex");
+    TEST_ASSERT_FALSE(updated.acquire_within(std::chrono::milliseconds(150)));
+    TEST_ASSERT_FALSE(updated.is_primary());
+
+    std::thread exiting([&] {
+        std::this_thread::sleep_for(std::chrono::milliseconds(150));
+        running.release();
+    });
+    const bool acquired = updated.acquire_within(std::chrono::seconds(5));
+    exiting.join();
+    TEST_ASSERT(acquired);
+    TEST_ASSERT(updated.is_primary());
 }

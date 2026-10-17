@@ -74,8 +74,11 @@ these rules:
 - **The overlay is an ordinary window.** It is a separate topmost window, like Discord's
   or OBS's. Nothing is drawn inside the game.
 
-The meter makes no network connections of its own: no updates, no uploads, no
-telemetry.
+- **Its one connection is the update check, to GitHub.** Once, soon after it starts, the
+  meter asks GitHub whether a newer release is out, sending nothing but its version.
+  *Check for updates at startup* in Settings turns that off. It downloads only when you
+  click **Update & restart**. There are no uploads and no telemetry, and nothing goes
+  to the game or its servers.
 
 ## 🚀 Quick start
 
@@ -83,8 +86,10 @@ telemetry.
    reducers and VPNs work too. Leave **"Restrict Npcap driver's access to
    Administrators only"** unticked, or the meter has to run as administrator. The
    licence does not allow bundling Npcap, so it is a separate install.
-2. **Get the release.** Download `aion2-combat-meter-windows-x64.zip` from Releases,
-   check it against `SHA256SUMS.txt`, and unzip it anywhere.
+2. **Get the release.** Download `aion2-combat-meter-windows-x64.zip` from
+   [Releases](https://github.com/mgauna-ar/aion2-combat-meter/releases/latest), check it
+   against `SHA256SUMS.txt`, and unzip it into a folder of its own, anywhere you can
+   write to: the meter updates itself there.
 3. **Set the game to Borderless Windowed.** An exclusive fullscreen game hides every
    other window, this one included.
 4. **Run `aion2-combat-meter.exe`.** The app window opens, the overlay shows up in the
@@ -119,7 +124,7 @@ found and dragged back.
 **The app window** opens at start, and from the tray icon. Its sidebar has three pages:
 - **Dashboard:** what the capture sees, recording, and the meter's files.
 - **Combat Meter:** the live fight and the saved ones.
-- **Settings:** the window, Start with Windows, notifications and the capture.
+- **Settings:** the window, Start with Windows, notifications, the capture and updates.
 
 Changes are saved as you make them. Closing the window hides it to the tray (or quits,
 with *Close to tray* off); starting the meter again while it runs opens it.
@@ -164,7 +169,8 @@ by hand only while the meter is closed. Out-of-range values are clamped.
 |---|---|---|
 | `open_window_at_start` | true | Open the app window when the meter starts; off, it starts in the tray. |
 | `close_to_tray` | true | Closing the app window hides it to the tray. Off, closing it quits. |
-| `notifications` | true | Tray notifications: a capture that failed to start, a recording started. |
+| `notifications` | true | Tray notifications: a capture that failed to start, a recording started, a new version. |
+| `check_for_updates` | true | Ask GitHub for a newer release once, 10 seconds after the meter starts. **Check now** in Settings works either way. |
 | `window_x`, `window_y`, `window_width`, `window_height` | -1, -1, 1280, 760 | The app window's position and size in screen pixels; -1, -1 centres it, at no more than 90% of the screen. |
 
 *Start with Windows* is not in the file: Windows' Run key for your user is its only record.
@@ -257,6 +263,18 @@ may have missed it. Start the meter before you form or join a party.
 **The boss fight says "partial data"**
 On crowded world bosses the server stops sending most players' hits, so the meter
 cannot see the whole fight. Only the hits it did see are counted.
+
+**How do I update?**
+When a new version is out, a tray notification says so and the sidebar shows **Update
+available**. Open **Settings → Updates** and click **Update & restart**. The meter
+downloads the release, checks it against the SHA-256 GitHub publishes for it, replaces
+its two executables and restarts; a fight still going is not saved. **Check now** checks
+at any time.
+- The old executables stay next to the new ones as `*.old` until the next start.
+- If the update can't write to the meter's folder (under `Program Files`, say), run the
+  meter as administrator once, or download the zip and unzip it over the old one.
+- A release with no published checksum is announced but not installed: download it from
+  its release page instead.
 
 ## 🎥 Recording a capture
 

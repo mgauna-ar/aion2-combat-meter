@@ -8,6 +8,7 @@ Occasional procedures are skills under `.claude/skills/`:
 - `decode-capture`: check and fix the decoder against a real capture. The decoder
   has not been through this yet.
 - `after-game-patch`: the game updated, and the opcodes or layouts moved.
+- `release`: cut a release, and what every installed copy's updater expects of it.
 
 ---
 
@@ -20,9 +21,13 @@ The meter **reads** the game's network traffic and **draws its own window**. It 
   functions);
 - sends anything: no packets (`pcap_sendpacket`, `pcap_inject`, WinDivert), no input
   (`SendInput`, `keybd_event`, `mouse_event`, `PostThreadMessage` to the game);
-- talks to any server: no update checks, uploads or telemetry.
+- talks to any server but GitHub's, and to GitHub only for the update check (Self-update):
+  one HTTPS request at start, which `check_for_updates` turns off, and a download
+  when the user clicks **Update & restart**. Nothing reaches the game or its servers;
+  there are no uploads and no telemetry.
 
-`tools/check_forbidden_apis.sh` greps our code (not `src/third_party`) for those APIs.
+`tools/check_forbidden_apis.sh` greps our code (not `src/third_party`) for those APIs,
+and keeps every network API in `src/common/src/os/http_client.cpp`.
 It runs in `make test` and in CI, so a violation fails the build. Finding the game's
 connection uses a Toolhelp process snapshot and `GetExtendedTcpTable`. Neither opens a
 handle to another process; keep it that way. "Is the game in front" (the overlay's
@@ -64,6 +69,8 @@ the code is ours.
    - Dear ImGui is vendored, unchanged, in `src/third_party/imgui`.
    - LZ4 *decoding* is our own (`lz4_block.cpp`). The tests' encoder is in
      `tests/lz4_test_encoder.hpp`.
+   - So are the updater's SHA-256 and zip reader (`sha256`, `archive/`, ported from
+     ffxiv-hub). HTTPS is Windows' own WinHTTP.
 5. **Privacy.**
    - Captures and fight records hold character names.
    - `*.pcap*` and `tests/fixtures/local/` are gitignored.
@@ -85,8 +92,10 @@ include/aion2/version.hpp        the one place the version is written (CMake, ap
 src/common/      aion2::config, aion2::os, aion2::common
     config/      json (ported), key_table (ported), json_file (atomic write)
     os/          logger, paths, single_instance, unique_handle, local_time (ported), tray_icon,
-                 auto_start (the Run key)
-    bounded_queue.hpp, snapshot_slot.hpp, micros.hpp, time_format
+                 auto_start (the Run key), http_client (WinHTTP GET, the only network
+                 access), process_launch (the updater's relaunch)
+    archive/     inflate (RFC 1951) and zip_reader, for the release zip (ported)
+    bounded_queue.hpp, snapshot_slot.hpp, micros.hpp, time_format, sha256 (ported)
 src/capture/     aion2::capture
     capture_file (pcap + pcapng reader), pcapng_writer, packet_headers, tcp_reassembler,
     packet_source + file_source, os/npcap_source, os/connection_finder
@@ -100,7 +109,9 @@ src/meter/       aion2::meter
 src/pipeline/    aion2::pipeline   stream_demux (flows -> frames), pipeline (all of it)
 src/app/         aion2::app
     app_settings, app_runtime (threads, history, recording), display_format,
-    overlay_view (ImGui, behind HAVE_IMGUI), app_frame (the app window's contents)
+    overlay_view (ImGui, behind HAVE_IMGUI), app_frame (the app window's contents),
+    update_check (release parsing, versions, the update balloon) and updater (check,
+    download, stage, swap), both ported from ffxiv-hub
     src/ui/      the app window's pages, theme, widgets and Lucide icons (ported from
                  ffxiv-hub; ImGui, behind HAVE_IMGUI)
     src/win32/   main.cpp, app_window, overlay_window: Windows only
@@ -131,7 +142,8 @@ capture + meter ← pipeline ← app.
 | Capture (one per Npcap adapter, or the FileSource thread) | its pcap handle | `BoundedQueue<OwnedPacket>` (8192), `try_push` only. A full queue drops and counts, and the drop shows up as a TCP gap. |
 | Npcap watcher | the loopback filter text | a mutex plus an atomic generation counter. Each capture thread applies a new filter itself between `pcap_next_ex` calls, because a pcap handle is not shared. |
 | Engine (`AppRuntime::run`) | `Pipeline`, `HistoryStore` writes, the recorder | publishes `LiveSnapshot` into a `SnapshotSlot` every 200 ms of capture time, and whenever the queue runs dry. |
-| UI (`wWinMain`) | both windows (the app window and the overlay, each with its own ImGui context), the tray, `AppSettings` | reads snapshots and the history index (copied under a mutex). Requests go to the engine as atomics: end fight, recording on/off, clear history. New meter and history settings go through `AppRuntime::update_settings`, under the mutex; the engine applies them on its next pass. |
+| UI (`wWinMain`) | both windows (the app window and the overlay, each with its own ImGui context), the tray, `AppSettings`, the `Updater` | reads snapshots and the history index (copied under a mutex). Requests go to the engine as atomics: end fight, recording on/off, clear history. New meter and history settings go through `AppRuntime::update_settings`, under the mutex; the engine applies them on its next pass. |
+| Updater worker (one at a time) | the check or the download | `Updater::status()`, copied under its mutex, which the UI reads each frame. Staged files are moved into place on the UI thread (`apply_staged`). `stop()` cancels a download and joins, before the engine stops. |
 
 `make tsan` runs the suite under ThreadSanitizer. The `AppRuntime` tests drive real
 threads with a FileSource.
@@ -390,6 +402,51 @@ in 2026-10.
 
 ---
 
+## 🔄 Self-update (`src/app`: `update_check`, `updater`; ported from ffxiv-hub)
+
+The meter updates itself from this repository's GitHub releases. The repository is
+public: GitHub's API shows a private repository's releases to no anonymous caller.
+
+- **One automatic check per start.** `Updater::tick()` checks once,
+  `kStartupCheckDelay` (10 s) after its first tick, when `check_for_updates` is on and
+  `os::http_supported()` holds, and never again in that run. `http_supported()` is false
+  on the mock, so no test, screenshot or non-Windows build reaches the network.
+  **Check now** ignores the switch.
+- **Only what can be verified is installed.**
+  - A release is announced when its `tag_name` is a strictly newer `vX.Y.Z`; never a
+    downgrade, a draft or a prerelease.
+  - It is installable only when its `aion2-combat-meter-windows-x64.zip` asset lies
+    under this repository's `releases/download/` and GitHub published a `sha256:`
+    digest for it. The download must match that digest before anything is unpacked.
+  - A URL from the API is followed or opened only under this repository's prefixes
+    (`update_check.hpp`), and `os::open_url()` opens nothing but `https://`.
+  - Only `UPDATE_FILES` (the two executables) come out of the zip, by exact name, each
+    checked against its size and CRC. README and LICENSE stay as they are.
+- **Rename aside, never overwrite.**
+  - A running exe can be renamed but not overwritten or deleted. The download is
+    staged in `.aion2-combat-meter-update/` inside the install folder, so moving it in
+    is a rename on one volume.
+  - `apply_staged_update()` renames each live file to `<name>.<old version>.old`,
+    moves the new one in, and undoes every step on any failure. A file the folder
+    lacks (a deleted replay tool) is just moved in.
+  - `remove_update_leftovers()` deletes the staging folder and those backups at every
+    start, best effort: a backup still running stays for a later start.
+- **The relaunch waits on the lock, not the process.** Once the files are swapped,
+  the app starts the new exe with `--updated` and leaves through its normal teardown.
+  The new instance retries the single-instance mutex for up to 15 s
+  (`SingleInstance::acquire_within`), which frees as the old one exits. Waiting on
+  the old process itself would need `OpenProcess`, which Passive only forbids.
+- **The tray stays lifecycle-only.** The update notice is a balloon through
+  `TrayIcon::notify`, once per version per run (`UpdateNotifier`), gated by
+  `notifications`. The tray menu gets no update item; installing lives in Settings,
+  behind a confirmation, and a sidebar pill points there.
+- **A release is a contract with every installed copy.** The asset's name, the
+  executables at the zip's root, the tag scheme and GitHub's digest are what old
+  versions look for. Changing any of them strands every copy already installed
+  (skill `release`).
+
+---
+
 ## 🧪 Verification
 
 | Command | Where | What |
@@ -405,4 +462,4 @@ in 2026-10.
 - Comments: `///` doc comments that say why, not what.
 - Commits: Conventional Commits.
 - Releases: bump `include/aion2/version.hpp`, then push a `vX.Y.Z` tag; CI checks the two
-  agree.
+  agree and publishes the release, which installed copies update to (skill `release`).

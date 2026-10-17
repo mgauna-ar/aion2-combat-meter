@@ -28,6 +28,7 @@
 #include <cstdio>
 #include <filesystem>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -158,7 +159,9 @@ struct AppScene {
 
 /// One page of the app window, in a window-sized picture with rounded corners and a
 /// shadow, over the backdrop.
-bool render_app(AppScene& scene, app::AppSettings& settings, const std::filesystem::path& out_dir) {
+/// `update` is the updater's state; unset on the README's pictures, which show none.
+bool render_app(AppScene& scene, app::AppSettings& settings, const std::filesystem::path& out_dir,
+                const std::optional<app::UpdateStatus>& update = std::nullopt) {
     ImGuiIO& io = ImGui::GetIO();
     const int w = static_cast<int>(std::lround(app::ui::metrics::WindowDefaultW * kScale));
     const int h = static_cast<int>(std::lround(app::ui::metrics::WindowDefaultH * kScale));
@@ -168,6 +171,7 @@ bool render_app(AppScene& scene, app::AppSettings& settings, const std::filesyst
     input.source_status = "Capturing on 2 adapters; the game's connection is on port 13328";
     input.settings = &settings;
     input.data_dir = "C:\\Users\\you\\AppData\\Roaming\\aion2-combat-meter";
+    input.update = update;
     // Several frames, so tables, tabs and wrapped rows settle before the one captured.
     for (int frame = 0; frame < 4; ++frame) {
         io.DisplaySize = ImVec2(static_cast<float>(w), static_cast<float>(h));
@@ -321,7 +325,16 @@ int main(int argc, char** argv) {
         ok = render_app(dashboard, app_settings, out_dir) && ok;
         AppScene app_page{"app-app-settings.png", done.snapshot, damage.history, {}};
         app_page.view.page = app::AppPage::Settings;
-        ok = render_app(app_page, app_settings, out_dir) && ok;
+        // A newer release found, so the Updates card and the sidebar pill show.
+        app::ReleaseInfo next;
+        next.version = {app::CURRENT_VERSION.major, app::CURRENT_VERSION.minor,
+                        static_cast<uint16_t>(app::CURRENT_VERSION.patch + 1)};
+        next.page_url = std::string(app::RELEASE_PAGE_PREFIX) + "tag/v" + next.version.to_string();
+        next.download_url = std::string(app::RELEASE_DOWNLOAD_PREFIX) + "v" + next.version.to_string() + "/" +
+                            std::string(app::RELEASE_ASSET_NAME);
+        next.sha256 = std::string(64, '0');
+        const app::UpdateStatus available{app::UpdateState::Available, next, 0.0f, {}};
+        ok = render_app(app_page, app_settings, out_dir, available) && ok;
     }
     ImGui::DestroyContext();
 

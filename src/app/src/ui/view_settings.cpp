@@ -7,8 +7,10 @@
 
 #ifdef HAVE_IMGUI
 #include <algorithm>
+#include <cfloat>
 #include <cstdio>
 #include <cstring>
+#include <string>
 #endif
 
 namespace aion2::app::ui {
@@ -22,8 +24,8 @@ void window_card(const AppFrameInput& in, AppActions& out) {
     WindowSettings& w = in.settings->window;
     setting_switch("Open this window at start", "Off, the meter starts in the tray.", &w.open_at_start, out);
     setting_switch("Close to tray", "Closing the window hides it; the tray's Exit quits.", &w.close_to_tray, out);
-    setting_switch("Notifications", "Tray notices: a capture that failed to start, a recording.", &w.notifications,
-                   out);
+    setting_switch("Notifications", "Tray notices: a capture that failed to start, a recording, a new version.",
+                   &w.notifications, out);
     bool start = in.start_with_windows;
     if (setting_toggle("Start with Windows", "Launch the meter when you sign in to Windows.", &start)) {
         out.start_with_windows = start;
@@ -79,6 +81,108 @@ void hotkeys_card() {
     end_settings_card();
 }
 
+/// The status line under the version: what the last check or install found.
+void update_status_line(const UpdateStatus& status) {
+    const std::string next = status.release ? status.release->version.to_string() : std::string();
+    ImGui::PushTextWrapPos(0.0f);
+    switch (status.state) {
+        case UpdateState::Idle:
+            text_colored_u32(colors::TextDim, "Not checked for updates yet.");
+            break;
+        case UpdateState::Checking:
+            text_colored_u32(colors::TextMuted, "Checking GitHub for a newer release...");
+            break;
+        case UpdateState::UpToDate:
+            text_colored_u32(colors::SuccessLight, "Up to date.");
+            break;
+        case UpdateState::Available:
+            text_colored_u32(colors::AccentHover, "Version %s is available.", next.c_str());
+            if (!status.release->installable()) {
+                text_colored_u32(colors::TextDim,
+                                 "It can't be checked before installing, so download it from its release page.");
+            }
+            break;
+        case UpdateState::Downloading:
+            text_colored_u32(colors::TextMuted, "Downloading version %s...", next.c_str());
+            ImGui::PushStyleColor(ImGuiCol_PlotHistogram, v4(colors::Accent));
+            ImGui::ProgressBar(status.progress, ImVec2(-FLT_MIN, m(6.0f)), "");
+            ImGui::PopStyleColor();
+            break;
+        case UpdateState::Ready:
+            text_colored_u32(colors::TextMuted, "Installing version %s...", next.c_str());
+            break;
+        case UpdateState::RestartPending:
+            text_colored_u32(colors::WarningLight, "Version %s is installed. Restart the meter to finish updating.",
+                             next.c_str());
+            break;
+        case UpdateState::Failed:
+            text_colored_u32(colors::DangerLight, "%s", status.error.c_str());
+            break;
+    }
+    ImGui::PopTextWrapPos();
+}
+
+void update_confirm_popup(const UpdateStatus& status, AppActions& out) {
+    if (!ImGui::BeginPopupModal("##ConfirmUpdate", nullptr,
+                                ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar)) {
+        return;
+    }
+    icon_chip(ICON_DOWNLOAD, colors::Accent, metrics::ChipSizeLg);
+    ImGui::SameLine(0.0f, m(10.0f));
+    ImGui::BeginGroup();
+    ImGui::PushFont(bold_font());
+    text_colored_u32(colors::TextPrimary, "Update to version %s?",
+                     status.release ? status.release->version.to_string().c_str() : "");
+    ImGui::PopFont();
+    text_dim("The meter downloads it, checks it and restarts.");
+    text_dim("A fight still going is not saved.");
+    ImGui::EndGroup();
+    ImGui::Dummy(ImVec2(0.0f, m(8.0f)));
+    if (button(ICON_DOWNLOAD "  Update & restart", ButtonKind::Primary, ButtonSize::Large)) {
+        out.install_update = true;
+        ImGui::CloseCurrentPopup();
+    }
+    ImGui::SameLine(0.0f, m(8.0f));
+    if (button("Cancel", ButtonKind::Secondary, ButtonSize::Small)) ImGui::CloseCurrentPopup();
+    ImGui::EndPopup();
+}
+
+void updates_card(const AppFrameInput& in, AppActions& out) {
+    begin_settings_card("##set_updates", ICON_DOWNLOAD, "UPDATES", colors::Accent);
+    if (in.update) {
+        const UpdateStatus& status = *in.update;
+        update_status_line(status);
+        ImGui::Dummy(ImVec2(0.0f, m(4.0f)));
+
+        const char* update_label = ICON_DOWNLOAD "  Update & restart";
+        const char* check_label = ICON_REFRESH "  Check now";
+        const char* notes_label = ICON_FILE "  Release notes";
+        const bool has_release = status.release.has_value();
+        if (has_release) {
+            ImGui::BeginDisabled(!status.can_install());
+            if (button(update_label, ButtonKind::Primary)) ImGui::OpenPopup("##ConfirmUpdate");
+            ImGui::EndDisabled();
+            if (!status.release->installable() && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                ImGui::SetTooltip("This release publishes no checksum to verify the download against.");
+            }
+            same_line_if_room(button_width(check_label));
+        }
+        // Once installed, only a restart is left to do.
+        ImGui::BeginDisabled(status.busy() || status.state == UpdateState::RestartPending);
+        if (button(check_label)) out.check_updates = true;
+        ImGui::EndDisabled();
+        if (has_release && !status.release->page_url.empty()) {
+            same_line_if_room(button_width(notes_label));
+            if (button(notes_label)) out.open_release_notes = true;
+        }
+        update_confirm_popup(status, out);
+        ImGui::Dummy(ImVec2(0.0f, m(4.0f)));
+    }
+    setting_switch("Check for updates at startup", "Asks GitHub for a newer release each time the meter starts.",
+                   &in.settings->window.check_for_updates, out);
+    end_settings_card();
+}
+
 void about_card(AppActions& out) {
     begin_settings_card("##set_about", ICON_INFO, "ABOUT", colors::Success);
     text_colored_u32(colors::TextPrimary, "AION 2 Combat Meter %s", VERSION_STRING);
@@ -103,6 +207,7 @@ void render_settings_page(const AppFrameInput& in, AppViewState&, AppActions& ou
         {[&] { window_card(in, out); }},
         {[&] { capture_card(in, out); }},
         {[&] { hotkeys_card(); }},
+        {[&] { updates_card(in, out); }},
         {[&] { about_card(out); }},
     };
     render_settings_grid(sections, sizeof(sections) / sizeof(sections[0]));
