@@ -263,7 +263,7 @@ float OverlayWindow::dpi_scale() const {
     return dpi == 0 ? 1.0f : static_cast<float>(dpi) / 96.0f;
 }
 
-OverlayActions OverlayWindow::render(OverlayFrameInput input, OverlayViewState& state) {
+OverlayActions OverlayWindow::render(OverlayFrameInput input) {
     if (m_imgui == nullptr) return {};
     ImGui::SetCurrentContext(m_imgui);
     if (m_resize_width != 0 && m_resize_height != 0) {
@@ -284,7 +284,7 @@ OverlayActions OverlayWindow::render(OverlayFrameInput input, OverlayViewState& 
     ImGui_ImplDX11_NewFrame();
     ImGui_ImplWin32_NewFrame();
     ImGui::NewFrame();
-    const OverlayActions actions = draw_overlay(input, state);
+    const OverlayActions actions = draw_overlay(input);
     m_drag_area = actions.drag_area;
     m_resize_grip = actions.resize_grip;
     ImGui::Render();

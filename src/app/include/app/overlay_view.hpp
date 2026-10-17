@@ -1,13 +1,10 @@
 #pragma once
 
 #include "app/app_settings.hpp"
-#include "meter/history_store.hpp"
 #include "meter/types.hpp"
 #include "pipeline/pipeline.hpp"
 
-#include <optional>
 #include <string>
-#include <vector>
 
 namespace aion2::app {
 
@@ -21,19 +18,9 @@ struct ClientRect {
     [[nodiscard]] bool contains(float x, float y) const noexcept { return x >= x0 && x < x1 && y >= y0 && y < y1; }
 };
 
-/// What the overlay shows between frames.
-struct OverlayViewState {
-    enum class Tab : uint8_t { Live, History };
-    Tab tab{Tab::Live};
-    /// The saved fight on view in History; empty for none.
-    std::string selected_file;
-    std::optional<meter::FightSummary> selected_fight;
-};
-
-/// One frame's inputs. Pointers may be null before the first snapshot.
+/// One frame's inputs. The snapshot may be null before the first one.
 struct OverlayFrameInput {
     const pipeline::LiveSnapshot* snapshot{nullptr};
-    const std::vector<meter::HistoryEntry>* history{nullptr};
     std::string source_status;
     bool recording{false};
     const OverlaySettings* settings{nullptr};
@@ -45,19 +32,18 @@ struct OverlayFrameInput {
 struct OverlayActions {
     bool end_fight{false};
     bool lock{false};
-    bool toggle_recording{false};
-    bool open_history_folder{false};
-    bool hide{false};
-    /// A saved fight to load into OverlayViewState::selected_fight.
-    std::string load_file;
+    /// Open the app window: the history and every setting live there.
+    bool open_app{false};
     /// Where a press drags the window (empty space in the header) and where it
     /// resizes it (the corner grip). The window's hit test uses them while unlocked.
     ClientRect drag_area;
     ClientRect resize_grip;
 };
 
-/// Draws the meter as one ImGui window filling the display, into the frame the
-/// caller has begun. A no-op where ImGui is not built (HAVE_IMGUI unset).
-OverlayActions draw_overlay(const OverlayFrameInput& input, OverlayViewState& state);
+/// Draws the meter's live fight as one ImGui window filling the display, into the
+/// frame the caller has begun: the party ranked, the boss's HP and the timer. Saved
+/// fights and settings are the app window's. A no-op where ImGui is not built
+/// (HAVE_IMGUI unset).
+OverlayActions draw_overlay(const OverlayFrameInput& input);
 
 } // namespace aion2::app

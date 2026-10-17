@@ -59,9 +59,14 @@ void draw_rows(const meter::FightSummary& f, const OverlaySettings& s, float sca
     cols.push_back({"DPS", 60.0f * scale});
     cols.push_back({"Damage", 66.0f * scale});
     if (s.show_share) cols.push_back({"Share", 54.0f * scale});
+    if (s.show_hits) cols.push_back({"Hits", 44.0f * scale});
     if (s.show_crit) cols.push_back({"Crit", 54.0f * scale});
+    if (s.show_perfect) cols.push_back({"Perf", 54.0f * scale});
+    if (s.show_double) cols.push_back({"Dbl", 54.0f * scale});
     if (s.show_back) cols.push_back({"Back", 54.0f * scale});
+    if (s.show_front) cols.push_back({"Front", 54.0f * scale});
     if (s.show_max_hit) cols.push_back({"Max", 58.0f * scale});
+    if (s.show_heal) cols.push_back({"Heal", 60.0f * scale});
     const float rank_w = 18.0f * scale;
     float numbers_w = 0;
     for (const auto& c : cols) numbers_w += c.width;
@@ -82,12 +87,16 @@ void draw_rows(const meter::FightSummary& f, const OverlaySettings& s, float sca
     const double top = f.combatants.empty() ? 1.0 : std::max(f.combatants.front().dps, 1.0);
     int rank = 0;
     for (const auto& row : f.combatants) {
+        // Players who only healed or were hit rank below everyone who dealt damage.
+        if (row.damage == 0 && !s.show_heal) continue;
+        if (rank >= s.max_rows) break;
         ++rank;
         const ImVec2 row_min(origin.x, y);
         const ImVec2 row_max(origin.x + width, y + row_h - 1.0f * scale);
         if (rank % 2 == 0) dl->AddRectFilled(row_min, row_max, u32(colors::Text, 0.03f));
         const float fraction = static_cast<float>(std::clamp(row.dps / top, 0.0, 1.0));
-        dl->AddRectFilled(row_min, ImVec2(row_min.x + width * fraction, row_max.y), u32(row_color(row), 0.38f),
+        const Rgb bar = s.class_bars ? row_color(row) : colors::Accent;
+        dl->AddRectFilled(row_min, ImVec2(row_min.x + width * fraction, row_max.y), u32(bar, s.class_bars ? 0.38f : 0.28f),
                           2.0f * scale);
 
         const float ty = y + (row_h - line) * 0.5f - 0.5f * scale;
@@ -108,21 +117,29 @@ void draw_rows(const meter::FightSummary& f, const OverlaySettings& s, float sca
             x += cols[ci++].width;
             text_right(dl, x - 4.0f * scale, ty, text, v);
         };
+        const auto rate = [&](uint64_t meter::HitCounts::*count) { return format_percent(row.hits.rate(count)); };
         put(format_rate(row.dps));
         put(format_amount(row.damage));
         if (s.show_share) put(format_percent(row.share));
-        if (s.show_crit) put(format_percent(row.crit_rate()));
-        if (s.show_back) put(format_percent(row.back_rate()));
+        if (s.show_hits) put(std::to_string(row.hits.hits));
+        if (s.show_crit) put(rate(&meter::HitCounts::crits));
+        if (s.show_perfect) put(rate(&meter::HitCounts::perfect));
+        if (s.show_double) put(rate(&meter::HitCounts::doubles));
+        if (s.show_back) put(rate(&meter::HitCounts::back));
+        if (s.show_front) put(rate(&meter::HitCounts::front));
         if (s.show_max_hit) put(format_amount(row.max_hit));
+        if (s.show_heal) put(format_amount(row.healing));
 
         if (interactive && ImGui::IsMouseHoveringRect(row_min, row_max)) {
-            ImGui::SetTooltip("%s\n%llu damage (%llu from DoTs)\n%llu hits, %s crit, %s back attacks\n"
-                              "max hit %llu\nclass code %u",
+            ImGui::SetTooltip("%s\n%llu damage (%llu from DoTs), %llu healing\n%llu hits: %s crit, %s perfect, "
+                              "%s double\n%s back, %s front; max hit %llu",
                               row.name.c_str(), static_cast<unsigned long long>(row.damage),
                               static_cast<unsigned long long>(row.dot_damage),
-                              static_cast<unsigned long long>(row.hits.hits), format_percent(row.crit_rate()).c_str(),
-                              format_percent(row.back_rate()).c_str(), static_cast<unsigned long long>(row.max_hit),
-                              row.class_code);
+                              static_cast<unsigned long long>(row.healing),
+                              static_cast<unsigned long long>(row.hits.hits), rate(&meter::HitCounts::crits).c_str(),
+                              rate(&meter::HitCounts::perfect).c_str(), rate(&meter::HitCounts::doubles).c_str(),
+                              rate(&meter::HitCounts::back).c_str(), rate(&meter::HitCounts::front).c_str(),
+                              static_cast<unsigned long long>(row.max_hit));
         }
         y += row_h;
     }
@@ -165,8 +182,7 @@ void draw_boss(const meter::FightSummary& f, float scale, bool interactive) {
     (void)scale;
 }
 
-const char* status_label(const pipeline::LiveSnapshot* snap, const meter::FightSummary* f, bool history) {
-    if (history) return "SAVED";
+const char* status_label(const pipeline::LiveSnapshot* snap, const meter::FightSummary* f) {
     if (snap == nullptr || snap->capture == pipeline::CaptureState::Waiting) return "WAIT";
     if (f != nullptr && f->live) return "LIVE";
     if (snap->capture == pipeline::CaptureState::Quiet) return "QUIET";
@@ -182,7 +198,7 @@ Rgb status_color(const char* label) {
 
 } // namespace
 
-OverlayActions draw_overlay(const OverlayFrameInput& in, OverlayViewState& state) {
+OverlayActions draw_overlay(const OverlayFrameInput& in) {
     OverlayActions out;
     const OverlaySettings defaults{};
     const OverlaySettings& s = in.settings != nullptr ? *in.settings : defaults;
@@ -204,17 +220,11 @@ OverlayActions draw_overlay(const OverlayFrameInput& in, OverlayViewState& state
                                    ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar |
                                    ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoBringToFrontOnFocus;
     if (ImGui::Begin("##aion2meter", nullptr, flags)) {
-        const bool history_tab = state.tab == OverlayViewState::Tab::History;
-        const meter::FightSummary* fight = nullptr;
-        if (history_tab) {
-            if (state.selected_fight) fight = &*state.selected_fight;
-        } else if (in.snapshot != nullptr && in.snapshot->fight.id != 0) {
-            fight = &in.snapshot->fight;
-        }
+        const meter::FightSummary* fight =
+            in.snapshot != nullptr && in.snapshot->fight.id != 0 ? &in.snapshot->fight : nullptr;
 
         // Header: status, timer, totals; buttons on the right.
-        const float header_top = ImGui::GetCursorPosY();
-        const char* status = status_label(in.snapshot, fight, history_tab);
+        const char* status = status_label(in.snapshot, fight);
         ImGui::TextColored(rgba(status_color(status)), "%s", status);
         if (fight != nullptr) {
             ImGui::SameLine();
@@ -226,69 +236,29 @@ OverlayActions draw_overlay(const OverlayFrameInput& in, OverlayViewState& state
         }
         const float text_end_x = ImGui::GetItemRectMax().x;
 
-        const char* tab_label = history_tab ? "Live" : "History";
+        const char* app_label = "App";
         const char* lock_label = "Lock";
-        const char* rec_label = in.recording ? "Stop rec" : "Rec";
-        const bool show_end = !history_tab && fight != nullptr && fight->live;
+        const bool show_end = fight != nullptr && fight->live;
         const float spacing = ImGui::GetStyle().ItemSpacing.x;
-        float buttons_w = button_width(tab_label) + button_width(lock_label) + button_width(rec_label) + 2 * spacing;
+        float buttons_w = button_width(app_label) + button_width(lock_label) + spacing;
         if (show_end) buttons_w += button_width("End") + spacing;
         const float buttons_x = ImGui::GetWindowContentRegionMax().x - buttons_w;
         if (interactive && buttons_x > text_end_x + spacing) {
             ImGui::SameLine(buttons_x);
             if (show_end && ImGui::SmallButton("End")) out.end_fight = true;
             if (show_end) ImGui::SameLine();
-            if (in.recording) ImGui::PushStyleColor(ImGuiCol_Button, rgba(colors::Live, 0.7f));
-            if (ImGui::SmallButton(rec_label)) out.toggle_recording = true;
-            if (in.recording) ImGui::PopStyleColor();
-            if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip("Record the game's traffic to a .pcapng for aion2meter-replay.\n"
-                                  "Recordings hold character names: share them with care.");
-            }
-            ImGui::SameLine();
-            if (ImGui::SmallButton(tab_label)) {
-                state.tab = history_tab ? OverlayViewState::Tab::Live : OverlayViewState::Tab::History;
-            }
+            if (ImGui::SmallButton(app_label)) out.open_app = true;
+            if (ImGui::IsItemHovered()) ImGui::SetTooltip("Open the app: saved fights, skills and settings.");
             ImGui::SameLine();
             if (ImGui::SmallButton(lock_label)) out.lock = true;
             if (ImGui::IsItemHovered()) ImGui::SetTooltip("Click-through and fixed in place. Ctrl+Alt+L unlocks.");
         }
         const float header_bottom = ImGui::GetCursorPosY();
-        out.drag_area = ClientRect{0.0f, 0.0f, interactive ? std::max(buttons_x, text_end_x) : 0.0f,
-                                   header_bottom};
-        (void)header_top;
+        out.drag_area = ClientRect{0.0f, 0.0f, interactive ? std::max(buttons_x, text_end_x) : 0.0f, header_bottom};
         ImGui::Separator();
 
         const float footer_h = ImGui::GetTextLineHeightWithSpacing();
-        if (history_tab) {
-            const std::vector<meter::HistoryEntry> empty;
-            const auto& history = in.history != nullptr ? *in.history : empty;
-            const float list_h = std::max(3.0f * ImGui::GetTextLineHeightWithSpacing(),
-                                          (ImGui::GetContentRegionAvail().y - footer_h) * 0.4f);
-            if (ImGui::BeginChild("##history", ImVec2(0.0f, list_h), ImGuiChildFlags_None)) {
-                if (history.empty()) {
-                    ImGui::TextColored(rgba(colors::TextDim), "No saved fights yet.");
-                }
-                for (auto it = history.rbegin(); it != history.rend(); ++it) {
-                    char line[160];
-                    std::snprintf(line, sizeof(line), "%s  %-14s %6s  %8s dps%s%s##%s",
-                                  common::local_clock(it->start_ts).c_str(),
-                                  it->boss_label.empty() ? "-" : it->boss_label.c_str(),
-                                  common::clock_duration(it->duration_s).c_str(), format_rate(it->total_dps).c_str(),
-                                  it->killed ? "  killed" : "", it->partial ? "  partial" : "", it->file.c_str());
-                    if (ImGui::Selectable(line, state.selected_file == it->file)) out.load_file = it->file;
-                }
-            }
-            ImGui::EndChild();
-            if (fight != nullptr) {
-                draw_boss(*fight, scale, interactive);
-                if (ImGui::BeginChild("##saved_rows", ImVec2(0.0f, -footer_h), ImGuiChildFlags_None,
-                                      ImGuiWindowFlags_NoBackground)) {
-                    draw_rows(*fight, s, scale, interactive);
-                }
-                ImGui::EndChild();
-            }
-        } else if (fight != nullptr) {
+        if (fight != nullptr) {
             draw_boss(*fight, scale, interactive);
             if (ImGui::BeginChild("##rows", ImVec2(0.0f, -footer_h), ImGuiChildFlags_None,
                                   ImGuiWindowFlags_NoBackground)) {
@@ -313,8 +283,7 @@ OverlayActions draw_overlay(const OverlayFrameInput& in, OverlayViewState& state
         }
         if (in.recording) ImGui::TextColored(rgba(colors::Live), "REC");
         if (in.recording) ImGui::SameLine();
-        ImGui::TextColored(rgba(colors::TextDim), "%s",
-                           fit(footer, ImGui::GetContentRegionAvail().x).c_str());
+        ImGui::TextColored(rgba(colors::TextDim), "%s", fit(footer, ImGui::GetContentRegionAvail().x).c_str());
 
         // Resize grip.
         if (interactive) {
@@ -337,7 +306,7 @@ OverlayActions draw_overlay(const OverlayFrameInput& in, OverlayViewState& state
 
 namespace aion2::app {
 
-OverlayActions draw_overlay(const OverlayFrameInput&, OverlayViewState&) { return {}; }
+OverlayActions draw_overlay(const OverlayFrameInput&) { return {}; }
 
 } // namespace aion2::app
 

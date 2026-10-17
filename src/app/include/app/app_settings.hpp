@@ -35,6 +35,22 @@ struct OverlaySettings {
     bool show_crit{true};
     bool show_back{true};
     bool show_max_hit{false};
+    bool show_hits{false};
+    bool show_perfect{false};
+    bool show_double{false};
+    bool show_front{false};
+    bool show_heal{false};
+    /// Bars in each player's class colour; off, all in one colour.
+    bool class_bars{true};
+    /// Rows drawn, best first.
+    int max_rows{8};
+    /// Shown only during a fight and for hide_after_combat_s after it. Like the
+    /// next one, it applies only while the overlay is locked, so an unlocked one
+    /// can always be found and dragged back.
+    bool show_in_combat_only{false};
+    float hide_after_combat_s{5.0f};
+    /// Hidden while neither the game nor one of the meter's windows is in front.
+    bool hide_when_game_unfocused{false};
 };
 
 struct HistorySettings {
@@ -73,7 +89,7 @@ inline constexpr std::array<config::ConfigKey<CaptureSettings>, 2> kCaptureKeys{
     config::field<CaptureSettings, &CaptureSettings::detect_relays>("detect_relays"),
 }};
 
-inline constexpr std::array<config::ConfigKey<OverlaySettings>, 12> kOverlayKeys{{
+inline constexpr std::array<config::ConfigKey<OverlaySettings>, 22> kOverlayKeys{{
     config::field<OverlaySettings, &OverlaySettings::visible>("visible"),
     config::field<OverlaySettings, &OverlaySettings::locked>("locked"),
     config::field<OverlaySettings, &OverlaySettings::opacity>("opacity"),
@@ -86,6 +102,16 @@ inline constexpr std::array<config::ConfigKey<OverlaySettings>, 12> kOverlayKeys
     config::field<OverlaySettings, &OverlaySettings::show_crit>("show_crit"),
     config::field<OverlaySettings, &OverlaySettings::show_back>("show_back"),
     config::field<OverlaySettings, &OverlaySettings::show_max_hit>("show_max_hit"),
+    config::field<OverlaySettings, &OverlaySettings::show_hits>("show_hits"),
+    config::field<OverlaySettings, &OverlaySettings::show_perfect>("show_perfect"),
+    config::field<OverlaySettings, &OverlaySettings::show_double>("show_double"),
+    config::field<OverlaySettings, &OverlaySettings::show_front>("show_front"),
+    config::field<OverlaySettings, &OverlaySettings::show_heal>("show_heal"),
+    config::field<OverlaySettings, &OverlaySettings::class_bars>("class_bars"),
+    config::field<OverlaySettings, &OverlaySettings::max_rows>("max_rows"),
+    config::field<OverlaySettings, &OverlaySettings::show_in_combat_only>("show_in_combat_only"),
+    config::field<OverlaySettings, &OverlaySettings::hide_after_combat_s>("hide_after_combat_s"),
+    config::field<OverlaySettings, &OverlaySettings::hide_when_game_unfocused>("hide_when_game_unfocused"),
 }};
 
 inline constexpr std::array<config::ConfigKey<HistorySettings>, 1> kHistoryKeys{{

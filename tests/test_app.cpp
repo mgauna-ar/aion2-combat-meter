@@ -4,6 +4,7 @@
 
 #include "app/app_runtime.hpp"
 #include "app/app_settings.hpp"
+#include "app/overlay_visibility.hpp"
 #include "app/display_format.hpp"
 #include "capture/capture_file.hpp"
 #include "capture/file_source.hpp"
@@ -305,4 +306,37 @@ TEST_CASE(AppRuntime, NewSettingsReachTheEngine) {
     }));
     runtime.stop();
     TEST_ASSERT(runtime.history().empty());
+}
+
+TEST_CASE(OverlayVisibility, CombatOnlyKeepsItUpAfterAFight) {
+    OverlaySettings s;
+    s.locked = true;
+    s.show_in_combat_only = true;
+    s.hide_after_combat_s = 5.0f;
+    OverlayConditions now;
+    TEST_ASSERT_FALSE(overlay_shown(s, now));  // no fight yet
+    now.fight_live = true;
+    TEST_ASSERT(overlay_shown(s, now));
+    now.fight_live = false;
+    now.seconds_since_fight = 4.9;
+    TEST_ASSERT(overlay_shown(s, now));
+    now.seconds_since_fight = 5.0;
+    TEST_ASSERT_FALSE(overlay_shown(s, now));
+}
+
+TEST_CASE(OverlayVisibility, ConditionsWaitForTheLock) {
+    OverlaySettings s;
+    s.show_in_combat_only = true;
+    s.hide_when_game_unfocused = true;
+    OverlayConditions now;
+    now.game_in_front = false;
+    TEST_ASSERT(overlay_shown(s, now));  // unlocked: always findable
+    s.locked = true;
+    TEST_ASSERT_FALSE(overlay_shown(s, now));
+    now.fight_live = true;
+    TEST_ASSERT_FALSE(overlay_shown(s, now));  // in a fight, but the game is not in front
+    now.game_in_front = true;
+    TEST_ASSERT(overlay_shown(s, now));
+    s.visible = false;
+    TEST_ASSERT_FALSE(overlay_shown(s, now));  // the hotkey's hide rules over all
 }

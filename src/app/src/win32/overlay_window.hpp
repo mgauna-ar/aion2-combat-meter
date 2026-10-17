@@ -69,7 +69,7 @@ public:
 
     /// Draws one frame. `input.scale` is the settings' scale; the monitor's DPI is
     /// applied here.
-    OverlayActions render(OverlayFrameInput input, OverlayViewState& state);
+    OverlayActions render(OverlayFrameInput input);
 
     std::function<void(Hotkey)> on_hotkey;
     /// The user finished moving or resizing the window.

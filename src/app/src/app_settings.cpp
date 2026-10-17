@@ -33,6 +33,8 @@ void sanitize(AppSettings& s) {
     s.overlay.scale = std::clamp(s.overlay.scale, 0.6f, 2.5f);
     s.overlay.width = std::clamp(s.overlay.width, 200, 4000);
     s.overlay.height = std::clamp(s.overlay.height, 90, 4000);
+    s.overlay.max_rows = std::clamp(s.overlay.max_rows, 1, 24);
+    s.overlay.hide_after_combat_s = std::clamp(s.overlay.hide_after_combat_s, 0.0f, 600.0f);
     s.meter.idle_timeout_s = std::clamp(s.meter.idle_timeout_s, 2.0, 600.0);
     s.meter.boss_idle_timeout_s = std::clamp(s.meter.boss_idle_timeout_s, s.meter.idle_timeout_s, 1800.0);
     s.meter.capture_lost_s = std::clamp(s.meter.capture_lost_s, 5.0, 600.0);

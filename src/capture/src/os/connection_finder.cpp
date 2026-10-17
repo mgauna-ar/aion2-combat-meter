@@ -69,6 +69,11 @@ bool wanted(const IpAddress& remote, uint16_t remote_port, uint16_t server_port)
 
 bool game_running(const std::string& process_name) { return !pids_named(process_name).empty(); }
 
+std::vector<uint32_t> game_process_ids(const std::string& process_name) {
+    const std::set<DWORD> pids = pids_named(process_name);
+    return std::vector<uint32_t>(pids.begin(), pids.end());
+}
+
 std::vector<GameConnection> find_game_connections(const std::string& process_name, uint16_t server_port) {
     std::vector<GameConnection> out;
     const std::set<DWORD> pids = pids_named(process_name);
@@ -115,6 +120,8 @@ std::vector<GameConnection> find_game_connections(const std::string& process_nam
 namespace aion2::capture {
 
 bool game_running(const std::string&) { return false; }
+
+std::vector<uint32_t> game_process_ids(const std::string&) { return {}; }
 
 std::vector<GameConnection> find_game_connections(const std::string&, uint16_t) { return {}; }
 

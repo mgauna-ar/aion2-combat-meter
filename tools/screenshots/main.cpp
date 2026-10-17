@@ -45,8 +45,6 @@ struct Scene {
     float width;
     float height;
     pipeline::LiveSnapshot snapshot;
-    app::OverlayViewState view;
-    std::vector<meter::HistoryEntry> history;
 };
 
 /// The synthetic capture replayed up to `until` (or to the end with 0), as the
@@ -113,7 +111,6 @@ bool render(Scene& scene, const app::OverlaySettings& settings, const std::files
     const int h = static_cast<int>(std::lround(scene.height * kScale));
     app::OverlayFrameInput input;
     input.snapshot = &scene.snapshot;
-    input.history = &scene.history;
     input.settings = &settings;
     input.scale = kScale;
     input.source_status = "capturing on 2 adapters; game connected";
@@ -123,7 +120,7 @@ bool render(Scene& scene, const app::OverlaySettings& settings, const std::files
         io.DeltaTime = 1.0f / 60.0f;
         io.AddMousePosEvent(-FLT_MAX, -FLT_MAX);
         ImGui::NewFrame();
-        const app::OverlayActions actions = app::draw_overlay(input, scene.view);
+        const app::OverlayActions actions = app::draw_overlay(input);
         ImGui::Render();
         (void)actions;
     }
@@ -284,36 +281,13 @@ int main(int argc, char** argv) {
     const auto session = test::synthetic::boss_session();
     app::OverlaySettings settings;
 
-    Scene live{"overlay-live.png", 430.0f, 215.0f, replay_until(session, 30.0, nullptr), {}, {}};
+    Scene live{"overlay-live.png", 430.0f, 215.0f, replay_until(session, 30.0, nullptr)};
 
     std::vector<meter::FightSummary> finished;
-    Scene done{"overlay-killed.png", 430.0f, 215.0f, replay_until(session, 0, &finished), {}, {}};
-
-    Scene history{"overlay-history.png", 430.0f, 300.0f, done.snapshot, {}, {}};
-    history.view.tab = app::OverlayViewState::Tab::History;
-    for (const auto& fight : finished) {
-        meter::HistoryEntry e;
-        e.file = meter::fight_file_name(fight);
-        e.id = fight.id;
-        e.map_id = fight.map_id;
-        e.start_ts = fight.start_ts;
-        e.duration_s = fight.duration_s;
-        e.boss_label = fight.boss.label;
-        e.is_boss = fight.boss.is_boss;
-        e.killed = fight.boss.killed;
-        e.partial = fight.quality.partial;
-        e.total_damage = fight.total_damage;
-        e.total_dps = fight.total_dps;
-        e.end_reason = fight.end_reason;
-        e.players = fight.combatants.size();
-        history.history.push_back(e);
-        history.view.selected_file = e.file;
-        history.view.selected_fight = fight;
-    }
+    Scene done{"overlay-killed.png", 430.0f, 215.0f, replay_until(session, 0, &finished)};
 
     bool ok = render(live, settings, out_dir);
     ok = render(done, settings, out_dir) && ok;
-    ok = render(history, settings, out_dir) && ok;
     ImGuiContext* overlay_ctx = ImGui::GetCurrentContext();
 
     setup_app_imgui(font, bold);
@@ -326,7 +300,11 @@ int main(int argc, char** argv) {
     ok = render_app(damage, app_settings, out_dir) && ok;
     AppScene settings_page{"app-settings.png", done.snapshot, damage.history, {}};
     settings_page.view.open_meter_tab = 3;
-    ok = render_app(settings_page, app_settings, out_dir) && ok;
+    // Locked, so the visibility conditions read as live rather than greyed out.
+    app::AppSettings shown_settings = app_settings;
+    shown_settings.overlay.locked = true;
+    shown_settings.overlay.show_in_combat_only = true;
+    ok = render_app(settings_page, shown_settings, out_dir) && ok;
     if (all) {
         AppScene healing = damage;
         healing.file = "app-healing.png";

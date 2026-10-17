@@ -8,7 +8,9 @@
 #include "aion2/version.hpp"
 #include "app/app_runtime.hpp"
 #include "app/app_settings.hpp"
+#include "app/overlay_visibility.hpp"
 #include "capture/file_source.hpp"
+#include "capture/os/connection_finder.hpp"
 #include "capture/os/npcap_source.hpp"
 #include "common/os/auto_start.hpp"
 #include "common/os/logger.hpp"
@@ -18,6 +20,7 @@
 
 #include <shellapi.h>
 
+#include <algorithm>
 #include <chrono>
 #include <cstdlib>
 #include <filesystem>
@@ -70,6 +73,18 @@ CommandLine parse_command_line() {
     }
     LocalFree(argv);
     return cl;
+}
+
+/// Whether the foreground window is the game's or one of the meter's, by process id
+/// alone: GetWindowThreadProcessId opens no handle. True when the game's process
+/// was not found, so the condition never hides the overlay on a guess.
+bool game_in_front(const std::vector<uint32_t>& game_pids) {
+    if (game_pids.empty()) return true;
+    HWND fg = GetForegroundWindow();
+    if (fg == nullptr) return true;
+    DWORD pid = 0;
+    GetWindowThreadProcessId(fg, &pid);
+    return pid == GetCurrentProcessId() || std::find(game_pids.begin(), game_pids.end(), pid) != game_pids.end();
 }
 
 std::filesystem::path data_dir() {
@@ -147,9 +162,9 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
         window.set_locked(locked);
         settings_dirty = true;
     };
+    // The window follows overlay_shown() each frame; this is the user's switch.
     const auto set_visible = [&](bool visible) {
         settings.overlay.visible = visible;
-        window.set_visible(visible);
         settings_dirty = true;
     };
     const auto toggle_recording = [&] {
@@ -181,10 +196,10 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
             case app::OpenTarget::None: break;
         }
     };
-    // The overlay window follows its settings, which the app window edits in place.
+    // The overlay window follows its settings, which the app window edits in place;
+    // whether it shows is decided each frame.
     const auto apply_overlay = [&] {
         if (window.locked() != settings.overlay.locked) window.set_locked(settings.overlay.locked);
-        if (window.visible() != settings.overlay.visible) window.set_visible(settings.overlay.visible);
     };
 
     window.on_hotkey = [&](app::win32::Hotkey key) {
@@ -261,8 +276,11 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     });
     if (!capturing) notify("AION 2 Combat Meter", capture_error);
 
-    app::OverlayViewState view;
     app::AppViewState app_view;
+    // The overlay's hide conditions: when a fight was last seen live, and the game's
+    // processes, refreshed with the housekeeping.
+    std::optional<Clock::time_point> last_live;
+    std::vector<uint32_t> game_pids = capture::game_process_ids(settings.capture.game_process);
     bool start_with_windows = os::auto_start_enabled();
     const std::string data_utf8 = os::to_utf8(data);
     const std::string log_utf8 = os::to_utf8(os::Logger::log_file_path());
@@ -284,7 +302,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
         const bool show_app = have_app && app_window.visible();
         // The revision before the list: a save in between then shows next frame
         // instead of being taken as seen.
-        if (window.visible() || show_app) {
+        if (show_app) {
             if (const uint64_t revision = runtime.history_revision(); revision != history_revision) {
                 history = runtime.history();
                 history_revision = revision;
@@ -335,30 +353,37 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
             }
         }
 
+        app::OverlayConditions conditions;
+        conditions.fight_live = snapshot != nullptr && snapshot->fight.live;
+        if (conditions.fight_live) last_live = Clock::now();
+        if (last_live) {
+            conditions.seconds_since_fight = std::chrono::duration<double>(Clock::now() - *last_live).count();
+        }
+        conditions.game_in_front = game_in_front(game_pids);
+        if (const bool shown = app::overlay_shown(settings.overlay, conditions); shown != window.visible()) {
+            window.set_visible(shown);
+        }
+
         if (window.visible()) {
             app::OverlayFrameInput input;
             input.snapshot = snapshot.get();
-            input.history = &history;
             input.source_status = runtime.source_status();
             input.recording = runtime.recording();
             input.settings = &settings.overlay;
             input.scale = settings.overlay.scale;
-            const app::OverlayActions actions = window.render(input, view);
+            const app::OverlayActions actions = window.render(input);
 
             if (actions.end_fight) runtime.request_end_fight();
             if (actions.lock) set_locked(true);
-            if (actions.toggle_recording) toggle_recording();
-            if (actions.open_history_folder) os::open_with_default_app(runtime.history_dir());
-            if (actions.hide) set_visible(false);
-            if (!actions.load_file.empty()) {
-                view.selected_file = actions.load_file;
-                view.selected_fight = runtime.load_fight(actions.load_file);
-            }
+            if (actions.open_app) open_app();
         }
 
         if (Clock::now() - last_housekeeping >= kHousekeeping) {
             last_housekeeping = Clock::now();
             window.keep_on_top();
+            if (settings.overlay.hide_when_game_unfocused) {
+                game_pids = capture::game_process_ids(settings.capture.game_process);
+            }
             std::string tip = "AION 2 Combat Meter";
             const std::string status = runtime.source_status();
             if (!status.empty()) tip += "\n" + status;

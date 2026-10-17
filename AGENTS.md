@@ -25,7 +25,9 @@ The meter **reads** the game's network traffic and **draws its own window**. It 
 `tools/check_forbidden_apis.sh` greps our code (not `src/third_party`) for those APIs.
 It runs in `make test` and in CI, so a violation fails the build. Finding the game's
 connection uses a Toolhelp process snapshot and `GetExtendedTcpTable`. Neither opens a
-handle to another process; keep it that way. AION 2 has anti-cheat, and the user cares
+handle to another process; keep it that way. "Is the game in front" (the overlay's
+hide condition) compares `GetWindowThreadProcessId` of the foreground window with
+those snapshot ids: no handle either. AION 2 has anti-cheat, and the user cares
 about account safety: when in doubt, don't.
 
 **Third-party code:** do not copy code from the community AION 2 meters. They are

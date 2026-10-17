@@ -35,4 +35,8 @@ struct GameConnection {
 /// Whether a process named `process_name` (case-insensitive) is running.
 [[nodiscard]] bool game_running(const std::string& process_name);
 
+/// The ids of the processes named `process_name` (case-insensitive), from the same
+/// Toolhelp snapshot: names and ids only, no handle opened. Empty off Windows.
+[[nodiscard]] std::vector<uint32_t> game_process_ids(const std::string& process_name);
+
 } // namespace aion2::capture

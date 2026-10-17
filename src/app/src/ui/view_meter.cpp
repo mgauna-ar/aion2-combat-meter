@@ -704,13 +704,44 @@ void overlay_card(const AppFrameInput& in, AppActions& out) {
     end_settings_card();
 }
 
+void visibility_card(const AppFrameInput& in, AppActions& out) {
+    begin_settings_card("##set_visibility", ICON_EYE, "OVERLAY VISIBILITY", colors::Violet);
+    OverlaySettings& o = in.settings->overlay;
+    // Conditions apply only while locked, so the overlay can always be dragged back.
+    if (!o.locked) ImGui::BeginDisabled();
+    setting_switch("Only in combat", "Hidden outside a fight.", &o.show_in_combat_only, out);
+    if (!o.show_in_combat_only) ImGui::BeginDisabled();
+    setting_slider("Hide after combat", "How long it stays up once a fight ends, to read the result.",
+                   &o.hide_after_combat_s, 0.0f, 60.0f, "%.0f s", out);
+    if (!o.show_in_combat_only) ImGui::EndDisabled();
+    setting_switch("Hide when the game is not in front", "Hidden while another program has the focus.",
+                   &o.hide_when_game_unfocused, out);
+    if (!o.locked) ImGui::EndDisabled();
+    ImGui::Dummy(ImVec2(0.0f, m(2.0f)));
+    ImGui::PushTextWrapPos(0.0f);
+    if (!o.locked) {
+        text_colored_u32(colors::WarningLight, ICON_WARNING "  Lock the overlay for these to apply.");
+    } else {
+        text_dim("They apply while the overlay is locked; unlocked, it always shows.");
+    }
+    ImGui::PopTextWrapPos();
+    end_settings_card();
+}
+
 void columns_card(const AppFrameInput& in, AppActions& out) {
-    begin_settings_card("##set_columns", ICON_SLIDERS, "OVERLAY COLUMNS", colors::Violet);
+    begin_settings_card("##set_columns", ICON_SLIDERS, "OVERLAY COLUMNS", colors::Accent);
     OverlaySettings& o = in.settings->overlay;
     setting_switch("Share", "Each player's share of the party's damage.", &o.show_share, out);
+    setting_switch("Hits", "HIT: direct hits.", &o.show_hits, out);
     setting_switch("Crit", "CRI: critical hits.", &o.show_crit, out);
+    setting_switch("Perfect", "PERF: perfect hits.", &o.show_perfect, out);
+    setting_switch("Double", "DOUB: double hits.", &o.show_double, out);
     setting_switch("Back", "BACK: hits from behind.", &o.show_back, out);
+    setting_switch("Front", "FRNT: hits from the front.", &o.show_front, out);
     setting_switch("Max hit", "The player's biggest hit.", &o.show_max_hit, out);
+    setting_switch("Healing", "Each player's healing.", &o.show_heal, out);
+    setting_switch("Class colours", "Bars in each player's class colour.", &o.class_bars, out);
+    setting_slider("Rows", "Players shown, best first.", &o.max_rows, 1, 24, "%d", out);
     end_settings_card();
 }
 
@@ -758,8 +789,9 @@ void settings_tab(const AppFrameInput& in, AppActions& out) {
     const SettingsSection sections[] = {
         {[&] { overlay_card(in, out); }},
         {[&] { tracking_card(in, out); }},
-        {[&] { columns_card(in, out); }},
+        {[&] { visibility_card(in, out); }},
         {[&] { history_card(in, out); }},
+        {[&] { columns_card(in, out); }},
     };
     render_settings_grid(sections, std::size(sections));
 }

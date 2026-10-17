@@ -85,11 +85,19 @@ SHA-256 is published with it.
 | Ctrl+Alt+H | Hide or show the overlay. |
 | Ctrl+Alt+R | End the current fight now. |
 
+**The overlay** shows the live fight only: the party ranked, the boss's HP and the
+timer. Saved fights and every setting are in the app window.
+
 **While unlocked:**
 - Drag the empty part of the header to move the overlay.
 - Drag the corner grip to resize it.
-- Use the header buttons: **End**, **Rec** (record a capture), **History** and **Lock**.
-- Hover a row for that player's hits, crit and back-attack rates, and max hit.
+- Use the header buttons: **End**, **App** (open the app window) and **Lock**.
+- Hover a row for that player's hit rates, healing and max hit.
+
+**Hiding it:** under the app's Combat Meter > Settings, the overlay can show only in
+combat (staying up a few seconds after, 5 by default), and hide while the game is not
+in front. Both apply only while it is locked, so an unlocked overlay can always be
+found and dragged back.
 
 **The app window** opens at start, and from the tray icon. Its sidebar has three pages:
 - **Dashboard:** what the capture sees, recording, and the meter's files.
@@ -109,7 +117,8 @@ history and recordings folders, `config.json` and the log.
   is 30 s instead, to cover phases where it can't be hit.
 - **Duration:** a fight's time runs from the first hit to the last, so the wait before
   a fight is called never lowers its DPS.
-- **Saving:** boss fights and fights longer than 20 s are saved to the History tab.
+- **Saving:** boss fights and fights longer than 20 s are saved, and listed on the app
+  window's Combat Meter page.
 
 **Who counts as party:**
 - Out of a party, every player hitting enemies is listed.
@@ -152,7 +161,13 @@ by hand only while the meter is closed. Out-of-range values are clamped.
 | `opacity` | 0.80 | Background opacity, 0 to 1. Text stays opaque. |
 | `scale` | 1.0 | Size, 0.6 to 2.5, on top of the monitor's DPI scaling. |
 | `x`, `y`, `width`, `height` | -1, -1, 430, 250 | Position and size in screen pixels. -1, -1 places it near the top-left; other negative values are on a monitor left of or above the main one. |
-| `show_share`, `show_crit`, `show_back`, `show_max_hit` | true, true, true, false | Optional columns. |
+| `show_share`, `show_crit`, `show_back`, `show_max_hit` | true, true, true, false | Optional columns: share of the damage, crit, back-attack rate, biggest hit. |
+| `show_hits`, `show_perfect`, `show_double`, `show_front`, `show_heal` | false | More optional columns: hits, perfect and double rates, front-attack rate, healing. |
+| `class_bars` | true | Bars in each player's class colour; off, all in one colour. |
+| `max_rows` | 8 | Players shown, best first, 1 to 24. |
+| `show_in_combat_only` | false | Show the overlay only during a fight, and for `hide_after_combat_s` after it. Applies only while locked. |
+| `hide_after_combat_s` | 5 | Seconds it stays up after a fight, to read the result. |
+| `hide_when_game_unfocused` | false | Hide it while neither the game nor the meter's window is in front. Applies only while locked. |
 
 **meter**
 
@@ -214,8 +229,8 @@ A capture of the game's traffic is how the decoder gets fixed and checked: repla
 any PC with `aion2meter-replay`. **Captures hold character names. Share them only with
 people you trust, and never commit them** (`.gitignore` blocks `*.pcap*`).
 
-**From the meter:** click **Rec** in the overlay or choose **Record capture** in the
-tray menu. The file goes to `%APPDATA%\aion2-combat-meter\captures\`.
+**From the meter:** click **Record** on the app window's Dashboard, or choose **Record
+capture** in the tray menu. The file goes to `%APPDATA%\aion2-combat-meter\captures\`.
 
 **With Wireshark (most complete):**
 1. Capture on both your network adapter and "Adapter for loopback traffic capture",
