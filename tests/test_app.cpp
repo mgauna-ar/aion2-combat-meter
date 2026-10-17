@@ -99,6 +99,15 @@ TEST_CASE(TimeFormat, StampsAndClocks) {
     const auto leap = common::utc_time(1'709'208'000'000'000ULL);  // 2024-02-29 12:00:00Z
     TEST_ASSERT_EQ(leap.month, 2u);
     TEST_ASSERT_EQ(leap.day, 29u);
+    TEST_ASSERT_EQ(common::clock_duration(std::nan("")), std::string("0:00"));
+    TEST_ASSERT_EQ(common::clock_duration(-4.0), std::string("0:00"));
+}
+
+TEST_CASE(TimeFormat, FromSecondsGuards) {
+    TEST_ASSERT_EQ(from_seconds(1.5), Micros{1'500'000});
+    TEST_ASSERT_EQ(from_seconds(std::nan("")), Micros{0});
+    TEST_ASSERT_EQ(from_seconds(-1.0), Micros{0});
+    TEST_ASSERT_EQ(from_seconds(1e300), kForever);
 }
 
 TEST_CASE(NpcapSource, Filters) {

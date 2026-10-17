@@ -44,6 +44,12 @@ TEST_CASE(Json, CompactIsOneLine) {
     TEST_ASSERT(*parsed == doc);
 }
 
+TEST_CASE(Json, TimestampsPrintAsIntegers) {
+    JsonValue doc;
+    doc["ts"] = uint64_t{1'792'152'000'123'456};
+    TEST_ASSERT_EQ(doc.stringify_compact(), std::string(R"({"ts":1792152000123456})"));
+}
+
 TEST_CASE(Json, RejectsTruncatedInput) {
     TEST_ASSERT_FALSE(JsonValue::parse(R"({"a":1,"b":[1,2)").has_value());
 }

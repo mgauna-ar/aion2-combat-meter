@@ -166,6 +166,7 @@ int main(int argc, char** argv) {
         e.boss_label = fight.boss.label;
         e.is_boss = fight.boss.is_boss;
         e.killed = fight.boss.killed;
+        e.partial = fight.quality.partial;
         e.total_damage = fight.total_damage;
         e.total_dps = fight.total_dps;
         e.end_reason = fight.end_reason;

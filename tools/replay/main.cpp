@@ -11,6 +11,7 @@
 #include "pipeline/pipeline.hpp"
 #include "protocol/entity_id.hpp"
 
+#include <algorithm>
 #include <cinttypes>
 #include <cstdio>
 #include <cstdlib>
@@ -187,9 +188,10 @@ int main(int argc, char** argv) {
     }
     if (!reader->error().empty()) std::fprintf(stderr, "warning: %s; stopped there\n", reader->error().c_str());
 
-    // The capture ended: holes will never fill, and a fight still open ends here,
-    // as the meter would once the game went quiet.
-    pipe.tick(last_ts + capture::TcpReassembler::kHoleTimeout);
+    // The capture ended: holes will never fill, a boss killed just before the end
+    // still gets its grace and ends as a kill, and a fight still open ends here, as
+    // the meter would once the game went quiet.
+    pipe.tick(last_ts + std::max(capture::TcpReassembler::kHoleTimeout, from_seconds(options.meter.kill_grace_s)));
     pipe.end_fight(meter::EndReason::CaptureLost, last_ts);
     drain_fights();
     if (opt.quiet) return 0;

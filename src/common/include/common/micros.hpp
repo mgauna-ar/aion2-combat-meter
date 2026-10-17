@@ -17,8 +17,15 @@ inline constexpr Micros kMicrosPerSecond = 1'000'000;
     return static_cast<double>(us) / static_cast<double>(kMicrosPerSecond);
 }
 
+/// Longer than anything the meter times: 2^62 µs, about 146,000 years, which a
+/// timestamp can still be added to without wrapping.
+inline constexpr Micros kForever = Micros{1} << 62;
+
+/// NaN and negatives are 0, and anything longer than kForever is kForever.
 [[nodiscard]] constexpr Micros from_seconds(double seconds) noexcept {
-    return seconds <= 0.0 ? 0 : static_cast<Micros>(seconds * static_cast<double>(kMicrosPerSecond));
+    if (!(seconds > 0.0)) return 0;
+    const double us = seconds * static_cast<double>(kMicrosPerSecond);
+    return us >= static_cast<double>(kForever) ? kForever : static_cast<Micros>(us);
 }
 
 } // namespace aion2

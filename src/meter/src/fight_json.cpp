@@ -1,5 +1,6 @@
 #include "meter/fight_json.hpp"
 
+#include <cstdint>
 #include <string>
 
 namespace aion2::meter {
@@ -10,7 +11,11 @@ namespace {
 
 [[nodiscard]] uint64_t u64(const JsonValue& v) {
     const double d = v.as_double(0.0);
-    return d <= 0.0 ? 0 : static_cast<uint64_t>(d);
+    // NaN fails the first test (1e999 in a file reads as infinity); a cast of a
+    // value past 2^64 would be undefined.
+    if (!(d > 0.0)) return 0;
+    if (d >= 18446744073709551616.0) return UINT64_MAX;
+    return static_cast<uint64_t>(d);
 }
 
 [[nodiscard]] uint32_t u32(const JsonValue& v) {

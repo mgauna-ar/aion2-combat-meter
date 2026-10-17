@@ -419,7 +419,9 @@ void stringify_internal(const JsonValue& val, std::ostringstream& ss, int indent
             if (!std::isfinite(d)) {
                 // JSON has no spelling for these, and "nan" would make the whole file unreadable.
                 ss << "null";
-            } else if (std::floor(d) == d && std::abs(d) < 1e15) {
+            } else if (std::floor(d) == d && std::abs(d) < 9007199254740992.0) {
+                // Below 2^53 a double holds every integer exactly: microsecond
+                // timestamps (about 1.8e15) print as the integers they are.
                 ss << static_cast<int64_t>(d);
             } else {
                 ss << std::fixed << std::setprecision(4) << d;

@@ -2,6 +2,7 @@
 
 #include "common/os/local_time.hpp"
 
+#include <algorithm>
 #include <cstdio>
 #include <ctime>
 
@@ -44,8 +45,9 @@ std::string local_clock(Micros ts) {
 }
 
 std::string clock_duration(double seconds) {
-    if (seconds < 0) seconds = 0;
-    const auto total = static_cast<unsigned long long>(seconds);
+    // NaN and negatives read as 0; the cap keeps the cast defined.
+    if (!(seconds > 0.0)) seconds = 0.0;
+    const auto total = static_cast<unsigned long long>(std::min(seconds, 1e12));
     char buf[32];
     if (total >= 3600) {
         std::snprintf(buf, sizeof(buf), "%llu:%02llu:%02llu", total / 3600, (total / 60) % 60, total % 60);

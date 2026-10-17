@@ -177,7 +177,8 @@ void Report::print_flows(const pipeline::StreamDemux& demux) const {
     for (const auto& f : flows) {
         if (f.role != pipeline::FlowRole::Game) continue;
         ++shown;
-        const double secs = to_seconds(f.last_ts - f.first_ts);
+        // Packets from two adapters can arrive a little out of order.
+        const double secs = f.last_ts > f.first_ts ? to_seconds(f.last_ts - f.first_ts) : 0.0;
         const auto& d = f.decoder;
         std::printf("flow %s  [%s]\n", m_opt.anonymize ? "(hidden)" : f.key.to_string().c_str(), role_name(f.role));
         std::printf("  %.1f s, %" PRIu64 " segments, %" PRIu64 " bytes, %" PRIu64 " gap bytes\n", secs, f.segments,

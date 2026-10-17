@@ -5,7 +5,10 @@
 #include "meter/fight_json.hpp"
 #include "meter/history_store.hpp"
 
+#include <cmath>
+#include <cstdint>
 #include <fstream>
+#include <limits>
 
 using namespace aion2;
 using namespace aion2::meter;
@@ -69,6 +72,16 @@ TEST_CASE(FightJson, RoundTrip) {
     TEST_ASSERT(back->combatants[0].cls == AionClass::Sorcerer);
     TEST_ASSERT_EQ(back->combatants[0].hits.crits, uint64_t{40});
     TEST_ASSERT_EQ(back->quality.resyncs, uint64_t{2});
+}
+
+TEST_CASE(FightJson, NonFiniteNumbersReadSafely) {
+    auto j = fight_to_json(sample_fight(1, 0));
+    j["total_damage"] = std::numeric_limits<double>::infinity();
+    j["start_ts"] = std::nan("");
+    const auto back = fight_from_json(j);
+    TEST_ASSERT(back.has_value());
+    TEST_ASSERT_EQ(back->total_damage, UINT64_MAX);
+    TEST_ASSERT_EQ(back->start_ts, Micros{0});
 }
 
 TEST_CASE(FightJson, OtherVersionIsRefused) {
