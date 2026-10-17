@@ -130,7 +130,7 @@ overlay. Edit it while the meter is closed. Out-of-range values are clamped.
 | `locked` | false | Click-through and fixed in place. |
 | `opacity` | 0.80 | Background opacity, 0 to 1. Text stays opaque. |
 | `scale` | 1.0 | Size, 0.6 to 2.5, on top of the monitor's DPI scaling. |
-| `x`, `y`, `width`, `height` | -1, -1, 430, 250 | Position and size in screen pixels. -1 places it near the top-left. |
+| `x`, `y`, `width`, `height` | -1, -1, 430, 250 | Position and size in screen pixels. -1, -1 places it near the top-left; other negative values are on a monitor left of or above the main one. |
 | `show_share`, `show_crit`, `show_back`, `show_max_hit` | true, true, true, false | Optional columns. |
 
 **meter**

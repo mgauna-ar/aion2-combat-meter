@@ -81,15 +81,18 @@ std::filesystem::path data_dir() {
 int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     const CommandLine cl = parse_command_line();
     const std::filesystem::path data = data_dir();
-    os::Logger::init(data / "meter.log");
-    os::Logger::info(std::string("AION 2 Combat Meter ") + VERSION_STRING);
 
+    // Before the log: opening it starts it afresh, which would wipe the running
+    // instance's.
     os::SingleInstance instance;
     if (!instance.try_acquire()) {
         // The running one shows its overlay.
         instance.notify_existing_instance();
         return 0;
     }
+
+    os::Logger::init(data / "meter.log");
+    os::Logger::info(std::string("AION 2 Combat Meter ") + VERSION_STRING);
 
     const std::filesystem::path config_path = data / "config.json";
     app::AppSettings settings = app::load_settings(config_path);
@@ -218,9 +221,11 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
         const auto frame_start = Clock::now();
 
         if (window.visible()) {
-            if (runtime.history_revision() != history_revision) {
+            // The revision before the list: a save in between then shows next frame
+            // instead of being taken as seen.
+            if (const uint64_t revision = runtime.history_revision(); revision != history_revision) {
                 history = runtime.history();
-                history_revision = runtime.history_revision();
+                history_revision = revision;
             }
             const auto snapshot = runtime.snapshot();
             app::OverlayFrameInput input;

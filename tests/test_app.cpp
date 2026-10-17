@@ -4,17 +4,62 @@
 
 #include "app/app_runtime.hpp"
 #include "app/app_settings.hpp"
+#include "app/display_format.hpp"
+#include "capture/capture_file.hpp"
 #include "capture/file_source.hpp"
 #include "capture/os/npcap_source.hpp"
 #include "common/time_format.hpp"
 
+#include <atomic>
 #include <chrono>
+#include <cmath>
 #include <fstream>
 #include <thread>
 
 using namespace aion2;
 using namespace aion2::app;
 using namespace aion2::test::file_support;
+
+namespace {
+
+/// A source that notes whether anything read it after it was stopped.
+class WatchedSource final : public capture::PacketSource {
+public:
+    bool start(Push, std::string&) override { return true; }
+    void stop() override { m_stopped = true; }
+    [[nodiscard]] Micros now() const override {
+        check();
+        return kMicrosPerSecond;
+    }
+    [[nodiscard]] uint64_t dropped() const override {
+        check();
+        return 0;
+    }
+    [[nodiscard]] std::string status() const override {
+        check();
+        return "watched";
+    }
+    [[nodiscard]] bool read_after_stop() const { return m_late.load(); }
+
+private:
+    void check() const {
+        if (m_stopped.load()) m_late = true;
+    }
+    std::atomic<bool> m_stopped{false};
+    mutable std::atomic<bool> m_late{false};
+};
+
+size_t count_packets(const std::filesystem::path& file) {
+    std::string error;
+    auto reader = capture::CaptureFileReader::open(file, error);
+    if (!reader) return 0;
+    size_t n = 0;
+    capture::CapturedPacket pkt;
+    while (reader->next(pkt)) ++n;
+    return n;
+}
+
+} // namespace
 
 TEST_CASE(AppSettings, RoundTripAndSanitize) {
     AppSettings s;
@@ -135,6 +180,50 @@ TEST_CASE(AppRuntime, RecordsWhatItCaptures) {
     const std::filesystem::path recorded = runtime.recording_path();
     TEST_ASSERT(std::filesystem::exists(recorded));
     TEST_ASSERT(std::filesystem::file_size(recorded) > 1000);
+}
+
+TEST_CASE(AppRuntime, RecordingStartedFirstHoldsEveryPacket) {
+    ScratchDir dir("aion2_test_runtime_rec_all");
+    const auto session = test::synthetic::boss_session();
+    const auto capture_file = dir.path / "in.pcapng";
+    {
+        std::ofstream out(capture_file, std::ios::binary);
+        out.write(reinterpret_cast<const char*>(session.pcapng.data()),
+                  static_cast<std::streamsize>(session.pcapng.size()));
+    }
+    AppRuntime runtime(AppSettings{}, dir.path / "data");
+    runtime.request_recording(true);
+    std::string error;
+    TEST_ASSERT(runtime.start(std::make_unique<capture::FileSource>(capture_file, 0.0), error));
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+    while (std::chrono::steady_clock::now() < deadline && !runtime.source_finished()) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    runtime.stop();
+    TEST_ASSERT_EQ(count_packets(runtime.recording_path()), count_packets(capture_file));
+}
+
+TEST_CASE(AppRuntime, StopsTheEngineBeforeTheSource) {
+    ScratchDir dir("aion2_test_runtime_stop");
+    AppRuntime runtime(AppSettings{}, dir.path / "data");
+    auto source = std::make_unique<WatchedSource>();
+    const WatchedSource* watched = source.get();
+    std::string error;
+    TEST_ASSERT(runtime.start(std::move(source), error));
+    std::this_thread::sleep_for(std::chrono::milliseconds(60));
+    runtime.stop();
+    TEST_ASSERT_FALSE(watched->read_after_stop());
+}
+
+TEST_CASE(DisplayFormat, UnitsFollowRounding) {
+    TEST_ASSERT_EQ(format_amount(999), std::string("999"));
+    TEST_ASSERT_EQ(format_amount(999'949), std::string("999.9k"));
+    TEST_ASSERT_EQ(format_amount(999'960), std::string("1.00M"));
+    TEST_ASSERT_EQ(format_amount(999'996'000), std::string("1.00B"));
+    TEST_ASSERT_EQ(format_rate(999.96), std::string("1.0k"));
+    TEST_ASSERT_EQ(format_rate(std::nan("")), std::string("0.0"));
+    TEST_ASSERT_EQ(format_percent(std::nan("")), std::string("0.0%"));
 }
 
 TEST_CASE(AppRuntime, MissingCaptureFileFailsToStart) {

@@ -25,11 +25,15 @@ void text_right(ImDrawList* dl, float x_right, float y, ImU32 col, const std::st
     dl->AddText(ImVec2(x_right - size.x, y), col, s.c_str());
 }
 
-/// `s` cut with "..." to fit `width`.
+/// `s` cut with "..." to fit `width`, by whole UTF-8 code points.
 std::string fit(const std::string& s, float width) {
     if (ImGui::CalcTextSize(s.c_str()).x <= width) return s;
     std::string out = s;
-    while (!out.empty() && ImGui::CalcTextSize((out + "...").c_str()).x > width) out.pop_back();
+    while (!out.empty() && ImGui::CalcTextSize((out + "...").c_str()).x > width) {
+        // Continuation bytes (10xxxxxx) go with the lead byte before them.
+        while (!out.empty() && (static_cast<unsigned char>(out.back()) & 0xC0) == 0x80) out.pop_back();
+        if (!out.empty()) out.pop_back();
+    }
     return out + "...";
 }
 
@@ -125,8 +129,9 @@ void draw_rows(const meter::FightSummary& f, const OverlaySettings& s, float sca
     ImGui::Dummy(ImVec2(width, y - origin.y));
 }
 
-/// The target's name and HP bar, and the data-quality warnings.
-void draw_boss(const meter::FightSummary& f, float scale) {
+/// The target's name and HP bar, and the data-quality warnings. Tooltips only while
+/// the window takes the mouse: once locked, ImGui's mouse position is stale.
+void draw_boss(const meter::FightSummary& f, float scale, bool interactive) {
     if (!f.boss.present()) return;
     const auto& b = f.boss;
     std::string label = b.label;
@@ -134,23 +139,24 @@ void draw_boss(const meter::FightSummary& f, float scale) {
     if (b.killed) label += "  (killed)";
     ImGui::TextUnformatted(label.c_str());
     if (b.hp_known) {
+        const bool estimate = !(b.killed || b.hp_exact);
         char overlay[64];
-        std::snprintf(overlay, sizeof(overlay), "%s%s / %s", b.killed || b.hp_exact ? "" : "~", format_amount(b.hp).c_str(),
+        std::snprintf(overlay, sizeof(overlay), "%s%s / %s", estimate ? "~" : "", format_amount(b.hp).c_str(),
                       format_amount(b.max_hp).c_str());
         ImGui::PushStyleColor(ImGuiCol_PlotHistogram, rgba(colors::BossHp, 0.85f));
         ImGui::PushStyleColor(ImGuiCol_FrameBg, rgba(colors::Background, 0.9f));
         ImGui::ProgressBar(static_cast<float>(b.hp_fraction()), ImVec2(-1.0f, 6.0f * scale + ImGui::GetTextLineHeight()),
                            overlay);
         ImGui::PopStyleColor(2);
-        if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Spawn HP less the damage the meter saw: an estimate (~) until the\n"
-                              "game's own HP packet is decoded.");
+        if (estimate && interactive && ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("An estimate (~): spawn HP less the damage the meter saw, until\n"
+                              "the server sends the boss's HP.");
         }
     }
     if (f.quality.partial) {
         ImGui::TextColored(rgba(colors::Warn), "Partial data");
-        if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("The boss died having taken far less damage than it had HP.\n"
+        if (interactive && ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Much of the boss's HP went down with no hit the meter saw.\n"
                               "On crowded world bosses the server sends only some players' hits.");
         }
     } else if (!f.quality.clean()) {
@@ -275,11 +281,15 @@ OverlayActions draw_overlay(const OverlayFrameInput& in, OverlayViewState& state
             }
             ImGui::EndChild();
             if (fight != nullptr) {
-                draw_boss(*fight, scale);
-                draw_rows(*fight, s, scale, interactive);
+                draw_boss(*fight, scale, interactive);
+                if (ImGui::BeginChild("##saved_rows", ImVec2(0.0f, -footer_h), ImGuiChildFlags_None,
+                                      ImGuiWindowFlags_NoBackground)) {
+                    draw_rows(*fight, s, scale, interactive);
+                }
+                ImGui::EndChild();
             }
         } else if (fight != nullptr) {
-            draw_boss(*fight, scale);
+            draw_boss(*fight, scale, interactive);
             if (ImGui::BeginChild("##rows", ImVec2(0.0f, -footer_h), ImGuiChildFlags_None,
                                   ImGuiWindowFlags_NoBackground)) {
                 draw_rows(*fight, s, scale, interactive);

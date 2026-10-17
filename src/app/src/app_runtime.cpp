@@ -47,10 +47,12 @@ bool AppRuntime::start(std::unique_ptr<capture::PacketSource> source, std::strin
 }
 
 void AppRuntime::stop() {
-    if (m_source) m_source->stop();
+    // The engine thread first: it reads the source (dropped(), now()), and stopping
+    // the source frees what those read. Pushes into the closed queue just fail.
     m_stop = true;
     m_queue.close();
     if (m_thread.joinable()) m_thread.join();
+    if (m_source) m_source->stop();
 }
 
 void AppRuntime::run() {
@@ -59,18 +61,21 @@ void AppRuntime::run() {
     Micros last_packet = 0;
     while (!m_stop.load()) {
         auto pkt = m_queue.pop_for(kPopTimeout);
-        if (pkt) {
-            if (m_recorder.is_open()) m_recorder.write(pkt->link_type, pkt->ts, pkt->data);
-            m_pipeline.on_packet(pkt->link_type, pkt->data, pkt->ts);
-            last_packet = std::max(last_packet, pkt->ts);
-        }
         // While packets are queued, time is the packet's: the source's clock runs
         // ahead of a backlog, and ticking on it would end fights whose hits are
         // still waiting in the queue. Only an empty queue lets time move on.
-        const Micros now = pkt ? last_packet : std::max(last_packet, m_source->now());
+        const Micros now = pkt ? std::max(last_packet, pkt->ts) : std::max(last_packet, m_source->now());
 
-        if (m_end_fight_requested.exchange(false)) m_pipeline.end_fight(meter::EndReason::Manual, now);
+        // Before the packet, so a recording started now includes it.
         handle_recording(now);
+        if (pkt) {
+            if (m_recorder.is_open()) m_recorder.write(pkt->link_type, pkt->ts, pkt->data);
+            m_pipeline.on_packet(pkt->link_type, pkt->data, pkt->ts);
+            last_packet = now;
+        }
+
+        const bool ended = m_end_fight_requested.exchange(false);
+        if (ended) m_pipeline.end_fight(meter::EndReason::Manual, now);
 
         if (now >= last_tick + pipeline::Pipeline::kTickEvery) {
             m_pipeline.set_dropped_packets(m_queue.dropped() + m_source->dropped());
@@ -79,9 +84,10 @@ void AppRuntime::run() {
         }
         save_finished();
 
-        // Published on capture time, and once more whenever the queue runs dry, so
-        // a replay at full speed still ends on its final state.
-        if (now >= last_publish + kPublishEvery || (!pkt && last_publish != now)) {
+        // Published on capture time, once more whenever the queue runs dry so a
+        // replay at full speed still ends on its final state, and after a manual end
+        // even when the clock stands still (a finished replay).
+        if (ended || now >= last_publish + kPublishEvery || (!pkt && last_publish != now)) {
             publish(now);
             last_publish = now;
         }

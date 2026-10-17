@@ -7,6 +7,7 @@
 #include <windowsx.h>
 
 #include <algorithm>
+#include <cfloat>
 #include <cmath>
 
 #include "imgui.h"
@@ -42,10 +43,12 @@ DWORD ex_style(bool locked) {
     return ex;
 }
 
-/// The saved position if any monitor still shows its top-left corner, else the default.
+/// The saved position if any monitor still shows its top-left corner, else the
+/// default. Only -1, -1 means unset: a monitor left of or above the main one has
+/// negative coordinates.
 POINT start_position(const OverlaySettings& s) {
     POINT pt{s.x, s.y};
-    if (s.x < 0 || s.y < 0 || MonitorFromPoint(pt, MONITOR_DEFAULTTONULL) == nullptr) {
+    if ((s.x == -1 && s.y == -1) || MonitorFromPoint(pt, MONITOR_DEFAULTTONULL) == nullptr) {
         pt = POINT{kDefaultX, kDefaultY};
     }
     return pt;
@@ -220,6 +223,9 @@ void OverlayWindow::register_hotkeys() {
 void OverlayWindow::set_locked(bool locked) {
     m_locked = locked;
     if (m_hwnd == nullptr) return;
+    // A click-through window gets no more mouse messages, so ImGui would keep the
+    // last position and its hover (a tooltip) for good.
+    if (locked && m_imgui_ready) ImGui::GetIO().AddMousePosEvent(-FLT_MAX, -FLT_MAX);
     SetWindowLongPtrW(m_hwnd, GWL_EXSTYLE, static_cast<LONG_PTR>(ex_style(locked)));
     SetWindowPos(m_hwnd, HWND_TOPMOST, 0, 0, 0, 0,
                  SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_FRAMECHANGED | SWP_NOOWNERZORDER);
@@ -253,6 +259,11 @@ OverlayActions OverlayWindow::render(OverlayFrameInput input, OverlayViewState& 
         m_swap_chain->ResizeBuffers(0, m_resize_width, m_resize_height, DXGI_FORMAT_UNKNOWN, 0);
         m_resize_width = m_resize_height = 0;
         create_render_target();
+    }
+    // A failed resize (the device was lost) leaves none: try again next frame.
+    if (!m_render_target) {
+        create_render_target();
+        if (!m_render_target) return {};
     }
     const float scale = input.scale * dpi_scale();
     if (std::fabs(scale - m_font_scale) > 0.01f) rebuild_fonts(scale);

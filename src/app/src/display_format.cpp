@@ -1,5 +1,6 @@
 #include "app/display_format.hpp"
 
+#include <cmath>
 #include <cstdio>
 
 namespace aion2::app {
@@ -24,37 +25,35 @@ Rgb row_color(const meter::CombatantTotals& row) noexcept {
     return row.is_local ? colors::Local : colors::Unknown;
 }
 
-std::string format_amount(uint64_t value) {
+namespace {
+
+/// `v` with k, M or B, chosen by how it prints: a unit starts where the one below
+/// would round up to 1000 (999,960 reads 1.00M, not 1000.0k).
+std::string with_unit(double v, const char* below_k) {
     char buf[32];
-    const auto v = static_cast<double>(value);
-    if (value >= 1'000'000'000ULL) {
+    if (v >= 1e9 - 5e3) {
         std::snprintf(buf, sizeof(buf), "%.2fB", v / 1e9);
-    } else if (value >= 1'000'000ULL) {
+    } else if (v >= 1e6 - 50.0) {
         std::snprintf(buf, sizeof(buf), "%.2fM", v / 1e6);
-    } else if (value >= 1'000ULL) {
+    } else if (v >= 1e3 - 0.05) {
         std::snprintf(buf, sizeof(buf), "%.1fk", v / 1e3);
     } else {
-        std::snprintf(buf, sizeof(buf), "%llu", static_cast<unsigned long long>(value));
+        std::snprintf(buf, sizeof(buf), below_k, v);
     }
     return buf;
 }
 
+} // namespace
+
+std::string format_amount(uint64_t value) { return with_unit(static_cast<double>(value), "%.0f"); }
+
 std::string format_rate(double value) {
-    if (value < 0) value = 0;
-    char buf[32];
-    if (value >= 1e9) {
-        std::snprintf(buf, sizeof(buf), "%.2fB", value / 1e9);
-    } else if (value >= 1e6) {
-        std::snprintf(buf, sizeof(buf), "%.2fM", value / 1e6);
-    } else if (value >= 1e3) {
-        std::snprintf(buf, sizeof(buf), "%.1fk", value / 1e3);
-    } else {
-        std::snprintf(buf, sizeof(buf), "%.1f", value);
-    }
-    return buf;
+    if (!std::isfinite(value) || value < 0.0) value = 0.0;
+    return with_unit(value, "%.1f");
 }
 
 std::string format_percent(double fraction) {
+    if (!std::isfinite(fraction)) fraction = 0.0;
     char buf[16];
     std::snprintf(buf, sizeof(buf), "%.1f%%", 100.0 * fraction);
     return buf;
