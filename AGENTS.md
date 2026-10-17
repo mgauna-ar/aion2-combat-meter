@@ -137,6 +137,9 @@ All of it lives in `src/protocol`. `opcodes.hpp` is the one place opcodes are sp
   ignored.
 - Through a ping reducer or VPN the game appears on loopback, on another port. The demux
   takes any flow once 3 heartbeats prove it is the game (`detect_relays`).
+- Reassembly (`TcpReassembler`): a hole waits 300 ms, or until 1 MiB queues behind it,
+  then is a gap. A segment more than 4 MiB ahead is ignored as a stray, unless nothing
+  else arrives for 300 ms: then the capture lost that much, and the stream skips there.
 
 **Framing**
 - A frame is `varint len, [flag 0xF0..0xFE], opcode (2 bytes, first byte high), body`.

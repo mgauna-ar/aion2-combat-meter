@@ -57,8 +57,11 @@ std::optional<TcpSegment> parse_ipv4(std::span<const uint8_t> ip, Micros ts) {
     if (ip[9] != kIpProtoTcp) return std::nullopt;
 
     // The total length trims the Ethernet padding a short frame carries. A frame
-    // cut by the snap length is shorter than it, and keeps what it has.
+    // cut by the snap length is shorter than it, and keeps what it has. 0 is what
+    // segmentation offload (LSO/RSC) leaves in a packet the NIC splits or merges:
+    // the captured length is all there is to go on.
     size_t total = be16(ip, 2);
+    if (total == 0) total = ip.size();
     if (total < header_len) return std::nullopt;
     if (total > ip.size()) total = ip.size();
 
@@ -71,9 +74,10 @@ std::optional<TcpSegment> parse_ipv6(std::span<const uint8_t> ip, Micros ts) {
     const IpAddress src = IpAddress::v6(ip.subspan<8, 16>());
     const IpAddress dst = IpAddress::v6(ip.subspan<24, 16>());
 
-    size_t payload_len = be16(ip, 4);
+    // 0 is a jumbogram or segmentation offload: keep what was captured.
+    const size_t payload_len = be16(ip, 4);
     std::span<const uint8_t> rest = ip.subspan(kIpv6Header);
-    if (payload_len < rest.size()) rest = rest.first(payload_len);
+    if (payload_len != 0 && payload_len < rest.size()) rest = rest.first(payload_len);
 
     // Walk the extension headers the stack may put before TCP. A fragment header
     // ends the walk, as an IPv4 fragment does.

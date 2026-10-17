@@ -35,11 +35,18 @@ public:
  * bytes queued behind it pass kMaxBuffered; then it is reported as a gap and the
  * stream goes on. A capture that drops a packet never sees it retransmitted, so
  * waiting longer would only delay everything behind it.
+ *
+ * A segment more than kMaxAhead past the next byte is not queued: one stray (a
+ * corrupt packet, a reused port) would otherwise become a gap that leaves every
+ * real segment behind it, read as old. Only when nothing but such segments has
+ * arrived for kHoleTimeout has the stream really moved on (the capture lost that
+ * much), and it skips there.
  */
 class TcpReassembler {
 public:
     static constexpr Micros kHoleTimeout = 300 * kMicrosPerMilli;
     static constexpr size_t kMaxBuffered = 1u << 20;
+    static constexpr uint64_t kMaxAhead = 4u << 20;
 
     void push(const TcpSegment& segment, StreamSink& sink);
 
@@ -60,6 +67,12 @@ private:
     [[nodiscard]] int64_t offset_of(uint32_t seq) const noexcept;
     void deliver(uint64_t start, std::span<const uint8_t> bytes, Micros ts, StreamSink& sink);
     void drain(Micros ts, StreamSink& sink);
+    /// Gives up on the bytes before `offset`: a gap, and delivery resumes there.
+    void skip_to(uint64_t offset, Micros ts, StreamSink& sink);
+    /// A segment within kMaxAhead: delivered, or queued behind a hole.
+    void push_near(int64_t first, std::span<const uint8_t> payload, Micros ts, StreamSink& sink);
+    /// A segment beyond kMaxAhead: ignored, unless only such have come for a while.
+    void push_far(uint64_t first, std::span<const uint8_t> payload, Micros ts, StreamSink& sink);
     void check_fin(Micros ts, StreamSink& sink);
 
     bool m_started{false};
@@ -67,11 +80,17 @@ private:
     uint32_t m_base_seq{0};
     /// Offset of the next byte to deliver.
     uint64_t m_next{0};
+    struct Pending {
+        std::vector<uint8_t> bytes;
+        Micros arrived{0};
+    };
     /// Segments ahead of m_next, by start offset.
-    std::map<uint64_t, std::vector<uint8_t>> m_pending;
+    std::map<uint64_t, Pending> m_pending;
     size_t m_buffered{0};
-    /// When the oldest hole opened; 0 with none.
+    /// When the hole in front of m_pending opened; 0 with none.
     Micros m_hole_since{0};
+    /// Since when only segments beyond kMaxAhead have arrived; 0 when not.
+    Micros m_far_since{0};
     uint64_t m_gap_bytes{0};
     /// The FIN was seen, at m_fin_at: the stream closes once delivery reaches it.
     bool m_fin_seen{false};

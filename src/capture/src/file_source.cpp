@@ -67,8 +67,10 @@ void FileSource::run(Push push) {
         }
         if (m_speed > 0.0) {
             // Sleep in short steps so stop() is never kept waiting by a long pause.
-            while (!m_stop.load() && pkt.ts > now()) {
-                const Micros wait = std::min<Micros>(pkt.ts - now(), 50 * kMicrosPerMilli);
+            // The wait is in capture time; at 2x speed it takes half as long.
+            for (Micros at = now(); !m_stop.load() && pkt.ts > at; at = now()) {
+                const auto wall = static_cast<Micros>(static_cast<double>(pkt.ts - at) / m_speed);
+                const Micros wait = std::min<Micros>(wall, 50 * kMicrosPerMilli);
                 std::this_thread::sleep_for(std::chrono::microseconds(static_cast<int64_t>(wait)));
             }
         }

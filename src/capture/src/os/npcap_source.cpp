@@ -308,7 +308,14 @@ struct NpcapSource::Impl {
                 continue;
             }
             d->link = static_cast<uint32_t>(api.datalink(d->handle));
-            if (!loopback) apply_filter(*d, NpcapSource::adapter_filter(options.server_port));
+            // Loopback's filter follows the relays later; it starts as the plain one.
+            const std::string filter = loopback ? NpcapSource::loopback_filter(options.server_port, {})
+                                                : NpcapSource::adapter_filter(options.server_port);
+            if (!apply_filter(*d, filter)) {
+                // Unfiltered, it would hand the meter everything the adapter sees.
+                api.close(d->handle);
+                continue;
+            }
             os::Logger::info("capture: opened " + d->description + (loopback ? " (loopback)" : ""));
             devices.push_back(std::move(d));
         }

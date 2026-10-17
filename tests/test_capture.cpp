@@ -71,9 +71,12 @@ TEST_CASE(PacketHeaders, Ipv4FragmentIsSkipped) {
     TEST_ASSERT_FALSE(parse_tcp_segment(link_type::Raw, ip, 0).has_value());
 }
 
-TEST_CASE(PacketHeaders, Ipv6Tcp) {
+namespace {
+
+/// An IPv6 packet from 2020:...:2001 to ::1 carrying a TCP segment.
+Bytes ipv6_tcp(uint16_t payload_length) {
     Bytes ip = {0x60, 0, 0, 0};
-    put_be16(ip, static_cast<uint16_t>(20 + kPayload.size()));
+    put_be16(ip, payload_length);
     put_bytes(ip, {6, 64});
     for (int i = 0; i < 15; ++i) ip.push_back(0x20);
     ip.push_back(0x01);  // src 2020:...:2001
@@ -82,11 +85,33 @@ TEST_CASE(PacketHeaders, Ipv6Tcp) {
     const Bytes v4 = ipv4_tcp(TcpSpec{}, kPayload);
     const Bytes tcp_only(v4.begin() + 20, v4.end());
     put_bytes(ip, tcp_only);
+    return ip;
+}
+
+} // namespace
+
+TEST_CASE(PacketHeaders, Ipv6Tcp) {
+    const Bytes ip = ipv6_tcp(static_cast<uint16_t>(20 + kPayload.size()));
     const auto seg = parse_tcp_segment(link_type::Raw, ip, 0);
     TEST_ASSERT(seg.has_value());
     TEST_ASSERT_FALSE(seg->flow.src.is_v4());
     TEST_ASSERT(seg->flow.dst.is_loopback());
     TEST_ASSERT_EQ(seg->flow.src_port, kServerPort);
+    TEST_ASSERT_EQ(seg->payload.size(), kPayload.size());
+}
+
+TEST_CASE(PacketHeaders, Ipv6ZeroPayloadLengthKeepsTheCapture) {
+    const auto seg = parse_tcp_segment(link_type::Raw, ipv6_tcp(0), 0);
+    TEST_ASSERT(seg.has_value());
+    TEST_ASSERT_EQ(seg->payload.size(), kPayload.size());
+}
+
+TEST_CASE(PacketHeaders, OffloadZeroLengthKeepsTheCapture) {
+    Bytes ip = ipv4_tcp(TcpSpec{}, kPayload);
+    ip[2] = 0;  // total length 0, as LSO/RSC leaves it
+    ip[3] = 0;
+    const auto seg = parse_tcp_segment(link_type::Raw, ip, 0);
+    TEST_ASSERT(seg.has_value());
     TEST_ASSERT_EQ(seg->payload.size(), kPayload.size());
 }
 
@@ -377,4 +402,54 @@ TEST_CASE(TcpReassembler, BufferCapForcesGap) {
     TEST_ASSERT_EQ(sink.gaps[0], uint64_t{9});
     TEST_ASSERT_EQ(sink.data.size(), 1 + queued);
     TEST_ASSERT_EQ(r.buffered_bytes(), size_t{0});
+}
+
+TEST_CASE(TcpReassembler, StrayFarAheadSegmentIsIgnored) {
+    TcpReassembler r;
+    RecordingSink sink;
+    r.push(seg(100, "ab", 1).segment, sink);
+    r.push(seg(100 + (3u << 29), "zz", 2).segment, sink);  // 1.5 GiB ahead
+    r.push(seg(102, "cd", 2 + TcpReassembler::kHoleTimeout).segment, sink);
+    r.expire(2 + 3 * TcpReassembler::kHoleTimeout, sink);
+    r.push(seg(104, "ef", 3 + 3 * TcpReassembler::kHoleTimeout).segment, sink);
+    TEST_ASSERT_EQ(sink.data, std::string("abcdef"));
+    TEST_ASSERT(sink.gaps.empty());
+}
+
+TEST_CASE(TcpReassembler, StreamThatMovedFarAheadSkipsThere) {
+    TcpReassembler r;
+    RecordingSink sink;
+    r.push(seg(100, "ab", 1).segment, sink);
+    const uint32_t far = 102 + static_cast<uint32_t>(TcpReassembler::kMaxAhead) + 1000;
+    r.push(seg(far, "xy", 2).segment, sink);
+    TEST_ASSERT(sink.gaps.empty());
+    r.push(seg(far + 2, "zw", 2 + TcpReassembler::kHoleTimeout).segment, sink);
+    TEST_ASSERT_EQ(sink.gaps.size(), size_t{1});
+    TEST_ASSERT_EQ(sink.gaps[0], uint64_t{far + 2 - 102});
+    TEST_ASSERT_EQ(sink.data, std::string("abzw"));
+    r.push(seg(far + 4, "!", 3 + TcpReassembler::kHoleTimeout).segment, sink);
+    TEST_ASSERT_EQ(sink.data, std::string("abzw!"));
+}
+
+TEST_CASE(TcpReassembler, RetransmittedSynAfterDataKeepsTheStream) {
+    TcpReassembler r;
+    RecordingSink sink;
+    r.push(seg(499, "", 1, tcp_flag::Syn | tcp_flag::Ack).segment, sink);
+    r.push(seg(500, "xy", 2).segment, sink);
+    r.push(seg(499, "", 3, tcp_flag::Syn | tcp_flag::Ack).segment, sink);
+    r.push(seg(502, "zz", 4).segment, sink);
+    TEST_ASSERT_EQ(sink.starts, 1);
+    TEST_ASSERT_EQ(sink.closes, 0);
+    TEST_ASSERT_EQ(sink.data, std::string("xyzz"));
+}
+
+TEST_CASE(TcpReassembler, HolesBehindOneAnotherExpireTogether) {
+    TcpReassembler r;
+    RecordingSink sink;
+    r.push(seg(100, "a", 1).segment, sink);
+    r.push(seg(105, "bb", 1).segment, sink);  // behind a hole at 101..104
+    r.push(seg(110, "cc", 1).segment, sink);  // behind another at 107..109
+    r.expire(1 + TcpReassembler::kHoleTimeout, sink);
+    TEST_ASSERT_EQ(sink.gaps.size(), size_t{2});
+    TEST_ASSERT_EQ(sink.data, std::string("abbcc"));
 }
