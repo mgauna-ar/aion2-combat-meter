@@ -183,7 +183,8 @@ All of it lives in `src/protocol`. `opcodes.hpp` is the one place opcodes are sp
     target's HP does not fall by them. Then the count again and a 00; the notes read
     that `01 00` as "another record follows", and no capture has shown one yet.
   - **It carries heals too:** a support skill on an ally looks like any hit, and the
-    ally's HP rises. Side inference must not trust a record between two players.
+    ally's HP rises. Side inference must not trust a record between two players,
+    and neither can healing: a PvP hit on the other faction looks the same.
     In the first capture these were layout 4 records, to the caster itself (Siphon,
     Warding Strike) or to an ally or spirit (Spirit Communion). A spirit's record to
     itself as it spawned carried 100,000, and is no heal.
@@ -253,6 +254,9 @@ All of it lives in `src/protocol`. `opcodes.hpp` is the one place opcodes are sp
   someone else. A party whose Ranger and Elementalist shared one row, the name
   switching from pull to pull, points to both, but no capture has shown a map load
   yet. The meter assumes both can happen (Meter rules, Sides).
+- how a player of the other faction is told apart, for PvP: perhaps 45 36's mask.
+  Until then they are players like the party, so a PvP fight starts nothing and a
+  hit on them counts for nothing (Meter rules, Party and Healing).
 
 ---
 
@@ -290,12 +294,18 @@ All of it lives in `src/protocol`. `opcodes.hpp` is the one place opcodes are sp
   - A map change drops NPCs, summons and inferred sides.
 - **Classes:** from the skill codes a player uses (their summons' count too), unless an
   identity packet's class code names one.
-- **Party:** with no roster, every player counts. With one, only roster names do.
-  Non-party hits still lower the boss's HP estimate.
+- **Party:** with a roster, only its names count, and the local player.
+  - With none, it depends on the map. In an instance (`MapLoad::is_instance`) every
+    player counts: only the group gets in. In the open world, or on a map the meter
+    did not see load, only the local player does, so a crowd at a world boss stays
+    out.
+  - Non-party hits still lower the boss's HP estimate, but never start or extend a
+    fight.
 - **Healing and damage taken** count only during a fight, and never start or extend
   one.
-  - Healing: heal ticks, and 04 38 records from a player (not a summon) to anyone on
-    the player side. It is the total, like the game's: no overheal split.
+  - Healing: heal ticks to anyone on the player side, and 04 38 records from a
+    player (not a summon) to a party member. A record to anyone else may be a PvP
+    hit. It is the total, like the game's: no overheal split.
   - Damage taken: an enemy's hits and ticks on a player. A summon's HP is its own.
   - Both are booked for party members by the roster and the local player; with no
     roster, for players already in the fight, so strangers nearby stay out.

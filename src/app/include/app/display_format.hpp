@@ -2,8 +2,10 @@
 
 #include "meter/types.hpp"
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
+#include <vector>
 
 namespace aion2::app {
 
@@ -42,5 +44,17 @@ inline constexpr Rgb Local{0.30f, 0.58f, 1.00f};
 [[nodiscard]] std::string format_rate(double value);
 /// "62.3%".
 [[nodiscard]] std::string format_percent(double fraction);
+
+/// A row the overlay draws: its place in the fight's combatants, and its rank.
+struct ShownRow {
+    size_t index{0};
+    int rank{0};
+};
+
+/// The overlay's rows: the best `max_rows`, ranked among those who dealt damage
+/// (or everyone, `with_healers`). The local player always shows: ranked below
+/// them, in a crowd, they take the last place, with their own rank.
+[[nodiscard]] std::vector<ShownRow> shown_rows(const std::vector<meter::CombatantTotals>& rows, int max_rows,
+                                               bool with_healers);
 
 } // namespace aion2::app

@@ -140,7 +140,7 @@ TEST_CASE(Registry, ANameOnANewIdLeavesItsIdFromAnEarlierMap) {
     CombatantRegistry r;
     r.on_identity(player(301, "Rhea"));
     r.on_identity(player(302, "Kaisinel"));
-    r.on_map_change();
+    r.on_map_change(false);
     // Still named until something says otherwise: ids may outlive the map.
     TEST_ASSERT_EQ(r.display_name(301), std::string("Rhea"));
     r.on_identity(player(305, "Rhea"));
@@ -167,14 +167,14 @@ TEST_CASE(Registry, AStaleIdGivesWayToASpawn) {
 TEST_CASE(Registry, TheLocalPlayersNameFollowsThemToANewId) {
     CombatantRegistry r;
     r.on_identity(player(100, "Ariel", true));
-    r.on_map_change();
+    r.on_map_change(false);
     r.on_self_values(130);
     TEST_ASSERT_EQ(r.local_player(), EntityId{130});
     TEST_ASSERT_EQ(r.display_name(130), std::string("Ariel"));
     TEST_ASSERT(r.find(100) == nullptr);
     // Their old id, given to a spawn on the next map, is the spawn's.
     r.on_identity(player(140, "Lumiel"));
-    r.on_map_change();
+    r.on_map_change(false);
     r.on_spawn(npc(130, 1000));
     TEST_ASSERT_EQ(r.local_player(), EntityId{0});
     r.on_self_values(150);
@@ -186,7 +186,7 @@ TEST_CASE(Registry, MapChangeKeepsPlayersDropsNpcs) {
     r.on_identity(player(100, "Ariel", true));
     r.on_spawn(npc(0x4100, 1000));
     r.observe_hit(100, 9001);
-    r.on_map_change();
+    r.on_map_change(false);
     TEST_ASSERT(r.find(0x4100) == nullptr);
     TEST_ASSERT(r.side(9001) == Side::Unknown);
     TEST_ASSERT_EQ(r.display_name(100), std::string("Ariel"));
@@ -198,12 +198,26 @@ TEST_CASE(Registry, PartyMembershipFollowsRoster) {
     r.on_identity(player(100, "Ariel", true));
     r.on_identity(player(200, "Lumiel"));
     r.on_identity(player(300, "Stranger"));
-    // No roster: every player counts.
+    const CharacterId stranger = r.character_of(300);
+    // No roster, and no map seen loading: only the local player counts.
+    TEST_ASSERT(r.in_party(100));
+    TEST_ASSERT_FALSE(r.in_party(300));
+    TEST_ASSERT(r.character_in_party(r.local_character()));
+    TEST_ASSERT_FALSE(r.character_in_party(stranger));
+    // In an instance, every player.
+    r.on_map_change(true);
     TEST_ASSERT(r.in_party(300));
+    TEST_ASSERT(r.character_in_party(stranger));
     r.on_party(roster({"Ariel", "Lumiel"}));
     TEST_ASSERT(r.in_party(100));
     TEST_ASSERT(r.in_party(200));
     TEST_ASSERT_FALSE(r.in_party(300));
+    TEST_ASSERT_FALSE(r.character_in_party(stranger));
+    // Back in the open world with the party gone: only the local player.
+    r.on_party(roster({}));
+    r.on_map_change(false);
+    TEST_ASSERT(r.in_party(100));
+    TEST_ASSERT_FALSE(r.in_party(200));
 }
 
 TEST_CASE(Registry, SummonsOwnerIsAPlayerBeforeTheirName) {

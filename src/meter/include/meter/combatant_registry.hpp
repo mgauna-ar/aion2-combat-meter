@@ -105,7 +105,8 @@ public:
     /// identity has named it. Summons use their owner's class digits.
     void on_skill_class(EntityId player, AionClass cls);
     /// A new map: NPCs, summons and inferred sides go; players stay, stale.
-    void on_map_change();
+    /// `instance` (proto::MapLoad::is_instance) says who counts with no roster.
+    void on_map_change(bool instance);
     /// The map loaded again: a teleport within it, or a new instance of it. NPCs
     /// stay; players go stale, since an instance has ids of its own.
     void on_map_reload();
@@ -127,7 +128,8 @@ public:
     /// The roster has been seen: party membership is known rather than assumed.
     [[nodiscard]] bool has_roster() const noexcept { return !m_roster.empty(); }
     /// In the party by the roster; the local player always. With no roster, every
-    /// player is.
+    /// player in an instance is, since only the group gets in; in the open world,
+    /// or on a map not seen loading, only the local player is.
     [[nodiscard]] bool in_party(EntityId id) const;
     /// The same for a character, whatever id it is on now.
     [[nodiscard]] bool character_in_party(CharacterId who) const;
@@ -170,6 +172,7 @@ private:
     std::unordered_set<std::string> m_roster;
     EntityId m_local{0};
     CharacterId m_local_character{0};
+    bool m_in_instance{false};
     std::deque<std::pair<EntityId, EntityId>> m_pending;
 };
 

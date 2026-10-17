@@ -60,4 +60,24 @@ std::string format_percent(double fraction) {
     return buf;
 }
 
+std::vector<ShownRow> shown_rows(const std::vector<meter::CombatantTotals>& rows, int max_rows,
+                                 bool with_healers) {
+    std::vector<ShownRow> out;
+    if (max_rows <= 0) return out;
+    const auto limit = static_cast<size_t>(max_rows);
+    int rank = 0;
+    for (size_t i = 0; i < rows.size(); ++i) {
+        // Players who only healed or were hit rank below everyone who dealt damage.
+        if (rows[i].damage == 0 && !with_healers) continue;
+        ++rank;
+        if (out.size() < limit) {
+            out.push_back({i, rank});
+        } else if (rows[i].is_local) {
+            out.back() = {i, rank};
+            break;
+        }
+    }
+    return out;
+}
+
 } // namespace aion2::app

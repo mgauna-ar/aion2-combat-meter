@@ -233,7 +233,8 @@ void CombatantRegistry::mark_players_stale() {
     }
 }
 
-void CombatantRegistry::on_map_change() {
+void CombatantRegistry::on_map_change(bool instance) {
+    m_in_instance = instance;
     for (auto it = m_actors.begin(); it != m_actors.end();) {
         if (it->second.is_player) {
             it->second.dead = false;
@@ -358,7 +359,7 @@ bool CombatantRegistry::in_party(EntityId id) const {
     if (id == 0) return false;
     if (id == m_local) return true;
     if (side(id) != Side::Player) return false;
-    if (!has_roster()) return true;
+    if (!has_roster()) return m_in_instance;
     const Character* c = character(character_of(id));
     return c != nullptr && m_roster.count(c->name) != 0;
 }
@@ -366,7 +367,8 @@ bool CombatantRegistry::in_party(EntityId id) const {
 bool CombatantRegistry::character_in_party(CharacterId who) const {
     const Character* c = character(who);
     if (c == nullptr) return false;
-    return who == m_local_character || !has_roster() || m_roster.count(c->name) != 0;
+    if (who == m_local_character) return true;
+    return has_roster() ? m_roster.count(c->name) != 0 : m_in_instance;
 }
 
 AionClass CombatantRegistry::class_of(EntityId id) const {

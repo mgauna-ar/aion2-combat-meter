@@ -85,15 +85,14 @@ void draw_rows(const meter::FightSummary& f, const OverlaySettings& s, float sca
     y += row_h;
 
     const double top = f.combatants.empty() ? 1.0 : std::max(f.combatants.front().dps, 1.0);
-    int rank = 0;
-    for (const auto& row : f.combatants) {
-        // Players who only healed or were hit rank below everyone who dealt damage.
-        if (row.damage == 0 && !s.show_heal) continue;
-        if (rank >= s.max_rows) break;
-        ++rank;
+    int line_no = 0;
+    for (const ShownRow& shown : shown_rows(f.combatants, s.max_rows, s.show_heal)) {
+        const meter::CombatantTotals& row = f.combatants[shown.index];
+        const int rank = shown.rank;
+        ++line_no;
         const ImVec2 row_min(origin.x, y);
         const ImVec2 row_max(origin.x + width, y + row_h - 1.0f * scale);
-        if (rank % 2 == 0) dl->AddRectFilled(row_min, row_max, u32(colors::Text, 0.03f));
+        if (line_no % 2 == 0) dl->AddRectFilled(row_min, row_max, u32(colors::Text, 0.03f));
         const float fraction = static_cast<float>(std::clamp(row.dps / top, 0.0, 1.0));
         const Rgb bar = s.class_bars ? row_color(row) : colors::Accent;
         dl->AddRectFilled(row_min, ImVec2(row_min.x + width * fraction, row_max.y), u32(bar, s.class_bars ? 0.38f : 0.28f),

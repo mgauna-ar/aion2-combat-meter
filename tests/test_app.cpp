@@ -16,6 +16,8 @@
 #include <cmath>
 #include <fstream>
 #include <thread>
+#include <utility>
+#include <vector>
 
 using namespace aion2;
 using namespace aion2::app;
@@ -240,6 +242,32 @@ TEST_CASE(DisplayFormat, UnitsFollowRounding) {
     TEST_ASSERT_EQ(format_rate(999.96), std::string("1.0k"));
     TEST_ASSERT_EQ(format_rate(std::nan("")), std::string("0.0"));
     TEST_ASSERT_EQ(format_percent(std::nan("")), std::string("0.0%"));
+}
+
+TEST_CASE(DisplayFormat, TheLocalPlayerAlwaysShows) {
+    std::vector<meter::CombatantTotals> rows(6);
+    for (size_t i = 0; i < rows.size(); ++i) rows[i].damage = 1000 - i * 100;
+    rows[2].damage = 0;  // only healed
+    const auto ranks = [](const std::vector<ShownRow>& shown) {
+        std::vector<std::pair<size_t, int>> out;
+        for (const auto& r : shown) out.emplace_back(r.index, r.rank);
+        return out;
+    };
+    using Ranks = std::vector<std::pair<size_t, int>>;
+
+    // Among the best: nothing moves.
+    rows[1].is_local = true;
+    TEST_ASSERT(ranks(shown_rows(rows, 3, false)) == (Ranks{{0, 1}, {1, 2}, {3, 3}}));
+    // Below them: the last place is theirs, with their rank.
+    rows[1].is_local = false;
+    rows[5].is_local = true;
+    TEST_ASSERT(ranks(shown_rows(rows, 3, false)) == (Ranks{{0, 1}, {1, 2}, {5, 5}}));
+    TEST_ASSERT(ranks(shown_rows(rows, 3, true)) == (Ranks{{0, 1}, {1, 2}, {5, 6}}));
+    TEST_ASSERT(ranks(shown_rows(rows, 1, false)) == (Ranks{{5, 5}}));
+    TEST_ASSERT(ranks(shown_rows(rows, 8, false)).size() == 5);
+    // A local player who dealt no damage is ranked with the healers.
+    rows[5].damage = 0;
+    TEST_ASSERT(ranks(shown_rows(rows, 3, false)) == (Ranks{{0, 1}, {1, 2}, {3, 3}}));
 }
 
 TEST_CASE(AppRuntime, MissingCaptureFileFailsToStart) {

@@ -18,10 +18,15 @@ constexpr EntityId kAlly = 200;
 constexpr EntityId kBoss = 0x4100;
 constexpr EntityId kAdd = 0x4101;
 constexpr uint64_t kBossHp = 5'000'000;
+constexpr uint32_t kDungeon = 610010;
+constexpr uint32_t kOpenWorld = 200100;
 
-/// An engine with the local player, one ally, a boss and an add in view.
-EncounterEngine setup() {
+/// An engine with the local player, one ally, a boss and an add in view, in a
+/// dungeon, where every player counts without a roster; or, on a map not seen
+/// loading, where only the local player does.
+EncounterEngine setup(bool dungeon = true) {
     EncounterEngine e;
+    if (dungeon) e.on_event(ev(at_s(0), proto::MapLoad{1, kDungeon}));
     e.on_event(ev(at_s(0), player(kMe, "Ariel", true)));
     e.on_event(ev(at_s(0), player(kAlly, "Lumiel")));
     e.on_event(ev(at_s(0), npc(kBoss, kBossHp, 777)));
@@ -250,8 +255,10 @@ TEST_CASE(Engine, RosterExcludesStrangers) {
 }
 
 TEST_CASE(Engine, MidSessionStartInfersSides) {
-    // No identity or spawn seen: players appear as #id once they hit a folded-range enemy.
+    // No identity or spawn seen: players appear as #id once they hit a folded-range
+    // enemy. In a dungeon, every player counts without a roster.
     EncounterEngine e;
+    e.on_event(ev(at_s(0), proto::MapLoad{1, kDungeon}));
     e.on_event(ev(at_s(1), hit(55, 0x4600, 500)));
     e.on_event(ev(at_s(2), hit(56, 0x4600, 250)));
     const FightSummary s = e.current();
@@ -297,6 +304,7 @@ TEST_CASE(Engine, WipeDetectionWhenEnabled) {
     EncounterEngine e(settings);
     e.on_event(ev(at_s(0), player(kMe, "Ariel", true)));
     e.on_event(ev(at_s(0), player(kAlly, "Lumiel")));
+    e.on_event(ev(at_s(0), roster({"Ariel", "Lumiel"})));
     e.on_event(ev(at_s(0), npc(kBoss, kBossHp)));
     e.on_event(ev(at_s(1), hit(kMe, kBoss, 100)));
     e.on_event(ev(at_s(1), hit(kAlly, kBoss, 100)));
@@ -310,6 +318,7 @@ TEST_CASE(Engine, WipeDetectionWhenEnabled) {
 TEST_CASE(Engine, SummonOfAnUnseenOwnerCountsOnAnyTarget) {
     // Mid-session: no names, and a target that spawned before the meter started.
     EncounterEngine e;
+    e.on_event(ev(at_s(0), proto::MapLoad{1, kDungeon}));
     e.on_event(ev(at_s(0), summon(0x4300, 300)));
     e.on_event(ev(at_s(1), hit(0x4300, 900, 500)));
     const FightSummary s = e.current();
@@ -324,6 +333,7 @@ TEST_CASE(Engine, DeadPlayersDotDoesNotReviveThem) {
     EncounterEngine e(settings);
     e.on_event(ev(at_s(0), player(kMe, "Ariel", true)));
     e.on_event(ev(at_s(0), player(kAlly, "Lumiel")));
+    e.on_event(ev(at_s(0), roster({"Ariel", "Lumiel"})));
     e.on_event(ev(at_s(0), npc(kBoss, kBossHp)));
     e.on_event(ev(at_s(1), hit(kMe, kBoss, 100)));
     e.on_event(ev(at_s(1), hit(kAlly, kBoss, 100)));
@@ -500,8 +510,63 @@ TEST_CASE(Engine, StrangersHealingOrHitNearbyGetNoRow) {
     TEST_ASSERT_EQ(row_of(after, kMe).damage_taken, uint64_t{0});
 }
 
-TEST_CASE(Engine, FightsCarryTheirMapVisit) {
+TEST_CASE(Engine, OutOfAPartyTheOpenWorldCountsOnlyYou) {
+    // A world boss, solo: everyone around hits it.
+    EncounterEngine e = setup(false);
+    constexpr EntityId kStranger = 300;
+    e.on_event(ev(at_s(0), player(kStranger, "Zikel")));
+    e.on_event(ev(at_s(1), hit(kStranger, kAdd, 900)));
+    TEST_ASSERT_FALSE(e.in_fight());
+    e.on_event(ev(at_s(2), hit(kMe, kAdd, 100)));
+    e.on_event(ev(at_s(3), hit(kStranger, kAdd, 900)));
+    const FightSummary s = e.current();
+    TEST_ASSERT_EQ(s.combatants.size(), size_t{1});
+    TEST_ASSERT(s.combatants[0].is_local);
+    TEST_ASSERT_EQ(s.total_damage, uint64_t{100});
+    // Their hits do not keep the fight going.
+    e.on_event(ev(at_s(13), hit(kStranger, kAdd, 900)));
+    TEST_ASSERT_FALSE(e.in_fight());
+
+    // In a dungeon, only the group is there: everyone counts.
+    e.on_event(ev(at_s(20), proto::MapLoad{2, kDungeon}));
+    e.on_event(ev(at_s(21), npc(kBoss, kBossHp, 777)));
+    e.on_event(ev(at_s(22), hit(kMe, kBoss, 100)));
+    e.on_event(ev(at_s(23), hit(kStranger, kBoss, 900)));
+    TEST_ASSERT_EQ(e.current().combatants.size(), size_t{2});
+
+    // Back out in the open world, only you again.
+    e.on_event(ev(at_s(30), proto::MapLoad{3, kOpenWorld}));
+    e.on_event(ev(at_s(31), npc(kAdd, 50'000, 778)));
+    e.on_event(ev(at_s(32), hit(kStranger, kAdd, 900)));
+    TEST_ASSERT_FALSE(e.in_fight());
+}
+
+TEST_CASE(Engine, APlayerToPlayerRecordOffThePartyIsNoHeal) {
+    // PvP: a hit on a player of the other faction is a 04 38 between two players,
+    // like a heal.
     EncounterEngine e = setup();
+    constexpr EntityId kFoe = 300;
+    e.on_event(ev(at_s(0), player(kFoe, "Zikel")));
+    e.on_event(ev(at_s(0), roster({"Ariel", "Lumiel"})));
+    e.on_event(ev(at_s(1), hit(kMe, kBoss, 1000)));
+    e.on_event(ev(at_s(2), skilled(hit(kMe, kFoe, 5000), 17010000)));
+    e.on_event(ev(at_s(3), skilled(hit(kMe, kAlly, 300), 17010000)));
+    // A heal tick is a heal, wherever it lands.
+    e.on_event(ev(at_s(4), heal_tick(kMe, kFoe, 200, 17080000)));
+    const FightSummary s = e.current();
+    TEST_ASSERT_EQ(row_of(s, kMe).healing, uint64_t{500});
+    TEST_ASSERT_EQ(s.total_healing, uint64_t{500});
+
+    // Out of a party, in the open world, only a record on yourself counts.
+    EncounterEngine solo = setup(false);
+    solo.on_event(ev(at_s(1), hit(kMe, kBoss, 1000)));
+    solo.on_event(ev(at_s(2), skilled(hit(kMe, kAlly, 5000), 17010000)));
+    solo.on_event(ev(at_s(3), skilled(hit(kMe, kMe, 300), 17010000)));
+    TEST_ASSERT_EQ(row_of(solo.current(), kMe).healing, uint64_t{300});
+}
+
+TEST_CASE(Engine, FightsCarryTheirMapVisit) {
+    EncounterEngine e = setup(false);
     e.on_event(ev(at_s(10), hit(kMe, kAdd, 100)));
     e.end_fight(EndReason::Manual, at_s(11));
     e.on_event(ev(at_s(20), hit(kMe, kAdd, 100)));

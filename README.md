@@ -42,6 +42,8 @@ captures are needed (`.claude/skills/decode-capture`), and these are still open:
   capture, a Templar and an Elementalist.
 - **Boss threshold:** an enemy with 1,000,000 max HP or more counts as a boss. That
   number is a guess (`meter.boss_min_max_hp`); open-world mobs have about 120,000.
+- **PvP:** the meter cannot yet tell a player of the other faction from your party, so
+  it counts no PvP damage. A capture of a PvP fight would show how to.
 
 ## ⚠️ Account safety
 
@@ -126,8 +128,13 @@ history and recordings folders, `config.json` and the log.
   window's Combat Meter page.
 
 **Who counts as party:**
-- Out of a party, every player hitting enemies is listed.
 - In a party, only its members are listed. Pets and summons count for their owner.
+- Out of a party, only you are listed in the open world, so a crowd at a world boss
+  stays out. In a dungeon only your group can be there, so every player is listed.
+- Your own row always shows on the overlay: when you rank below the rows it shows, you
+  take the last one, with your rank.
+- Healing between two players counts only when it lands on the party, since a PvP hit
+  looks the same.
 
 ![The app window's Combat Meter page: saved fights by map visit on the left, the selected fight's ranking with the in-game window's hit columns, and one player's skills below](docs/images/app-damage.png)
 
@@ -171,7 +178,7 @@ by hand only while the meter is closed. Out-of-range values are clamped.
 | `show_share`, `show_crit`, `show_back`, `show_max_hit` | true, true, true, false | Optional columns: share of the damage, crit, back-attack rate, biggest hit. |
 | `show_hits`, `show_perfect`, `show_double`, `show_front`, `show_heal` | false | More optional columns: hits, perfect and double rates, front-attack rate, healing. |
 | `class_bars` | true | Bars in each player's class colour; off, all in one colour. |
-| `max_rows` | 8 | Players shown, best first, 1 to 24. |
+| `max_rows` | 8 | Players shown, best first, 1 to 24. Your own row is always one of them. |
 | `show_in_combat_only` | false | Show the overlay only during a fight, and for `hide_after_combat_s` after it. Applies only while locked. |
 | `hide_after_combat_s` | 5 | Seconds it stays up after a fight, to read the result. |
 | `hide_when_game_unfocused` | false | Hide it while neither the game nor the meter's window is in front. Applies only while locked. |
@@ -227,6 +234,11 @@ stays out of sight until those allow it; unlock it (Ctrl+Alt+L) to see it at onc
 The game sends names mostly on loading screens. Start the meter before you log in or
 teleport, and the names will appear after the next loading screen. Until then your own
 row shows as **You**.
+
+**Only my own row shows**
+Out of a party, the open world lists only you. In a party, the meter learns who is in
+it from the party list the game sends; if the meter started after the party formed, it
+may have missed it. Start the meter before you form or join a party.
 
 **The boss fight says "partial data"**
 On crowded world bosses the server stops sending most players' hits, so the meter

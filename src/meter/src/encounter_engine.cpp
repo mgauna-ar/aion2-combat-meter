@@ -201,6 +201,9 @@ void EncounterEngine::book_heal(EntityId actor, EntityId target, uint64_t amount
     if (m_registry.side(healer) != Side::Player || m_registry.side(m_registry.resolve(target)) != Side::Player) return;
     // Not a summon's record: a spirit's to itself, as it spawned, carried 100,000.
     if (record && actor != healer) return;
+    // A record between two players may be a PvP hit, not a heal: only one landing
+    // on the party counts. Heal ticks are heals, wherever they land.
+    if (record && !m_registry.in_party(target)) return;
     if (!counts_in_fight(healer)) return;
     m_registry.on_skill_class(healer, class_of_skill(skill));
     Accum& acc = m_fight->players[row_key(healer)];
@@ -239,7 +242,8 @@ void EncounterEngine::credit(EntityId actor, EntityId target, uint64_t amount, u
     const EntityId enemy = m_registry.resolve(target);
     if (m_registry.side(player) != Side::Player || m_registry.side_or_guess(enemy) != Side::Enemy) return;
     m_registry.on_skill_class(player, class_of_skill(skill));
-    // Out of a party, every player counts; in one, only its members do.
+    // In a party, its members count; out of one, everyone in an instance, and
+    // only the local player in the open world.
     if (!m_registry.in_party(player)) return;
 
     if (!m_fight) {
@@ -314,7 +318,7 @@ void EncounterEngine::on_map(const proto::MapLoad& m, Micros ts) {
     if (m_fight) finish(EndReason::MapChange, ts);
     m_map_id = m.map_id;
     m_visit_ts = ts;
-    m_registry.on_map_change();
+    m_registry.on_map_change(m.is_instance());
     m_damage_since_spawn.clear();
     m_hp_loss.clear();
 }
