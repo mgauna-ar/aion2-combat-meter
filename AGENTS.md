@@ -103,7 +103,8 @@ src/app/         aion2::app
     src/win32/   main.cpp, app_window, overlay_window: Windows only
 tools/replay/    aion2meter-replay (every platform)
 tools/synth/     aion2meter-synth: writes the tests' made-up boss fight as a pcapng
-tools/screenshots/  renders docs/images from overlay_view (software rasterizer from ffxiv-hub)
+tools/screenshots/  renders docs/images from overlay_view and app_frame (software rasterizer from
+                 ffxiv-hub), in UTC; --all also draws the pages the README does not show
 tools/check_forbidden_apis.sh, tools/gen_app_icon.py, tools/embed_icon_font.py
 tools/gen_skill_table.py         skills.tsv → skill_table.inc (`make test` checks they agree)
 tests/           TEST_CASE framework (ported), one test_<concern>.cpp per area
@@ -309,6 +310,8 @@ All of it lives in `src/protocol`. `opcodes.hpp` is the one place opcodes are sp
     the first fight after the meter starts. A reload of the same map does not.
   - A cut-off index line is skipped. A missing index is rebuilt from the files.
   - Pruning keeps `history.max_fights`, in batches of 50.
+  - Clearing (the app window's trash button) deletes the fight records and the index,
+    on the engine thread; other files in the folder stay.
 
 ---
 

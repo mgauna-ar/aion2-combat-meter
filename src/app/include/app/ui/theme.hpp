@@ -95,8 +95,8 @@ constexpr float TileMinW = 150.0f;  // a stat tile row wraps rather than go belo
 constexpr float HeaderActionMinW = 360.0f;  // below this a page header's action drops to its own line
 constexpr float WindowMinW = 880.0f;  // smallest client area the layout is designed for
 constexpr float WindowMinH = 600.0f;
-constexpr float WindowDefaultW = 1100.0f;  // client area the window opens at
-constexpr float WindowDefaultH = 700.0f;
+constexpr float WindowDefaultW = 1280.0f;  // the window opens at this, or 90% of a smaller screen
+constexpr float WindowDefaultH = 760.0f;
 }  // namespace metrics
 
 /// The slate styling on the current ImGui context, at the scale set_ui_scale() set.

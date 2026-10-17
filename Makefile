@@ -190,6 +190,7 @@ check-skills:
 SHOTS_DIR = tools/screenshots
 SHOTS_BUILD = build/screenshots
 SHOTS_FONT ?= /System/Library/Fonts/Supplemental/Arial.ttf
+SHOTS_BOLD_FONT ?= /System/Library/Fonts/Supplemental/Arial Bold.ttf
 SHOTS_BASE_FLAGS = -std=c++20 -O2 -MMD -MP $(TEST_INC) -I$(SHOTS_DIR) -I$(IMGUI_DIR)
 SHOTS_FLAGS = $(SHOTS_BASE_FLAGS) -Wall -Wextra -Wpedantic -Wno-format-truncation $(NO_NONTRIVIAL_MEMCALL) \
               -DHAVE_IMGUI=1 -include $(IMGUI_DIR)/imgui.h
@@ -200,7 +201,7 @@ SHOTS_OBJS = $(patsubst %.cpp,$(SHOTS_BUILD)/obj/%.o,$(SHOTS_SRCS))
 SHOTS_IMGUI_OBJS = $(patsubst %.cpp,$(SHOTS_BUILD)/obj/%.o,$(SHOTS_IMGUI_SRCS))
 
 screenshots: $(SHOTS_BUILD)/aion2_screenshots
-	$(SHOTS_BUILD)/aion2_screenshots --font "$(SHOTS_FONT)" --out docs/images
+	TZ=UTC $(SHOTS_BUILD)/aion2_screenshots --font "$(SHOTS_FONT)" --bold "$(SHOTS_BOLD_FONT)" --out docs/images
 
 $(SHOTS_BUILD)/aion2_screenshots: $(SHOTS_OBJS) $(SHOTS_IMGUI_OBJS)
 	$(CXX) $^ -o $@ -lz -pthread

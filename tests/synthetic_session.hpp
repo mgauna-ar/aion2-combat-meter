@@ -124,17 +124,24 @@ inline Session boss_session() {
 
     uint64_t boss_taken = 0;
     bool dead = false;
+    // Real skill codes, so classes and skill names come out as they would in game:
+    // a Sorcerer, a Gladiator, and an Elementalist with a spirit.
+    const uint32_t sorcerer[] = {15210000, 15040000, 15050000, 15060000};
+    const uint32_t gladiator[] = {11010000, 11020000, 11040000, 11050000};
+    const uint32_t elementalist[] = {16020030, 16030030, 16040020, 16060010};
     const auto land = [&](double t, uint64_t actor, uint64_t credit_to, uint64_t amount, bool crit, bool back,
-                          bool bundled) {
+                          bool bundled, uint32_t skill, uint8_t modifiers) {
         if (dead) return;
         DamageSpec d;
         d.target = boss;
         d.actor = actor;
+        d.skill = skill;
         d.amount = amount;
         d.crit = crit;
         d.direction = back ? 1 : 2;
-        // Only the long layouts carry a direction, as in a real capture.
+        // Only the long layouts carry a direction and modifiers, as in a real capture.
         d.layout = back ? 6 : crit ? 5 : 4;
+        if (d.layout != 4) d.modifiers = modifiers;
         const Bytes frame = opcode_frame(Damage, damage_body({d}));
         script.emplace_back(t, bundled ? bundle_frame(frame) : frame);
         truth.damage[credit_to] += amount;
@@ -154,17 +161,32 @@ inline Session boss_session() {
 
     for (int i = 0; !dead && i < 200; ++i) {
         const double t = 5.0 + 0.5 * i;
-        land(t, kMe, kMe, 9'000 + static_cast<uint64_t>(i * 37 % 2000), i % 4 == 0, i % 3 == 0, i % 10 == 5);
-        land(t + 0.1, kAlly, kAlly, 11'000 + static_cast<uint64_t>(i * 53 % 3000), i % 5 == 0, false, false);
-        land(t + 0.2, kAlly2, kAlly2, 7'000 + static_cast<uint64_t>(i * 29 % 1500), false, i % 2 == 0, false);
-        if (i % 2 == 0) land(t + 0.3, spirit, kAlly2, 3'000, false, false, false);
+        const auto pick = [i](const uint32_t (&skills)[4]) { return skills[(i * 7 + i / 3) % 4]; };
+        const uint8_t mods = static_cast<uint8_t>((i % 7 == 0 ? proto::hit_modifier::Perfect : 0) |
+                                                  (i % 9 == 0 ? proto::hit_modifier::Double : 0));
+        land(t, kMe, kMe, 9'000 + static_cast<uint64_t>(i * 37 % 2000), i % 4 == 0, i % 3 == 0, i % 10 == 5,
+             pick(sorcerer), mods);
+        land(t + 0.1, kAlly, kAlly, 11'000 + static_cast<uint64_t>(i * 53 % 3000), i % 5 == 0, false, false,
+             pick(gladiator), 0);
+        land(t + 0.2, kAlly2, kAlly2, 7'000 + static_cast<uint64_t>(i * 29 % 1500), false, i % 2 == 0, false,
+             pick(elementalist), mods);
+        if (i % 2 == 0) land(t + 0.3, spirit, kAlly2, 3'000, false, false, false, 16120002, 0);
         if (i % 6 == 0) {
-            // The boss hits back; it starts nothing and counts for nobody.
+            // The boss hits back: damage taken, which starts nothing.
             DamageSpec back;
             back.target = kMe;
             back.actor = boss;
+            back.skill = 900101;
             back.amount = 4'000;
             script.emplace_back(t + 0.4, opcode_frame(Damage, damage_body({back})));
+        }
+        if (i % 12 == 3) {
+            // The Elementalist's heals over time on the other two.
+            const auto heal = static_cast<uint64_t>(1'800 + i * 11 % 700);
+            const uint32_t communion = 16770000;  // Spirit Communion
+            script.emplace_back(t + 0.45, opcode_frame(proto::opcode::Tick, tick_body(kMe, 0x09, kAlly2, communion, heal)));
+            script.emplace_back(t + 0.46,
+                                opcode_frame(proto::opcode::Tick, tick_body(kAlly, 0x09, kAlly2, communion, heal / 2)));
         }
     }
     truth.boss_damage = boss_taken;

@@ -22,8 +22,9 @@ struct PageTab {
 /// The tab bar under a page's header. No label is ever clipped: every tab shows its
 /// icon while all of them fit, only its label once they do not, and the bar scrolls
 /// when even the bare labels do not fit. A tab keeps its id either way, so the open
-/// tab survives a resize across the switch.
-void render_tabs(const char* id, const PageTab* tabs, size_t count);
+/// tab survives a resize across the switch. `select`, when in range, opens that tab
+/// this frame.
+void render_tabs(const char* id, const PageTab* tabs, size_t count, int select = -1);
 
 /// One card of a settings page. The order these are listed in is the order the
 /// user sees.

@@ -60,6 +60,8 @@ public:
     [[nodiscard]] bool visible() const noexcept { return m_visible; }
     /// Re-asserts topmost: a game going fullscreen-borderless can push it down.
     void keep_on_top();
+    /// Back to the default spot near the main monitor's top-left corner.
+    void reset_position();
     /// The window in screen pixels.
     [[nodiscard]] RECT screen_rect() const;
     /// The monitor's DPI over 96.

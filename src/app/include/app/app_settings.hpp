@@ -54,8 +54,8 @@ struct WindowSettings {
     /// Screen position and size; x and y of -1 centre it on the main monitor.
     int x{-1};
     int y{-1};
-    int width{1100};
-    int height{700};
+    int width{1280};
+    int height{760};
 };
 
 struct AppSettings {

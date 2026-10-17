@@ -11,9 +11,9 @@ namespace aion2::app {
 
 #ifdef HAVE_IMGUI
 
+// In ui, so colors:: is the window's palette and never the overlay's (app::colors).
+namespace ui {
 namespace {
-
-using namespace ui;
 
 struct NavItem {
     const char* label;
@@ -141,8 +141,10 @@ void render_sidebar(const AppFrameInput& in, AppViewState& state) {
 }
 
 } // namespace
+} // namespace ui
 
 AppActions draw_app(const AppFrameInput& in, AppViewState& state) {
+    using namespace ui;
     AppActions out;
     ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f));
     ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);

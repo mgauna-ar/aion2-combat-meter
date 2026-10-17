@@ -131,7 +131,7 @@ by hand only while the meter is closed. Out-of-range values are clamped.
 | `open_window_at_start` | true | Open the app window when the meter starts; off, it starts in the tray. |
 | `close_to_tray` | true | Closing the app window hides it to the tray. Off, closing it quits. |
 | `notifications` | true | Tray notifications: a capture that failed to start, a recording started. |
-| `window_x`, `window_y`, `window_width`, `window_height` | -1, -1, 1100, 700 | The app window's position and size in screen pixels; -1, -1 centres it. |
+| `window_x`, `window_y`, `window_width`, `window_height` | -1, -1, 1280, 760 | The app window's position and size in screen pixels; -1, -1 centres it, at no more than 90% of the screen. |
 
 *Start with Windows* is not in the file: Windows' Run key for your user is its only record.
 

@@ -38,17 +38,22 @@ std::string windows_font(const char* file) {
 }
 
 /// The saved rectangle if a monitor still shows its top-left corner; else the
-/// default size, centred on the main monitor. Only -1, -1 means unset.
+/// default size, no more than 90% of the main monitor's work area, centred on it.
+/// Only -1, -1 means unset.
 RECT start_rect(const WindowSettings& s) {
     const POINT corner{s.x, s.y};
     if (!(s.x == -1 && s.y == -1) && MonitorFromPoint(corner, MONITOR_DEFAULTTONULL) != nullptr) {
         return RECT{s.x, s.y, s.x + s.width, s.y + s.height};
     }
-    const UINT dpi = GetDpiForSystem();
-    const int w = MulDiv(static_cast<int>(ui::metrics::WindowDefaultW), static_cast<int>(dpi), 96);
-    const int h = MulDiv(static_cast<int>(ui::metrics::WindowDefaultH), static_cast<int>(dpi), 96);
-    const int x = std::max(0, (GetSystemMetrics(SM_CXSCREEN) - w) / 2);
-    const int y = std::max(0, (GetSystemMetrics(SM_CYSCREEN) - h) / 2);
+    RECT work{0, 0, GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN)};
+    SystemParametersInfoW(SPI_GETWORKAREA, 0, &work, 0);
+    const int work_w = work.right - work.left;
+    const int work_h = work.bottom - work.top;
+    const auto dpi = static_cast<int>(GetDpiForSystem());
+    const int w = std::min(MulDiv(static_cast<int>(ui::metrics::WindowDefaultW), dpi, 96), work_w * 9 / 10);
+    const int h = std::min(MulDiv(static_cast<int>(ui::metrics::WindowDefaultH), dpi, 96), work_h * 9 / 10);
+    const int x = work.left + std::max(0, (work_w - w) / 2);
+    const int y = work.top + std::max(0, (work_h - h) / 2);
     return RECT{x, y, x + w, y + h};
 }
 

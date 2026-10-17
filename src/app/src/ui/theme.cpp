@@ -45,7 +45,8 @@ void apply_slate_theme() {
 
     style.WindowPadding = ImVec2(metrics::CardPad, metrics::CardPad);
     style.FramePadding = ImVec2(10.0f, 6.0f);
-    style.CellPadding = ImVec2(8.0f, 5.0f);
+    // Narrower than ffxiv-hub's: the ranking tables carry the game's six hit columns.
+    style.CellPadding = ImVec2(6.0f, 5.0f);
     style.ItemSpacing = ImVec2(metrics::Gutter, 8.0f);
     style.ItemInnerSpacing = ImVec2(7.0f, 6.0f);
     style.IndentSpacing = 16.0f;

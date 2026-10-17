@@ -247,6 +247,11 @@ void OverlayWindow::keep_on_top() {
     SetWindowPos(m_hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
 }
 
+void OverlayWindow::reset_position() {
+    if (m_hwnd == nullptr) return;
+    SetWindowPos(m_hwnd, nullptr, kDefaultX, kDefaultY, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+}
+
 RECT OverlayWindow::screen_rect() const {
     RECT r{};
     if (m_hwnd != nullptr) GetWindowRect(m_hwnd, &r);

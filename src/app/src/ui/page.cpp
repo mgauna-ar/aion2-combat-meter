@@ -38,7 +38,7 @@ float tabs_width(const PageTab* tabs, size_t count, bool with_icons) {
 
 } // namespace
 
-void render_tabs(const char* id, const PageTab* tabs, size_t count) {
+void render_tabs(const char* id, const PageTab* tabs, size_t count, int select) {
     if (tabs == nullptr || count == 0) return;
 
     // ImGui's default fitting shrinks tabs that do not fit and clips their labels.
@@ -51,7 +51,8 @@ void render_tabs(const char* id, const PageTab* tabs, size_t count) {
     for (size_t i = 0; i < count; ++i) {
         char label[128];
         tab_label(label, sizeof(label), tabs[i], with_icons);
-        if (ImGui::BeginTabItem(label)) {
+        const ImGuiTabItemFlags flags = static_cast<int>(i) == select ? ImGuiTabItemFlags_SetSelected : 0;
+        if (ImGui::BeginTabItem(label, nullptr, flags)) {
             ImGui::Dummy(ImVec2(0.0f, m(4.0f)));
             tabs[i].body();
             ImGui::EndTabItem();

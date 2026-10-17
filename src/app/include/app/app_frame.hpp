@@ -7,14 +7,12 @@
 // small and the screenshot tool can draw it on the Mac.
 
 #include "app/app_settings.hpp"
-#include "common/micros.hpp"
 #include "meter/history_store.hpp"
 #include "meter/types.hpp"
 #include "pipeline/pipeline.hpp"
 
 #include <cstdint>
 #include <optional>
-#include <set>
 #include <string>
 #include <vector>
 
@@ -32,10 +30,8 @@ struct AppViewState {
     meter::EntityId damage_player{0};
     meter::EntityId heal_player{0};
     meter::EntityId taken_player{0};
-    /// Map visits folded shut in the pull list, by visit start.
-    std::set<Micros> collapsed_visits;
-    /// The Clear history confirmation is open.
-    bool confirm_clear{false};
+    /// A Combat Meter tab to open on the next frame (0 Damage .. 3 Settings); -1 for none.
+    int open_meter_tab{-1};
 };
 
 /// One frame's inputs. Pointers may be null before the first snapshot.

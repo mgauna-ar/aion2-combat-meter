@@ -322,6 +322,12 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
             if (actions.end_fight) runtime.request_end_fight();
             if (actions.toggle_recording) toggle_recording();
             if (actions.clear_history) runtime.request_clear_history();
+            if (actions.reset_overlay_position) {
+                window.reset_position();
+                settings.overlay.x = -1;
+                settings.overlay.y = -1;
+                save_now();
+            }
             open_target(actions.open);
             if (!actions.load_file.empty()) {
                 app_view.selected_file = actions.load_file;
