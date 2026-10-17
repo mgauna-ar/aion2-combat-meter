@@ -130,7 +130,7 @@ void EncounterEngine::on_event(const proto::ParsedEvent& event) {
             } else if constexpr (std::is_same_v<T, proto::Death>) {
                 on_death(e.id, ts);
             } else if constexpr (std::is_same_v<T, proto::MapLoad>) {
-                on_map(e, ts);
+                on_map(e, event.connection, ts);
             } else if constexpr (std::is_same_v<T, proto::Damage>) {
                 on_damage(e, ts);
             } else if constexpr (std::is_same_v<T, proto::Tick>) {
@@ -310,9 +310,17 @@ void EncounterEngine::on_death(EntityId id, Micros ts) {
     }
 }
 
-void EncounterEngine::on_map(const proto::MapLoad& m, Micros ts) {
-    // Every load is a new visit, the map you are on included: running a dungeon
-    // again, straight back in, loads the same map id, and each run is its own.
+void EncounterEngine::on_map(const proto::MapLoad& m, uint32_t connection, Micros ts) {
+    // Entering a dungeon opens a connection to its server, so running it again,
+    // straight back in, loads the same map id on a new one: each run is its own
+    // visit. The same map on the same connection is a teleport or a revive within
+    // the run: the fight and the visit go on, though players may have new ids.
+    const bool reload = m.map_id == m_map_id && connection != 0 && connection == m_map_connection;
+    m_map_connection = connection;
+    if (reload) {
+        m_registry.on_map_reload();
+        return;
+    }
     if (m_fight) finish(EndReason::MapChange, ts);
     m_map_id = m.map_id;
     m_visit_ts = ts;

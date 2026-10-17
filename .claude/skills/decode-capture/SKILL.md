@@ -66,6 +66,9 @@ make replay
   and whether their identities come after it. Does a player keep their id? Does an old
   id come back as someone else, or as an NPC? AGENTS.md's Sides rules assume ids can
   move and be reused; confirm that, or simplify them.
+- **Loads within a run:** a `map` event inside a dungeon run (a teleport, a revive)
+  should name the same `connection` as the load that entered it; a new run, a new
+  one. The engine keeps or splits runs by that (AGENTS.md, Fight end).
 - **Map ids:** a `map` event prints the name `src/meter/data/maps.tsv` gives its id.
   - Every map event starts a new visit. Ask the user to run one dungeon twice,
     straight back in, and to use a teleport inside it: the re-entry should show a

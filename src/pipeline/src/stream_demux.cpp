@@ -8,7 +8,9 @@ namespace aion2::pipeline {
 /// while it is a candidate.
 class StreamDemux::Flow final : public capture::StreamSink, public proto::FrameSink {
 public:
-    Flow(capture::FlowKey key, FlowRole role) : m_role(role) { m_summary.key = key; }
+    Flow(capture::FlowKey key, FlowRole role, uint32_t connection) : m_role(role), m_connection(connection) {
+        m_summary.key = key;
+    }
 
     void push(const capture::TcpSegment& segment, proto::FrameSink& out) {
         ++m_summary.segments;
@@ -57,7 +59,10 @@ public:
     // proto::FrameSink
     void on_frame(const proto::Frame& frame) override {
         if (m_role == FlowRole::Game) {
-            if (m_out != nullptr) m_out->on_frame(frame);
+            if (m_out == nullptr) return;
+            proto::Frame f = frame;
+            f.connection = m_connection;
+            m_out->on_frame(f);
             return;
         }
         if (m_role != FlowRole::Candidate) return;
@@ -102,6 +107,7 @@ private:
                     f.ts = h.ts;
                     f.depth = h.depth;
                     f.stream_offset = h.offset;
+                    f.connection = m_connection;
                     m_out->on_frame(f);
                 }
             }
@@ -116,6 +122,7 @@ private:
     }
 
     FlowRole m_role;
+    uint32_t m_connection;
     FlowSummary m_summary;
     capture::TcpReassembler m_reassembler;
     proto::FrameDecoder m_decoder;
@@ -144,7 +151,7 @@ void StreamDemux::on_segment(const capture::TcpSegment& segment, proto::FrameSin
         // heartbeats, so it is rejected without decoding.
         const bool client_side = segment.flow.dst_port == m_options.server_port;
         const FlowRole role = server_side ? FlowRole::Game : client_side ? FlowRole::Rejected : FlowRole::Candidate;
-        it = m_flows.emplace(segment.flow, std::make_unique<Flow>(segment.flow, role)).first;
+        it = m_flows.emplace(segment.flow, std::make_unique<Flow>(segment.flow, role, m_next_connection++)).first;
     }
     Flow& flow = *it->second;
     flow.push(segment, sink);

@@ -53,7 +53,8 @@ struct FlowSummary {
  * released in order, so the identities sent right after login are not lost to the
  * wait. A candidate that has passed kRejectAfterBytes with no heartbeat is dropped.
  * Frames of every game flow go to one sink: the game uses one connection at a time,
- * and a reconnect is a new flow.
+ * and a reconnect is a new flow. Each frame says which flow it came on
+ * (Frame::connection): entering a dungeon opens a connection to its server.
  */
 class StreamDemux {
 public:
@@ -90,6 +91,8 @@ private:
     std::unordered_map<capture::FlowKey, std::unique_ptr<Flow>, capture::FlowKeyHash> m_flows;
     uint64_t m_packets{0};
     uint64_t m_segments{0};
+    /// Frame::connection of the next flow seen.
+    uint32_t m_next_connection{1};
     Micros m_last_game_ts{0};
 };
 

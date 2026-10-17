@@ -140,7 +140,7 @@ history and recordings folders, `config.json` and the log.
   a fight is called never lowers its DPS.
 - **Saving:** boss fights and fights longer than 20 s are saved, and listed on the app
   window's Combat Meter page, grouped by map visit: each run of a dungeon is its own
-  entry. *Save only dungeon fights* keeps the open world out.
+  entry, and a teleport or revive inside a run stays in it. *Save only dungeon fights* keeps the open world out.
 
 **Who counts as party:**
 - In a party, only its members are listed. Pets and summons count for their owner.

@@ -129,8 +129,9 @@ void Report::on_event(const proto::ParsedEvent& pe, const meter::CombatantRegist
             } else if constexpr (std::is_same_v<T, proto::Death>) {
                 std::printf("%+.3f  death     %s\n", t, who(e.id, reg).c_str());
             } else if constexpr (std::is_same_v<T, proto::MapLoad>) {
-                std::printf("%+.3f  map       %u%s (load %u)%s\n", t, e.map_id, map_suffix(e.map_id).c_str(),
-                            e.load_count, e.is_instance() ? " instance" : "");
+                std::printf("%+.3f  map       %u%s (load %u)%s connection %u\n", t, e.map_id,
+                            map_suffix(e.map_id).c_str(), e.load_count, e.is_instance() ? " instance" : "",
+                            pe.connection);
             } else if constexpr (std::is_same_v<T, proto::Damage>) {
                 std::printf("%+.3f  damage    %s -> %s %" PRIu64, t, who(e.actor, reg).c_str(),
                             who(e.target, reg).c_str(), e.amount);

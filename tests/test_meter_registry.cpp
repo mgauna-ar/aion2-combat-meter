@@ -232,34 +232,35 @@ TEST_CASE(Registry, SummonsOwnerIsAPlayerBeforeTheirName) {
     TEST_ASSERT(r.side(300) == Side::Player);
 }
 
-TEST_CASE(Registry, ScannedIdentityNeverTurnsAnNpcIntoAPlayer) {
+TEST_CASE(Registry, AScannedIdentityNamesNoOne) {
+    // A scan pairs a name with some other number: in the second capture, none of
+    // its 38 had the named character's id.
+    const auto scanned = [](EntityId id, const char* name) {
+        proto::Identity i = player(id, name);
+        i.scanned = true;
+        return i;
+    };
     CombatantRegistry r;
     r.on_spawn(npc(0x4100, 5'000'000));
-    proto::Identity look_alike = player(0x4100, "Bogus");
-    look_alike.scanned = true;
-    r.on_identity(look_alike);
+    r.on_identity(scanned(0x4100, "Bogus"));
     TEST_ASSERT(r.side(0x4100) == Side::Enemy);
     TEST_ASSERT_EQ(r.display_name(0x4100), std::string("#16640"));
-}
 
-TEST_CASE(Registry, ScannedIdentityNeverRenamesOrMovesAPlayer) {
-    CombatantRegistry r;
+    r.on_identity(player(100, "Ariel", true));
     r.on_identity(player(301, "Rhea"));
-    r.on_identity(player(302, "Kaisinel"));
-    // A scan may misread the id in front of a name.
-    proto::Identity rename = player(301, "Kaisinel");
-    rename.scanned = true;
-    r.on_identity(rename);
+    r.on_party(roster({"Ariel", "Rhea"}));
+    r.on_identity(scanned(301, "Kaisinel"));
     TEST_ASSERT_EQ(r.display_name(301), std::string("Rhea"));
-    proto::Identity elsewhere = player(777, "Rhea");
-    elsewhere.scanned = true;
-    r.on_identity(elsewhere);
-    TEST_ASSERT(r.find(777) == nullptr);
-    // A name nobody holds can still be found by one.
-    proto::Identity fresh = player(778, "Lumiel");
-    fresh.scanned = true;
-    r.on_identity(fresh);
-    TEST_ASSERT_EQ(r.display_name(778), std::string("Lumiel"));
+    r.on_identity(scanned(778, "Lumiel"));
+    TEST_ASSERT(r.find(778) == nullptr);
+    // After a map load, before Rhea's identity comes again, her id is stale. A scan
+    // with her name used to move it to its own number and forget hers, and she fell
+    // out of the party.
+    r.on_map_reload();
+    r.on_identity(scanned(4, "Rhea"));
+    TEST_ASSERT(r.find(4) == nullptr);
+    TEST_ASSERT_EQ(r.display_name(301), std::string("Rhea"));
+    TEST_ASSERT(r.in_party(301));
 }
 
 TEST_CASE(Registry, NamelessOwnIdentityKeepsTheIdsName) {

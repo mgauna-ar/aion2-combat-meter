@@ -309,12 +309,14 @@ void PacketParser::parse(const Frame& frame, std::vector<ParsedEvent>& out) {
     ++m_stats.unknown;
     for (Identity& id : scan_identities(frame.body, m_known_servers)) {
         ++m_stats.scanned_identities;
-        out.push_back(ParsedEvent{frame.ts, frame.opcode, std::move(id)});
+        out.push_back(ParsedEvent{frame.ts, frame.opcode, std::move(id), frame.connection});
     }
 }
 
 bool PacketParser::parse_known(const Frame& frame, std::vector<ParsedEvent>& out) {
-    const auto emit = [&](Event e) { out.push_back(ParsedEvent{frame.ts, frame.opcode, std::move(e)}); };
+    const auto emit = [&](Event e) {
+        out.push_back(ParsedEvent{frame.ts, frame.opcode, std::move(e), frame.connection});
+    };
     ByteReader r(frame.body);
 
     switch (frame.opcode) {

@@ -114,7 +114,7 @@ private:
     /// 00 8D: the local player's id, and HP, whose 0 is a death.
     void on_values(const proto::RemainingHp& v, Micros ts);
     void on_death(EntityId id, Micros ts);
-    void on_map(const proto::MapLoad& m, Micros ts);
+    void on_map(const proto::MapLoad& m, uint32_t connection, Micros ts);
     /// A hit from the player side on an enemy, credited to its resolved player.
     void credit(EntityId actor, EntityId target, uint64_t amount, uint32_t skill, const proto::Damage* direct,
                 Micros ts);
@@ -140,6 +140,8 @@ private:
     std::optional<Fight> m_fight;
     uint64_t m_next_fight_id{1};
     uint32_t m_map_id{0};
+    /// The connection the current map loaded on (Frame::connection); 0 for none.
+    uint32_t m_map_connection{0};
     /// The current map visit's start; 0 until a map load or the first fight.
     Micros m_visit_ts{0};
     Micros m_last_event_ts{0};

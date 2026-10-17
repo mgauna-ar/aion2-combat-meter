@@ -22,6 +22,11 @@ inline constexpr Micros kT0 = 1'792'152'000'000'000ULL;
     return proto::ParsedEvent{ts, 0, std::move(e)};
 }
 
+/// `e` as it came on game connection `connection` (Frame::connection).
+[[nodiscard]] inline proto::ParsedEvent ev_on(uint32_t connection, Micros ts, proto::Event e) {
+    return proto::ParsedEvent{ts, 0, std::move(e), connection};
+}
+
 [[nodiscard]] inline proto::Identity player(EntityId id, std::string name, bool own = false,
                                             uint16_t server = 0x0123) {
     proto::Identity i;

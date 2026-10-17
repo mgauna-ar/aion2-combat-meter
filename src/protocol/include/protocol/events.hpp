@@ -26,7 +26,9 @@ struct Identity {
     /// The wire's class code; meter::class_from_code names it.
     uint32_t class_code{0};
     bool own{false};
-    /// Found by scanning an unknown packet rather than read from 33 36 / 45 36.
+    /// Found by scanning an unknown packet rather than read from 33 36 / 45 36. The
+    /// meter does not name anyone by it: in the second capture none of 38 had the
+    /// right id.
     bool scanned{false};
 };
 
@@ -168,6 +170,8 @@ struct ParsedEvent {
     Micros ts{0};
     uint16_t opcode{0};
     Event event;
+    /// Frame::connection of the frame it came from.
+    uint32_t connection{0};
 };
 
 } // namespace aion2::proto

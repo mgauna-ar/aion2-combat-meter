@@ -167,7 +167,9 @@ BACK, FRNT, MULT and BLOC share matched it exactly.
 - Through a ping reducer or VPN the game appears on loopback, on another port. The demux
   takes any flow once 3 heartbeats prove it is the game (`detect_relays`).
 - Entering a dungeon opens a new connection, to another server; leaving it, another
-  back to the town's. Each is its own flow, with its own framing state.
+  back to the town's. Each is its own flow, with its own framing state. The demux
+  numbers them (`Frame::connection`, carried into `ParsedEvent`), and the engine tells
+  a new run of a dungeon from a reload within one by it (Meter rules, Fight end).
 - Reassembly (`TcpReassembler`): a hole waits 300 ms, or until 1 MiB queues behind it,
   then is a gap. A segment more than 4 MiB ahead is ignored as a stray, unless nothing
   else arrives for 300 ms: then the capture lost that much, and the stream skips there.
@@ -260,6 +262,10 @@ BACK, FRNT, MULT and BLOC share matched it exactly.
     0x02020000: a Gladiator and a Ranger shared one value, a Sorcerer and a Chanter
     another. Its two high bytes may be faction and gender; unconfirmed.
     `class_codes.cpp` stays empty, and skill codes give the class.
+  - `scan_identities` finds record look-alikes in packets the parser does not read.
+    The meter names no one by them: in the second capture 16 of its 38 carried a real
+    character's name, none with that character's id. They came in bursts with the
+    party packets, as a dungeon was entered and finished. Replay still prints them.
   - A name is at most 16 letters or digits, with at least one letter.
   - A name starting with `$` is a tutorial placeholder.
 - **Spawn `41 36`:**
@@ -345,9 +351,13 @@ BACK, FRNT, MULT and BLOC share matched it exactly.
   came back with a new id). A party whose Ranger and Elementalist shared one row,
   the name switching from pull to pull, points to reuse. The meter assumes both
   (Meter rules, Sides).
-- whether a teleport within a dungeon sends a 21 36. Re-entering the same dungeon
-  straight away did, as the runs that shared one visit showed; a teleport that did too
-  would now split a run and end its fight;
+- whether a teleport or a revive within a dungeon sends a 21 36, and over which
+  connection. Re-entering the same dungeon straight away did, as the runs that shared
+  one visit showed, and runs then split once every load was taken for a new one. The
+  meter takes the same map over the same connection for a reload within a run, and
+  over a new connection for a new run, since entering a dungeon opened one in the
+  second capture. A run still split in two, or two runs in one, would prove it
+  wrong;
 - how a player of the other faction is told apart, for PvP: perhaps 45 36's mask.
   Until then they are players like the party, so a PvP fight starts nothing and a
   hit on them counts for nothing (Meter rules, Party and Healing).
@@ -385,16 +395,16 @@ in 2026-10.
     - a hit goes to its id's row for the character the id was then, and the summary
       joins a character's rows. An id named after it hit joins its character. Ids are
       never joined to each other, so two characters never share a row;
-    - a map load, the same map's included (a new run of a dungeon is a new
-      instance of it), leaves players stale rather than dropping them, since their
-      names may have come before it. A spawn on a stale id makes it the spawn, and a character named on a
+    - a map load, or a reload within a run, leaves players stale rather than
+      dropping them, since their names may have come before it. A spawn on a stale id makes it the spawn, and a character named on a
       new id leaves its stale one. On the map they were named on, two ids can share a
       name;
     - the local player's name follows 00 8D's own values to their new id.
-  - A scanned identity may have misread the id before the name. It never turns a
-    spawned NPC or summon into a player, renames a player, or takes a name that an
-    identity gave another id on this map.
-  - Every map load drops NPCs, summons and inferred sides, the same map's included.
+  - A scanned identity names no one (Protocol, Identity). One that took a stale
+    party member's name, after a load, made the meter forget the member's id, and
+    the member fell out of the party.
+  - A map load drops NPCs, summons and inferred sides; a reload within a run keeps
+    them.
 - **Classes:** from the skill codes a player uses (their summons' count too), unless an
   identity packet's class code names one.
 - **Party:** with a roster, only its names count, and the local player.
@@ -425,8 +435,9 @@ in 2026-10.
 - **Fight start:** a direct hit that lands, from the player side on an enemy. A DoT tick
   never starts a fight.
 - **Fight end:** the boss's death (00 8D HP 0 or 42 36, after `kill_grace_s`, unless a
-  bigger boss was hit during the grace), a map load (the same map's included: running a
-  dungeon again, straight back in), idle time with no party hit (`idle_timeout_s`, or
+  bigger boss was hit during the grace), a map load (the same map's included when it
+  comes over a new connection: running a dungeon again, straight back in; not over the
+  same one, a teleport or a revive within the run), idle time with no party hit (`idle_timeout_s`, or
   `boss_idle_timeout_s` while a boss stands), no traffic (`capture_lost_s`), a wipe
   (when enabled) or by hand.
   - A dead player stays dead for the wipe check while their DoTs and summons keep
@@ -454,9 +465,9 @@ in 2026-10.
     `# By hand` line, so not map 0, an open-world zone, or a map added by hand).
   - Each fight is one JSON file (`"v":2`; version 1 files still load, without the
     breakdowns), written atomically, plus a line appended to `index.jsonl`.
-  - Fights are grouped by map visit (`visit_ts`): every map load starts one, the same
-    map's included, so each run of a dungeon is its own. So does the first fight after
-    the meter starts.
+  - Fights are grouped by map visit (`visit_ts`): every map load starts one but a
+    reload within a run (the same map over the same connection), so each run of a
+    dungeon is its own. So does the first fight after the meter starts.
   - A cut-off index line is skipped. A missing index is rebuilt from the files.
   - Pruning keeps `history.max_fights`, in batches of 50.
   - Clearing (the app window's trash button) deletes the fight records and the index,

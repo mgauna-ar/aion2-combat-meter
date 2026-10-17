@@ -6,6 +6,7 @@
 #include "pipeline/stream_demux.hpp"
 #include "protocol/opcodes.hpp"
 
+#include <algorithm>
 #include <vector>
 
 using namespace aion2;
@@ -19,7 +20,11 @@ constexpr Micros kTs = kServerMs * kMicrosPerMilli;
 
 struct OpcodeSink final : proto::FrameSink {
     std::vector<uint16_t> opcodes;
-    void on_frame(const proto::Frame& f) override { opcodes.push_back(f.opcode); }
+    std::vector<uint32_t> connections;
+    void on_frame(const proto::Frame& f) override {
+        opcodes.push_back(f.opcode);
+        connections.push_back(f.connection);
+    }
 };
 
 /// Sends `stream` as segments of `chunk` bytes from `spec`, starting at spec.seq.
@@ -78,6 +83,29 @@ TEST_CASE(StreamDemux, RelayFlowIsHeldUntilHeartbeatsConfirmIt) {
     TEST_ASSERT((sink.opcodes == std::vector<uint16_t>{proto::opcode::Heartbeat, proto::opcode::Damage,
                                                         proto::opcode::Heartbeat, proto::opcode::Heartbeat}));
     TEST_ASSERT(demux.flows()[0].role == FlowRole::Game);
+    // The held frames say which connection they came on, like the rest.
+    TEST_ASSERT(sink.connections[0] != 0);
+    TEST_ASSERT(std::all_of(sink.connections.begin(), sink.connections.end(),
+                            [&](uint32_t c) { return c == sink.connections[0]; }));
+}
+
+TEST_CASE(StreamDemux, EachConnectionHasItsOwnNumber) {
+    // Entering a dungeon opens a connection to its server: the engine tells a new
+    // run from a reload within one by it.
+    StreamDemux demux;
+    OpcodeSink sink;
+    TcpSpec town;
+    send(demux, sink, town, concat({heartbeat(kServerMs), opcode_frame(proto::opcode::MapLoad, {1})}), 64, kTs);
+    TcpSpec dungeon;
+    dungeon.src_ip = ip4(10, 0, 0, 9);
+    dungeon.dst_port = static_cast<uint16_t>(kClientPort + 1);
+    send(demux, sink, dungeon, concat({heartbeat(kServerMs + 50), opcode_frame(proto::opcode::MapLoad, {2})}), 64,
+         kTs);
+    TEST_ASSERT_EQ(sink.connections.size(), size_t{4});
+    TEST_ASSERT(sink.connections[0] != 0);
+    TEST_ASSERT_EQ(sink.connections[1], sink.connections[0]);
+    TEST_ASSERT(sink.connections[2] != 0 && sink.connections[2] != sink.connections[0]);
+    TEST_ASSERT_EQ(sink.connections[3], sink.connections[2]);
 }
 
 TEST_CASE(StreamDemux, NoisyFlowIsRejected) {

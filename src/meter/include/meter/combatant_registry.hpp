@@ -107,11 +107,14 @@ public:
     /// `player` used a skill of class `cls` (class_of_skill): their class, when no
     /// identity has named it. Summons use their owner's class digits.
     void on_skill_class(EntityId player, AionClass cls);
-    /// A map load, the same map again included (a new run of a dungeon): NPCs,
-    /// summons and inferred sides go; players stay, stale, since a new instance has
-    /// ids of its own. `instance` (proto::MapLoad::is_instance) says who counts with
-    /// no roster.
+    /// A map load, the same map again included when it is a new run of a dungeon:
+    /// NPCs, summons and inferred sides go; players stay, stale, since a new
+    /// instance has ids of its own. `instance` (proto::MapLoad::is_instance) says
+    /// who counts with no roster.
     void on_map_change(bool instance);
+    /// The map loaded again within one run (a teleport, a revive): NPCs stay, and
+    /// players go stale, in case they have new ids.
+    void on_map_reload();
 
     /// The id a hit by `id` is credited to: the owner of a summon, through chains
     /// of them.
@@ -152,8 +155,6 @@ private:
     void bind(Actor& a, CharacterId who);
     /// Forgets everything about `id`: the server has given it to someone else.
     void forget(EntityId id);
-    /// Whether a scanned identity, which may have misread its id, can name it.
-    [[nodiscard]] bool scan_can_name(const proto::Identity& identity) const;
     /// Makes `id` the local player. Their name moves with them from their last id.
     void set_local(EntityId id);
     void set_inferred(EntityId id, Side side);

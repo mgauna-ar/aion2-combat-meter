@@ -23,6 +23,9 @@ struct Frame {
     uint8_t depth{0};
     /// Byte offset of the enclosing top-level frame in the stream.
     uint64_t stream_offset{0};
+    /// The connection it came on: StreamDemux numbers each flow from 1, in the order
+    /// they start; 0 when nothing numbered it.
+    uint32_t connection{0};
 };
 
 class FrameSink {

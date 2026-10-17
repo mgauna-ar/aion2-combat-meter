@@ -198,17 +198,18 @@ TEST_CASE(Engine, HpFallingByAMultipleOfDamageIsNotPartial) {
     TEST_ASSERT_FALSE(s.quality.partial);
 }
 
-TEST_CASE(Engine, EveryMapLoadEndsTheFight) {
+TEST_CASE(Engine, EveryMapLoadOnANewConnectionEndsTheFight) {
     EncounterEngine e = setup();
-    e.on_event(ev(at_s(0), proto::MapLoad{1, 610010}));
+    e.on_event(ev_on(1, at_s(0), proto::MapLoad{1, 610010}));
     e.on_event(ev(at_s(0), npc(kBoss, kBossHp)));
     e.on_event(ev(at_s(1), hit(kMe, kBoss, 100)));
-    // The same map again: running the dungeon again, straight back in.
-    e.on_event(ev(at_s(2), proto::MapLoad{2, 610010}));
+    // The same map on a new connection: running the dungeon again, straight back in.
+    e.on_event(ev_on(2, at_s(2), proto::MapLoad{2, 610010}));
     TEST_ASSERT_FALSE(e.in_fight());
     e.on_event(ev(at_s(3), npc(kBoss, kBossHp)));
     e.on_event(ev(at_s(4), hit(kMe, kBoss, 100)));
-    e.on_event(ev(at_s(5), proto::MapLoad{3, 200100}));
+    // Another map ends it, whatever the connection.
+    e.on_event(ev_on(2, at_s(5), proto::MapLoad{3, 200100}));
     TEST_ASSERT_FALSE(e.in_fight());
     const auto finished = e.take_finished();
     TEST_ASSERT_EQ(finished.size(), size_t{2});
@@ -627,12 +628,13 @@ TEST_CASE(Engine, FightsCarryTheirMapVisit) {
 
     proto::MapLoad map;
     map.map_id = 610010;
-    e.on_event(ev(at_s(30), map));
+    e.on_event(ev_on(1, at_s(30), map));
     e.on_event(ev(at_s(31), npc(kBoss, kBossHp, 777)));
     e.on_event(ev(at_s(40), hit(kMe, kBoss, 100)));
     e.end_fight(EndReason::Manual, at_s(41));
-    // Loading the same map again is a new run of it: a visit of its own.
-    e.on_event(ev(at_s(50), map));
+    // Loading the same map again over a new connection is a new run of it: a visit
+    // of its own.
+    e.on_event(ev_on(2, at_s(50), map));
     e.on_event(ev(at_s(51), npc(kBoss, kBossHp, 777)));
     e.on_event(ev(at_s(60), hit(kMe, kBoss, 100)));
     e.end_fight(EndReason::Manual, at_s(61));
@@ -651,6 +653,36 @@ std::optional<uint64_t> damage_by_name(const FightSummary& s, const std::string&
 }
 
 } // namespace
+
+TEST_CASE(Engine, AReloadOnTheSameConnectionKeepsTheRun) {
+    // A teleport or a revive inside a dungeon loads its map again, over the same
+    // connection: one run, one visit, and the fight goes on.
+    EncounterEngine e = setup(false);
+    e.on_event(ev(at_s(0), roster({"Ariel", "Lumiel"})));
+    e.on_event(ev_on(1, at_s(1), proto::MapLoad{1, kDungeon}));
+    e.on_event(ev(at_s(1), player(kMe, "Ariel", true)));
+    e.on_event(ev(at_s(1), player(kAlly, "Lumiel")));
+    e.on_event(ev(at_s(1), npc(kBoss, kBossHp, 777)));
+    e.on_event(ev(at_s(2), hit(kMe, kBoss, 100)));
+    e.on_event(ev_on(1, at_s(3), proto::MapLoad{2, kDungeon}));
+    TEST_ASSERT(e.in_fight());
+    // A scan arriving with the load names no one: it used to take Lumiel's name off
+    // her id, stale after the load, and she fell out of the party.
+    proto::Identity look_alike = player(4, "Lumiel");
+    look_alike.scanned = true;
+    e.on_event(ev_on(1, at_s(3), look_alike));
+    e.on_event(ev(at_s(4), hit(kAlly, kBoss, 300)));
+    const FightSummary s = e.current();
+    TEST_ASSERT_EQ(s.visit_ts, at_s(1));
+    TEST_ASSERT_EQ(s.combatants.size(), size_t{2});
+    TEST_ASSERT_EQ(damage_by_name(s, "Lumiel"), std::optional<uint64_t>{300});
+    TEST_ASSERT_EQ(s.boss.id, kBoss);
+
+    // A load with no connection to go by is a new visit.
+    e.on_event(ev(at_s(10), proto::MapLoad{3, kDungeon}));
+    TEST_ASSERT_FALSE(e.in_fight());
+    TEST_ASSERT_EQ(e.take_finished().size(), size_t{1});
+}
 
 TEST_CASE(Engine, IdsHandedToOtherPlayersOnANewMapKeepThemApart) {
     // Ids are the server's per map, and it reuses them: on the second map the
@@ -702,14 +734,15 @@ TEST_CASE(Engine, AnOldPlayersIdCanBeTheNextMapsBoss) {
 
 TEST_CASE(Engine, ANewRunOfTheSameMapKeepsItsPlayersApart) {
     EncounterEngine e = setup();
-    e.on_event(ev(at_s(0), proto::MapLoad{1, 610010}));
+    e.on_event(ev_on(1, at_s(0), proto::MapLoad{1, 610010}));
     e.on_event(ev(at_s(0), player(301, "Rhea")));
     e.on_event(ev(at_s(0), player(302, "Kaisinel")));
     e.on_event(ev(at_s(0), npc(kBoss, kBossHp, 777)));
     e.on_event(ev(at_s(1), hit(301, kBoss, 100)));
     e.on_event(ev(at_s(1), hit(302, kBoss, 200)));
-    // The same map again: a new run, whose instance hands out new ids.
-    e.on_event(ev(at_s(5), proto::MapLoad{2, 610010}));
+    // The same map again, over a new connection: a new run, whose instance hands
+    // out new ids.
+    e.on_event(ev_on(2, at_s(5), proto::MapLoad{2, 610010}));
     e.on_event(ev(at_s(5), player(302, "Rhea")));
     e.on_event(ev(at_s(5), player(305, "Kaisinel")));
     e.on_event(ev(at_s(5), npc(kBoss, kBossHp, 777)));

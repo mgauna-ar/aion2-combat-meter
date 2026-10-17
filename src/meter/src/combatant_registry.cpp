@@ -84,27 +84,12 @@ void CombatantRegistry::bind(Actor& a, CharacterId who) {
     if (c.cls == AionClass::Unknown) c.cls = a.cls;
 }
 
-bool CombatantRegistry::scan_can_name(const proto::Identity& identity) const {
-    if (identity.name.empty()) return false;
-    const auto named = m_by_name.find(name_key(identity.name, identity.server));
-    const CharacterId who = named == m_by_name.end() ? 0 : named->second;
-    // Not a spawned NPC or summon, nor a player an identity named on this map.
-    if (const Actor* a = find(identity.id); a != nullptr) {
-        if (a->spawned) return false;
-        if (a->character != 0 && a->character != who && !a->stale) return false;
-    }
-    // Nor a name an identity gave another id on this map.
-    if (const Character* c = character(who); c != nullptr && c->id != 0 && c->id != identity.id) {
-        const Actor* holder = find(c->id);
-        if (holder != nullptr && holder->character == who && !holder->stale) return false;
-    }
-    return true;
-}
-
 void CombatantRegistry::on_identity(const proto::Identity& identity) {
-    if (identity.id == 0) return;
-    // A scan's look-alike may have misread the id in front of the name.
-    if (identity.scanned && !scan_can_name(identity)) return;
+    // A scan's look-alike pairs a name with some other number: in the second
+    // capture, 16 of its 38 carried a real character's name and none that
+    // character's id. Taken, one took a party member's name off their real id,
+    // stale after a map load, and the member fell out of the party.
+    if (identity.id == 0 || identity.scanned) return;
     const CharacterId who = identity.name.empty() ? 0 : character_for(identity);
     Actor& a = get_or_create(identity.id);
     // A spawn's id, or another character's: the server has handed it on, and
@@ -233,6 +218,8 @@ void CombatantRegistry::mark_players_stale() {
         if (a.is_player) a.stale = true;
     }
 }
+
+void CombatantRegistry::on_map_reload() { mark_players_stale(); }
 
 void CombatantRegistry::on_map_change(bool instance) {
     m_in_instance = instance;
