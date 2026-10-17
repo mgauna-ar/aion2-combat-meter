@@ -96,7 +96,7 @@ def import_pages(folder):
     if not rows:
         sys.exit(f"no dungeon tiers found in {folder}")
     today = datetime.date.today().isoformat()
-    with open(TSV, "w", encoding="utf-8") as f:
+    with open(TSV, "w", encoding="utf-8", newline="\n") as f:
         f.write(
             "# AION 2 map names by map id, as the map load (21 36) carries it. By the\n"
             "# community's notes ids 600000 to 700000 are instances; the Awakening tiers\n"
@@ -105,8 +105,13 @@ def import_pages(folder):
             f"# Source: aion2.app's dungeon pages (aion2.app/db/dungeons/<name>), retrieved\n"
             f"# {today}: one row per difficulty tier, keyed by the tier's id. Unchecked: no\n"
             "# capture has shown a map load yet, so these are assumed, not known, to be the\n"
-            "# ids 21 36 carries. Open-world zones have no public ids: add them by hand\n"
-            "# below as captures show them. Regenerate with tools/gen_map_table.py.\n"
+            "# ids 21 36 carries, and no second source gives tier ids to compare with.\n"
+            "#\n"
+            "# Open-world zones have no public ids. The game's own files cannot be read for\n"
+            "# them (they are encrypted), and no site lists numeric ids for open-world maps.\n"
+            "# metabot.gg gives zone ids (Reshanta's Root is 622), but they look like zones\n"
+            "# within a map, not maps. Add rows by hand below as captures show them.\n"
+            "# Regenerate with tools/gen_map_table.py.\n"
         )
         for map_id, name in sorted(rows.items()):
             f.write(f"{map_id}\t{name}\n")
@@ -137,7 +142,7 @@ def main():
             if f.read() != text:
                 sys.exit("map_table.inc is out of date: run python3 tools/gen_map_table.py")
         return
-    with open(INC, "w", encoding="utf-8") as f:
+    with open(INC, "w", encoding="utf-8", newline="\n") as f:
         f.write(text)
     print(f"wrote {os.path.relpath(INC, ROOT)}")
 

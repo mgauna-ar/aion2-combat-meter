@@ -5,8 +5,13 @@
 # Source: aion2.app's dungeon pages (aion2.app/db/dungeons/<name>), retrieved
 # 2026-10-17: one row per difficulty tier, keyed by the tier's id. Unchecked: no
 # capture has shown a map load yet, so these are assumed, not known, to be the
-# ids 21 36 carries. Open-world zones have no public ids: add them by hand
-# below as captures show them. Regenerate with tools/gen_map_table.py.
+# ids 21 36 carries, and no second source gives tier ids to compare with.
+#
+# Open-world zones have no public ids. The game's own files cannot be read for
+# them (they are encrypted), and no site lists numeric ids for open-world maps.
+# metabot.gg gives zone ids (Reshanta's Root is 622), but they look like zones
+# within a map, not maps. Add rows by hand below as captures show them.
+# Regenerate with tools/gen_map_table.py.
 600001	Krao Cave (Conquest)
 600002	Krao Cave (Exploration)
 600011	Urugugu Canyon (Exploration)

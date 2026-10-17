@@ -97,6 +97,7 @@ src/meter/       aion2::meter
     types, class_codes, skill_names (data/skills.tsv → skill_table.inc),
     map_names (data/maps.tsv → map_table.inc), combatant_registry, encounter_engine,
     meter_settings, fight_json, history_store
+    data/npcs.tsv: monster and NPC names by npc code, not read yet (Protocol, Spawn)
 src/pipeline/    aion2::pipeline   stream_demux (flows -> frames), pipeline (all of it)
 src/app/         aion2::app
     app_settings, app_runtime (threads, history, recording), display_format,
@@ -111,6 +112,8 @@ tools/screenshots/  renders docs/images from overlay_view and app_frame (softwar
 tools/check_forbidden_apis.sh, tools/gen_app_icon.py, tools/embed_icon_font.py
 tools/gen_skill_table.py         skills.tsv → skill_table.inc (`make test` checks they agree)
 tools/gen_map_table.py           maps.tsv → map_table.inc (the same)
+tools/gen_npc_table.py           aion2.app's monster and NPC pages → npcs.tsv (no .inc until
+                                 the spawn's npc code is confirmed)
 tests/           TEST_CASE framework (ported), one test_<concern>.cpp per area
 ```
 
@@ -224,6 +227,11 @@ All of it lives in `src/protocol`. `opcodes.hpp` is the one place opcodes are sp
     triple, a heading f32, a u16, a byte (01; 00 for a corpse coming into view, with
     cur_hp 0), cur_hp varint and max_hp varint. Open-world mobs: 119,700.
   - **Owner:** the u32 after `07 02 06`.
+  - **Npc code:** read as the u24 after the mask, unconfirmed (below). The public ids
+    in `src/meter/data/npcs.tsv` (aion2.app's 7,545 monsters and 3,719 NPCs; metabot.gg
+    agrees on the bosses compared) are seven digits, 2,000,002 to 2,990,928. A boss
+    shows as "NPC #code" until a capture shows where the code sits; the TSV is not
+    read until then.
 - **Other opcodes:**
   - Death `42 36`: id varint. For a mob it comes about 4 s after 00 8D says HP 0: the
     corpse going. HP 0 is the death.
@@ -233,7 +241,9 @@ All of it lives in `src/protocol`. `opcodes.hpp` is the one place opcodes are sp
       (Conquest), with Awakening tiers at 910000 and up, outside the instance range.
       Those ids are assumed to be the map id here; no capture has shown a 21 36 yet.
     - Open-world zones have no public numeric ids. Their rows go by hand under the
-      TSV's `# By hand` line, which `--import-pages` keeps.
+      TSV's `# By hand` line, which `--import-pages` keeps. metabot.gg gives 333 zone
+      ids (Reshanta's Root is 622), but they look like zones within a map, not maps,
+      so none are in the TSV; compare them with the first open-world 21 36.
   - Party `02 97`: names only, found by scanning, since each member's tail varies in
     length. A found name has at least 2 characters: `01` and a letter turn up in the
     tails.
@@ -245,7 +255,8 @@ All of it lives in `src/protocol`. `opcodes.hpp` is the one place opcodes are sp
 **Unknown or guessed. Each needs a real capture (skill `decode-capture`):**
 - whether the "optional 00 pad" can be confused with a scalar of 0;
 - whether `npc_code` is the u24 right after the spawn mask: every open-world mob in the
-  first capture read 8206, and they may all have been one kind of mob;
+  first capture read 8206, and they may all have been one kind of mob. The public ids
+  are seven digits (Spawn, above), so 8206 is probably not the code;
 - the damage scale (above): the varint is what the public meters count; the game's own
   meter has not been compared yet;
 - the layout of `33 36`: the first capture started after login, so it had none;
@@ -257,7 +268,9 @@ All of it lives in `src/protocol`. `opcodes.hpp` is the one place opcodes are sp
 - the right `boss_min_max_hp`;
 - whether the folded id range means anything: in the first capture NPC and player ids
   were all small numbers, side by side, none folded;
-- the game's executable name (`Aion2.exe` is reported by third-party guides);
+- the game's process name: the Steam install's executable is
+  `Aion2/Binaries/Win64/AION2.exe`, which the default `Aion2.exe` matches (the match
+  ignores case), but no one has checked the name of the running process;
 - whether 21 36's map id is aion2.app's dungeon tier id (`maps.tsv`), and the ids of
   open-world zones;
 - whether ids change on a map load, and whether the server hands a player's old id to
@@ -267,6 +280,15 @@ All of it lives in `src/protocol`. `opcodes.hpp` is the one place opcodes are sp
 - how a player of the other faction is told apart, for PvP: perhaps 45 36's mask.
   Until then they are players like the party, so a PvP fight starts nothing and a
   hit on them counts for nothing (Meter rules, Party and Healing).
+
+**The client's own files cannot fill in names.** They were checked on the Steam install
+in 2026-10.
+- **Format:** UE5. Every `.pak` (v11) has an AES-encrypted index, and 245 of the 282
+  IoStore `.utoc` containers are flagged encrypted, all under the default key id, which
+  Unreal builds into the executable.
+- **NC's tables:** NC's own tables (`StartUpData/Table/*.dat`, `L10N/<lang>/L10NString.dat`)
+  sit next to a `key_manifest.dat`, so a second layer of encryption is likely.
+- **Instead:** names come from public databases (aion2.app) and from captures.
 
 ---
 

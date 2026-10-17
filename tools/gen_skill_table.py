@@ -88,7 +88,7 @@ def import_pages(folder):
             if parts and parts[0] not in PLACEHOLDERS:
                 rows[int(m.group(1))] = parts[0]
     today = datetime.date.today().isoformat()
-    with open(TSV, "w", encoding="utf-8") as f:
+    with open(TSV, "w", encoding="utf-8", newline="\n") as f:
         f.write(
             "# AION 2 skill names by skill code, as damage (04 38) and tick (05 38) records\n"
             "# carry them. A code is 8 digits: the first two are the class (11 Gladiator to\n"
@@ -117,7 +117,7 @@ def main():
             if f.read() != text:
                 sys.exit("skill_table.inc is out of date: run python3 tools/gen_skill_table.py")
         return
-    with open(INC, "w", encoding="utf-8") as f:
+    with open(INC, "w", encoding="utf-8", newline="\n") as f:
         f.write(text)
     print(f"wrote {os.path.relpath(INC, ROOT)}")
 

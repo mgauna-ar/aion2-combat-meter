@@ -72,10 +72,17 @@ make replay
     it in AGENTS.md, and find what the ids do follow before trusting the table.
   - Open-world zones have no public ids. Add a row under the TSV's `# By hand` line for
     each zone the capture shows (the user knows where they were), then run
-    `python3 tools/gen_map_table.py`.
+    `python3 tools/gen_map_table.py`. metabot.gg's zone pages give a zone id
+    (`?focus=zone:622`). If an open-world id matches the zone the user stood in, those
+    are map ids after all: note it in AGENTS.md.
 - **Spawn:** a boss spawn's `hp` should be its max HP. The `npc` field should be stable
-  across sightings of the same boss. If it is not, the u24 after the mask is the wrong
-  place for the npc code.
+  across sightings of the same boss.
+  - A real npc code is one of `src/meter/data/npcs.tsv`'s ids: seven digits, and the
+    user can say which boss it was. The u24 after the mask read 8206 for every mob in
+    the first capture, which is not one.
+  - If `npc` is not such an id, search the spawn body for the boss's id from the TSV
+    (as a u32 LE, or as a varint) and move `read_spawn` there.
+  - The meter reads no names from the TSV yet: ask the user before wiring it in.
 - **Failures:** `parsed ...: N failed` names each opcode that failed. Fix those before
   trusting any total.
 

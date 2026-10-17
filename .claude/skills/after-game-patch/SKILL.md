@@ -66,7 +66,25 @@ A patch can add dungeons or tiers. Maps the meter cannot name read "Map 600001".
 3. **Check the diff.** New tiers are expected. An id that moved to another dungeon is
    not, and means the ids were renumbered.
 
-## 5. Check and ship
+## 5. Refresh the NPC names
+
+A patch can add monsters and NPCs. The meter does not read `src/meter/data/npcs.tsv`
+yet (AGENTS.md, Spawn), so this only keeps the table current.
+
+1. **Download the lists.** The monster list has about 126 pages and the NPC list about
+   62, at the time of writing. The site's pager shows the count:
+   ```bash
+   mkdir -p /tmp/npcs
+   for p in $(seq 1 126); do curl -sSL -o /tmp/npcs/monsters-$p.html "https://aion2.app/db/monsters?page=$p"; sleep 1; done
+   for p in $(seq 1 62); do curl -sSL -o /tmp/npcs/npcs-$p.html "https://aion2.app/db/npcs?page=$p"; sleep 1; done
+   ```
+2. **Rebuild the table.** Run `python3 tools/gen_npc_table.py --import-pages /tmp/npcs`.
+   It rewrites `src/meter/data/npcs.tsv`, and warns when a list came out shorter than
+   the site says it is (a page missing or cut off).
+3. **Check the diff.** New ids are expected. A known id under another name is not, and
+   means the ids were renumbered.
+
+## 6. Check and ship
 
 1. Run `make fixtures`. Re-pin any `.expected.txt` whose change you have checked against
    the ground truth.
