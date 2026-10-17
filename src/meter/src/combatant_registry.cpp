@@ -38,7 +38,10 @@ const Actor* CombatantRegistry::find(EntityId id) const {
 
 void CombatantRegistry::on_identity(const proto::Identity& identity) {
     if (identity.id == 0) return;
-    EntityId canonical = identity.id;
+    // A scan's look-alike never turns a spawned NPC or summon into a player.
+    if (const Actor* known = find(identity.id); identity.scanned && known != nullptr && known->spawned) return;
+    // With no name to go by, an id already known as another's alias stays theirs.
+    EntityId canonical = identity.name.empty() ? follow_alias(identity.id) : identity.id;
     if (!identity.name.empty()) {
         const std::string key = name_key(identity.name, identity.server);
         const auto [it, inserted] = m_by_name.try_emplace(key, identity.id);
@@ -116,6 +119,8 @@ void CombatantRegistry::on_spawn(const proto::Spawn& spawn) {
     }
     if (proto::spawn_kind::is_player_object(spawn.kind) && spawn.owner != 0 && spawn.owner != spawn.id) {
         a.owner = spawn.owner;
+        // Its hits are credited to the owner, whose side the spawn has just told us.
+        make_player(spawn.owner);
     }
     settle_pending(spawn.id);
 }
@@ -123,12 +128,11 @@ void CombatantRegistry::on_spawn(const proto::Spawn& spawn) {
 void CombatantRegistry::on_death(EntityId id) {
     if (id == 0) return;
     // Not resolve(): a summon dying leaves its owner alive.
-    if (const auto alias = m_alias.find(id); alias != m_alias.end()) id = alias->second;
-    get_or_create(id).dead = true;
+    get_or_create(follow_alias(id)).dead = true;
 }
 
 void CombatantRegistry::on_revive(EntityId id) {
-    const auto it = m_actors.find(resolve(id));
+    const auto it = m_actors.find(follow_alias(id));
     if (it != m_actors.end()) it->second.dead = false;
 }
 
@@ -157,6 +161,11 @@ EntityId CombatantRegistry::resolve(EntityId id) const {
         id = a->owner;
     }
     return id;
+}
+
+EntityId CombatantRegistry::follow_alias(EntityId id) const {
+    const auto alias = m_alias.find(id);
+    return alias == m_alias.end() ? id : alias->second;
 }
 
 Side CombatantRegistry::side(EntityId id) const {

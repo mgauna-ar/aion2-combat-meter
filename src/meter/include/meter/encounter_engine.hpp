@@ -80,6 +80,7 @@ private:
         Micros kill_ts{0};
     };
 
+    void on_spawn(const proto::Spawn& s);
     void on_damage(const proto::Damage& d, Micros ts);
     void on_tick(const proto::Tick& t, Micros ts);
     /// 00 8D: the local player's id, and HP, whose 0 is a death.
@@ -116,6 +117,17 @@ private:
         bool hit_since{false};
         uint64_t lost{0};
         uint64_t lost_unseen{0};
+
+        /// The server's figure is now `hp`.
+        void observe(uint64_t hp) noexcept {
+            if (known && hp < last) {
+                lost += last - hp;
+                if (!hit_since) lost_unseen += last - hp;
+            }
+            known = true;
+            last = hp;
+            hit_since = false;
+        }
     };
     std::unordered_map<EntityId, HpLoss> m_hp_loss;
     /// A hit (or heal) on `target` was seen: the next HP change is accounted for.

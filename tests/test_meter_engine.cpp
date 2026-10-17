@@ -302,3 +302,74 @@ TEST_CASE(Engine, WipeDetectionWhenEnabled) {
     TEST_ASSERT_FALSE(e.in_fight());
     TEST_ASSERT(e.take_finished().at(0).end_reason == EndReason::Wipe);
 }
+
+TEST_CASE(Engine, SummonOfAnUnseenOwnerCountsOnAnyTarget) {
+    // Mid-session: no names, and a target that spawned before the meter started.
+    EncounterEngine e;
+    e.on_event(ev(at_s(0), summon(0x4300, 300)));
+    e.on_event(ev(at_s(1), hit(0x4300, 900, 500)));
+    const FightSummary s = e.current();
+    TEST_ASSERT_EQ(s.combatants.size(), size_t{1});
+    TEST_ASSERT_EQ(s.combatants[0].id, EntityId{300});
+    TEST_ASSERT_EQ(s.combatants[0].damage, uint64_t{500});
+}
+
+TEST_CASE(Engine, DeadPlayersDotDoesNotReviveThem) {
+    MeterSettings settings;
+    settings.wipe_detection = true;
+    EncounterEngine e(settings);
+    e.on_event(ev(at_s(0), player(kMe, "Ariel", true)));
+    e.on_event(ev(at_s(0), player(kAlly, "Lumiel")));
+    e.on_event(ev(at_s(0), npc(kBoss, kBossHp)));
+    e.on_event(ev(at_s(1), hit(kMe, kBoss, 100)));
+    e.on_event(ev(at_s(1), hit(kAlly, kBoss, 100)));
+    e.on_event(ev(at_s(5), proto::Death{kMe}));
+    e.on_event(ev(at_s(5.5), dot(kMe, kBoss, 30)));  // still ticking on the boss
+    e.on_event(ev(at_s(6), proto::Death{kAlly}));
+    TEST_ASSERT_FALSE(e.in_fight());
+    TEST_ASSERT(e.take_finished().at(0).end_reason == EndReason::Wipe);
+}
+
+TEST_CASE(Engine, BossBackInViewKeepsItsHpLoss) {
+    EncounterEngine e = setup();
+    e.on_event(ev(at_s(1), hit(kMe, kBoss, 100'000)));
+    e.on_event(ev(at_s(1), hp(kBoss, 4'000'000)));
+    // Out of view, others take it down to 1M; it spawns again when it comes back.
+    e.on_event(ev(at_s(5), npc(kBoss, kBossHp, 777, 1'000'000)));
+    e.on_event(ev(at_s(6), hit(kMe, kBoss, 100'000)));
+    e.on_event(ev(at_s(6), hp(kBoss, 0)));
+    e.tick(at_s(10));
+    const FightSummary s = e.take_finished().at(0);
+    TEST_ASSERT(s.boss.killed);
+    TEST_ASSERT(s.quality.partial);
+}
+
+TEST_CASE(Engine, LateAliasJoinsTheRows) {
+    EncounterEngine e = setup();
+    // An ally under a second id, unnamed at first...
+    e.on_event(ev(at_s(1), hit(300, kBoss, 1'000)));
+    // ...then named: the same character as kAlly.
+    e.on_event(ev(at_s(2), player(300, "Lumiel")));
+    e.on_event(ev(at_s(3), hit(kAlly, kBoss, 500)));
+    const FightSummary s = e.current();
+    TEST_ASSERT_EQ(s.combatants.size(), size_t{1});
+    TEST_ASSERT_EQ(s.combatants[0].id, kAlly);
+    TEST_ASSERT_EQ(s.combatants[0].damage, uint64_t{1'500});
+    TEST_ASSERT_EQ(s.combatants[0].hits.hits, uint64_t{2});
+}
+
+TEST_CASE(Engine, BiggerBossHitDuringTheGraceKeepsTheFight) {
+    constexpr EntityId kBigger = 0x4102;
+    EncounterEngine e = setup();
+    e.on_event(ev(at_s(0), npc(kBigger, 2 * kBossHp, 779)));
+    e.on_event(ev(at_s(1), hit(kMe, kBoss, 100)));
+    e.on_event(ev(at_s(5), proto::Death{kBoss}));
+    e.on_event(ev(at_s(6), hit(kMe, kBigger, 100)));
+    e.tick(at_s(8));
+    TEST_ASSERT(e.in_fight());
+    TEST_ASSERT_EQ(e.current().boss.id, kBigger);
+    e.on_event(ev(at_s(20), proto::Death{kBigger}));
+    e.tick(at_s(23));
+    TEST_ASSERT_FALSE(e.in_fight());
+    TEST_ASSERT(e.take_finished().at(0).end_reason == EndReason::BossKilled);
+}

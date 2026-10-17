@@ -231,7 +231,8 @@ All of it lives in `src/protocol`. `opcodes.hpp` is the one place opcodes are sp
 - **Sides** (`CombatantRegistry`):
   - Identity packets make players. Spawns make NPCs, or player objects for summon and
     effect kinds.
-  - A summon's side is the player side, whoever owns it.
+  - A summon's side is the player side, whoever owns it, and its spawn makes the owner
+    a player before any name arrives.
   - Ids the meter was never told about get their side from the hits they trade: PvE
     damage only crosses sides.
   - Hits between two unknown ids are held (up to 4096) and settled when either end
@@ -240,16 +241,21 @@ All of it lives in `src/protocol`. `opcodes.hpp` is the one place opcodes are sp
     inference: mobs do not fight mobs, and 04 38 also carries heals between players.
   - 00 8D's own values make the local player, shown as "You" until 33 36 names them.
   - With no anchor at all, an id in the folded range is guessed to be an enemy.
-  - Two ids with the same name@server are one player (aliases).
+  - Two ids with the same name@server are one player (aliases). Their rows merge even
+    when the name arrives mid-fight.
+  - A scanned identity never turns a spawned NPC or summon into a player.
   - A map change drops NPCs, summons and inferred sides. Players and names stay.
 - **Party:** with no roster, every player counts. With one, only roster names do.
   Non-party hits still lower the boss's HP estimate.
 - **Fight start:** a direct hit that lands, from the player side on an enemy. A DoT tick
   never starts a fight.
-- **Fight end:** the boss's death (00 8D HP 0 or 42 36, after `kill_grace_s`), a map change (not a reload of
-  the same map, which is a teleport), idle time with no party hit
-  (`idle_timeout_s`, or `boss_idle_timeout_s` while a boss stands), no traffic
-  (`capture_lost_s`), a wipe (when enabled) or by hand.
+- **Fight end:** the boss's death (00 8D HP 0 or 42 36, after `kill_grace_s`, unless a
+  bigger boss was hit during the grace), a map change (not a reload of the same map,
+  which is a teleport), idle time with no party hit (`idle_timeout_s`, or
+  `boss_idle_timeout_s` while a boss stands), no traffic (`capture_lost_s`), a wipe
+  (when enabled) or by hand.
+  - A dead player stays dead for the wipe check while their DoTs and summons keep
+    hitting; their own direct hit, or 00 8D HP above 0, revives them.
   - Duration runs from the first hit to the last, floored at 1 s for DPS.
 - **Boss:** the damaged enemy with the most max HP. It is a boss if that max HP is at
   least `boss_min_max_hp`.
@@ -259,7 +265,8 @@ All of it lives in `src/protocol`. `opcodes.hpp` is the one place opcodes are sp
     stands in for it.
   - **Partial:** a killed boss that lost less than `partial_damage_ratio` of its HP (by
     00 8D) with a hit seen since the HP figure before marks the fight partial. It is
-    HP against HP: damage and HP are not in the same units.
+    HP against HP: damage and HP are not in the same units. A boss that leaves view
+    and spawns again keeps the loss counted so far; its spawn HP is one more figure.
 - **History:**
   - What is saved: boss fights, and fights of at least `min_saved_duration_s`.
   - Each fight is one JSON file (`"v":1`), written atomically, plus a line appended to

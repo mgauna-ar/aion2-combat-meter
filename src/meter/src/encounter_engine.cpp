@@ -14,6 +14,16 @@ constexpr double kMinDurationSeconds = 1.0;
 
 [[nodiscard]] uint64_t grew(uint64_t now, uint64_t then) noexcept { return now >= then ? now - then : 0; }
 
+void add(HitCounts& into, const HitCounts& h) noexcept {
+    into.hits += h.hits;
+    into.crits += h.crits;
+    into.back += h.back;
+    into.parry += h.parry;
+    into.perfect += h.perfect;
+    into.doubles += h.doubles;
+    into.heavy += h.heavy;
+}
+
 [[nodiscard]] std::string npc_label(uint32_t npc_code, EntityId id) {
     char buf[32];
     if (npc_code != 0) {
@@ -41,9 +51,7 @@ void EncounterEngine::on_event(const proto::ParsedEvent& event) {
             } else if constexpr (std::is_same_v<T, proto::Identity>) {
                 m_registry.on_identity(e);
             } else if constexpr (std::is_same_v<T, proto::Spawn>) {
-                m_registry.on_spawn(e);
-                m_damage_since_spawn.erase(e.id);
-                m_hp_loss[e.id] = HpLoss{e.has_hp, e.cur_hp, false, 0, 0};
+                on_spawn(e);
             } else if constexpr (std::is_same_v<T, proto::Death>) {
                 on_death(e.id, ts);
             } else if constexpr (std::is_same_v<T, proto::MapLoad>) {
@@ -62,6 +70,22 @@ void EncounterEngine::on_event(const proto::ParsedEvent& event) {
 }
 
 void EncounterEngine::note_hit_on(EntityId target) { m_hp_loss[target].hit_since = true; }
+
+void EncounterEngine::on_spawn(const proto::Spawn& s) {
+    m_registry.on_spawn(s);
+    // Without HP the registry keeps the spawn HP it had, and the damage counted
+    // against it with it.
+    if (!s.has_hp) return;
+    m_damage_since_spawn.erase(s.id);
+    // Coming back into view, a boss keeps the HP loss counted so far, and its HP
+    // now is one more figure. A new id, or one last seen at 0, starts afresh.
+    const auto loss = m_hp_loss.find(s.id);
+    if (loss == m_hp_loss.end() || !loss->second.known || loss->second.last == 0) {
+        m_hp_loss[s.id] = HpLoss{true, s.cur_hp, false, 0, 0};
+    } else {
+        loss->second.observe(s.cur_hp);
+    }
+}
 
 void EncounterEngine::on_damage(const proto::Damage& d, Micros ts) {
     if (d.actor == 0 || d.target == 0) return;
@@ -117,21 +141,16 @@ void EncounterEngine::credit(EntityId actor, EntityId target, uint64_t amount, c
     }
     fight.enemies[enemy] += amount;
     if (ts > fight.last_hit_ts) fight.last_hit_ts = ts;
-    m_registry.on_revive(player);
+    // Only the player's own hand proves them alive: their DoTs and summons keep
+    // going after they die.
+    if (direct != nullptr && m_registry.follow_alias(actor) == player) m_registry.on_revive(player);
 }
 
 void EncounterEngine::on_values(const proto::RemainingHp& v, Micros ts) {
     if (v.self) m_registry.on_self_values(v.id);
     if (!v.has_hp) return;
     m_registry.on_hp(v.id, v.hp);
-    HpLoss& loss = m_hp_loss[v.id];
-    if (loss.known && v.hp < loss.last) {
-        loss.lost += loss.last - v.hp;
-        if (!loss.hit_since) loss.lost_unseen += loss.last - v.hp;
-    }
-    loss.known = true;
-    loss.last = v.hp;
-    loss.hit_since = false;
+    m_hp_loss[v.id].observe(v.hp);
     // HP reaching 0 is the death; 42 36 follows seconds later, with the corpse.
     if (v.hp == 0) on_death(v.id, ts);
 }
@@ -164,7 +183,8 @@ void EncounterEngine::on_map(const proto::MapLoad& m, Micros ts) {
 bool EncounterEngine::party_wiped(const Fight& fight) const {
     bool any = false;
     for (const auto& [id, acc] : fight.players) {
-        const Actor* a = m_registry.find(id);
+        // resolve(): a row may predate the alias that joined it to another id.
+        const Actor* a = m_registry.find(m_registry.resolve(id));
         if (a == nullptr || !a->dead) return false;
         any = true;
     }
@@ -174,11 +194,15 @@ bool EncounterEngine::party_wiped(const Fight& fight) const {
 void EncounterEngine::check_end(Micros now) {
     if (!m_fight) return;
     const Fight& f = *m_fight;
-    if (f.boss_killed && now >= f.kill_ts + from_seconds(m_settings.kill_grace_s)) {
-        finish(EndReason::BossKilled, now);
-        return;
-    }
     const BossSummary boss = boss_of(f);
+    if (f.boss_killed && now >= f.kill_ts + from_seconds(m_settings.kill_grace_s)) {
+        // Unless a bigger boss was hit during the grace: the fight goes on.
+        if (boss.present() && boss.is_boss && boss.killed) {
+            finish(EndReason::BossKilled, now);
+            return;
+        }
+        m_fight->boss_killed = false;
+    }
     const bool boss_standing = boss.present() && boss.is_boss && !boss.killed;
     const double idle = boss_standing ? m_settings.boss_idle_timeout_s : m_settings.idle_timeout_s;
     if (now > f.last_hit_ts && now - f.last_hit_ts >= from_seconds(idle)) {
@@ -261,7 +285,17 @@ FightSummary EncounterEngine::summarize(const Fight& fight, bool live, EndReason
     s.duration_s = std::max(span, kMinDurationSeconds);
     s.boss = boss_of(fight);
 
+    // By the player each row resolves to now: a row may predate the alias that
+    // joined two ids of one player.
+    std::unordered_map<EntityId, Accum> players;
     for (const auto& [id, acc] : fight.players) {
+        Accum& into = players[m_registry.resolve(id)];
+        into.damage += acc.damage;
+        into.dot_damage += acc.dot_damage;
+        into.max_hit = std::max(into.max_hit, acc.max_hit);
+        add(into.hits, acc.hits);
+    }
+    for (const auto& [id, acc] : players) {
         CombatantTotals row;
         row.id = id;
         row.name = m_registry.display_name(id);

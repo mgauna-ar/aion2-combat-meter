@@ -55,7 +55,7 @@ struct Actor {
  * (up to kMaxPendingEdges) and settled when either end becomes known. With no
  * anchor at all, an id in the folded spawn range is taken as an enemy. 04 38 also
  * carries heals, so a hit with a spawned NPC, which only a player trades, overrides
- * an earlier inference.
+ * an earlier inference. A summon's spawn names its owner, who is then a player too.
  *
  * Names outlive map changes, since they arrive only on loading screens; NPCs and
  * summons are per map and are dropped on one.
@@ -85,6 +85,9 @@ public:
     /// The id a hit by `id` is credited to: the owner of a summon (through chains of
     /// them), the first id of a player seen under several.
     [[nodiscard]] EntityId resolve(EntityId id) const;
+    /// The first id of a player seen under several; any other id as it is. Unlike
+    /// resolve(), a summon stays itself: its death and HP are its own.
+    [[nodiscard]] EntityId follow_alias(EntityId id) const;
     [[nodiscard]] Side side(EntityId id) const;
     /// Side, with the folded-range guess for an id nothing else settled.
     [[nodiscard]] Side side_or_guess(EntityId id) const;

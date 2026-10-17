@@ -147,3 +147,37 @@ TEST_CASE(Registry, PartyMembershipFollowsRoster) {
     TEST_ASSERT(r.in_party(200));
     TEST_ASSERT_FALSE(r.in_party(300));
 }
+
+TEST_CASE(Registry, SummonsOwnerIsAPlayerBeforeTheirName) {
+    CombatantRegistry r;
+    r.on_spawn(summon(0x4200, 300));
+    TEST_ASSERT(r.side(300) == Side::Player);
+    // So its hit on a target nothing else told us about settles that target.
+    r.observe_hit(0x4200, 900);
+    TEST_ASSERT(r.side(900) == Side::Enemy);
+    // A name later is still the same player.
+    r.on_identity(player(300, "Lumiel"));
+    TEST_ASSERT(r.side(300) == Side::Player);
+}
+
+TEST_CASE(Registry, ScannedIdentityNeverTurnsAnNpcIntoAPlayer) {
+    CombatantRegistry r;
+    r.on_spawn(npc(0x4100, 5'000'000));
+    proto::Identity look_alike = player(0x4100, "Bogus");
+    look_alike.scanned = true;
+    r.on_identity(look_alike);
+    TEST_ASSERT(r.side(0x4100) == Side::Enemy);
+    TEST_ASSERT_EQ(r.display_name(0x4100), std::string("#16640"));
+}
+
+TEST_CASE(Registry, NamelessOwnIdentityFollowsTheAlias) {
+    CombatantRegistry r;
+    r.on_identity(player(100, "Ariel"));
+    r.on_identity(player(140, "Ariel"));
+    proto::Identity own;
+    own.id = 140;
+    own.own = true;
+    r.on_identity(own);
+    TEST_ASSERT_EQ(r.local_player(), EntityId{100});
+    TEST_ASSERT(r.in_party(140));
+}
