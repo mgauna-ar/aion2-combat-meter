@@ -94,8 +94,9 @@ src/protocol/    aion2::proto
     byte_reader, lz4_block, frame_decoder, opcodes.hpp, events.hpp, entity_id, identity,
     packet_parser
 src/meter/       aion2::meter
-    types, class_codes, skill_names (data/skills.tsv → skill_table.inc), combatant_registry,
-    encounter_engine, meter_settings, fight_json, history_store
+    types, class_codes, skill_names (data/skills.tsv → skill_table.inc),
+    map_names (data/maps.tsv → map_table.inc), combatant_registry, encounter_engine,
+    meter_settings, fight_json, history_store
 src/pipeline/    aion2::pipeline   stream_demux (flows -> frames), pipeline (all of it)
 src/app/         aion2::app
     app_settings, app_runtime (threads, history, recording), display_format,
@@ -109,6 +110,7 @@ tools/screenshots/  renders docs/images from overlay_view and app_frame (softwar
                  ffxiv-hub), in UTC; --all also draws the pages the README does not show
 tools/check_forbidden_apis.sh, tools/gen_app_icon.py, tools/embed_icon_font.py
 tools/gen_skill_table.py         skills.tsv → skill_table.inc (`make test` checks they agree)
+tools/gen_map_table.py           maps.tsv → map_table.inc (the same)
 tests/           TEST_CASE framework (ported), one test_<concern>.cpp per area
 ```
 
@@ -226,6 +228,12 @@ All of it lives in `src/protocol`. `opcodes.hpp` is the one place opcodes are sp
   - Death `42 36`: id varint. For a mob it comes about 4 s after 00 8D says HP 0: the
     corpse going. HP 0 is the death.
   - Map load `21 36`: load count u32, map id u32. Ids 600000–700000 are instances.
+    - Names come from `src/meter/data/maps.tsv`. It holds aion2.app's dungeon tier
+      ids: one row per difficulty, such as Krao Cave 600002 (Exploration) and 600001
+      (Conquest), with Awakening tiers at 910000 and up, outside the instance range.
+      Those ids are assumed to be the map id here; no capture has shown a 21 36 yet.
+    - Open-world zones have no public numeric ids. Their rows go by hand under the
+      TSV's `# By hand` line, which `--import-pages` keeps.
   - Party `02 97`: names only, found by scanning, since each member's tail varies in
     length. A found name has at least 2 characters: `01` and a letter turn up in the
     tails.
@@ -250,6 +258,8 @@ All of it lives in `src/protocol`. `opcodes.hpp` is the one place opcodes are sp
 - whether the folded id range means anything: in the first capture NPC and player ids
   were all small numbers, side by side, none folded;
 - the game's executable name (`Aion2.exe` is reported by third-party guides);
+- whether 21 36's map id is aion2.app's dungeon tier id (`maps.tsv`), and the ids of
+  open-world zones;
 - whether ids change on a map load, and whether the server hands a player's old id to
   someone else. A party whose Ranger and Elementalist shared one row, the name
   switching from pull to pull, points to both, but no capture has shown a map load

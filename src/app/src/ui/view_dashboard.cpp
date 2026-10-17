@@ -4,11 +4,13 @@
 #include "app/ui/icons.hpp"
 #include "app/ui/page.hpp"
 #include "app/ui/widgets.hpp"
+#include "meter/map_names.hpp"
 
 #ifdef HAVE_IMGUI
 #include <cinttypes>
 #include <cstdio>
 #include <string>
+#include <string_view>
 #endif
 
 namespace aion2::app::ui {
@@ -122,13 +124,24 @@ void render_dashboard(const AppFrameInput& in, AppViewState&, AppActions& out) {
     const CaptureLook look = capture_look(in.snapshot);
     const pipeline::LiveSnapshot* s = in.snapshot;
     const std::string character = s != nullptr && !s->local_name.empty() ? s->local_name : "Not seen yet";
-    const std::string map = s != nullptr && s->map_id != 0 ? std::to_string(s->map_id) : "-";
+    // The map's name when the table has its id, else the id itself.
+    const uint32_t map_id = s != nullptr ? s->map_id : 0;
+    const std::string_view map_name = meter::map_name(map_id);
+    std::string map = "-";
+    std::string map_detail = "No map load seen yet";
+    if (!map_name.empty()) {
+        map = std::string(map_name);
+        map_detail = "Map " + std::to_string(map_id);
+    } else if (map_id != 0) {
+        map = std::to_string(map_id);
+        map_detail = "No name for this id yet";
+    }
     const std::string fights = std::to_string(in.history != nullptr ? in.history->size() : 0);
     const StatTileSpec tiles[] = {
         {"##tile_capture", ICON_ACTIVITY, "CAPTURE", look.label, look.color, look.detail, colors::Accent},
         {"##tile_char", ICON_TARGET, "CHARACTER", character.c_str(), colors::TextPrimary, "From the game's traffic",
          colors::Violet},
-        {"##tile_map", ICON_CROSSHAIR, "MAP", map.c_str(), colors::TextPrimary, "The map's id", colors::Warning},
+        {"##tile_map", ICON_CROSSHAIR, "MAP", map.c_str(), colors::TextPrimary, map_detail.c_str(), colors::Warning},
         {"##tile_saved", ICON_HISTORY, "SAVED FIGHTS", fights.c_str(), colors::TextPrimary, "Boss fights and long ones",
          colors::Success},
     };

@@ -40,6 +40,10 @@ captures are needed (`.claude/skills/decode-capture`), and these are still open:
 - **Classes and skill names:** both come from the skill codes, with names from a public
   skill database (`src/meter/data/skills.tsv`). They have been checked against one
   capture, a Templar and an Elementalist.
+- **Map names:** dungeons are named from the same database's dungeon ids
+  (`src/meter/data/maps.tsv`). No capture has shown a map change yet, so whether the
+  game sends those same ids is unchecked. A map the table doesn't name, such as every
+  open-world zone, shows its id ("Map 400001").
 - **Boss threshold:** an enemy with 1,000,000 max HP or more counts as a boss. That
   number is a guess (`meter.boss_min_max_hp`); open-world mobs have about 120,000.
 - **PvP:** the meter cannot yet tell a player of the other faction from your party, so
@@ -345,6 +349,6 @@ the GPL meters.
 
 MIT, see [LICENSE](LICENSE). Dear ImGui is MIT (`src/third_party/imgui/LICENSE.txt`). The
 app window's icons are a subset of [Lucide](https://lucide.dev) (ISC), embedded in
-`src/app/include/app/ui/icons_font.inl` by `tools/embed_icon_font.py`. Skill names come
-from aion2.app's skill database (see `src/meter/data/skills.tsv`).
+`src/app/include/app/ui/icons_font.inl` by `tools/embed_icon_font.py`. Skill and dungeon
+names come from aion2.app's database (see `src/meter/data/skills.tsv` and `maps.tsv`).
 AION 2 is a trademark of NCSOFT. This project is not affiliated with NCSOFT.

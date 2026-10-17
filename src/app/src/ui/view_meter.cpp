@@ -5,6 +5,7 @@
 #include "app/ui/page.hpp"
 #include "app/ui/widgets.hpp"
 #include "common/time_format.hpp"
+#include "meter/map_names.hpp"
 #include "meter/pull_grouping.hpp"
 #include "meter/skill_names.hpp"
 
@@ -40,8 +41,6 @@ struct Shown {
     const meter::HistoryEntry* entry{nullptr};
     int number{0};
 };
-
-std::string map_label(uint32_t map_id) { return map_id == 0 ? "Unknown map" : "Map " + std::to_string(map_id); }
 
 uint32_t row_color_u32(const meter::CombatantTotals& c) {
     if (c.cls != meter::AionClass::Unknown) return class_color_u32(c.cls);
@@ -498,6 +497,44 @@ bool pull_row(const meter::HistoryEntry& e, int number_in_visit, bool selected, 
     return clicked;
 }
 
+/// `text` cut to fit `width`, ending in "..." when cut.
+std::string fit_text(const std::string& text, float width) {
+    if (ImGui::CalcTextSize(text.c_str()).x <= width) return text;
+    std::string cut = text;
+    while (!cut.empty()) {
+        cut.pop_back();
+        while (!cut.empty() && (static_cast<unsigned char>(cut.back()) & 0xC0) == 0x80) cut.pop_back();
+        if (ImGui::CalcTextSize((cut + "...").c_str()).x <= width) break;
+    }
+    return cut + "...";
+}
+
+/// A map visit's folding row. The tree node draws only its arrow. The visit's time keeps
+/// the right edge, as the fights' times do below it, and is the first thing to go when
+/// the map's name needs the room; a name too long even then is cut. The tooltip holds both.
+bool visit_header(const std::string& map, const std::string& clock) {
+    const ImVec2 pos = ImGui::GetCursorScreenPos();
+    const float right = pos.x + ImGui::GetContentRegionAvail().x;
+    ImGui::PushStyleColor(ImGuiCol_Text, v4(colors::TextMuted));
+    const bool open = ImGui::TreeNodeEx("##visit", ImGuiTreeNodeFlags_SpanAvailWidth);
+    ImGui::PopStyleColor();
+    if (!ImGui::IsItemVisible()) return open;
+
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    const float line_h = ImGui::GetTextLineHeight();
+    const float text_x = pos.x + ImGui::GetTreeNodeToLabelSpacing();
+    const float text_y = ImGui::GetItemRectMin().y + (ImGui::GetItemRectSize().y - line_h) * 0.5f;
+    const float clock_w = ImGui::CalcTextSize(clock.c_str()).x;
+    const float map_w = ImGui::CalcTextSize(map.c_str()).x;
+    if (text_x + map_w + m(8.0f) + clock_w <= right) {
+        dl->AddText(ImVec2(right - clock_w, text_y), colors::TextDim, clock.c_str());
+        dl->AddText(ImVec2(text_x, text_y), colors::TextMuted, map.c_str());
+    } else if (right > text_x) {
+        dl->AddText(ImVec2(text_x, text_y), colors::TextMuted, fit_text(map, right - text_x).c_str());
+    }
+    return open;
+}
+
 void clear_history_popup(size_t count, AppViewState& state, AppActions& out) {
     if (!ImGui::BeginPopupModal("##ConfirmClear", nullptr,
                                 ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar)) {
@@ -582,13 +619,12 @@ void rail(const AppFrameInput& in, AppViewState& state, AppActions& out, const s
             // that the user's own folding wins.
             ImGui::SetNextItemOpen(gi == 0 || holds_selection, ImGuiCond_Once);
             const Micros started = g.visit_ts != 0 ? g.visit_ts : history[g.pulls.back().index].start_ts;
-            const std::string header = map_label(g.map_id) + "  " + common::local_clock(started);
-            ImGui::PushStyleColor(ImGuiCol_Text, v4(colors::TextMuted));
-            const bool open = ImGui::TreeNodeEx(header.c_str(), ImGuiTreeNodeFlags_SpanAvailWidth);
-            ImGui::PopStyleColor();
+            const std::string map = meter::map_label(g.map_id);
+            const std::string clock = common::local_clock(started);
+            const bool open = visit_header(map, clock);
             if (ImGui::IsItemHovered()) {
                 const size_t n = g.pulls.size();
-                ImGui::SetTooltip("%s, from %s\n%zu %s", map_label(g.map_id).c_str(), common::local_clock(started).c_str(), n,
+                ImGui::SetTooltip("%s, from %s\n%zu %s", map.c_str(), clock.c_str(), n,
                                   n == 1 ? "fight saved" : "fights saved");
             }
             if (open) {
@@ -617,7 +653,7 @@ void top_bar(const Shown& shown, AppActions& out) {
     begin_card("##TopBar", ImVec2(0.0f, 0.0f), opts);
     const meter::FightSummary& f = *shown.fight;
     std::string title = f.live ? "Live fight" : "Last fight";
-    if (shown.entry != nullptr) title = map_label(f.map_id) + "  -  Fight #" + std::to_string(shown.number);
+    if (shown.entry != nullptr) title = meter::map_label(f.map_id) + "  -  Fight #" + std::to_string(shown.number);
     if (f.boss.present()) title += "  -  " + std::string(f.boss.is_boss ? "Boss " : "") + f.boss.label;
     ImGui::PushFont(bold_font());
     text_colored_u32(colors::TextPrimary, "%s", title.c_str());

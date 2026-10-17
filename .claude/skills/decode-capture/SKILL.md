@@ -66,6 +66,13 @@ make replay
   and whether their identities come after it. Does a player keep their id? Does an old
   id come back as someone else, or as an NPC? AGENTS.md's Sides rules assume ids can
   move and be reused; confirm that, or simplify them.
+- **Map ids:** a `map` event prints the name `src/meter/data/maps.tsv` gives its id.
+  - Entering a dungeon should print that dungeon and the tier you picked. If it prints
+    the wrong tier, or no name, then aion2.app's tier ids are not the wire's ids. Note
+    it in AGENTS.md, and find what the ids do follow before trusting the table.
+  - Open-world zones have no public ids. Add a row under the TSV's `# By hand` line for
+    each zone the capture shows (the user knows where they were), then run
+    `python3 tools/gen_map_table.py`.
 - **Spawn:** a boss spawn's `hp` should be its max HP. The `npc` field should be stable
   across sightings of the same boss. If it is not, the u24 after the mask is the wrong
   place for the npc code.

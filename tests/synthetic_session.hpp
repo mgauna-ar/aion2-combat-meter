@@ -29,7 +29,9 @@ inline constexpr uint64_t kBossRaw = 2'000'123;
 inline constexpr uint64_t kSpiritRaw = 3'000'001;
 inline constexpr uint32_t kBossNpc = 0x0A1B2C;
 inline constexpr uint64_t kBossHp = 3'000'000;
-inline constexpr uint32_t kDungeon = 610010;
+/// A real dungeon tier's id (Krao Cave, Conquest, in maps.tsv), so the README pictures
+/// show a map name. The fight in it is still made up.
+inline constexpr uint32_t kDungeon = 600001;
 inline constexpr uint32_t kTown = 200100;
 
 /// What the capture holds, to check the meter against.

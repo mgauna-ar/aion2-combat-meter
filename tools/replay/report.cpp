@@ -2,6 +2,7 @@
 
 #include "hex_dump.hpp"
 
+#include "meter/map_names.hpp"
 #include "meter/skill_names.hpp"
 #include "protocol/opcodes.hpp"
 
@@ -23,6 +24,13 @@ const char* role_name(pipeline::FlowRole role) {
         case pipeline::FlowRole::Rejected: return "not game";
     }
     return "?";
+}
+
+/// " <name>" after a map id the table names, else nothing: the id stays first, since a
+/// capture investigation works from it.
+std::string map_suffix(uint32_t map_id) {
+    const std::string_view name = meter::map_name(map_id);
+    return name.empty() ? std::string() : " " + std::string(name);
 }
 
 std::string modifiers(uint8_t m, bool crit, uint8_t direction) {
@@ -117,8 +125,8 @@ void Report::on_event(const proto::ParsedEvent& pe, const meter::CombatantRegist
             } else if constexpr (std::is_same_v<T, proto::Death>) {
                 std::printf("%+.3f  death     %s\n", t, who(e.id, reg).c_str());
             } else if constexpr (std::is_same_v<T, proto::MapLoad>) {
-                std::printf("%+.3f  map       %u (load %u)%s\n", t, e.map_id, e.load_count,
-                            e.is_instance() ? " instance" : "");
+                std::printf("%+.3f  map       %u%s (load %u)%s\n", t, e.map_id, map_suffix(e.map_id).c_str(),
+                            e.load_count, e.is_instance() ? " instance" : "");
             } else if constexpr (std::is_same_v<T, proto::Damage>) {
                 std::printf("%+.3f  damage    %s -> %s %" PRIu64, t, who(e.actor, reg).c_str(),
                             who(e.target, reg).c_str(), e.amount);
@@ -149,8 +157,9 @@ void Report::on_event(const proto::ParsedEvent& pe, const meter::CombatantRegist
 void Report::on_fight(const meter::FightSummary& f) {
     ++m_fights;
     if (!m_opt.fights) return;
-    std::printf("\nfight %" PRIu64 "  map %u  at %+.2f s  %.2f s  end %s\n", f.id, f.map_id, rel(f.start_ts),
-                f.duration_s, std::string(meter::end_reason_name(f.end_reason)).c_str());
+    std::printf("\nfight %" PRIu64 "  map %u%s  at %+.2f s  %.2f s  end %s\n", f.id, f.map_id,
+                map_suffix(f.map_id).c_str(), rel(f.start_ts), f.duration_s,
+                std::string(meter::end_reason_name(f.end_reason)).c_str());
     if (f.boss.present()) {
         std::printf("  target %s  max hp %" PRIu64 "%s%s", f.boss.label.c_str(), f.boss.max_hp,
                     f.boss.is_boss ? "  boss" : "", f.boss.killed ? "  killed" : "");

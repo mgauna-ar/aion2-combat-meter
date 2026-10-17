@@ -3,6 +3,7 @@
 #include "app/display_format.hpp"
 #include "app/imgui_guard.hpp"
 #include "common/time_format.hpp"
+#include "meter/map_names.hpp"
 
 #ifdef HAVE_IMGUI
 
@@ -274,7 +275,7 @@ OverlayActions draw_overlay(const OverlayFrameInput& in) {
         if (in.snapshot != nullptr && in.snapshot->capture != pipeline::CaptureState::Waiting) {
             if (!in.snapshot->local_name.empty()) footer = in.snapshot->local_name;
             if (in.snapshot->map_id != 0) {
-                footer += (footer.empty() ? "" : "  ") + std::string("map ") + std::to_string(in.snapshot->map_id);
+                footer += (footer.empty() ? "" : "  ") + meter::map_label(in.snapshot->map_id);
             }
             if (in.snapshot->capture == pipeline::CaptureState::Quiet) footer += "  (no game traffic)";
         } else {

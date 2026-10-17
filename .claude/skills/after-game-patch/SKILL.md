@@ -48,7 +48,25 @@ A patch can add or rename skills. Rows the meter cannot name read "Skill 1234567
 3. **Check the diff.** Renamed rows are expected. A class whose codes stopped starting
    with its two digits (`class_of_skill`) is not, and means the codes were renumbered.
 
-## 4. Check and ship
+## 4. Refresh the map names
+
+A patch can add dungeons or tiers. Maps the meter cannot name read "Map 600001".
+
+1. **Download the pages.** The list pages give each dungeon's page, and each dungeon's
+   page gives its tier ids:
+   ```bash
+   mkdir -p /tmp/dungeons/list /tmp/dungeons/pages
+   for p in 1 2 3; do curl -sSL -o /tmp/dungeons/list/page$p.html "https://aion2.app/db/dungeons?page=$p"; sleep 1; done
+   grep -oh 'href="/db/dungeons/[^"?#]*"' /tmp/dungeons/list/*.html | sed 's|href="/db/dungeons/||; s|"$||' | sort -u > /tmp/dungeons/slugs.txt
+   while read -r s; do curl -sSL -o "/tmp/dungeons/pages/$s.html" "https://aion2.app/db/dungeons/$s"; sleep 1; done < /tmp/dungeons/slugs.txt
+   ```
+   Add list pages if the site shows more than three.
+2. **Rebuild the table.** Run `python3 tools/gen_map_table.py --import-pages /tmp/dungeons/pages`.
+   It rewrites `src/meter/data/maps.tsv` above its `# By hand` line, and `map_table.inc`.
+3. **Check the diff.** New tiers are expected. An id that moved to another dungeon is
+   not, and means the ids were renumbered.
+
+## 5. Check and ship
 
 1. Run `make fixtures`. Re-pin any `.expected.txt` whose change you have checked against
    the ground truth.

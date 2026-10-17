@@ -1,5 +1,5 @@
 
-fight 1  map 610010  at +5.00 s  47.60 s  end boss_killed
+fight 1  map 600001 Krao Cave (Conquest)  at +5.00 s  47.60 s  end boss_killed
   target NPC #662316  max hp 3000000  boss  killed
   total 3005385 damage, 63138.3 dps
   #  name             cls        damage        dps  share   hits  crit%  back%   max hit
