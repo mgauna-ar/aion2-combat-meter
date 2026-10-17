@@ -150,7 +150,8 @@ All of it lives in `src/protocol`. `opcodes.hpp` is the one place opcodes are sp
 
 **Heartbeat**
 - The frame is `0E 00 36` plus a u64 LE of server Unix ms, about every 50 ms.
-- The decoder resyncs on one whose time is within a day of the capture's.
+- The decoder resyncs on one whose time is within a day of the capture's. Only such a
+  frame (no flag, an 8-byte body, a time that close) counts as a heartbeat.
 - 3 s with no heartbeat while bytes keep flowing means the decoder is misaligned, and it
   resyncs.
 
@@ -202,7 +203,8 @@ All of it lives in `src/protocol`. `opcodes.hpp` is the one place opcodes are sp
     corpse going. HP 0 is the death.
   - Map load `21 36`: load count u32, map id u32. Ids 600000–700000 are instances.
   - Party `02 97`: names only, found by scanning, since each member's tail varies in
-    length.
+    length. A found name has at least 2 characters: `01` and a letter turn up in the
+    tails.
   - Entity values `00 8D`: id varint, kind u8, count u8, then that many (stat u8,
     value). Kind 1 is the local player's own values (u32; stats 1, 3, 6 seen, meaning
     unknown): no one else gets them, so they name the local player when 33 36 was

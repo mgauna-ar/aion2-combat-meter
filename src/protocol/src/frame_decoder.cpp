@@ -25,6 +25,15 @@ constexpr size_t kCompactAfter = 64u << 10;
 
 [[nodiscard]] bool is_flag_byte(uint8_t b) noexcept { return b >= 0xF0 && b <= 0xFE; }
 
+/// A heartbeat's server time read as a real one: near the capture's clock, or any
+/// time this century when the capture has none (`ts` 0).
+[[nodiscard]] bool plausible_server_ms(uint64_t ms, Micros ts) noexcept {
+    if (ts == 0) return ms >= kEarliestServerMs && ms <= kLatestServerMs;
+    const uint64_t capture_ms = ts / kMicrosPerMilli;
+    const uint64_t diff = ms > capture_ms ? ms - capture_ms : capture_ms - ms;
+    return diff <= FrameDecoder::kClockToleranceMs;
+}
+
 /// The frame at the front of `bytes`: its wire size, and its content after the
 /// varint. nullopt when `bytes` does not hold a whole valid one; `lost` then says
 /// whether that is because it is invalid rather than incomplete.
@@ -56,11 +65,7 @@ bool FrameDecoder::is_heartbeat_at(std::span<const uint8_t> bytes, Micros ts) no
     if (bytes.size() < kHeartbeatFrameBytes) return false;
     if (bytes[0] != 0x0E || bytes[1] != 0x00 || bytes[2] != 0x36) return false;
     ByteReader r(bytes.subspan(3, 8));
-    const uint64_t ms = r.u64le();
-    if (ts == 0) return ms >= kEarliestServerMs && ms <= kLatestServerMs;
-    const uint64_t capture_ms = ts / kMicrosPerMilli;
-    const uint64_t diff = ms > capture_ms ? ms - capture_ms : capture_ms - ms;
-    return diff <= kClockToleranceMs;
+    return plausible_server_ms(r.u64le(), ts);
 }
 
 void FrameDecoder::start(bool at_boundary, Micros ts) {
@@ -105,16 +110,7 @@ void FrameDecoder::search(Micros ts) {
 
 void FrameDecoder::feed(std::span<const uint8_t> bytes, Micros ts, FrameSink& sink) {
     m_buf.insert(m_buf.end(), bytes.begin(), bytes.end());
-
-    for (;;) {
-        if (!m_aligned) {
-            search(ts);
-            if (!m_aligned) break;
-        }
-        const Step step = decode_one(ts, sink);
-        if (step == Step::NeedMore) break;
-        if (step == Step::Lost) lose_alignment();
-    }
+    decode_all(ts, sink);
 
     // Aligned but no heartbeat for a while as bytes keep coming: the lengths are
     // being read from the wrong places, even if each looked plausible.
@@ -122,11 +118,25 @@ void FrameDecoder::feed(std::span<const uint8_t> bytes, Micros ts, FrameSink& si
         const Micros since = std::max(m_last_heartbeat_ts, m_aligned_since);
         if (ts > since && ts - since > kHeartbeatSilence) {
             lose_alignment();
-            search(ts);
+            // A heartbeat already buffered realigns, and what follows it is decoded
+            // now rather than with the next bytes.
+            decode_all(ts, sink);
         }
     }
 
     compact();
+}
+
+void FrameDecoder::decode_all(Micros ts, FrameSink& sink) {
+    for (;;) {
+        if (!m_aligned) {
+            search(ts);
+            if (!m_aligned) return;
+        }
+        const Step step = decode_one(ts, sink);
+        if (step == Step::NeedMore) return;
+        if (step == Step::Lost) lose_alignment();
+    }
 }
 
 FrameDecoder::Step FrameDecoder::decode_one(Micros ts, FrameSink& sink) {
@@ -182,11 +192,15 @@ void FrameDecoder::emit(std::span<const uint8_t> raw, std::span<const uint8_t> p
     frame.depth = depth;
     frame.stream_offset = offset;
 
-    if (op == opcode::Heartbeat && frame.body.size() >= 8) {
+    // Counted only when it is one: a misread 00 36 would keep the watchdog quiet.
+    if (op == opcode::Heartbeat && flag == 0 && frame.body.size() == kHeartbeatFrameBytes - 3) {
         ByteReader r(frame.body);
-        m_stats.last_server_ms = r.u64le();
-        ++m_stats.heartbeats;
-        m_last_heartbeat_ts = ts;
+        const uint64_t ms = r.u64le();
+        if (plausible_server_ms(ms, ts)) {
+            m_stats.last_server_ms = ms;
+            ++m_stats.heartbeats;
+            m_last_heartbeat_ts = ts;
+        }
     }
     sink.on_frame(frame);
 }

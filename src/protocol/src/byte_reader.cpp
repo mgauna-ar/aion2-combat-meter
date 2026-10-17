@@ -12,7 +12,8 @@ std::optional<Varint> read_varint(std::span<const uint8_t> bytes, bool* overlong
     if (overlong != nullptr) *overlong = false;
     uint64_t value = 0;
     for (size_t i = 0; i < bytes.size(); ++i) {
-        if (i == kMaxVarintBytes) {
+        // A 10th byte over 1, or an 11th, would be bits past 64: never a value.
+        if (i == kMaxVarintBytes || (i == kMaxVarintBytes - 1 && bytes[i] > 0x01)) {
             if (overlong != nullptr) *overlong = true;
             return std::nullopt;
         }

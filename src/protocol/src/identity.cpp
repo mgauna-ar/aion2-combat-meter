@@ -11,13 +11,26 @@ namespace {
 constexpr uint8_t kHasName = 0x01;
 /// 16 code points of up to 3 UTF-8 bytes each.
 constexpr size_t kMaxNameBytes = kMaxNameChars * 3;
-constexpr size_t kMinScannedNameChars = 2;
 
 [[nodiscard]] bool is_ascii_letter(uint8_t c) noexcept { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'); }
 [[nodiscard]] bool is_ascii_digit(uint8_t c) noexcept { return c >= '0' && c <= '9'; }
 
-/// Code points in `utf8` if it is a valid name, else 0.
-size_t name_chars(std::string_view utf8) noexcept {
+/// Whether a multi-byte sequence starting `lead, second` is one a UTF-8 decoder
+/// accepts: not an overlong form, a UTF-16 surrogate, past U+10FFFF or a C1 control.
+[[nodiscard]] bool valid_lead_pair(uint8_t lead, uint8_t second) noexcept {
+    switch (lead) {
+        case 0xC2: return second >= 0xA0;  // U+0080..U+009F are C1 controls
+        case 0xE0: return second >= 0xA0;
+        case 0xED: return second < 0xA0;
+        case 0xF0: return second >= 0x90;
+        case 0xF4: return second < 0x90;
+        default: return true;
+    }
+}
+
+} // namespace
+
+size_t character_name_chars(std::string_view utf8) noexcept {
     if (utf8.empty() || utf8.front() == '$') return 0;
     size_t chars = 0;
     bool has_letter = false;
@@ -41,6 +54,7 @@ size_t name_chars(std::string_view utf8) noexcept {
         for (size_t k = 1; k < len; ++k) {
             if ((static_cast<uint8_t>(utf8[i + k]) & 0xC0) != 0x80) return 0;
         }
+        if (len > 1 && !valid_lead_pair(c, static_cast<uint8_t>(utf8[i + 1]))) return 0;
         if (len > 1) has_letter = true;
         i += len;
         if (++chars > kMaxNameChars) return 0;
@@ -48,9 +62,7 @@ size_t name_chars(std::string_view utf8) noexcept {
     return has_letter ? chars : 0;
 }
 
-} // namespace
-
-bool is_character_name(std::string_view utf8) noexcept { return name_chars(utf8) != 0; }
+bool is_character_name(std::string_view utf8) noexcept { return character_name_chars(utf8) != 0; }
 
 std::optional<Identity> read_identity_record(ByteReader& r) {
     Identity id;
@@ -78,7 +90,7 @@ std::vector<Identity> scan_identities(std::span<const uint8_t> bytes, std::span<
     for (size_t start = 0; start < bytes.size();) {
         ByteReader r(bytes.subspan(start));
         auto id = read_identity_record(r);
-        if (id && !id->name.empty() && name_chars(id->name) >= kMinScannedNameChars &&
+        if (id && !id->name.empty() && character_name_chars(id->name) >= kMinFoundNameChars &&
             std::find(known_servers.begin(), known_servers.end(), id->server) != known_servers.end()) {
             id->scanned = true;
             found.push_back(std::move(*id));

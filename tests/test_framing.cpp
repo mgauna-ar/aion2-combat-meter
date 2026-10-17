@@ -7,6 +7,7 @@
 #include "protocol/lz4_block.hpp"
 #include "protocol/opcodes.hpp"
 
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -57,6 +58,15 @@ TEST_CASE(Varint, IncompleteAndOverlong) {
     TEST_ASSERT_FALSE(overlong);
     const Bytes junk(11, 0xFF);
     TEST_ASSERT_FALSE(read_varint(junk, &overlong).has_value());
+    TEST_ASSERT(overlong);
+
+    // Ten bytes reach bit 63 at most: a 10th byte of 1 is the top bit, more is not a value.
+    Bytes top(9, 0xFF);
+    top.push_back(0x01);
+    const auto max = read_varint(top, &overlong);
+    TEST_ASSERT(max.has_value() && max->value == UINT64_MAX);
+    top.back() = 0x02;
+    TEST_ASSERT_FALSE(read_varint(top, &overlong).has_value());
     TEST_ASSERT(overlong);
 }
 
@@ -285,5 +295,43 @@ TEST_CASE(FrameDecoder, SilenceWatchdogResyncs) {
     // Plausible frames but no heartbeat for longer than the watchdog allows.
     d.feed(opcode_frame(opcode::Damage, {1}), kTs + FrameDecoder::kHeartbeatSilence + 1, sink);
     TEST_ASSERT_FALSE(d.aligned());
+    TEST_ASSERT_EQ(d.stats().resyncs, uint64_t{1});
+}
+
+TEST_CASE(FrameDecoder, OnlyARealHeartbeatCounts) {
+    FrameDecoder d;
+    CollectingSink sink;
+    d.start(true, kTs);
+    d.feed(heartbeat(kServerMs), kTs, sink);
+    Bytes far_off;
+    put_le64(far_off, kServerMs + 10ULL * 24 * 3600 * 1000);
+    Bytes long_body;
+    put_le64(long_body, kServerMs);
+    put_le32(long_body, 0);
+    Bytes in_time;
+    put_le64(in_time, kServerMs + 50);
+    d.feed(concat({opcode_frame(opcode::Heartbeat, far_off), opcode_frame(opcode::Heartbeat, long_body),
+                   opcode_frame(opcode::Heartbeat, in_time, 0xF1)}),
+           kTs, sink);
+    // Delivered as frames, but none is the server's clock.
+    TEST_ASSERT_EQ(sink.frames.size(), size_t{4});
+    TEST_ASSERT_EQ(d.stats().heartbeats, uint64_t{1});
+    TEST_ASSERT_EQ(d.stats().last_server_ms, kServerMs);
+}
+
+TEST_CASE(FrameDecoder, WatchdogDecodesWhatFollowsTheHeartbeatAtOnce) {
+    FrameDecoder d;
+    CollectingSink sink;
+    d.start(true, kTs);
+    d.feed(heartbeat(kServerMs), kTs, sink);
+    // Read as aligned, a length that wants more bytes than will come, holding the
+    // next heartbeat and a frame.
+    Bytes misread;
+    put_varint(misread, 1000);
+    put_bytes(misread, {0x04, 0x38});
+    const Micros late = kTs + FrameDecoder::kHeartbeatSilence + 1;
+    d.feed(concat({misread, heartbeat(kServerMs + 3001), opcode_frame(opcode::Death, {1})}), late, sink);
+    TEST_ASSERT((sink.opcodes() == std::vector<uint16_t>{opcode::Heartbeat, opcode::Heartbeat, opcode::Death}));
+    TEST_ASSERT(d.aligned());
     TEST_ASSERT_EQ(d.stats().resyncs, uint64_t{1});
 }

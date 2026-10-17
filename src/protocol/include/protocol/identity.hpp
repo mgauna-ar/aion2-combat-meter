@@ -13,11 +13,17 @@ namespace aion2::proto {
 
 /// Longest character name, in code points.
 inline constexpr size_t kMaxNameChars = 16;
+/// Shortest name believed when one is found by scanning rather than read where a
+/// known layout puts it: one letter is too easily two bytes of something else.
+inline constexpr size_t kMinFoundNameChars = 2;
 
 /// Whether `utf8` is a character name: 1 to 16 letters or digits with at least one
 /// letter. Any non-ASCII code point counts as a letter (accented Latin, Hangul,
 /// Han). A name starting with '$' is a tutorial placeholder, not a player's.
 [[nodiscard]] bool is_character_name(std::string_view utf8) noexcept;
+
+/// The code points in `utf8` if it is a character name, else 0.
+[[nodiscard]] size_t character_name_chars(std::string_view utf8) noexcept;
 
 /// The identity record at `r`'s position: id varint, mask u32, flags u8 (bit 0:
 /// has a name), name length u8, the name, server u16, class u32. With no name only

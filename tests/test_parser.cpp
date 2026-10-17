@@ -6,6 +6,7 @@
 #include "protocol/opcodes.hpp"
 #include "protocol/packet_parser.hpp"
 
+#include <algorithm>
 #include <string>
 #include <vector>
 
@@ -63,6 +64,13 @@ TEST_CASE(Names, CharacterNameRules) {
     TEST_ASSERT_FALSE(is_character_name("has space"));
     TEST_ASSERT_FALSE(is_character_name("ThisNameIsWayTooLong"));
     TEST_ASSERT_FALSE(is_character_name(std::string("bad\xFF", 4)));
+    // What a UTF-8 decoder refuses: a C1 control, an overlong form, a surrogate,
+    // past U+10FFFF.
+    TEST_ASSERT_FALSE(is_character_name("a\xC2\x85"));
+    TEST_ASSERT_FALSE(is_character_name("a\xE0\x80\xAF"));
+    TEST_ASSERT_FALSE(is_character_name("a\xED\xA0\x80"));
+    TEST_ASSERT_FALSE(is_character_name("a\xF4\x90\x80\x80"));
+    TEST_ASSERT_EQ(character_name_chars("Zoë"), size_t{3});
 }
 
 TEST_CASE(Parser, OwnAndOtherIdentity) {
@@ -305,6 +313,21 @@ TEST_CASE(Parser, PartyRosterNames) {
     TEST_ASSERT_EQ(roster.members.size(), size_t{3});
     TEST_ASSERT_EQ(roster.members[0].name, std::string("Ariel"));
     TEST_ASSERT_EQ(roster.members[2].name, std::string("Zikel"));
+}
+
+TEST_CASE(Parser, PartyScanSkipsOneLetterLookAlikes) {
+    PacketParser p;
+    Bytes body = party_body({"Ariel", "Lumiel"});
+    // In Ariel's tail, where the scan for the next member starts, 01 'A' reads as
+    // a one-letter name.
+    const Bytes ariel = bytes_of("Ariel");
+    const auto at = std::search(body.begin(), body.end(), ariel.begin(), ariel.end()) - body.begin();
+    const auto tail = static_cast<size_t>(at) + ariel.size();
+    body[tail + 15] = 0x01;
+    body[tail + 16] = 'A';
+    const auto& roster = only<PartyRoster>(parse_one(p, opcode::PartyRoster, body));
+    TEST_ASSERT_EQ(roster.members.size(), size_t{2});
+    TEST_ASSERT_EQ(roster.members[1].name, std::string("Lumiel"));
 }
 
 TEST_CASE(Parser, IgnoredOpcodesAreNeitherDecodedNorUnknown) {

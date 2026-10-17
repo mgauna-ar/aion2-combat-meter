@@ -195,7 +195,7 @@ std::optional<PartyRoster> read_party(std::span<const uint8_t> body) {
             if (len == 0 || at + 1 + len > body.size()) continue;
             const std::string name(body.begin() + static_cast<std::ptrdiff_t>(at + 1),
                                    body.begin() + static_cast<std::ptrdiff_t>(at + 1 + len));
-            if (!is_character_name(name)) continue;
+            if (character_name_chars(name) < kMinFoundNameChars) continue;
             roster.members.push_back(PartyMember{name});
             cursor = at + 1 + len;
             found = true;

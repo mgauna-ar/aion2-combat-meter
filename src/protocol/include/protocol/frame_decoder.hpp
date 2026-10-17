@@ -87,6 +87,8 @@ private:
 
     void lose_alignment();
     void search(Micros ts);
+    /// Decodes every whole frame buffered, searching first when unaligned.
+    void decode_all(Micros ts, FrameSink& sink);
     /// Decodes one frame at m_pos.
     Step decode_one(Micros ts, FrameSink& sink);
     /// Emits `payload` (flag stripped) as one frame, expanding a bundle.
