@@ -39,6 +39,7 @@ TEST_CASE(Pipeline, SyntheticBossFightEndToEnd) {
     TEST_ASSERT(f.boss.is_boss);
     TEST_ASSERT(f.boss.killed);
     TEST_ASSERT_EQ(f.boss.npc_code, kBossNpc);
+    TEST_ASSERT_EQ(f.boss.label, std::string("Ultimate Berk"));
     TEST_ASSERT_EQ(f.boss.max_hp, kBossHp);
     TEST_ASSERT_FALSE(f.quality.partial);
     TEST_ASSERT(f.quality.clean());

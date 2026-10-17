@@ -199,31 +199,32 @@ inline Bytes identity_body(uint64_t id, std::string_view name, uint16_t server, 
 struct SpawnSpec {
     uint64_t raw_id{2'000'123};
     uint8_t kind{0x10};
-    /// Three bytes, chosen free of the marker patterns.
-    uint32_t npc_code{0x0A1B2C};
+    /// Seven digits, like the game's (src/meter/data/npcs.tsv); this one is invented.
+    uint32_t npc_code{2'345'678};
     uint64_t cur_hp{1'000'000};
     uint64_t max_hp{1'000'000};
     uint32_t owner{0};
     /// 00 for a corpse coming into view.
     uint8_t alive{0x01};
+    /// Fields between the npc code and the position marker. The first capture had
+    /// none, but the parser finds the marker wherever they end.
+    Bytes before_marker{};
 };
 
-/// 41 36: id, mask (kind in its first byte), npc code, fields that vary by kind,
-/// the owner link for summons, the 00 00 02 marker, position, heading, a u16, the
-/// alive byte, HP.
+/// 41 36, as the first capture showed it: id, the mask (kind, then two bytes), the
+/// npc code (u32), then 00 02, which with the code's top byte 00 makes the 00 00 02
+/// marker, position, heading, a u16, the alive byte, HP, and for a summon the owner
+/// link after them.
 inline Bytes spawn_body(const SpawnSpec& s) {
     Bytes b;
     put_varint(b, s.raw_id);
-    put_le32(b, 0x00ABCD00u | s.kind);
-    b.push_back(static_cast<uint8_t>(s.npc_code));
-    b.push_back(static_cast<uint8_t>(s.npc_code >> 8));
-    b.push_back(static_cast<uint8_t>(s.npc_code >> 16));
-    put_bytes(b, {0x11, 0x22, 0x33, 0x44, 0x55});
-    if (s.owner != 0) {
-        put_bytes(b, {0x07, 0x02, 0x06});
-        put_le32(b, s.owner);
+    put_bytes(b, {s.kind, 0x20, 0x00});
+    put_le32(b, s.npc_code);
+    if (!s.before_marker.empty()) {
+        put_bytes(b, s.before_marker);
+        b.push_back(0x00);  // the marker's own first byte, with no code just before it
     }
-    put_bytes(b, {0x66, 0x00, 0x00, 0x02});
+    put_bytes(b, {0x00, 0x02});
     put_f32(b, 1024.5f);
     put_f32(b, -310.25f);
     put_f32(b, 88.0f);
@@ -232,6 +233,10 @@ inline Bytes spawn_body(const SpawnSpec& s) {
     b.push_back(s.alive);
     put_varint(b, s.cur_hp);
     put_varint(b, s.max_hp);
+    if (s.owner != 0) {
+        put_bytes(b, {0x07, 0x02, 0x06});
+        put_le32(b, s.owner);
+    }
     put_bytes(b, {0x99, 0x98});
     return b;
 }

@@ -45,9 +45,10 @@ captures are needed (`.claude/skills/decode-capture`), and these are still open:
   game sends those same ids is unchecked. A map the table doesn't name, such as every
   open-world zone, shows its id ("Map 400001"). No public source lists open-world map
   ids, so those wait for a capture.
-- **Boss names:** a boss shows its npc code ("NPC #8206"). A table of monster and NPC
-  names from the same database is ready (`src/meter/data/npcs.tsv`), but the meter
-  doesn't use it yet: where the spawn packet carries the code is still a guess.
+- **Boss names:** monsters and bosses are named from the same database's ids
+  (`src/meter/data/npcs.tsv`). The one capture had only open-world mobs, all named
+  right; no boss has been checked yet. A code the table doesn't list shows as
+  "NPC #2920107".
 - **Boss threshold:** an enemy with 1,000,000 max HP or more counts as a boss. That
   number is a guess (`meter.boss_min_max_hp`); open-world mobs have about 120,000.
 - **PvP:** the meter cannot yet tell a player of the other faction from your party, so

@@ -57,7 +57,7 @@ ASAN_FLAGS = -fsanitize=address,undefined -fno-sanitize-recover=undefined \
 
 all: test replay
 
-test: aion2_test_runner check-headers check-ui check-forbidden check-skills check-maps replay-smoke
+test: aion2_test_runner check-headers check-ui check-forbidden check-skills check-maps check-npcs replay-smoke
 	./aion2_test_runner
 
 replay: aion2meter-replay
@@ -188,6 +188,10 @@ check-skills:
 check-maps:
 	@python3 tools/gen_map_table.py --check
 
+# npc_table.inc is generated from src/meter/data/npcs.tsv, the same way.
+check-npcs:
+	@python3 tools/gen_npc_table.py --check
+
 # README pictures (docs/images): the overlay's own drawing code, run on the made-up
 # boss fight and rasterized in software (tools/screenshots/canvas.cpp, from
 # ffxiv-hub). Needs zlib; SHOTS_FONT stands in for Segoe UI.
@@ -241,4 +245,4 @@ clean:
 
 FORCE:
 
-.PHONY: all test replay tsan asan clean check-ui check-headers check-forbidden check-skills check-maps fixtures replay-smoke golden screenshots FORCE
+.PHONY: all test replay tsan asan clean check-ui check-headers check-forbidden check-skills check-maps check-npcs fixtures replay-smoke golden screenshots FORCE

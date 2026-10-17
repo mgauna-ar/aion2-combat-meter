@@ -95,9 +95,8 @@ src/protocol/    aion2::proto
     packet_parser
 src/meter/       aion2::meter
     types, class_codes, skill_names (data/skills.tsv → skill_table.inc),
-    map_names (data/maps.tsv → map_table.inc), combatant_registry, encounter_engine,
-    meter_settings, fight_json, history_store
-    data/npcs.tsv: monster and NPC names by npc code, not read yet (Protocol, Spawn)
+    map_names (data/maps.tsv → map_table.inc), npc_names (data/npcs.tsv → npc_table.inc),
+    combatant_registry, encounter_engine, meter_settings, fight_json, history_store
 src/pipeline/    aion2::pipeline   stream_demux (flows -> frames), pipeline (all of it)
 src/app/         aion2::app
     app_settings, app_runtime (threads, history, recording), display_format,
@@ -112,8 +111,8 @@ tools/screenshots/  renders docs/images from overlay_view and app_frame (softwar
 tools/check_forbidden_apis.sh, tools/gen_app_icon.py, tools/embed_icon_font.py
 tools/gen_skill_table.py         skills.tsv → skill_table.inc (`make test` checks they agree)
 tools/gen_map_table.py           maps.tsv → map_table.inc (the same)
-tools/gen_npc_table.py           aion2.app's monster and NPC pages → npcs.tsv (no .inc until
-                                 the spawn's npc code is confirmed)
+tools/gen_npc_table.py           aion2.app's monster and NPC pages → npcs.tsv → npc_table.inc
+                                 (the same)
 tests/           TEST_CASE framework (ported), one test_<concern>.cpp per area
 ```
 
@@ -221,17 +220,24 @@ All of it lives in `src/protocol`. `opcodes.hpp` is the one place opcodes are sp
 - **Spawn `41 36`:**
   - **Id:** a varint. An id over 1,000,000 is folded to `(raw & 0x3FFF) | 0x4000`, in
     `entity_id.cpp` only.
-  - **Mask:** a u32 whose first byte is the kind. 1F/5F are summons (with an owner);
-    1D/5D are spirits and effects; 1C is a boss mechanic.
+  - **Mask:** 3 bytes, the first the kind (then `20 00` for mobs, `10 00` for the one
+    summon seen). 1F/5F are summons (with an owner); 1D/5D are spirits and effects;
+    1C is a boss mechanic.
+  - **Npc code:** the u32 after the mask. Names come from `src/meter/data/npcs.tsv`
+    (aion2.app's 7,545 monsters and 3,719 NPCs; metabot.gg agrees on the bosses
+    compared): seven digits, 2,000,002 to 2,990,928, one id per level or difficulty.
+    - Checked against the first capture: all 10 mob spawns carried a listed code
+      there (Highland Odyle Sparkie, Docile Highland Brax). The summon's code
+      (2,920,107) is not listed.
+    - It was read as the u24 a byte later until then: the code's upper bytes, 8206 for
+      every 2,100,7xx mob.
+    - A code not listed shows as "NPC #code".
   - **Position and HP:** the first `00 (00|40) 02` marker followed by a sane xyz f32
     triple, a heading f32, a u16, a byte (01; 00 for a corpse coming into view, with
-    cur_hp 0), cur_hp varint and max_hp varint. Open-world mobs: 119,700.
-  - **Owner:** the u32 after `07 02 06`.
-  - **Npc code:** read as the u24 after the mask, unconfirmed (below). The public ids
-    in `src/meter/data/npcs.tsv` (aion2.app's 7,545 monsters and 3,719 NPCs; metabot.gg
-    agrees on the bosses compared) are seven digits, 2,000,002 to 2,990,928. A boss
-    shows as "NPC #code" until a capture shows where the code sits; the TSV is not
-    read until then.
+    cur_hp 0), cur_hp varint and max_hp varint. Open-world mobs: 119,700. In the first
+    capture the marker came straight after the npc code, its 00 being the code's top
+    byte, so the search starts at the code.
+  - **Owner:** the u32 after `07 02 06`, which comes after the HP.
 - **Other opcodes:**
   - Death `42 36`: id varint. For a mob it comes about 4 s after 00 8D says HP 0: the
     corpse going. HP 0 is the death.
@@ -254,9 +260,8 @@ All of it lives in `src/protocol`. `opcodes.hpp` is the one place opcodes are sp
 
 **Unknown or guessed. Each needs a real capture (skill `decode-capture`):**
 - whether the "optional 00 pad" can be confused with a scalar of 0;
-- whether `npc_code` is the u24 right after the spawn mask: every open-world mob in the
-  first capture read 8206, and they may all have been one kind of mob. The public ids
-  are seven digits (Spawn, above), so 8206 is probably not the code;
+- whether a boss's spawn carries its code where a mob's does: the first capture had
+  only open-world mobs;
 - the damage scale (above): the varint is what the public meters count; the game's own
   meter has not been compared yet;
 - the layout of `33 36`: the first capture started after login, so it had none;
@@ -355,6 +360,9 @@ in 2026-10.
   - Duration runs from the first hit to the last, floored at 1 s for DPS.
 - **Boss:** the damaged enemy with the most max HP. It is a boss if that max HP is at
   least `boss_min_max_hp`.
+  - Its name comes from its spawn's npc code (`npc_label`): "NPC #code" when the table
+    does not list it, "#id" when it was never seen spawning. The label is saved with
+    the fight, so a fight keeps the name it had.
   - Its HP is the server's figure (00 8D) once one arrives. Before that, it is the spawn
     HP minus all damage seen since the spawn, shown with `~`.
   - A mob that spawned before the meter started has no max HP; the most 00 8D HP seen

@@ -120,7 +120,7 @@ TEST_CASE(Parser, SpawnWithHpAndOwner) {
     boss.max_hp = 5'000'000;
     const auto& s = only<Spawn>(parse_one(p, opcode::Spawn, spawn_body(boss)));
     TEST_ASSERT_EQ(s.id, normalize_entity_id(2'000'123));
-    TEST_ASSERT_EQ(s.npc_code, 0x0A1B2Cu);
+    TEST_ASSERT_EQ(s.npc_code, 2'345'678u);
     TEST_ASSERT(s.has_hp);
     TEST_ASSERT_EQ(s.cur_hp, uint64_t{4'500'000});
     TEST_ASSERT_EQ(s.max_hp, uint64_t{5'000'000});
@@ -137,6 +137,34 @@ TEST_CASE(Parser, SpawnWithHpAndOwner) {
     TEST_ASSERT_EQ(summon.kind, spawn_kind::Summon);
     TEST_ASSERT_EQ(summon.owner, EntityId{501});
     TEST_ASSERT(summon.has_hp);
+}
+
+TEST_CASE(Parser, SpawnCarriesItsNpcCodeAfterTheMask) {
+    // As the first capture's open-world mobs: the mask's three bytes, then the code as
+    // a u32. Read a byte late, every 2,100,7xx code there came out 8206.
+    PacketParser p;
+    SpawnSpec mob;
+    mob.kind = 0x05;
+    mob.npc_code = 2'100'795;
+    mob.cur_hp = 99'393;
+    mob.max_hp = 119'700;
+    const auto& s = only<Spawn>(parse_one(p, opcode::Spawn, spawn_body(mob)));
+    TEST_ASSERT_EQ(s.kind, uint8_t{0x05});
+    TEST_ASSERT_EQ(s.npc_code, 2'100'795u);
+    TEST_ASSERT(s.has_hp);
+    TEST_ASSERT_EQ(s.cur_hp, uint64_t{99'393});
+    TEST_ASSERT_EQ(s.max_hp, uint64_t{119'700});
+}
+
+TEST_CASE(Parser, SpawnFindsItsPositionAfterOtherFields) {
+    PacketParser p;
+    SpawnSpec mob;
+    mob.before_marker = {0x11, 0x22, 0x33, 0x44, 0x55};
+    const auto& s = only<Spawn>(parse_one(p, opcode::Spawn, spawn_body(mob)));
+    TEST_ASSERT_EQ(s.npc_code, 2'345'678u);
+    TEST_ASSERT(s.has_hp);
+    TEST_ASSERT_NEAR(s.x, 1024.5f, 1e-3f);
+    TEST_ASSERT_EQ(s.max_hp, uint64_t{1'000'000});
 }
 
 TEST_CASE(Parser, SpawnOfACorpse) {

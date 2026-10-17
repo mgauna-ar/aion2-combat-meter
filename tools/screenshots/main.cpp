@@ -222,7 +222,7 @@ std::vector<meter::HistoryEntry> evening(const meter::FightSummary& kill) {
     earlier.visit_ts = kill.start_ts - 3'600 * kMicrosPerSecond;
     earlier.start_ts = earlier.visit_ts + 300 * kMicrosPerSecond;
     earlier.duration_s = 41.0;
-    earlier.boss_label = "NPC #8206";
+    earlier.boss_label = "Highland Odyle Sparkie";
     earlier.is_boss = false;
     earlier.killed = true;
     earlier.end_reason = meter::EndReason::Idle;

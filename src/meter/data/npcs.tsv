@@ -1,6 +1,5 @@
-# AION 2 monster and NPC names by npc code. Not read by the meter yet: where
-# the spawn (41 36) carries the npc code is unconfirmed, and the u24 read as
-# it so far gave 8206 for every open-world mob, which is not an id like these.
+# AION 2 monster and NPC names by npc code, the u32 a spawn (41 36) carries
+# after its mask. Every mob spawn in the first capture carried one of these.
 #
 # Source: aion2.app's monster and NPC lists (aion2.app/db/monsters and
 # aion2.app/db/npcs), retrieved 2026-10-17; the site says it reads them from the

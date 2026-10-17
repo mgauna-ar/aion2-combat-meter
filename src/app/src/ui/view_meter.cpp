@@ -6,6 +6,7 @@
 #include "app/ui/widgets.hpp"
 #include "common/time_format.hpp"
 #include "meter/map_names.hpp"
+#include "meter/npc_names.hpp"
 #include "meter/pull_grouping.hpp"
 #include "meter/skill_names.hpp"
 
@@ -424,7 +425,7 @@ void taken_tab(const meter::FightSummary& f, AppViewState& state) {
             row_progress_bar(static_cast<float>(static_cast<double>(s.amount) / static_cast<double>(top)),
                              colors::Danger);
             cell(0, colors::TextBody, meter::skill_label(s.code));
-            cell(1, colors::TextMuted, s.source_npc != 0 ? "NPC #" + std::to_string(s.source_npc) : std::string("-"));
+            cell(1, colors::TextMuted, s.source_npc != 0 ? meter::npc_label(s.source_npc) : std::string("-"));
             cell(2, colors::TextPrimary, format_amount(s.amount));
             cell(3, colors::TextMuted, share(s.amount, open->damage_taken));
             cell(4, colors::TextMuted, number(s.hits));

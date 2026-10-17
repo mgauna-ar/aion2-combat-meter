@@ -1,9 +1,9 @@
 #include "meter/encounter_engine.hpp"
 
+#include "meter/npc_names.hpp"
 #include "meter/skill_names.hpp"
 
 #include <algorithm>
-#include <cstdio>
 #include <type_traits>
 #include <variant>
 
@@ -73,14 +73,11 @@ auto sorted_values(const Map& map, Amount amount) {
     return out;
 }
 
-[[nodiscard]] std::string npc_label(uint32_t npc_code, EntityId id) {
-    char buf[32];
-    if (npc_code != 0) {
-        std::snprintf(buf, sizeof(buf), "NPC #%u", npc_code);
-    } else {
-        std::snprintf(buf, sizeof(buf), "#%u", id);
-    }
-    return buf;
+/// The boss's name from its npc code, or "NPC #code" for a code not listed, or "#id"
+/// for a target never seen spawning.
+[[nodiscard]] std::string target_label(uint32_t npc_code, EntityId id) {
+    if (npc_code != 0) return npc_label(npc_code);
+    return "#" + std::to_string(id);
 }
 
 } // namespace
@@ -413,7 +410,7 @@ BossSummary EncounterEngine::boss_of(const Fight& fight) const {
         }
         if (b.killed) b.hp = 0;
     }
-    b.label = npc_label(b.npc_code, b.id);
+    b.label = target_label(b.npc_code, b.id);
     return b;
 }
 

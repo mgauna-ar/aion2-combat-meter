@@ -103,17 +103,19 @@ std::optional<Spawn> read_spawn(std::span<const uint8_t> body) {
     ByteReader r(body);
     Spawn s;
     s.id = normalize_entity_id(r.varint());
-    s.mask = r.u32le();
+    s.mask = r.u24le();
     if (!r.ok() || s.id == 0) return std::nullopt;
     s.kind = static_cast<uint8_t>(s.mask & 0xFF);
     const size_t after_mask = r.pos();
-    s.npc_code = r.u24le();
+    s.npc_code = r.u32le();
     if (!r.ok()) s.npc_code = 0;
 
     // Position and HP follow the marker 00 (00|40) 02, wherever the fields before
     // it (which vary by kind) end: x, y, z, a heading (f32), a u16, then a byte
     // that is 01, or 00 for a corpse coming into view (current HP 0), and the
     // current and max HP. The first marker followed by all of that, sane, is taken.
+    // In the first capture it came straight after the npc code, its 00 being the
+    // code's top byte, so the search starts at the code rather than after it.
     for (size_t at = after_mask; at + 3 <= body.size(); ++at) {
         if (body[at] != 0x00 || (body[at + 1] != 0x00 && body[at + 1] != 0x40) || body[at + 2] != 0x02) continue;
         ByteReader p(body.subspan(at + 3));

@@ -3,6 +3,7 @@
 #include "hex_dump.hpp"
 
 #include "meter/map_names.hpp"
+#include "meter/npc_names.hpp"
 #include "meter/skill_names.hpp"
 #include "protocol/opcodes.hpp"
 
@@ -26,12 +27,11 @@ const char* role_name(pipeline::FlowRole role) {
     return "?";
 }
 
-/// " <name>" after a map id the table names, else nothing: the id stays first, since a
+/// " <name>" after an id a table names, else nothing: the id stays first, since a
 /// capture investigation works from it.
-std::string map_suffix(uint32_t map_id) {
-    const std::string_view name = meter::map_name(map_id);
-    return name.empty() ? std::string() : " " + std::string(name);
-}
+std::string name_suffix(std::string_view name) { return name.empty() ? std::string() : " " + std::string(name); }
+
+std::string map_suffix(uint32_t map_id) { return name_suffix(meter::map_name(map_id)); }
 
 std::string modifiers(uint8_t m, bool crit, uint8_t direction) {
     std::string out;
@@ -65,7 +65,7 @@ std::string Report::who(uint32_t id, const meter::CombatantRegistry& registry) c
     if (c != nullptr) {
         label = name(c->name, id);
     } else if (a != nullptr && a->npc_code != 0) {
-        label = "NPC #" + std::to_string(a->npc_code);
+        label = meter::npc_label(a->npc_code);
     } else {
         label = "#" + std::to_string(id);
     }
@@ -118,7 +118,8 @@ void Report::on_event(const proto::ParsedEvent& pe, const meter::CombatantRegist
                             e.scanned ? "scanned" : "", e.id, name(e.name, e.id).c_str(), unsigned{e.server},
                             e.class_code);
             } else if constexpr (std::is_same_v<T, proto::Spawn>) {
-                std::printf("%+.3f  spawn     %u kind %02x npc %u", t, e.id, unsigned{e.kind}, e.npc_code);
+                std::printf("%+.3f  spawn     %u kind %02x npc %u%s", t, e.id, unsigned{e.kind}, e.npc_code,
+                            name_suffix(meter::npc_name(e.npc_code)).c_str());
                 if (e.has_hp) std::printf(" hp %" PRIu64 "/%" PRIu64, e.cur_hp, e.max_hp);
                 if (e.owner != 0) std::printf(" owner %u", e.owner);
                 std::printf("\n");
@@ -212,8 +213,8 @@ void Report::print_breakdown(const meter::CombatantTotals& c) const {
         std::printf("    taken %" PRIu64 " (%" PRIu64 " hits, %.1f%% crit)\n", c.damage_taken, c.taken.hits,
                     100.0 * c.taken.rate(&meter::HitCounts::crits));
         for (const auto& s : c.taken_by) {
-            const std::string from = s.source_npc != 0 ? "NPC #" + std::to_string(s.source_npc) : std::string("?");
-            std::printf("      %-26.26s %-12s %9" PRIu64 " %5" PRIu64 " hits\n", meter::skill_label(s.code).c_str(),
+            const std::string from = s.source_npc != 0 ? meter::npc_label(s.source_npc) : std::string("?");
+            std::printf("      %-26.26s %-24s %9" PRIu64 " %5" PRIu64 " hits\n", meter::skill_label(s.code).c_str(),
                         from.c_str(), s.amount, s.hits);
         }
     }

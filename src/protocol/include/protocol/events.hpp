@@ -35,7 +35,10 @@ struct Spawn {
     EntityId id{0};
     /// The mask's first byte: what kind of thing it is (spawn_kind).
     uint8_t kind{0};
+    /// The three bytes after the id.
     uint32_t mask{0};
+    /// What it is: a monster's or NPC's id, as src/meter/data/npcs.tsv lists them
+    /// (seven digits). A summon's code is not listed.
     uint32_t npc_code{0};
     float x{0.0f};
     float y{0.0f};

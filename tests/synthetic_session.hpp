@@ -27,7 +27,8 @@ inline constexpr uint64_t kAlly = 1002;
 inline constexpr uint64_t kAlly2 = 1003;
 inline constexpr uint64_t kBossRaw = 2'000'123;
 inline constexpr uint64_t kSpiritRaw = 3'000'001;
-inline constexpr uint32_t kBossNpc = 0x0A1B2C;
+/// Ultimate Berk, Krao Cave's last boss, in npcs.tsv. The fight is still made up.
+inline constexpr uint32_t kBossNpc = 2'300'171;
 inline constexpr uint64_t kBossHp = 3'000'000;
 /// A real dungeon tier's id (Krao Cave, Conquest, in maps.tsv), so the README pictures
 /// show a map name. The fight in it is still made up.
