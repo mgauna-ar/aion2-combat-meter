@@ -12,10 +12,11 @@ what, with which skill, for how much. It shows what the game's own Combat Analys
 window (Ctrl+X) shows, but for every party member:
 
 - **An overlay** over the game with the live fight: the party ranked by DPS, the boss's
-  HP and the fight timer. It can show only in combat.
+  HP and the fight timer. It can show only in combat, or only in dungeons.
 - **An app window** with the details: damage, hit counts, crit, perfect, double, back
   and front rates for each player and each of their skills; healing; damage taken; and
-  every saved fight, grouped by visit to a map. Every setting is there too.
+  every saved fight, grouped by visit to a map, one entry per dungeon run. Every setting
+  is there too.
 
 ![The overlay during a boss fight: three players ranked by DPS, the boss's HP bar and the fight timer](docs/images/overlay-live.png)
 
@@ -128,13 +129,14 @@ history and recordings folders, `config.json` and the log.
 
 **How fights are cut:**
 - **Start:** a fight starts on the party's first hit on an enemy.
-- **End:** it ends 2 s after the boss dies (so the last DoT ticks count), on a map
-  change, or after 10 s without a party hit. While a boss is still standing, the wait
+- **End:** it ends 2 s after the boss dies (so the last DoT ticks count), on a loading
+  screen (entering the same dungeon again too), or after 10 s without a party hit. While a boss is still standing, the wait
   is 30 s instead, to cover phases where it can't be hit.
 - **Duration:** a fight's time runs from the first hit to the last, so the wait before
   a fight is called never lowers its DPS.
 - **Saving:** boss fights and fights longer than 20 s are saved, and listed on the app
-  window's Combat Meter page.
+  window's Combat Meter page, grouped by map visit: each run of a dungeon is its own
+  entry. *Save only dungeon fights* keeps the open world out.
 
 **Who counts as party:**
 - In a party, only its members are listed. Pets and summons count for their owner.
@@ -191,6 +193,7 @@ by hand only while the meter is closed. Out-of-range values are clamped.
 | `show_in_combat_only` | false | Show the overlay only during a fight, and for `hide_after_combat_s` after it. Applies only while locked. |
 | `hide_after_combat_s` | 5 | Seconds it stays up after a fight, to read the result. |
 | `hide_when_game_unfocused` | false | Hide it while neither the game nor the meter's window is in front. Applies only while locked. |
+| `show_in_dungeons_only` | false | Show the overlay only in a dungeon: one of `src/meter/data/maps.tsv`'s dungeon tiers. Hidden in the open world, the Abyss, battlefields, and before the first loading screen. Applies only while locked. |
 
 **meter**
 
@@ -202,6 +205,7 @@ by hand only while the meter is closed. Out-of-range values are clamped.
 | `kill_grace_s` | 2 | Hits after the boss dies still count for this long. |
 | `boss_min_max_hp` | 1000000 | Max HP that makes an enemy a boss. A guess until real captures calibrate it. |
 | `min_saved_duration_s` | 20 | A fight with no boss is saved if it lasts at least this long. |
+| `save_only_dungeons` | false | Save only fights in a dungeon, as `overlay.show_in_dungeons_only` tells them. A dungeon the meter cannot name (its fights read "Map <number>") counts as not one. |
 | `partial_damage_ratio` | 0.7 | A boss that dies having lost less than this share of its HP with hits the meter saw (by the game's own HP updates) marks the fight "partial data". |
 | `wipe_detection` | false | End the fight when every party member is dead. Off until real captures show how revives look on the wire. |
 | `memory_history` | 10 | Finished fights kept in memory. |
@@ -235,9 +239,10 @@ run the meter as administrator.
   and run `aion2meter-replay` on it. It lists every flow it decoded as the game.
 
 **I can't see the overlay in game**
-Use Borderless Windowed. If it is hidden, press Ctrl+Alt+H. Shown only in combat, or
-hidden while the game is not in front (its Visibility settings), a locked overlay
-stays out of sight until those allow it; unlock it (Ctrl+Alt+L) to see it at once.
+Use Borderless Windowed. If it is hidden, press Ctrl+Alt+H. Shown only in combat or only
+in dungeons, or hidden while the game is not in front (its Visibility settings), a
+locked overlay stays out of sight until those allow it; unlock it (Ctrl+Alt+L) to see
+it at once. A dungeon the meter cannot name ("Map <number>") counts as not one.
 
 **My party shows as #12345 instead of names**
 The game sends names mostly on loading screens. Start the meter before you log in or

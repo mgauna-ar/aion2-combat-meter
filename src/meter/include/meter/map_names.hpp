@@ -15,4 +15,9 @@ namespace aion2::meter {
 /// load seen yet).
 [[nodiscard]] std::string map_label(uint32_t map_id);
 
+/// One of maps.tsv's dungeon tiers (the rows above its "# By hand" line). False for
+/// the rows added by hand, for ids not listed (every open-world zone, the Abyss,
+/// battlefields), and for 0.
+[[nodiscard]] bool is_dungeon(uint32_t map_id) noexcept;
+
 } // namespace aion2::meter

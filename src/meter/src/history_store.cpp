@@ -4,6 +4,7 @@
 #include "common/config/json_file.hpp"
 #include "common/time_format.hpp"
 #include "meter/fight_json.hpp"
+#include "meter/map_names.hpp"
 
 #include <algorithm>
 #include <fstream>
@@ -103,6 +104,7 @@ void sort_oldest_first(std::vector<HistoryEntry>& entries) {
 } // namespace
 
 bool worth_saving(const FightSummary& fight, const MeterSettings& settings) noexcept {
+    if (settings.save_only_dungeons && !is_dungeon(fight.map_id)) return false;
     return fight.boss.is_boss || fight.duration_s >= settings.min_saved_duration_s;
 }
 

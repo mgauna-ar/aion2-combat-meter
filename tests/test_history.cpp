@@ -107,6 +107,26 @@ TEST_CASE(History, WorthSaving) {
     TEST_ASSERT(worth_saving(f, s));
 }
 
+TEST_CASE(History, WorthSavingOnlyInDungeons) {
+    MeterSettings s;
+    FightSummary f;
+    f.boss.is_boss = true;
+    const uint32_t dungeon = 600001;  // Krao Cave (Conquest)
+    const uint32_t open_world = 400001;
+    for (const uint32_t map : {dungeon, open_world, 0u}) {
+        f.map_id = map;
+        TEST_ASSERT(worth_saving(f, s));
+    }
+    s.save_only_dungeons = true;
+    f.map_id = dungeon;
+    TEST_ASSERT(worth_saving(f, s));
+    f.map_id = open_world;
+    TEST_ASSERT_FALSE(worth_saving(f, s));
+    // No map load seen yet: not known to be a dungeon.
+    f.map_id = 0;
+    TEST_ASSERT_FALSE(worth_saving(f, s));
+}
+
 TEST_CASE(History, SaveLoadAndIndex) {
     ScratchDir dir("aion2_test_history");
     HistoryStore store(dir.path / "history");
@@ -276,6 +296,20 @@ TEST_CASE(PullGrouping, VisitsNewestFirstNumberedFromOne) {
     TEST_ASSERT_EQ(groups[0].pulls[2].number, 1);
     TEST_ASSERT_EQ(groups[1].pulls[0].index, size_t{1});
     TEST_ASSERT_EQ(groups[1].pulls[0].number, 2);
+}
+
+TEST_CASE(PullGrouping, TwoRunsOfOneDungeonAreTwoGroups) {
+    std::vector<HistoryEntry> entries(4);
+    for (size_t i = 0; i < entries.size(); ++i) {
+        entries[i].map_id = 600001;
+        entries[i].visit_ts = i < 2 ? at_s(0) : at_s(900);
+        entries[i].start_ts = at_s(10.0 + 300.0 * static_cast<double>(i));
+    }
+    const auto groups = group_by_visit(entries);
+    TEST_ASSERT_EQ(groups.size(), size_t{2});
+    TEST_ASSERT_EQ(groups[0].visit_ts, at_s(900));
+    TEST_ASSERT_EQ(groups[0].pulls.size(), size_t{2});
+    TEST_ASSERT_EQ(groups[1].pulls.size(), size_t{2});
 }
 
 TEST_CASE(PullGrouping, OldRecordsGroupByMapRuns) {

@@ -35,7 +35,8 @@ struct HistoryEntry {
     size_t players{0};
 };
 
-/// A boss fight, or any fight at least min_saved_duration_s long.
+/// A boss fight, or any fight at least min_saved_duration_s long; with
+/// save_only_dungeons, only in a dungeon.
 [[nodiscard]] bool worth_saving(const FightSummary& fight, const MeterSettings& settings) noexcept;
 
 /// "20261016-120000Z-12.json": the fight's start in UTC and its id.

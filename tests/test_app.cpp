@@ -352,6 +352,22 @@ TEST_CASE(OverlayVisibility, CombatOnlyKeepsItUpAfterAFight) {
     TEST_ASSERT_FALSE(overlay_shown(s, now));
 }
 
+TEST_CASE(OverlayVisibility, DungeonsOnly) {
+    OverlaySettings s;
+    s.show_in_dungeons_only = true;
+    OverlayConditions now;
+    TEST_ASSERT(overlay_shown(s, now));  // unlocked: always findable
+    s.locked = true;
+    TEST_ASSERT_FALSE(overlay_shown(s, now));  // no map load yet, or the open world
+    now.in_dungeon = true;
+    TEST_ASSERT(overlay_shown(s, now));
+    // Both conditions must allow it.
+    s.show_in_combat_only = true;
+    TEST_ASSERT_FALSE(overlay_shown(s, now));
+    now.fight_live = true;
+    TEST_ASSERT(overlay_shown(s, now));
+}
+
 TEST_CASE(OverlayVisibility, ConditionsWaitForTheLock) {
     OverlaySettings s;
     s.show_in_combat_only = true;

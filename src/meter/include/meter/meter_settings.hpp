@@ -22,6 +22,9 @@ struct MeterSettings {
     uint64_t boss_min_max_hp{1'000'000};
     /// Fights without a boss are saved when at least this long.
     double min_saved_duration_s{20.0};
+    /// Save only fights in a dungeon (is_dungeon): none in the open world, or before
+    /// the first map load.
+    bool save_only_dungeons{false};
     /// A killed boss that lost less than this share of its HP (by the server's HP
     /// figures) with hits we saw makes the fight's data partial.
     double partial_damage_ratio{0.7};
@@ -32,13 +35,14 @@ struct MeterSettings {
     int memory_history{10};
 };
 
-inline constexpr std::array<config::ConfigKey<MeterSettings>, 9> kMeterSettingKeys{{
+inline constexpr std::array<config::ConfigKey<MeterSettings>, 10> kMeterSettingKeys{{
     config::field<MeterSettings, &MeterSettings::idle_timeout_s>("idle_timeout_s"),
     config::field<MeterSettings, &MeterSettings::boss_idle_timeout_s>("boss_idle_timeout_s"),
     config::field<MeterSettings, &MeterSettings::capture_lost_s>("capture_lost_s"),
     config::field<MeterSettings, &MeterSettings::kill_grace_s>("kill_grace_s"),
     config::field<MeterSettings, &MeterSettings::boss_min_max_hp>("boss_min_max_hp"),
     config::field<MeterSettings, &MeterSettings::min_saved_duration_s>("min_saved_duration_s"),
+    config::field<MeterSettings, &MeterSettings::save_only_dungeons>("save_only_dungeons"),
     config::field<MeterSettings, &MeterSettings::partial_damage_ratio>("partial_damage_ratio"),
     config::field<MeterSettings, &MeterSettings::wipe_detection>("wipe_detection"),
     config::field<MeterSettings, &MeterSettings::memory_history>("memory_history"),

@@ -511,8 +511,9 @@ std::string fit_text(const std::string& text, float width) {
 }
 
 /// A map visit's folding row. The tree node draws only its arrow. The visit's time keeps
-/// the right edge, as the fights' times do below it, and is the first thing to go when
-/// the map's name needs the room; a name too long even then is cut. The tooltip holds both.
+/// the right edge, as the fights' times do below it: runs of one dungeon share a name,
+/// and the time tells them apart. A name too long for the rest is cut; the tooltip
+/// holds both.
 bool visit_header(const std::string& map, const std::string& clock) {
     const ImVec2 pos = ImGui::GetCursorScreenPos();
     const float right = pos.x + ImGui::GetContentRegionAvail().x;
@@ -526,13 +527,9 @@ bool visit_header(const std::string& map, const std::string& clock) {
     const float text_x = pos.x + ImGui::GetTreeNodeToLabelSpacing();
     const float text_y = ImGui::GetItemRectMin().y + (ImGui::GetItemRectSize().y - line_h) * 0.5f;
     const float clock_w = ImGui::CalcTextSize(clock.c_str()).x;
-    const float map_w = ImGui::CalcTextSize(map.c_str()).x;
-    if (text_x + map_w + m(8.0f) + clock_w <= right) {
-        dl->AddText(ImVec2(right - clock_w, text_y), colors::TextDim, clock.c_str());
-        dl->AddText(ImVec2(text_x, text_y), colors::TextMuted, map.c_str());
-    } else if (right > text_x) {
-        dl->AddText(ImVec2(text_x, text_y), colors::TextMuted, fit_text(map, right - text_x).c_str());
-    }
+    const float name_w = right - clock_w - m(8.0f) - text_x;
+    dl->AddText(ImVec2(right - clock_w, text_y), colors::TextDim, clock.c_str());
+    if (name_w > 0.0f) dl->AddText(ImVec2(text_x, text_y), colors::TextMuted, fit_text(map, name_w).c_str());
     return open;
 }
 
@@ -600,8 +597,10 @@ void rail(const AppFrameInput& in, AppViewState& state, AppActions& out, const s
 
     if (history.empty()) {
         ImGui::PushTextWrapPos(0.0f);
-        text_colored_u32(colors::TextFaint, "Boss fights, and fights longer than %.0f s, are saved here.",
-                         in.settings != nullptr ? in.settings->meter.min_saved_duration_s : 20.0);
+        const bool dungeons_only = in.settings != nullptr && in.settings->meter.save_only_dungeons;
+        text_colored_u32(colors::TextFaint, "Boss fights, and fights longer than %.0f s, are saved here%s.",
+                         in.settings != nullptr ? in.settings->meter.min_saved_duration_s : 20.0,
+                         dungeons_only ? ", in dungeons only" : "");
         ImGui::PopTextWrapPos();
     } else {
         ImGui::BeginChild("##PullList", ImVec2(0.0f, fill_h(0.0f)), ImGuiChildFlags_None,
@@ -753,6 +752,8 @@ void visibility_card(const AppFrameInput& in, AppActions& out) {
     if (!o.show_in_combat_only) ImGui::EndDisabled();
     setting_switch("Hide when the game is not in front", "Hidden while another program has the focus.",
                    &o.hide_when_game_unfocused, out);
+    setting_switch("Only in dungeons", "Hidden in the open world, and on maps the meter can't name.",
+                   &o.show_in_dungeons_only, out);
     if (!o.locked) ImGui::EndDisabled();
     ImGui::Dummy(ImVec2(0.0f, m(2.0f)));
     ImGui::PushTextWrapPos(0.0f);
@@ -793,6 +794,9 @@ void tracking_card(const AppFrameInput& in, AppActions& out) {
                    "%.1f s", out, Applies::Meter);
     setting_slider("Shortest fight saved", "A fight with no boss is saved if it lasts this long.",
                    &s.min_saved_duration_s, 0.0, 600.0, "%.0f s", out, Applies::Meter);
+    setting_switch("Save only dungeon fights",
+                   "Keeps the open world out. A dungeon shown as \"Map <number>\" is not one the meter knows.",
+                   &s.save_only_dungeons, out, Applies::Meter);
 
     begin_setting_row("Boss HP", "Max HP that makes an enemy a boss. A guess until captures calibrate it.");
     uint64_t hp = s.boss_min_max_hp;

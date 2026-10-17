@@ -104,12 +104,11 @@ public:
     /// `player` used a skill of class `cls` (class_of_skill): their class, when no
     /// identity has named it. Summons use their owner's class digits.
     void on_skill_class(EntityId player, AionClass cls);
-    /// A new map: NPCs, summons and inferred sides go; players stay, stale.
-    /// `instance` (proto::MapLoad::is_instance) says who counts with no roster.
+    /// A map load, the same map again included (a new run of a dungeon): NPCs,
+    /// summons and inferred sides go; players stay, stale, since a new instance has
+    /// ids of its own. `instance` (proto::MapLoad::is_instance) says who counts with
+    /// no roster.
     void on_map_change(bool instance);
-    /// The map loaded again: a teleport within it, or a new instance of it. NPCs
-    /// stay; players go stale, since an instance has ids of its own.
-    void on_map_reload();
 
     /// The id a hit by `id` is credited to: the owner of a summon, through chains
     /// of them.

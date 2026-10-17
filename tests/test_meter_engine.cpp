@@ -198,18 +198,27 @@ TEST_CASE(Engine, HpFallingByAMultipleOfDamageIsNotPartial) {
     TEST_ASSERT_FALSE(s.quality.partial);
 }
 
-TEST_CASE(Engine, MapChangeEndsFightButTeleportDoesNot) {
+TEST_CASE(Engine, EveryMapLoadEndsTheFight) {
     EncounterEngine e = setup();
     e.on_event(ev(at_s(0), proto::MapLoad{1, 610010}));
     e.on_event(ev(at_s(0), npc(kBoss, kBossHp)));
     e.on_event(ev(at_s(1), hit(kMe, kBoss, 100)));
+    // The same map again: running the dungeon again, straight back in.
     e.on_event(ev(at_s(2), proto::MapLoad{2, 610010}));
-    TEST_ASSERT(e.in_fight());
-    e.on_event(ev(at_s(3), proto::MapLoad{3, 200100}));
     TEST_ASSERT_FALSE(e.in_fight());
-    const FightSummary s = e.take_finished().at(0);
-    TEST_ASSERT(s.end_reason == EndReason::MapChange);
-    TEST_ASSERT_EQ(s.map_id, 610010u);
+    e.on_event(ev(at_s(3), npc(kBoss, kBossHp)));
+    e.on_event(ev(at_s(4), hit(kMe, kBoss, 100)));
+    e.on_event(ev(at_s(5), proto::MapLoad{3, 200100}));
+    TEST_ASSERT_FALSE(e.in_fight());
+    const auto finished = e.take_finished();
+    TEST_ASSERT_EQ(finished.size(), size_t{2});
+    TEST_ASSERT(finished[0].end_reason == EndReason::MapChange);
+    TEST_ASSERT(finished[1].end_reason == EndReason::MapChange);
+    TEST_ASSERT_EQ(finished[0].map_id, 610010u);
+    TEST_ASSERT_EQ(finished[1].map_id, 610010u);
+    // Each run is its own visit.
+    TEST_ASSERT_EQ(finished[0].visit_ts, at_s(0));
+    TEST_ASSERT_EQ(finished[1].visit_ts, at_s(2));
     TEST_ASSERT_EQ(e.map_id(), 200100u);
 }
 
@@ -581,12 +590,13 @@ TEST_CASE(Engine, FightsCarryTheirMapVisit) {
     e.on_event(ev(at_s(31), npc(kBoss, kBossHp, 777)));
     e.on_event(ev(at_s(40), hit(kMe, kBoss, 100)));
     e.end_fight(EndReason::Manual, at_s(41));
-    // Loading the same map again is a teleport within the visit.
+    // Loading the same map again is a new run of it: a visit of its own.
     e.on_event(ev(at_s(50), map));
+    e.on_event(ev(at_s(51), npc(kBoss, kBossHp, 777)));
     e.on_event(ev(at_s(60), hit(kMe, kBoss, 100)));
     e.end_fight(EndReason::Manual, at_s(61));
     TEST_ASSERT_EQ(e.recent()[2].visit_ts, at_s(30));
-    TEST_ASSERT_EQ(e.recent()[3].visit_ts, at_s(30));
+    TEST_ASSERT_EQ(e.recent()[3].visit_ts, at_s(50));
 }
 
 namespace {
@@ -649,7 +659,7 @@ TEST_CASE(Engine, AnOldPlayersIdCanBeTheNextMapsBoss) {
     TEST_ASSERT(s.boss.is_boss);
 }
 
-TEST_CASE(Engine, ANewInstanceOfTheSameMapKeepsTheFightAndItsPlayersApart) {
+TEST_CASE(Engine, ANewRunOfTheSameMapKeepsItsPlayersApart) {
     EncounterEngine e = setup();
     e.on_event(ev(at_s(0), proto::MapLoad{1, 610010}));
     e.on_event(ev(at_s(0), player(301, "Rhea")));
@@ -657,15 +667,20 @@ TEST_CASE(Engine, ANewInstanceOfTheSameMapKeepsTheFightAndItsPlayersApart) {
     e.on_event(ev(at_s(0), npc(kBoss, kBossHp, 777)));
     e.on_event(ev(at_s(1), hit(301, kBoss, 100)));
     e.on_event(ev(at_s(1), hit(302, kBoss, 200)));
-    // The same map again: the fight goes on, with new ids.
+    // The same map again: a new run, whose instance hands out new ids.
     e.on_event(ev(at_s(5), proto::MapLoad{2, 610010}));
     e.on_event(ev(at_s(5), player(302, "Rhea")));
     e.on_event(ev(at_s(5), player(305, "Kaisinel")));
+    e.on_event(ev(at_s(5), npc(kBoss, kBossHp, 777)));
     e.on_event(ev(at_s(6), hit(302, kBoss, 1000)));
     e.on_event(ev(at_s(6), hit(305, kBoss, 500)));
     TEST_ASSERT(e.in_fight());
+    const FightSummary first = e.take_finished().at(0);
+    TEST_ASSERT(first.end_reason == EndReason::MapChange);
+    TEST_ASSERT_EQ(damage_by_name(first, "Rhea"), std::optional<uint64_t>{100});
+    TEST_ASSERT_EQ(damage_by_name(first, "Kaisinel"), std::optional<uint64_t>{200});
     const FightSummary s = e.current();
     TEST_ASSERT_EQ(s.combatants.size(), size_t{2});
-    TEST_ASSERT_EQ(damage_by_name(s, "Rhea"), std::optional<uint64_t>{1100});
-    TEST_ASSERT_EQ(damage_by_name(s, "Kaisinel"), std::optional<uint64_t>{700});
+    TEST_ASSERT_EQ(damage_by_name(s, "Rhea"), std::optional<uint64_t>{1000});
+    TEST_ASSERT_EQ(damage_by_name(s, "Kaisinel"), std::optional<uint64_t>{500});
 }

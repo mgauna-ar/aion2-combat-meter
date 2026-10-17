@@ -247,8 +247,6 @@ void CombatantRegistry::on_map_change(bool instance) {
     m_pending.clear();
 }
 
-void CombatantRegistry::on_map_reload() { mark_players_stale(); }
-
 EntityId CombatantRegistry::resolve(EntityId id) const {
     for (int hop = 0; hop < kMaxOwnerHops; ++hop) {
         const Actor* a = find(id);

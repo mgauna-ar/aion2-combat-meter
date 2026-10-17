@@ -158,7 +158,7 @@ TEST_CASE(Registry, AStaleIdGivesWayToASpawn) {
     // On the map it was named on, a spawn is the player coming into view.
     r.on_spawn(npc(301, 1000));
     TEST_ASSERT(r.side(301) == Side::Player);
-    r.on_map_reload();
+    r.on_map_change(true);
     r.on_spawn(npc(301, 1000));
     TEST_ASSERT(r.side(301) == Side::Enemy);
     TEST_ASSERT_EQ(r.display_name(301), std::string("#301"));

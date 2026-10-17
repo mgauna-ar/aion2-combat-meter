@@ -20,6 +20,14 @@ TEST_CASE(MapNames, AOneTierPageKeepsItsOwnName) {
     TEST_ASSERT_EQ(std::string(map_name(910064)), std::string("Chamber of the Dead (Challenge)"));
 }
 
+TEST_CASE(MapNames, DungeonsAreTheImportedTiers) {
+    TEST_ASSERT(is_dungeon(600001));
+    TEST_ASSERT(is_dungeon(910064));
+    // Open-world zones are not listed, and 0 is no map load seen yet.
+    TEST_ASSERT_FALSE(is_dungeon(400001));
+    TEST_ASSERT_FALSE(is_dungeon(0));
+}
+
 TEST_CASE(MapNames, UnlistedIdsHaveALabel) {
     // Open-world zones have no public ids, so none is listed.
     TEST_ASSERT(map_name(400001).empty());

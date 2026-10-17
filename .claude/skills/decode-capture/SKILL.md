@@ -67,6 +67,10 @@ make replay
   id come back as someone else, or as an NPC? AGENTS.md's Sides rules assume ids can
   move and be reused; confirm that, or simplify them.
 - **Map ids:** a `map` event prints the name `src/meter/data/maps.tsv` gives its id.
+  - Every map event starts a new visit. Ask the user to run one dungeon twice,
+    straight back in, and to use a teleport inside it: the re-entry should show a
+    `map` event with the same id (note its load count), and the teleport none. A
+    teleport that sends one splits a run (AGENTS.md, Unknowns).
   - Entering a dungeon should print that dungeon and the tier you picked. If it prints
     the wrong tier, or no name, then aion2.app's tier ids are not the wire's ids. Note
     it in AGENTS.md, and find what the ids do follow before trusting the table.

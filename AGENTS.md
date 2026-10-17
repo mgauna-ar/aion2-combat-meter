@@ -282,6 +282,9 @@ All of it lives in `src/protocol`. `opcodes.hpp` is the one place opcodes are sp
   someone else. A party whose Ranger and Elementalist shared one row, the name
   switching from pull to pull, points to both, but no capture has shown a map load
   yet. The meter assumes both can happen (Meter rules, Sides).
+- whether a teleport within a dungeon sends a 21 36. Re-entering the same dungeon
+  straight away did, as the runs that shared one visit showed; a teleport that did too
+  would now split a run and end its fight;
 - how a player of the other faction is told apart, for PvP: perhaps 45 36's mask.
   Until then they are players like the party, so a PvP fight starts nothing and a
   hit on them counts for nothing (Meter rules, Party and Healing).
@@ -319,16 +322,16 @@ in 2026-10.
     - a hit goes to its id's row for the character the id was then, and the summary
       joins a character's rows. An id named after it hit joins its character. Ids are
       never joined to each other, so two characters never share a row;
-    - a map load, or a reload of the same map (a teleport, or a new instance of it),
-      leaves players stale rather than dropping them, since their names may have come
-      before it. A spawn on a stale id makes it the spawn, and a character named on a
+    - a map load, the same map's included (a new run of a dungeon is a new
+      instance of it), leaves players stale rather than dropping them, since their
+      names may have come before it. A spawn on a stale id makes it the spawn, and a character named on a
       new id leaves its stale one. On the map they were named on, two ids can share a
       name;
     - the local player's name follows 00 8D's own values to their new id.
   - A scanned identity may have misread the id before the name. It never turns a
     spawned NPC or summon into a player, renames a player, or takes a name that an
     identity gave another id on this map.
-  - A map change drops NPCs, summons and inferred sides.
+  - Every map load drops NPCs, summons and inferred sides, the same map's included.
 - **Classes:** from the skill codes a player uses (their summons' count too), unless an
   identity packet's class code names one.
 - **Party:** with a roster, only its names count, and the local player.
@@ -351,8 +354,8 @@ in 2026-10.
 - **Fight start:** a direct hit that lands, from the player side on an enemy. A DoT tick
   never starts a fight.
 - **Fight end:** the boss's death (00 8D HP 0 or 42 36, after `kill_grace_s`, unless a
-  bigger boss was hit during the grace), a map change (not a reload of the same map:
-  a teleport, or a new instance of it), idle time with no party hit (`idle_timeout_s`, or
+  bigger boss was hit during the grace), a map load (the same map's included: running a
+  dungeon again, straight back in), idle time with no party hit (`idle_timeout_s`, or
   `boss_idle_timeout_s` while a boss stands), no traffic (`capture_lost_s`), a wipe
   (when enabled) or by hand.
   - A dead player stays dead for the wipe check while their DoTs and summons keep
@@ -372,11 +375,14 @@ in 2026-10.
     HP against HP: damage and HP are not in the same units. A boss that leaves view
     and spawns again keeps the loss counted so far; its spawn HP is one more figure.
 - **History:**
-  - What is saved: boss fights, and fights of at least `min_saved_duration_s`.
+  - What is saved: boss fights, and fights of at least `min_saved_duration_s`. With
+    `save_only_dungeons`, only in a dungeon (`is_dungeon`: a row above maps.tsv's
+    `# By hand` line, so not map 0, an open-world zone, or a map added by hand).
   - Each fight is one JSON file (`"v":2`; version 1 files still load, without the
     breakdowns), written atomically, plus a line appended to `index.jsonl`.
-  - Fights are grouped by map visit (`visit_ts`): a map load starts one, and so does
-    the first fight after the meter starts. A reload of the same map does not.
+  - Fights are grouped by map visit (`visit_ts`): every map load starts one, the same
+    map's included, so each run of a dungeon is its own. So does the first fight after
+    the meter starts.
   - A cut-off index line is skipped. A missing index is rebuilt from the files.
   - Pruning keeps `history.max_fights`, in batches of 50.
   - Clearing (the app window's trash button) deletes the fight records and the index,

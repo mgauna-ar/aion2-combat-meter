@@ -306,12 +306,8 @@ void EncounterEngine::on_death(EntityId id, Micros ts) {
 }
 
 void EncounterEngine::on_map(const proto::MapLoad& m, Micros ts) {
-    // Loading the map you are on is a teleport within it, or a new instance of
-    // it: the fight and the visit go on, but players may have new ids.
-    if (m.map_id == m_map_id) {
-        m_registry.on_map_reload();
-        return;
-    }
+    // Every load is a new visit, the map you are on included: running a dungeon
+    // again, straight back in, loads the same map id, and each run is its own.
     if (m_fight) finish(EndReason::MapChange, ts);
     m_map_id = m.map_id;
     m_visit_ts = ts;

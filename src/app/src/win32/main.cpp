@@ -17,6 +17,7 @@
 #include "common/os/paths.hpp"
 #include "common/os/single_instance.hpp"
 #include "common/os/tray_icon.hpp"
+#include "meter/map_names.hpp"
 
 #include <shellapi.h>
 
@@ -360,6 +361,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
             conditions.seconds_since_fight = std::chrono::duration<double>(Clock::now() - *last_live).count();
         }
         conditions.game_in_front = game_in_front(game_pids);
+        conditions.in_dungeon = snapshot != nullptr && meter::is_dungeon(snapshot->map_id);
         if (const bool shown = app::overlay_shown(settings.overlay, conditions); shown != window.visible()) {
             window.set_visible(shown);
         }
