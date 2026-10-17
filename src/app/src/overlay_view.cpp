@@ -66,6 +66,8 @@ void draw_rows(const meter::FightSummary& f, const OverlaySettings& s, float sca
     if (s.show_double) cols.push_back({"Dbl", 54.0f * scale});
     if (s.show_back) cols.push_back({"Back", 54.0f * scale});
     if (s.show_front) cols.push_back({"Front", 54.0f * scale});
+    if (s.show_multi) cols.push_back({"Multi", 54.0f * scale});
+    if (s.show_block) cols.push_back({"Block", 54.0f * scale});
     if (s.show_max_hit) cols.push_back({"Max", 58.0f * scale});
     if (s.show_heal) cols.push_back({"Heal", 60.0f * scale});
     const float rank_w = 18.0f * scale;
@@ -127,17 +129,20 @@ void draw_rows(const meter::FightSummary& f, const OverlaySettings& s, float sca
         if (s.show_double) put(rate(&meter::HitCounts::doubles));
         if (s.show_back) put(rate(&meter::HitCounts::back));
         if (s.show_front) put(rate(&meter::HitCounts::front));
+        if (s.show_multi) put(rate(&meter::HitCounts::multi));
+        if (s.show_block) put(rate(&meter::HitCounts::blocks));
         if (s.show_max_hit) put(format_amount(row.max_hit));
         if (s.show_heal) put(format_amount(row.healing));
 
         if (interactive && ImGui::IsMouseHoveringRect(row_min, row_max)) {
             ImGui::SetTooltip("%s\n%llu damage (%llu from DoTs), %llu healing\n%llu hits: %s crit, %s perfect, "
-                              "%s double\n%s back, %s front; max hit %llu",
+                              "%s double, %s multi, %s blocked\n%s back, %s front; max hit %llu",
                               row.name.c_str(), static_cast<unsigned long long>(row.damage),
                               static_cast<unsigned long long>(row.dot_damage),
                               static_cast<unsigned long long>(row.healing),
                               static_cast<unsigned long long>(row.hits.hits), rate(&meter::HitCounts::crits).c_str(),
                               rate(&meter::HitCounts::perfect).c_str(), rate(&meter::HitCounts::doubles).c_str(),
+                              rate(&meter::HitCounts::multi).c_str(), rate(&meter::HitCounts::blocks).c_str(),
                               rate(&meter::HitCounts::back).c_str(), rate(&meter::HitCounts::front).c_str(),
                               static_cast<unsigned long long>(row.max_hit));
         }

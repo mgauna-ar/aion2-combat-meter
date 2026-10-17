@@ -22,7 +22,8 @@ JsonValue hits_to_json(const HitCounts& h) {
     j["crits"] = h.crits;
     j["back"] = h.back;
     j["front"] = h.front;
-    j["parry"] = h.parry;
+    j["block"] = h.blocks;
+    j["multi"] = h.multi;
     j["perfect"] = h.perfect;
     j["double"] = h.doubles;
     j["heavy"] = h.heavy;
@@ -35,7 +36,9 @@ HitCounts hits_from_json(const JsonValue& j) {
     h.crits = u64(j["crits"]);
     h.back = u64(j["back"]);
     h.front = u64(j["front"]);
-    h.parry = u64(j["parry"]);
+    // Written as "parry" before the bit was known to be a block.
+    h.blocks = u64(j.contains("block") ? j["block"] : j["parry"]);
+    h.multi = u64(j["multi"]);
     h.perfect = u64(j["perfect"]);
     h.doubles = u64(j["double"]);
     h.heavy = u64(j["heavy"]);

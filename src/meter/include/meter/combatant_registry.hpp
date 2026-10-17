@@ -47,6 +47,9 @@ struct Actor {
     bool spawned{false};
     uint8_t spawn_kind{0};
     uint32_t npc_code{0};
+    /// A boss mechanic aimed at a player (Spawn::aimed_at), such as a trap the party
+    /// breaks. Hits on it are no damage: the game's own window leaves them out.
+    bool aimed_mechanic{false};
     /// The player a summon or effect belongs to; 0 for none.
     EntityId owner{0};
     bool has_hp{false};

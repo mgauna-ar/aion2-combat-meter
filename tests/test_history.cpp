@@ -198,6 +198,8 @@ TEST_CASE(FightJson, BreakdownsRoundTrip) {
     f.total_healing = 900;
     CombatantTotals& a = f.combatants[0];
     a.hits.front = 7;
+    a.hits.multi = 5;
+    a.hits.blocks = 2;
     SkillTotals judgment;
     judgment.code = 12240000;
     judgment.damage = 12300;
@@ -224,6 +226,8 @@ TEST_CASE(FightJson, BreakdownsRoundTrip) {
     TEST_ASSERT_EQ(back->total_healing, uint64_t{900});
     const CombatantTotals& b = back->combatants[0];
     TEST_ASSERT_EQ(b.hits.front, uint64_t{7});
+    TEST_ASSERT_EQ(b.hits.multi, uint64_t{5});
+    TEST_ASSERT_EQ(b.hits.blocks, uint64_t{2});
     TEST_ASSERT_EQ(b.skills.size(), size_t{1});
     TEST_ASSERT(b.skills[0] == judgment);
     TEST_ASSERT_EQ(b.healing, uint64_t{900});
@@ -233,6 +237,21 @@ TEST_CASE(FightJson, BreakdownsRoundTrip) {
     TEST_ASSERT_EQ(b.damage_taken, uint64_t{1050});
     TEST_ASSERT(b.taken == a.taken);
     TEST_ASSERT(b.taken_by == a.taken_by);
+}
+
+TEST_CASE(FightJson, BlocksSavedAsParryStillLoad) {
+    // Before the second capture the block bit was read as a parry and saved so.
+    FightSummary f = sample_fight(1, 0);
+    f.combatants[0].hits.blocks = 4;
+    auto j = fight_to_json(f);
+    for (auto& row : j["combatants"].as_array()) {
+        auto& hits = row["hits"];
+        hits["parry"] = hits["block"];
+        hits.as_object().erase("block");
+    }
+    const auto back = fight_from_json(j);
+    TEST_ASSERT(back.has_value());
+    TEST_ASSERT_EQ(back->combatants[0].hits.blocks, uint64_t{4});
 }
 
 TEST_CASE(FightJson, VersionOneReadsWithoutBreakdowns) {

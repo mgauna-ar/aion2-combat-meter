@@ -39,6 +39,8 @@ struct OverlaySettings {
     bool show_perfect{false};
     bool show_double{false};
     bool show_front{false};
+    bool show_multi{false};
+    bool show_block{false};
     bool show_heal{false};
     /// Bars in each player's class colour; off, all in one colour.
     bool class_bars{true};
@@ -94,7 +96,7 @@ inline constexpr std::array<config::ConfigKey<CaptureSettings>, 2> kCaptureKeys{
     config::field<CaptureSettings, &CaptureSettings::detect_relays>("detect_relays"),
 }};
 
-inline constexpr std::array<config::ConfigKey<OverlaySettings>, 23> kOverlayKeys{{
+inline constexpr std::array<config::ConfigKey<OverlaySettings>, 25> kOverlayKeys{{
     config::field<OverlaySettings, &OverlaySettings::visible>("visible"),
     config::field<OverlaySettings, &OverlaySettings::locked>("locked"),
     config::field<OverlaySettings, &OverlaySettings::opacity>("opacity"),
@@ -111,6 +113,8 @@ inline constexpr std::array<config::ConfigKey<OverlaySettings>, 23> kOverlayKeys
     config::field<OverlaySettings, &OverlaySettings::show_perfect>("show_perfect"),
     config::field<OverlaySettings, &OverlaySettings::show_double>("show_double"),
     config::field<OverlaySettings, &OverlaySettings::show_front>("show_front"),
+    config::field<OverlaySettings, &OverlaySettings::show_multi>("show_multi"),
+    config::field<OverlaySettings, &OverlaySettings::show_block>("show_block"),
     config::field<OverlaySettings, &OverlaySettings::show_heal>("show_heal"),
     config::field<OverlaySettings, &OverlaySettings::class_bars>("class_bars"),
     config::field<OverlaySettings, &OverlaySettings::max_rows>("max_rows"),

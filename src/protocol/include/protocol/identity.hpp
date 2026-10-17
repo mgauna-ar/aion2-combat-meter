@@ -27,8 +27,11 @@ inline constexpr size_t kMinFoundNameChars = 2;
 
 /// The identity record at `r`'s position: id varint, mask u32, flags u8 (bit 0:
 /// has a name), name length u8, the name, server u16, class u32. With no name only
-/// the id is read. nullopt when the record does not parse or the name is not one.
-[[nodiscard]] std::optional<Identity> read_identity_record(ByteReader& r);
+/// the id is read. The local player's own record (33 36, `own`) has a u16 of
+/// unknown meaning between the name and the server: the same 1406 in all three of
+/// the second capture's, whose server was 9 where the name turned up elsewhere.
+/// nullopt when the record does not parse or the name is not one.
+[[nodiscard]] std::optional<Identity> read_identity_record(ByteReader& r, bool own = false);
 
 /**
  * @brief Identity records embedded in a packet the parser does not otherwise read.

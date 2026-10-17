@@ -42,7 +42,7 @@ std::string modifiers(uint8_t m, bool crit, uint8_t direction) {
     if (crit) add("crit");
     if (direction == proto::hit_direction::Back) add("back");
     if (direction == proto::hit_direction::Front) add("front");
-    if ((m & proto::hit_modifier::Parry) != 0) add("parry");
+    if ((m & proto::hit_modifier::Block) != 0) add("block");
     if ((m & proto::hit_modifier::Perfect) != 0) add("perfect");
     if ((m & proto::hit_modifier::Double) != 0) add("double");
     if ((m & proto::hit_modifier::Heavy) != 0) add("heavy");
@@ -122,6 +122,9 @@ void Report::on_event(const proto::ParsedEvent& pe, const meter::CombatantRegist
                             name_suffix(meter::npc_name(e.npc_code)).c_str());
                 if (e.has_hp) std::printf(" hp %" PRIu64 "/%" PRIu64, e.cur_hp, e.max_hp);
                 if (e.owner != 0) std::printf(" owner %u", e.owner);
+                if (!e.aimed_at.empty()) {
+                    std::printf(" aimed at %s", m_opt.anonymize ? "a player" : ("\"" + e.aimed_at + "\"").c_str());
+                }
                 std::printf("\n");
             } else if constexpr (std::is_same_v<T, proto::Death>) {
                 std::printf("%+.3f  death     %s\n", t, who(e.id, reg).c_str());
@@ -190,17 +193,18 @@ void Report::print_breakdown(const meter::CombatantTotals& c) const {
     const std::string who = name(c.name.starts_with('#') ? std::string() : c.name, c.id);
     std::printf("  %s: %s\n", who.c_str(), std::string(meter::class_name(c.cls)).c_str());
     if (!c.skills.empty()) {
-        std::printf("    %-26s %9s %6s %5s %5s %6s %6s %6s %6s %6s %8s\n", "skill", "damage", "share", "hits", "ticks",
-                    "crit%", "perf%", "dbl%", "back%", "frnt%", "max");
+        std::printf("    %-26s %9s %6s %5s %5s %6s %6s %6s %6s %6s %6s %6s %8s\n", "skill", "damage", "share", "hits",
+                    "ticks", "crit%", "perf%", "dbl%", "back%", "frnt%", "mult%", "blk%", "max");
     }
     for (const auto& s : c.skills) {
         const double share = c.damage == 0 ? 0.0 : 100.0 * static_cast<double>(s.damage) / static_cast<double>(c.damage);
-        std::printf("    %-26.26s %9" PRIu64 " %5.1f%% %5" PRIu64 " %5" PRIu64 " %6.1f %6.1f %6.1f %6.1f %6.1f %8" PRIu64
-                    "\n",
+        std::printf("    %-26.26s %9" PRIu64 " %5.1f%% %5" PRIu64 " %5" PRIu64
+                    " %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f %8" PRIu64 "\n",
                     meter::skill_label(s.code).c_str(), s.damage, share, s.hits.hits, s.ticks,
                     100.0 * s.hits.rate(&meter::HitCounts::crits), 100.0 * s.hits.rate(&meter::HitCounts::perfect),
                     100.0 * s.hits.rate(&meter::HitCounts::doubles), 100.0 * s.hits.rate(&meter::HitCounts::back),
-                    100.0 * s.hits.rate(&meter::HitCounts::front), s.max_hit);
+                    100.0 * s.hits.rate(&meter::HitCounts::front), 100.0 * s.hits.rate(&meter::HitCounts::multi),
+                    100.0 * s.hits.rate(&meter::HitCounts::blocks), s.max_hit);
     }
     if (c.healing > 0) {
         std::printf("    healing %" PRIu64 " (%.1f hps, %" PRIu64 " heals)\n", c.healing, c.hps, c.heal_hits);

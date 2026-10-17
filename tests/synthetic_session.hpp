@@ -106,7 +106,7 @@ inline Session boss_session() {
     std::vector<std::pair<double, Bytes>> script;
     for (int i = 0; i <= 80 * 20; ++i) script.emplace_back(i * 0.05, heartbeat(kStartMs + static_cast<uint64_t>(i) * 50));
 
-    script.emplace_back(0.001, opcode_frame(proto::opcode::OwnCharacter, identity_body(kMe, "Ariel", 0x0123, 7)));
+    script.emplace_back(0.001, opcode_frame(proto::opcode::OwnCharacter, own_identity_body(kMe, "Ariel", 0x0123, 7)));
     script.emplace_back(0.002, opcode_frame(proto::opcode::MapLoad, map_load_body(1, kDungeon)));
     script.emplace_back(0.003, opcode_frame(proto::opcode::OtherPlayer, identity_body(kAlly, "Lumiel", 0x0123, 3)));
     script.emplace_back(0.004, opcode_frame(proto::opcode::OtherPlayer, identity_body(kAlly2, "Zikel", 0x0123, 5)));

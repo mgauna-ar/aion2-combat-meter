@@ -196,6 +196,7 @@ void CombatantRegistry::on_spawn(const proto::Spawn& spawn) {
     a.spawned = true;
     a.spawn_kind = spawn.kind;
     a.npc_code = spawn.npc_code;
+    a.aimed_mechanic = !spawn.aimed_at.empty();
     a.dead = false;
     a.inferred_side = Side::Unknown;
     a.has_live_hp = false;

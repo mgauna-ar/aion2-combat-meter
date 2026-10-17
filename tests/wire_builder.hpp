@@ -182,7 +182,7 @@ inline void put_f32(Bytes& b, float f) {
     put_le32(b, bits);
 }
 
-/// 33 36 / 45 36: id, mask, flags (has name), name, server, class, then a level.
+/// 45 36: id, mask, flags (has name), name, server, class, then a level.
 inline Bytes identity_body(uint64_t id, std::string_view name, uint16_t server, uint32_t class_code) {
     Bytes b;
     put_varint(b, id);
@@ -190,6 +190,22 @@ inline Bytes identity_body(uint64_t id, std::string_view name, uint16_t server, 
     b.push_back(0x01);
     b.push_back(static_cast<uint8_t>(name.size()));
     put_bytes(b, bytes_of(name));
+    put_le16(b, server);
+    put_le32(b, class_code);
+    put_le32(b, 45);  // level
+    return b;
+}
+
+/// 33 36: the same record, with the u16 the real ones carry between the name and
+/// the server (1406 in all of the second capture's).
+inline Bytes own_identity_body(uint64_t id, std::string_view name, uint16_t server, uint32_t class_code) {
+    Bytes b;
+    put_varint(b, id);
+    put_le32(b, 0x00000101);
+    b.push_back(0x01);
+    b.push_back(static_cast<uint8_t>(name.size()));
+    put_bytes(b, bytes_of(name));
+    put_le16(b, 1406);
     put_le16(b, server);
     put_le32(b, class_code);
     put_le32(b, 45);  // level
@@ -209,6 +225,9 @@ struct SpawnSpec {
     /// Fields between the npc code and the position marker. The first capture had
     /// none, but the parser finds the marker wherever they end.
     Bytes before_marker{};
+    /// A boss mechanic's target: the mask becomes (kind, 00, 01) and the name, length
+    /// first, goes before the npc code, as the second capture's traps had it.
+    std::string aimed_at{};
 };
 
 /// 41 36, as the first capture showed it: id, the mask (kind, then two bytes), the
@@ -218,7 +237,13 @@ struct SpawnSpec {
 inline Bytes spawn_body(const SpawnSpec& s) {
     Bytes b;
     put_varint(b, s.raw_id);
-    put_bytes(b, {s.kind, 0x20, 0x00});
+    if (s.aimed_at.empty()) {
+        put_bytes(b, {s.kind, 0x20, 0x00});
+    } else {
+        put_bytes(b, {s.kind, 0x00, 0x01});
+        b.push_back(static_cast<uint8_t>(s.aimed_at.size()));
+        put_bytes(b, bytes_of(s.aimed_at));
+    }
     put_le32(b, s.npc_code);
     if (!s.before_marker.empty()) {
         put_bytes(b, s.before_marker);
@@ -316,6 +341,47 @@ inline Bytes self_values_body(uint64_t id) {
     put_le32(b, 127300);
     b.push_back(0x06);
     put_le32(b, 459500);
+    return b;
+}
+
+/// 00 8D kind 3, the local player's: kind 1's (stat, u32) list, then a count and
+/// kind 2's (stat, u64) list, here with their HP.
+inline Bytes both_values_body(uint64_t id, uint64_t hp) {
+    Bytes b;
+    put_varint(b, id);
+    put_bytes(b, {0x03, 0x02});
+    b.push_back(0x01);
+    put_le32(b, 2096);
+    b.push_back(0x03);
+    put_le32(b, 92133);
+    b.push_back(0x01);
+    b.push_back(0x00);
+    put_le64(b, hp);
+    return b;
+}
+
+/// 05 38 effect 0x30, on the player themself: the unscaled skill 2001, the
+/// amount, then the enemy skill whose hit set it off.
+inline Bytes heal_on_hit_body(uint64_t player, uint64_t amount, uint32_t cause_skill) {
+    Bytes b;
+    put_varint(b, player);
+    b.push_back(0x30);
+    put_varint(b, player);
+    put_varint(b, 393);
+    put_le32(b, 2001);
+    put_varint(b, amount);
+    put_le32(b, cause_skill);
+    return b;
+}
+
+/// 05 38 effect 0x00, a boss's on itself: a u32 and no amount.
+inline Bytes no_amount_tick_body(uint64_t id) {
+    Bytes b;
+    put_varint(b, id);
+    b.push_back(0x00);
+    put_varint(b, id);
+    put_varint(b, 1);
+    put_le32(b, 100'000'010);
     return b;
 }
 

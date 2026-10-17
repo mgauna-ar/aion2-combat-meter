@@ -40,6 +40,10 @@ struct Spawn {
     /// What it is: a monster's or NPC's id, as src/meter/data/npcs.tsv lists them
     /// (seven digits). A summon's code is not listed.
     uint32_t npc_code{0};
+    /// The player a boss mechanic is aimed at, by name, when the mask's third byte
+    /// has bit 0 set (spawn_mask::AimedAtPlayer): a trap around them that the party
+    /// breaks, 1 damage a hit. Empty for anything else.
+    std::string aimed_at;
     float x{0.0f};
     float y{0.0f};
     float z{0.0f};
@@ -50,12 +54,17 @@ struct Spawn {
     EntityId owner{0};
 };
 
+namespace spawn_mask {
+/// In the mask's third byte: a name (u8 length, UTF-8) comes before the npc code.
+inline constexpr uint32_t AimedAtPlayer = 0x010000;
+} // namespace spawn_mask
+
 namespace spawn_kind {
 inline constexpr uint8_t Summon = 0x1F;
 inline constexpr uint8_t SummonAlt = 0x5F;
 inline constexpr uint8_t Spirit = 0x1D;
 inline constexpr uint8_t Effect = 0x5D;
-/// Boss mechanics: their inline name is the targeted player, not an owner.
+/// Boss mechanics. Some are aimed at a player, and name them (Spawn::aimed_at).
 inline constexpr uint8_t Mechanic = 0x1C;
 
 /// Summons, spirits, pets and skill effects: things a player's damage comes from.
@@ -87,7 +96,9 @@ inline constexpr uint8_t Front = 2;
 } // namespace hit_direction
 
 namespace hit_modifier {
-inline constexpr uint8_t Parry = 0x02;
+/// The target blocked it. Read as a parry from the community's notes until the
+/// second capture: its count matched the game's BLOC (11 of 862 hits).
+inline constexpr uint8_t Block = 0x02;
 inline constexpr uint8_t Perfect = 0x04;
 inline constexpr uint8_t Double = 0x08;
 inline constexpr uint8_t Heavy = 0x20;
@@ -107,9 +118,12 @@ struct Damage {
     uint8_t direction{hit_direction::None};
     /// The hit: all of it. A real capture's HP updates (00 8D) fall by this alone.
     uint64_t amount{0};
-    /// The values behind switch bit 0x20. Not damage: the target's HP does not fall
-    /// by them. Kept for --events while their meaning is unknown.
+    /// The values behind switch bit 0x20: a multi-hit's further strikes. A record
+    /// with them is one the game's MULT counts (228 of 862 in the second capture,
+    /// matching per skill); neither the game's damage nor the target's HP adds them.
     std::vector<uint64_t> extra_hits;
+
+    [[nodiscard]] bool multi_hit() const noexcept { return !extra_hits.empty(); }
 
     [[nodiscard]] bool back() const noexcept { return direction == hit_direction::Back; }
     [[nodiscard]] bool front() const noexcept { return direction == hit_direction::Front; }
@@ -123,6 +137,8 @@ struct Tick {
     uint8_t effect{0};
     bool heal{false};
     uint64_t amount{0};
+    /// Effect 0x30's: the skill of the hit that set it off, an enemy's on the player.
+    uint32_t cause_skill{0};
 };
 
 struct PartyMember {
@@ -140,8 +156,8 @@ struct RemainingHp {
     /// The local player's own values (resources, by stat codes not yet known). No
     /// one else is sent these, so they name the local player when 33 36 was missed.
     bool self{false};
-    /// Anyone else's current HP, exact: an NPC's falls with each hit and reaches 0
-    /// when it dies.
+    /// Current HP, exact: an NPC's falls with each hit and reaches 0 when it dies.
+    /// Anyone else's, and the local player's own in a kind 3 record.
     bool has_hp{false};
     uint64_t hp{0};
 };

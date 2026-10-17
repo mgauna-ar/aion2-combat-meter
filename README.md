@@ -30,28 +30,24 @@ window (Ctrl+X) shows, but for every party member:
 ## 🚧 Status
 
 Version 0.1. The decoder started from the community's notes on the Global client's
-protocol and has been checked against one real capture: 30 seconds of open-world mobs.
-That capture fixed the spawn and damage layouts and decoded the game's HP packet. More
-captures are needed (`.claude/skills/decode-capture`), and these are still open:
+protocol and has been checked against two real captures: 30 seconds of open-world
+mobs, then a full dungeon run with three boss kills.
 
-- **Damage scale:** a mob's HP falls by a steady multiple of the damage number the meter
-  reads (4.5 for one player, about 10.6 for others). The public meters count the same
-  number with no multiple, so the totals match theirs; a check against the game's own
-  meter is still to do.
-- **Classes and skill names:** both come from the skill codes, with names from a public
-  skill database (`src/meter/data/skills.tsv`). They have been checked against one
-  capture, a Templar and an Elementalist.
-- **Map names:** dungeons are named from the same database's dungeon ids
-  (`src/meter/data/maps.tsv`). No capture has shown a map change yet, so whether the
-  game sends those same ids is unchecked. A map the table doesn't name, such as every
-  open-world zone, shows its id ("Map 400001"). No public source lists open-world map
-  ids, so those wait for a capture.
-- **Boss names:** monsters and bosses are named from the same database's ids
-  (`src/meter/data/npcs.tsv`). The one capture had only open-world mobs, all named
-  right; no boss has been checked yet. A code the table doesn't list shows as
-  "NPC #2920107".
-- **Boss threshold:** an enemy with 1,000,000 max HP or more counts as a boss. That
-  number is a guess (`meter.boss_min_max_hp`); open-world mobs have about 120,000.
+**Checked against the game's own Combat Analysis (Ctrl+X):** for the last boss fight of
+that run, your damage, hits and every per-skill CRI, PERF, DOUB, BACK, FRNT, MULT and
+BLOC share matched the game's window exactly. Healing came to 97% of the game's Total
+Heal. Dungeon and boss names were right, and so were the classes from skill codes.
+
+**Still open** (more captures help, `.claude/skills/decode-capture`):
+- **Misses and defences:** the game also counts missed hits (ACC) and the target's
+  endurance, regeneration and invincibility. The capture had none of them, so where
+  they live is unknown.
+- **Map names:** dungeons are named from a public database's dungeon ids
+  (`src/meter/data/maps.tsv`), which the game turned out to send. Open-world zones have
+  no public ids, so they show theirs ("Map 1010") until named by hand.
+- **Boss threshold:** an enemy with 1,000,000 max HP or more counts as a boss
+  (`meter.boss_min_max_hp`). One dungeon's bosses had 5.2M–9.9M, its trash under
+  450,000 and open-world mobs about 120,000; other dungeons are unchecked.
 - **PvP:** the meter cannot yet tell a player of the other faction from your party, so
   it counts no PvP damage. A capture of a PvP fight would show how to.
 
@@ -135,7 +131,8 @@ The tray icon's menu opens the window, does all of the above, and also opens the
 history and recordings folders, `config.json` and the log.
 
 **How fights are cut:**
-- **Start:** a fight starts on the party's first hit on an enemy.
+- **Start:** a fight starts on the party's first hit on an enemy. Breaking a boss's trap
+  around a party member (1 damage a hit) counts for nothing, as in the game's own window.
 - **End:** it ends 2 s after the boss dies (so the last DoT ticks count), on a loading
   screen (entering the same dungeon again too), or after 10 s without a party hit. While a boss is still standing, the wait
   is 30 s instead, to cover phases where it can't be hit.
@@ -195,7 +192,7 @@ by hand only while the meter is closed. Out-of-range values are clamped.
 | `scale` | 1.0 | Size, 0.6 to 2.5, on top of the monitor's DPI scaling. |
 | `x`, `y`, `width`, `height` | -1, -1, 430, 250 | Position and size in screen pixels. -1, -1 places it near the top-left; other negative values are on a monitor left of or above the main one. |
 | `show_share`, `show_crit`, `show_back`, `show_max_hit` | true, true, true, false | Optional columns: share of the damage, crit, back-attack rate, biggest hit. |
-| `show_hits`, `show_perfect`, `show_double`, `show_front`, `show_heal` | false | More optional columns: hits, perfect and double rates, front-attack rate, healing. |
+| `show_hits`, `show_perfect`, `show_double`, `show_front`, `show_multi`, `show_block`, `show_heal` | false | More optional columns: hits, perfect and double rates, front-attack rate, multi-hit and blocked rates, healing. |
 | `class_bars` | true | Bars in each player's class colour; off, all in one colour. |
 | `max_rows` | 8 | Players shown, best first, 1 to 24. Your own row is always one of them. |
 | `show_in_combat_only` | false | Show the overlay only during a fight, and for `hide_after_combat_s` after it. Applies only while locked. |
@@ -211,7 +208,7 @@ by hand only while the meter is closed. Out-of-range values are clamped.
 | `boss_idle_timeout_s` | 30 | The same while a boss is still standing. |
 | `capture_lost_s` | 15 | No game traffic for this long ends a fight. |
 | `kill_grace_s` | 2 | Hits after the boss dies still count for this long. |
-| `boss_min_max_hp` | 1000000 | Max HP that makes an enemy a boss. A guess until real captures calibrate it. |
+| `boss_min_max_hp` | 1000000 | Max HP that makes an enemy a boss. One dungeon's bosses had 5.2M–9.9M, its trash under 450,000. |
 | `min_saved_duration_s` | 20 | A fight with no boss is saved if it lasts at least this long. |
 | `save_only_dungeons` | false | Save only fights in a dungeon, as `overlay.show_in_dungeons_only` tells them. A dungeon the meter cannot name (its fights read "Map <number>") counts as not one. |
 | `partial_damage_ratio` | 0.7 | A boss that dies having lost less than this share of its HP with hits the meter saw (by the game's own HP updates) marks the fight "partial data". |

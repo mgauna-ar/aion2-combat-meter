@@ -64,7 +64,7 @@ size_t character_name_chars(std::string_view utf8) noexcept {
 
 bool is_character_name(std::string_view utf8) noexcept { return character_name_chars(utf8) != 0; }
 
-std::optional<Identity> read_identity_record(ByteReader& r) {
+std::optional<Identity> read_identity_record(ByteReader& r, bool own) {
     Identity id;
     const uint64_t raw_id = r.varint();
     r.skip(4);  // mask
@@ -78,6 +78,7 @@ std::optional<Identity> read_identity_record(ByteReader& r) {
     if (!r.ok() || len == 0 || len > kMaxNameBytes) return std::nullopt;
     id.name.assign(name.begin(), name.end());
     if (!is_character_name(id.name)) return std::nullopt;
+    if (own) r.skip(2);
     id.server = r.u16le();
     id.class_code = r.u32le();
     if (!r.ok()) return std::nullopt;

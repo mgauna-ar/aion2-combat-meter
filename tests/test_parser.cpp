@@ -75,7 +75,7 @@ TEST_CASE(Names, CharacterNameRules) {
 
 TEST_CASE(Parser, OwnAndOtherIdentity) {
     PacketParser p;
-    const auto own = parse_one(p, opcode::OwnCharacter, identity_body(501, "Ariel", kServer, 7));
+    const auto own = parse_one(p, opcode::OwnCharacter, own_identity_body(501, "Ariel", kServer, 7));
     const auto& me = only<Identity>(own);
     TEST_ASSERT_EQ(me.id, EntityId{501});
     TEST_ASSERT_EQ(me.name, std::string("Ariel"));
@@ -97,7 +97,7 @@ TEST_CASE(Parser, ScansUnknownPacketsOnlyForKnownServers) {
     // No server known yet: a look-alike could be anything.
     TEST_ASSERT(parse_one(p, 0x7777, blob).empty());
 
-    (void)parse_one(p, opcode::OwnCharacter, identity_body(501, "Ariel", kServer, 7));
+    (void)parse_one(p, opcode::OwnCharacter, own_identity_body(501, "Ariel", kServer, 7));
     const auto found = parse_one(p, 0x7777, blob);
     const auto& id = only<Identity>(found);
     TEST_ASSERT_EQ(id.id, EntityId{777});
@@ -154,6 +154,34 @@ TEST_CASE(Parser, SpawnCarriesItsNpcCodeAfterTheMask) {
     TEST_ASSERT(s.has_hp);
     TEST_ASSERT_EQ(s.cur_hp, uint64_t{99'393});
     TEST_ASSERT_EQ(s.max_hp, uint64_t{119'700});
+}
+
+TEST_CASE(Parser, SpawnAimedAtAPlayerNamesThemBeforeItsCode) {
+    // The second capture's traps: kind 1C, a mask of 1C 00 01, the trapped player's
+    // name, then the code. Read as the code, the name's first bytes made
+    // "NPC #1818840325".
+    PacketParser p;
+    SpawnSpec trap;
+    trap.kind = spawn_kind::Mechanic;
+    trap.aimed_at = "Lumiel";
+    trap.npc_code = 2'920'360;
+    trap.cur_hp = 10;
+    trap.max_hp = 10;
+    const auto& s = only<Spawn>(parse_one(p, opcode::Spawn, spawn_body(trap)));
+    TEST_ASSERT_EQ(s.aimed_at, std::string("Lumiel"));
+    TEST_ASSERT_EQ(s.npc_code, 2'920'360u);
+    TEST_ASSERT(s.has_hp);
+    TEST_ASSERT_EQ(s.max_hp, uint64_t{10});
+
+    // Without the flag there is no name to read.
+    SpawnSpec mob;
+    mob.kind = 0x0C;
+    TEST_ASSERT(only<Spawn>(parse_one(p, opcode::Spawn, spawn_body(mob))).aimed_at.empty());
+
+    // A flagged spawn whose name is not one does not parse.
+    trap.aimed_at = "$Guide";
+    TEST_ASSERT(parse_one(p, opcode::Spawn, spawn_body(trap)).empty());
+    TEST_ASSERT_EQ(p.stats().failed, uint64_t{1});
 }
 
 TEST_CASE(Parser, SpawnFindsItsPositionAfterOtherFields) {
@@ -283,6 +311,29 @@ TEST_CASE(Parser, MultiRecordAndExtraHits) {
     TEST_ASSERT_EQ(second.amount, uint64_t{200});
 }
 
+TEST_CASE(Parser, BlockedAndMultiHits) {
+    // Checked against the game's Combat Analysis: modifier 0x02 counted its BLOC,
+    // and a record with extra values its MULT.
+    PacketParser p;
+    DamageSpec blocked;
+    blocked.target = 16500;
+    blocked.actor = 501;
+    blocked.layout = 6;
+    blocked.modifiers = hit_modifier::Block;
+    blocked.amount = 4000;
+    blocked.pad = true;
+    const auto& b = only<Damage>(parse_one(p, opcode::Damage, damage_body({blocked})));
+    TEST_ASSERT((b.modifiers & hit_modifier::Block) != 0);
+    TEST_ASSERT_FALSE(b.multi_hit());
+
+    DamageSpec multi = blocked;
+    multi.modifiers = 0;
+    multi.extra_hits = {1};
+    const auto& m = only<Damage>(parse_one(p, opcode::Damage, damage_body({multi})));
+    TEST_ASSERT(m.multi_hit());
+    TEST_ASSERT_EQ(m.amount, uint64_t{4000});
+}
+
 TEST_CASE(Parser, CastMarkerIsNotDamage) {
     PacketParser p;
     Bytes body;
@@ -315,6 +366,24 @@ TEST_CASE(Parser, DotAndHotTicks) {
     TEST_ASSERT_EQ(p.stats().failed, uint64_t{1});
 }
 
+TEST_CASE(Parser, HealOnHitAndTicksWithoutAnAmount) {
+    PacketParser p;
+    // Effect 0x30: the skill is not scaled, and the enemy skill that set it off
+    // follows the amount.
+    const auto& heal = only<Tick>(parse_one(p, opcode::Tick, heal_on_hit_body(501, 67'613, 1'604'531)));
+    TEST_ASSERT(heal.heal);
+    TEST_ASSERT_EQ(heal.target, EntityId{501});
+    TEST_ASSERT_EQ(heal.actor, EntityId{501});
+    TEST_ASSERT_EQ(heal.skill, 2001u);
+    TEST_ASSERT_EQ(heal.amount, uint64_t{67'613});
+    TEST_ASSERT_EQ(heal.cause_skill, 1'604'531u);
+
+    // Effect 0x00 carries no amount: decoded, and nothing to count.
+    TEST_ASSERT(parse_one(p, opcode::Tick, no_amount_tick_body(16500)).empty());
+    TEST_ASSERT_EQ(p.stats().decoded, uint64_t{2});
+    TEST_ASSERT_EQ(p.stats().failed, uint64_t{0});
+}
+
 TEST_CASE(Parser, DeathAndMap) {
     PacketParser p;
     TEST_ASSERT_EQ(only<Death>(parse_one(p, opcode::Death, death_body(16500))).id, EntityId{16500});
@@ -337,10 +406,16 @@ TEST_CASE(Parser, EntityValuesHpAndSelf) {
     TEST_ASSERT_EQ(me.id, EntityId{6745});
     TEST_ASSERT(me.self);
     TEST_ASSERT_FALSE(me.has_hp);
+
+    // Kind 3, the local player's both lists, carries their own HP.
+    const auto& both = only<RemainingHp>(parse_one(p, opcode::RemainingHp, both_values_body(6745, 23'754)));
+    TEST_ASSERT(both.self);
+    TEST_ASSERT(both.has_hp);
+    TEST_ASSERT_EQ(both.hp, uint64_t{23'754});
     TEST_ASSERT_EQ(p.stats().failed, uint64_t{0});
 
     Bytes odd_kind = hp_body(100, 5);  // a one-byte id: the kind is byte 1
-    odd_kind[1] = 0x03;
+    odd_kind[1] = 0x04;
     (void)parse_one(p, opcode::RemainingHp, odd_kind);
     Bytes trailing = hp_body(100, 5);
     trailing.push_back(0x00);

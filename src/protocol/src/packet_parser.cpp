@@ -29,12 +29,18 @@ constexpr std::array<size_t, 4> kBlockSize{8, 12, 10, 14};
 constexpr uint64_t kDamageTypeCrit = 3;
 /// The skill code of a tick is the skill id times this.
 constexpr uint32_t kTickSkillScale = 100;
+/// 05 38 effects with their own layout (read_tick).
+constexpr uint8_t kTickNoAmount = 0x00;
+constexpr uint8_t kTickHealOnHit = 0x30;
 /// Positions are world coordinates: anything beyond this is not a position.
 constexpr float kMaxCoordinate = 1.0e7f;
 constexpr size_t kPartyMemberPrefix = 10;  // mask, slot, account u64
 /// 00 8D kinds, and the stat that is current HP.
 constexpr uint8_t kValuesSelf = 1;
 constexpr uint8_t kValuesOther = 2;
+/// The local player's, both lists in one: kind 1's u32 values, then a count and
+/// kind 2's u64 values, which carry their own HP.
+constexpr uint8_t kValuesBoth = 3;
 constexpr uint8_t kStatHp = 0;
 
 enum class Record : uint8_t { Damage, CastMarker, Failed };
@@ -73,28 +79,50 @@ Record read_damage_record(ByteReader& r, Damage& d) {
     return r.ok() ? Record::Damage : Record::Failed;
 }
 
-std::optional<Tick> read_tick(ByteReader& r) {
+/// 05 38 into `out`, left empty for a record with nothing to count. False when the
+/// body does not parse, or its effect is one not yet understood.
+bool read_tick(ByteReader& r, std::optional<Tick>& out) {
     Tick t;
     t.target = normalize_entity_id(r.varint());
     t.effect = r.u8();
     t.actor = normalize_entity_id(r.varint());
     (void)r.varint();  // meaning unknown
-    t.skill = r.u32le() / kTickSkillScale;
+    if (!r.ok()) return false;
+    if (t.effect == kTickNoAmount) {
+        // A record on the target itself, a boss's, with a u32 and no amount.
+        (void)r.u32le();
+        return r.ok();
+    }
+    const uint32_t skill = r.u32le();
     t.amount = r.varint();
-    if (!r.ok()) return std::nullopt;
+    if (t.effect == kTickHealOnHit) {
+        // The skill unscaled (2001 for every class), then the enemy skill whose hit
+        // set it off. The game's Total Heal counts it: without it the local
+        // player's healing came to half the game's figure.
+        t.skill = skill;
+        t.cause_skill = r.u32le();
+        t.heal = true;
+    } else {
+        t.skill = skill / kTickSkillScale;
+    }
+    if (!r.ok()) return false;
     switch (t.effect) {
         case 0x02:
         case 0x0A:
             t.heal = false;
-            return t;
+            break;
         case 0x01:
         case 0x09:
         case 0x0B:
             t.heal = true;
-            return t;
+            break;
+        case kTickHealOnHit:
+            break;
         default:
-            return std::nullopt;
+            return false;
     }
+    out = t;
+    return true;
 }
 
 [[nodiscard]] bool plausible_coordinate(float v) noexcept { return std::isfinite(v) && std::fabs(v) < kMaxCoordinate; }
@@ -106,6 +134,15 @@ std::optional<Spawn> read_spawn(std::span<const uint8_t> body) {
     s.mask = r.u24le();
     if (!r.ok() || s.id == 0) return std::nullopt;
     s.kind = static_cast<uint8_t>(s.mask & 0xFF);
+    if ((s.mask & spawn_mask::AimedAtPlayer) != 0) {
+        // The player's name before the code. Its bytes read as a code made every
+        // such mechanic "NPC #<four bytes of a name>".
+        const uint8_t len = r.u8();
+        const auto name = r.bytes(len);
+        if (!r.ok()) return std::nullopt;
+        s.aimed_at.assign(name.begin(), name.end());
+        if (!is_character_name(s.aimed_at)) return std::nullopt;
+    }
     const size_t after_mask = r.pos();
     s.npc_code = r.u32le();
     if (!r.ok()) s.npc_code = 0;
@@ -155,19 +192,29 @@ std::optional<Spawn> read_spawn(std::span<const uint8_t> body) {
 
 /// 00 8D: id, a kind, a count, then that many (stat u8, value). The local player's
 /// own values are kind 1 with u32 values; anyone else's are kind 2 with u64
-/// values, of which stat 0 is current HP.
+/// values, of which stat 0 is current HP. Kind 3, the local player's again, is
+/// kind 1's list followed by kind 2's, with its own count.
 std::optional<RemainingHp> read_entity_values(ByteReader& r) {
     RemainingHp v;
     v.id = normalize_entity_id(r.varint());
     const uint8_t kind = r.u8();
-    const uint8_t count = r.u8();
+    uint8_t count = r.u8();
     if (!r.ok() || v.id == 0 || count == 0 || count > PacketParser::kMaxEntityValues) return std::nullopt;
-    if (kind != kValuesSelf && kind != kValuesOther) return std::nullopt;
-    v.self = kind == kValuesSelf;
+    if (kind != kValuesSelf && kind != kValuesOther && kind != kValuesBoth) return std::nullopt;
+    v.self = kind != kValuesOther;
+    if (v.self) {
+        for (uint8_t i = 0; i < count; ++i) {
+            (void)r.u8();  // stat
+            (void)r.u32le();
+        }
+        if (kind == kValuesSelf) return r.ok() && r.at_end() ? std::optional<RemainingHp>(v) : std::nullopt;
+        count = r.u8();
+        if (!r.ok() || count > PacketParser::kMaxEntityValues) return std::nullopt;
+    }
     for (uint8_t i = 0; i < count; ++i) {
         const uint8_t stat = r.u8();
-        const uint64_t value = v.self ? r.u32le() : r.u64le();
-        if (!v.self && stat == kStatHp) {
+        const uint64_t value = r.u64le();
+        if (stat == kStatHp) {
             v.has_hp = true;
             v.hp = value;
         }
@@ -279,9 +326,10 @@ bool PacketParser::parse_known(const Frame& frame, std::vector<ParsedEvent>& out
         }
         case opcode::OwnCharacter:
         case opcode::OtherPlayer: {
-            auto id = read_identity_record(r);
+            const bool own = frame.opcode == opcode::OwnCharacter;
+            auto id = read_identity_record(r, own);
             if (!id) return false;
-            id->own = frame.opcode == opcode::OwnCharacter;
+            id->own = own;
             if (!id->name.empty()) remember_server(id->server);
             emit(std::move(*id));
             return true;
@@ -313,9 +361,9 @@ bool PacketParser::parse_known(const Frame& frame, std::vector<ParsedEvent>& out
             return true;
         }
         case opcode::Tick: {
-            const auto tick = read_tick(r);
-            if (!tick) return false;
-            emit(*tick);
+            std::optional<Tick> tick;
+            if (!read_tick(r, tick)) return false;
+            if (tick) emit(*tick);
             return true;
         }
         case opcode::PartyRoster: {

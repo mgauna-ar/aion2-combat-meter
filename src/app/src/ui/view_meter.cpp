@@ -108,14 +108,18 @@ bool begin_table(const char* id, const Column* cols, int count, float height) {
     std::vector<bool> shown(static_cast<size_t>(count), false);
     float used = 0.0f;
     float natural = 0.0f;
+    int shown_count = 0;
     for (const int i : order) {
         const float w = m(cols[i].width > 0.0f ? cols[i].width : 110.0f) + chrome;
         if (used > 0.0f && used + w > avail) continue;
         used += w;
         natural += cols[i].width > 0.0f ? cols[i].width : 110.0f;
         shown[static_cast<size_t>(i)] = true;
+        ++shown_count;
     }
-    const auto sizing = table_sizing(natural, count, kTableFlags);
+    // The chrome of the columns shown only: counting the dropped ones made a table
+    // that fits look cramped, and its stretching column shrank to its minimum.
+    const auto sizing = table_sizing(natural, shown_count, kTableFlags);
     if (!ImGui::BeginTable(id, count, sizing.flags, ImVec2(0.0f, height))) return false;
     for (int i = 0; i < count; ++i) {
         const ImGuiTableColumnFlags hide = shown[static_cast<size_t>(i)] ? 0 : ImGuiTableColumnFlags_Disabled;
@@ -161,6 +165,8 @@ const char* const kTipPerfect = "PERF: perfect hits, of the direct hits.";
 const char* const kTipDouble = "DOUB: double hits, of the direct hits.";
 const char* const kTipBack = "BACK: hits from behind the target, of the direct hits.";
 const char* const kTipFront = "FRNT: hits from the target's front, of the direct hits.";
+const char* const kTipMulti = "MULT: multi-hits, of the direct hits.";
+const char* const kTipBlock = "BLOC: hits the target blocked, of the direct hits.";
 
 /// The table's height when a breakdown shares the space under it.
 float table_height(bool breakdown_open) { return breakdown_open ? fill_h(0.0f) * 0.5f : fill_h(0.0f); }
@@ -213,6 +219,8 @@ void damage_breakdown(const meter::CombatantTotals& c, meter::EntityId& selected
         {"DOUB", 50.0f, kTipDouble, 9},
         {"BACK", 50.0f, kTipBack, 7},
         {"FRNT", 50.0f, kTipFront, 10},
+        {"MULT", 50.0f, kTipMulti, 13},
+        {"BLOC", 50.0f, kTipBlock, 14},
         {"DoT", 80.0f, "Damage from the skill's ticks, and how many.", 12},
     };
     if (begin_table("##SkillTable", cols, static_cast<int>(std::size(cols)), fill_h(0.0f))) {
@@ -235,7 +243,9 @@ void damage_breakdown(const meter::CombatantTotals& c, meter::EntityId& selected
             cell(9, colors::TextMuted, rate(s.hits, &meter::HitCounts::doubles));
             cell(10, colors::TextMuted, rate(s.hits, &meter::HitCounts::back));
             cell(11, colors::TextMuted, rate(s.hits, &meter::HitCounts::front));
-            cell(12, colors::TextDim, s.ticks == 0 ? "-" : format_amount(s.tick_damage) + " (" + number(s.ticks) + ")");
+            cell(12, colors::TextMuted, rate(s.hits, &meter::HitCounts::multi));
+            cell(13, colors::TextMuted, rate(s.hits, &meter::HitCounts::blocks));
+            cell(14, colors::TextDim, s.ticks == 0 ? "-" : format_amount(s.tick_damage) + " (" + number(s.ticks) + ")");
         }
         ImGui::EndTable();
     }
@@ -265,6 +275,8 @@ void damage_tab(const meter::FightSummary& f, AppViewState& state) {
         {"DOUB", 50.0f, kTipDouble, 9},
         {"BACK", 50.0f, kTipBack, 5},
         {"FRNT", 50.0f, kTipFront, 10},
+        {"MULT", 50.0f, kTipMulti, 13},
+        {"BLOC", 50.0f, kTipBlock, 14},
         {"Max", 58.0f, "The player's biggest hit.", 11},
     };
     if (begin_table("##DamageTable", cols, static_cast<int>(std::size(cols)), table_height(open != nullptr))) {
@@ -292,7 +304,9 @@ void damage_tab(const meter::FightSummary& f, AppViewState& state) {
             cell(9, colors::TextMuted, rate(c->hits, &meter::HitCounts::doubles));
             cell(10, colors::TextMuted, rate(c->hits, &meter::HitCounts::back));
             cell(11, colors::TextMuted, rate(c->hits, &meter::HitCounts::front));
-            cell(12, colors::TextMuted, format_amount(c->max_hit));
+            cell(12, colors::TextMuted, rate(c->hits, &meter::HitCounts::multi));
+            cell(13, colors::TextMuted, rate(c->hits, &meter::HitCounts::blocks));
+            cell(14, colors::TextMuted, format_amount(c->max_hit));
         }
         ImGui::EndTable();
     }
@@ -776,6 +790,8 @@ void columns_card(const AppFrameInput& in, AppActions& out) {
     setting_switch("Double", "DOUB: double hits.", &o.show_double, out);
     setting_switch("Back", "BACK: hits from behind.", &o.show_back, out);
     setting_switch("Front", "FRNT: hits from the front.", &o.show_front, out);
+    setting_switch("Multi", "MULT: multi-hits.", &o.show_multi, out);
+    setting_switch("Block", "BLOC: hits the target blocked.", &o.show_block, out);
     setting_switch("Max hit", "The player's biggest hit.", &o.show_max_hit, out);
     setting_switch("Healing", "Each player's healing.", &o.show_heal, out);
     setting_switch("Class colours", "Bars in each player's class colour.", &o.class_bars, out);

@@ -21,7 +21,8 @@ void add(HitCounts& into, const HitCounts& h) noexcept {
     into.crits += h.crits;
     into.back += h.back;
     into.front += h.front;
-    into.parry += h.parry;
+    into.blocks += h.blocks;
+    into.multi += h.multi;
     into.perfect += h.perfect;
     into.doubles += h.doubles;
     into.heavy += h.heavy;
@@ -33,7 +34,8 @@ void count(HitCounts& h, const proto::Damage& d) noexcept {
     if (d.crit) ++h.crits;
     if (d.back()) ++h.back;
     if (d.front()) ++h.front;
-    if ((d.modifiers & proto::hit_modifier::Parry) != 0) ++h.parry;
+    if ((d.modifiers & proto::hit_modifier::Block) != 0) ++h.blocks;
+    if (d.multi_hit()) ++h.multi;
     if ((d.modifiers & proto::hit_modifier::Perfect) != 0) ++h.perfect;
     if ((d.modifiers & proto::hit_modifier::Double) != 0) ++h.doubles;
     if ((d.modifiers & proto::hit_modifier::Heavy) != 0) ++h.heavy;
@@ -239,6 +241,9 @@ void EncounterEngine::credit(EntityId actor, EntityId target, uint64_t amount, u
     const EntityId enemy = m_registry.resolve(target);
     if (m_registry.side(player) != Side::Player || m_registry.side_or_guess(enemy) != Side::Enemy) return;
     m_registry.on_skill_class(player, class_of_skill(skill));
+    // Breaking a trap around a party member, 1 damage a hit: the game counts no hit
+    // and no damage, and neither starts or extends a fight.
+    if (const Actor* e = m_registry.find(enemy); e != nullptr && e->aimed_mechanic) return;
     // In a party, its members count; out of one, everyone in an instance, and
     // only the local player in the open world.
     if (!m_registry.in_party(player)) return;

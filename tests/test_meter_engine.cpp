@@ -450,6 +450,47 @@ TEST_CASE(Engine, AnIdentityWithAnUnknownClassKeepsTheSkillsClass) {
     TEST_ASSERT(row_of(s, kAlly).cls == AionClass::Spiritmaster);
 }
 
+TEST_CASE(Engine, HitsOnATrapAroundAPlayerCountNothing) {
+    // The second capture's: a mechanic aimed at a party member, 10 HP, that the
+    // others break 1 damage a hit. The game counts neither the hits nor the damage.
+    constexpr EntityId kTrap = 0x4102;
+    EncounterEngine e = setup();
+    proto::Spawn trap = npc(kTrap, 10, 2'920'360);
+    trap.kind = proto::spawn_kind::Mechanic;
+    trap.aimed_at = "Lumiel";
+    e.on_event(ev(at_s(1), trap));
+    e.on_event(ev(at_s(2), hit(kMe, kTrap, 1)));
+    TEST_ASSERT_FALSE(e.in_fight());
+
+    e.on_event(ev(at_s(3), hit(kMe, kBoss, 1000)));
+    e.on_event(ev(at_s(4), hit(kMe, kTrap, 1)));
+    e.on_event(ev(at_s(5), hit(kMe, kTrap, 1)));
+    const FightSummary f = e.current();
+    const CombatantTotals& me = row_of(f, kMe);
+    TEST_ASSERT_EQ(me.damage, uint64_t{1000});
+    TEST_ASSERT_EQ(me.hits.hits, uint64_t{1});
+    TEST_ASSERT_NEAR(f.duration_s, 1.0, 1e-9);
+}
+
+TEST_CASE(Engine, MultiHitsAndBlocksAreCounted) {
+    EncounterEngine e = setup();
+    proto::Damage multi = hit(kMe, kBoss, 1000);
+    multi.extra_hits = {1, 1};
+    proto::Damage blocked = hit(kMe, kBoss, 800);
+    blocked.layout = 6;
+    blocked.modifiers = proto::hit_modifier::Block;
+    e.on_event(ev(at_s(1), multi));
+    e.on_event(ev(at_s(2), blocked));
+    e.on_event(ev(at_s(3), hit(kMe, kBoss, 900)));
+    const FightSummary f = e.current();
+    const CombatantTotals& me = row_of(f, kMe);
+    TEST_ASSERT_EQ(me.hits.hits, uint64_t{3});
+    TEST_ASSERT_EQ(me.hits.multi, uint64_t{1});
+    TEST_ASSERT_EQ(me.hits.blocks, uint64_t{1});
+    // A multi-hit's further strikes add no damage.
+    TEST_ASSERT_EQ(me.damage, uint64_t{2700});
+}
+
 TEST_CASE(Engine, HealingCountsOnlyDuringAFight) {
     EncounterEngine e = setup();
     e.on_event(ev(at_s(1), heal_tick(kAlly, kMe, 500, 17080000)));

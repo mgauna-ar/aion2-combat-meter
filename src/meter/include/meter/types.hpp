@@ -58,7 +58,10 @@ struct HitCounts {
     uint64_t crits{0};
     uint64_t back{0};
     uint64_t front{0};
-    uint64_t parry{0};
+    /// The target blocked it (the game's BLOC).
+    uint64_t blocks{0};
+    /// A multi-hit (the game's MULT): one hit, however many strikes.
+    uint64_t multi{0};
     uint64_t perfect{0};
     uint64_t doubles{0};
     uint64_t heavy{0};

@@ -150,9 +150,15 @@ threads with a FileSource.
 
 ---
 
-## 📡 Protocol (Global client; from the community's notes, checked against one capture)
+## 📡 Protocol (Global client; from the community's notes, checked against two captures)
 
 All of it lives in `src/protocol`. `opcodes.hpp` is the one place opcodes are spelled.
+
+The two captures: 30 s of open-world mobs, then a full run of a dungeon (Vakron Sky
+Island), from login through three boss kills and back to town, whose final boss fight
+was checked against the game's own Combat Analysis window (Ctrl+X). For the local
+player there, damage (2,265,310), hits (862) and every per-skill CRI, PERF, DOUB,
+BACK, FRNT, MULT and BLOC share matched it exactly.
 
 **Transport**
 - TCP, server port 13328.
@@ -160,6 +166,8 @@ All of it lives in `src/protocol`. `opcodes.hpp` is the one place opcodes are sp
   ignored.
 - Through a ping reducer or VPN the game appears on loopback, on another port. The demux
   takes any flow once 3 heartbeats prove it is the game (`detect_relays`).
+- Entering a dungeon opens a new connection, to another server; leaving it, another
+  back to the town's. Each is its own flow, with its own framing state.
 - Reassembly (`TcpReassembler`): a hole waits 300 ms, or until 1 MiB queues behind it,
   then is a gap. A segment more than 4 MiB ahead is ignored as a stray, unless nothing
   else arrives for 300 ms: then the capture lost that much, and the stream skips there.
@@ -184,34 +192,42 @@ All of it lives in `src/protocol`. `opcodes.hpp` is the one place opcodes are sp
   - **Switch:** the low 3 bits are the layout (4–7; 0 marks a cast, not damage). Bit
     0x08 puts a u32 after the damage (so 0x0C is layout 4). Bit 0x20 means an extra
     list follows.
-  - **Damage type:** 3 is a crit.
+  - **Damage type:** 3 is a crit; 2 otherwise in the second capture.
   - **Block:** layout 4 has 8 bytes: a hit id (u32, counting up) and a count (u32).
     Layouts 5, 6 and 7 have 12, 10 and 14 bytes (6 seen in a capture; 5 and 7 as
-    NOIA2 reads them), starting with the modifiers (0x02 parry, 0x04 perfect, 0x08
-    double, 0x20 heavy; 0x80 seen, meaning unknown), a byte, and the direction (1
-    back, 2 front, 0 none). Layout 4 carries no modifiers or direction.
+    NOIA2 reads them), starting with the modifiers (0x02 block, 0x04 perfect, 0x08
+    double, 0x20 heavy; 0x80 seen, meaning unknown), a byte (00 in every record of
+    the second capture), and the direction (1 back, 2 front, 0 none). Layout 4
+    carries no modifiers or direction.
+    - 0x02 was the notes' "parry". Its count was the game's BLOC (11 of 862), skill
+      by skill: the target blocked the hit.
     waffle_meter reads the flag byte as rotated by a 2026-07 patch, and says a
     lifesteal varint of 1–3 bytes can come before the direction; neither is
     confirmed here.
   - **Damage:** an optional 00 pad, then a scalar varint (about 10,000: 10,000 for a
-    mob, 10,250 or 10,910 for players), then the damage varint.
-  - **Tail:** with 0x20, a count and that many varints. They are not damage: the
-    target's HP does not fall by them. Then the count again and a 00; the notes read
-    that `01 00` as "another record follows", and no capture has shown one yet.
+    mob, 10,250, 10,910 or 12,910 for players), then the damage varint. Layouts 5–7
+    had the pad in every record of the second capture, layout 4 never.
+  - **Tail:** with 0x20, a count (1–4) and that many varints: a multi-hit's further
+    strikes. A record with them is one the game's MULT counts (228 of 862, matching
+    per skill). Neither the game's damage nor the target's HP adds them. Then the
+    count again and a 00; the notes read that `01 00` as "another record follows",
+    and no capture has shown one yet.
   - **It carries heals too:** a support skill on an ally looks like any hit, and the
     ally's HP rises. Side inference must not trust a record between two players,
     and neither can healing: a PvP hit on the other faction looks the same.
     In the first capture these were layout 4 records, to the caster itself (Siphon,
     Warding Strike) or to an ally or spirit (Spirit Communion). A spirit's record to
     itself as it spawned carried 100,000, and is no heal.
-  - **Not decoded yet:** whether a hit missed, was blocked, or set off the target's
-    endurance, regeneration or invincibility, all of which the game's own window
-    counts; and multi-hit, which may be the 0x20 tail.
-  - **Scale:** a mob's HP (00 8D) falls by a steady multiple of the damage varint:
-    exactly 4.5 for one player, about 10.6 for two others, 1 for a mob hitting a
-    player. The multiple is not anywhere in the record. The public meters (NOIA2,
-    waffle_meter) count the varint unscaled and add no extra-hit values, as we do.
-    Never compare damage with HP: compare HP with HP.
+  - **Not decoded yet:** whether a hit missed, or set off the target's endurance,
+    regeneration or invincibility, all of which the game's own window counts. The
+    second capture had none of them (ACC 100%, ENDR, RSTO and INVC 0%), so it could
+    not show where they live.
+  - **Scale: settled.** The damage varint is the game's own damage figure: summed
+    over the second capture's boss fight it matched the Combat Analysis to the
+    point. HP is in other units: a mob's HP (00 8D) falls by a steady multiple of
+    the damage (4.5 for one player in the first capture, about 10.6 for two others),
+    and the last boss took 18.59M damage against 9.86M max HP. Never compare damage
+    with HP: compare HP with HP.
 - **Skill codes** (in 04 38 and 05 38):
   - 8 digits. The first two are the class: 11 Gladiator, 12 Templar, 13 Assassin,
     14 Ranger, 15 Sorcerer, 16 Elementalist (the enum's Spiritmaster), 17 Cleric,
@@ -225,8 +241,25 @@ All of it lives in `src/protocol`. `opcodes.hpp` is the one place opcodes are sp
 - **Tick `05 38`:** target varint, effect u8, actor varint, a varint of unknown meaning,
   skill u32 (×100), amount varint.
   - Effects 02 and 0A are damage; 01, 09 and 0B are heals.
+  - Effect 00 has no amount: after the varint, a u32 (100,000,010 or so) and the end.
+    It came on a boss, actor and target both, about once a second of its fight.
+  - Effect 30 is a heal, always on the player themself: the skill u32 is not scaled
+    (2001 for every class; once 100031), and after the amount a u32 names the enemy
+    skill whose hit set it off. It may be a shield taking the hit. The game's Total
+    Heal counts it: without it the local player's healing came to half the game's
+    figure, with it to 97%.
+  - Effects 02 to self (100,000, a spirit spawning), 08 and 38 (a boss skill on a
+    trap, naming a player) are rare, and 08 and 38 fail to parse until understood.
 - **Identity `33 36` (own) / `45 36` (other):** id varint, mask u32, flags u8 (bit 0:
-  has a name), name length u8, name, server u16, class u32.
+  has a name), name length u8, name, server u16, a u32 read as the class.
+  - 33 36 has a u16 of unknown meaning between the name and the server: 1406 in
+    all three of the second capture's, whose server was 9 where the same name turned
+    up in other packets. Read as the server, it made the local player a character of
+    server 1406. Its flags were 0x37, where 45 36's are 0x07.
+  - The "class" u32 is not the class. In 45 36 it was 0x01010000, 0x02010000 or
+    0x02020000: a Gladiator and a Ranger shared one value, a Sorcerer and a Chanter
+    another. Its two high bytes may be faction and gender; unconfirmed.
+    `class_codes.cpp` stays empty, and skill codes give the class.
   - A name is at most 16 letters or digits, with at least one letter.
   - A name starting with `$` is a tutorial placeholder.
 - **Spawn `41 36`:**
@@ -235,7 +268,14 @@ All of it lives in `src/protocol`. `opcodes.hpp` is the one place opcodes are sp
   - **Mask:** 3 bytes, the first the kind (then `20 00` for mobs, `10 00` for the one
     summon seen). 1F/5F are summons (with an owner); 1D/5D are spirits and effects;
     1C is a boss mechanic.
-  - **Npc code:** the u32 after the mask. Names come from `src/meter/data/npcs.tsv`
+  - **Aimed at a player:** bit 0 of the mask's third byte (`1C 00 01`, also on kinds
+    14 and 54) puts a name before the npc code: length u8, then the name of the
+    party member the mechanic is aimed at. All 57 such spawns in the second capture
+    carried one, then a valid code (2,920,360, 364, 371 or 474, none listed).
+    - The 10-HP and 3-HP ones are traps around that player, which the others break
+      1 damage a hit. The game's window counts neither those hits nor their damage.
+    - Read as the code, the name's first bytes made "NPC #1818840325" and the like.
+  - **Npc code:** the u32 after the mask, or after the name. Names come from `src/meter/data/npcs.tsv`
     (aion2.app's 7,545 monsters and 3,719 NPCs; metabot.gg agrees on the bosses
     compared): seven digits, 2,000,002 to 2,990,928, one id per level or difficulty.
     - Checked against the first capture: all 10 mob spawns carried a listed code
@@ -243,6 +283,9 @@ All of it lives in `src/protocol`. `opcodes.hpp` is the one place opcodes are sp
       (2,920,107) is not listed.
     - It was read as the u24 a byte later until then: the code's upper bytes, 8206 for
       every 2,100,7xx mob.
+    - Checked against the second capture: its bosses (Tiere, Thamon, Vakron) and its
+      trash named themselves from their spawn's code. The boss adds and mechanics
+      (2,920,xxx) are not listed.
     - A code not listed shows as "NPC #code".
   - **Position and HP:** the first `00 (00|40) 02` marker followed by a sane xyz f32
     triple, a heading f32, a u16, a byte (01; 00 for a corpse coming into view, with
@@ -257,43 +300,51 @@ All of it lives in `src/protocol`. `opcodes.hpp` is the one place opcodes are sp
     - Names come from `src/meter/data/maps.tsv`. It holds aion2.app's dungeon tier
       ids: one row per difficulty, such as Krao Cave 600002 (Exploration) and 600001
       (Conquest), with Awakening tiers at 910000 and up, outside the instance range.
-      Those ids are assumed to be the map id here; no capture has shown a 21 36 yet.
+      The second capture's dungeon came as 600072, which the table names Vakron Sky
+      Island (Conquest), the dungeon that was run: the tier ids are the map ids.
     - Open-world zones have no public numeric ids. Their rows go by hand under the
       TSV's `# By hand` line, which `--import-pages` keeps. metabot.gg gives 333 zone
       ids (Reshanta's Root is 622), but they look like zones within a map, not maps,
-      so none are in the TSV; compare them with the first open-world 21 36.
+      so none are in the TSV. The second capture's town came as 1010, which matches
+      none of them.
   - Party `02 97`: names only, found by scanning, since each member's tail varies in
     length. A found name has at least 2 characters: `01` and a letter turn up in the
-    tails.
+    tails. A list sent while the party forms or breaks up names fewer members than
+    its count, and is dropped: a partial list would leave out members who are there.
   - Entity values `00 8D`: id varint, kind u8, count u8, then that many (stat u8,
     value). Kind 1 is the local player's own values (u32; stats 1, 3, 6 seen, meaning
     unknown): no one else gets them, so they name the local player when 33 36 was
-    missed. Kind 2 is anyone else's (u64); stat 0 is current HP, exact.
+    missed. Kind 2 is anyone else's (u64); stat 0 is current HP, exact. Kind 3 is
+    the local player's again, both lists in one: kind 1's, then a count and kind 2's,
+    which carry their own HP.
 
 **Unknown or guessed. Each needs a real capture (skill `decode-capture`):**
 - whether the "optional 00 pad" can be confused with a scalar of 0;
-- whether a boss's spawn carries its code where a mob's does: the first capture had
-  only open-world mobs;
-- the damage scale (above): the varint is what the public meters count; the game's own
-  meter has not been compared yet;
-- the layout of `33 36`: the first capture started after login, so it had none;
 - multi-record `04 38` packets;
-- misses, blocks, multi-hit, and the target's endurance, regeneration and
-  invincibility (above);
-- the class codes in 33 36 / 45 36 (`meter/class_codes.cpp` is empty; skill codes
-  give the class instead);
-- the right `boss_min_max_hp`;
+- misses, and the target's endurance, regeneration and invincibility (above);
+- where the class is in 33 36 / 45 36, and what their "class" u32 and 33 36's extra
+  u16 hold (`meter/class_codes.cpp` is empty; skill codes give the class instead);
+- tick effects 08 and 38;
+- whether the game's Total Heal counts heals before a fight's first hit: the meter's
+  healing came to 97% of it;
+- what the 5-HP object (2,920,366, kind 14, no name) the party broke in the second
+  capture's first boss fight is: its 1-damage hits still count, while the game's
+  window for that fight was not checked;
+- `boss_min_max_hp` (1,000,000) against other dungeons: the second capture's bosses
+  had 5.22M–9.86M max HP, its trash 203k–435k, open-world mobs about 120k;
 - whether the folded id range means anything: in the first capture NPC and player ids
   were all small numbers, side by side, none folded;
 - the game's process name: the Steam install's executable is
   `Aion2/Binaries/Win64/AION2.exe`, which the default `Aion2.exe` matches (the match
   ignores case), but no one has checked the name of the running process;
-- whether 21 36's map id is aion2.app's dungeon tier id (`maps.tsv`), and the ids of
-  open-world zones;
-- whether ids change on a map load, and whether the server hands a player's old id to
-  someone else. A party whose Ranger and Elementalist shared one row, the name
-  switching from pull to pull, points to both, but no capture has shown a map load
-  yet. The meter assumes both can happen (Meter rules, Sides).
+- the open-world zones' map ids (the second capture's town was 1010);
+- whether the server hands a player's old id to someone else. Ids belong to a map
+  instance and are handed out on entering it: in the second capture the local
+  player's id was new on each of its three maps, while players who stayed in town
+  kept theirs across the 14 minutes the local player spent in the dungeon (22 of 23; one
+  came back with a new id). A party whose Ranger and Elementalist shared one row,
+  the name switching from pull to pull, points to reuse. The meter assumes both
+  (Meter rules, Sides).
 - whether a teleport within a dungeon sends a 21 36. Re-entering the same dungeon
   straight away did, as the runs that shared one visit showed; a teleport that did too
   would now split a run and end its fight;
@@ -355,14 +406,22 @@ in 2026-10.
     fight.
 - **Healing and damage taken** count only during a fight, and never start or extend
   one.
-  - Healing: heal ticks to anyone on the player side, and 04 38 records from a
-    player (not a summon) to a party member. A record to anyone else may be a PvP
-    hit. It is the total, like the game's: no overheal split.
+  - Healing: heal ticks to anyone on the player side (effect 30's included), and 04 38
+    records from a player (not a summon) to a party member. A record to anyone else
+    may be a PvP hit. It is the total, like the game's: no overheal split.
   - Damage taken: an enemy's hits and ticks on a player. A summon's HP is its own.
   - Both are booked for party members by the roster and the local player; with no
     roster, for players already in the fight, so strangers nearby stay out.
 - **Skills:** each player's damage, healing and damage taken are kept per skill, keyed
   by `skill_key()`: variants of one skill share a row.
+- **Hits** (`HitCounts`, the game's columns): direct hits, and of them crits (CRI),
+  perfect (PERF), double (DOUB), back (BACK), front (FRNT), multi-hits (MULT: a
+  record with the 0x20 tail, one hit however many strikes) and blocked (BLOC).
+  History files before the block was known saved it as `"parry"`, which still loads.
+- **Aimed mechanics:** a spawn aimed at a player (Spawn::aimed_at), such as a trap the
+  party breaks, takes no damage that counts: hits on it are neither damage nor hits,
+  and never start or extend a fight, as in the game's window. Its hits on players are
+  damage taken.
 - **Fight start:** a direct hit that lands, from the player side on an enemy. A DoT tick
   never starts a fight.
 - **Fight end:** the boss's death (00 8D HP 0 or 42 36, after `kill_grace_s`, unless a
@@ -375,6 +434,9 @@ in 2026-10.
   - Duration runs from the first hit to the last, floored at 1 s for DPS.
 - **Boss:** the damaged enemy with the most max HP. It is a boss if that max HP is at
   least `boss_min_max_hp`.
+  - Calibrated on one dungeon: its bosses had 5.22M–9.86M max HP, its trash
+    203k–435k. Undamaged adds and mechanics can share the boss's max HP; they never
+    win, having taken no damage.
   - Its name comes from its spawn's npc code (`npc_label`): "NPC #code" when the table
     does not list it, "#id" when it was never seen spawning. The label is saved with
     the fight, so a fight keeps the name it had.
