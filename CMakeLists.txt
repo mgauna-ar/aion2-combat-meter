@@ -150,14 +150,15 @@ if(AION2_WINDOWS)
         target_link_options(aion2-combat-meter PRIVATE "/MANIFEST:NO")
     endif()
 
-    install(TARGETS aion2-combat-meter aion2meter-replay RUNTIME DESTINATION .)
-    install(FILES LICENSE README.md DESTINATION .)
+    # The release zip holds the meter alone. The replay tool is its own release asset
+    # (ci.yml), outside the zip and the updater; the docs live in the repository.
+    install(TARGETS aion2-combat-meter RUNTIME DESTINATION .)
 endif()
 
 # -----------------------------------------------------------------------------
-# Packaging (CPack): the release zip, binaries at its root. Every installed copy's
-# updater looks for this name with the two executables at the root
-# (RELEASE_ASSET_NAME and UPDATE_FILES in src/app/include/app/update_check.hpp).
+# Packaging (CPack): the release zip, the meter's exe at its root. Every installed
+# copy's updater looks for this name with that exe at the root (RELEASE_ASSET_NAME
+# and UPDATE_FILES in src/app/include/app/update_check.hpp).
 # -----------------------------------------------------------------------------
 set(CPACK_PACKAGE_NAME "aion2-combat-meter")
 set(CPACK_PACKAGE_VENDOR "aion2-combat-meter contributors")

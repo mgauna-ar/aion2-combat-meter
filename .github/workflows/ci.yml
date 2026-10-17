@@ -122,9 +122,14 @@ jobs:
       - name: Package (CPack)
         run: cpack --config build/CPackConfig.cmake -G ZIP -C Release -B dist
 
-      - name: SHA-256 of the Package
+      # The replay tool ships beside the zip, not in it: the zip is what the updater
+      # installs. Bare names, so `sha256sum -c` works where they were downloaded.
+      - name: SHA-256 of the Release Files
         shell: bash
-        run: sha256sum dist/aion2-combat-meter-windows-x64.zip | tee dist/SHA256SUMS.txt
+        run: |
+          cp build/bin/Release/aion2meter-replay.exe dist/
+          cd dist
+          sha256sum aion2-combat-meter-windows-x64.zip aion2meter-replay.exe | tee SHA256SUMS.txt
 
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v7
@@ -143,6 +148,7 @@ jobs:
           name: aion2-combat-meter-release
           path: |
             dist/aion2-combat-meter-windows-x64.zip
+            dist/aion2meter-replay.exe
             dist/SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 1
@@ -180,5 +186,6 @@ jobs:
         with:
           files: |
             aion2-combat-meter-windows-x64.zip
+            aion2meter-replay.exe
             SHA256SUMS.txt
           generate_release_notes: true

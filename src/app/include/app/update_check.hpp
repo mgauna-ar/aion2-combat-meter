@@ -24,9 +24,8 @@ inline constexpr std::string_view RELEASE_DOWNLOAD_PREFIX =
 /// for this name.
 inline constexpr std::string_view RELEASE_ASSET_NAME = "aion2-combat-meter-windows-x64.zip";
 /// What an update replaces, each at the archive's root and next to the running exe.
-/// The zip's README and LICENSE are left as they are.
-inline constexpr std::array<std::string_view, 2> UPDATE_FILES = {"aion2-combat-meter.exe",
-                                                                 "aion2meter-replay.exe"};
+/// The replay tool is a release asset of its own, outside the zip and the updater.
+inline constexpr std::array<std::string_view, 1> UPDATE_FILES = {"aion2-combat-meter.exe"};
 inline constexpr std::string_view UPDATE_EXE_NAME = UPDATE_FILES[0];
 
 struct Version {

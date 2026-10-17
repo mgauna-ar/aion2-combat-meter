@@ -72,8 +72,8 @@ using RenameFn = std::function<bool(const std::filesystem::path& from, const std
                                               std::string_view backup_tag, const RenameFn& rename_fn = {});
 
 /// Removes the staging folder and the backups apply_staged_update() leaves. Best
-/// effort: a backup still running, such as a replay tool left open, stays for a
-/// later start.
+/// effort: a backup still running, the old build when it outlived its wait, stays
+/// for a later start.
 void remove_update_leftovers(const std::filesystem::path& install_dir);
 
 /**
@@ -92,7 +92,7 @@ public:
     static constexpr size_t kMaxDownloadBytes = 64 * 1024 * 1024;
     static constexpr size_t kMaxFileBytes = 64 * 1024 * 1024;
 
-    /// `folder` holds the running exe and the replay tool.
+    /// `folder` holds the running exe.
     explicit Updater(std::filesystem::path folder, Fetch fetch = &os::https_get);
     ~Updater();
 

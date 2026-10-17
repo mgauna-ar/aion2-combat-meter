@@ -95,7 +95,8 @@ struct FakeGitHub {
     }
 };
 
-/// An install folder holding the build being replaced.
+/// An install folder holding the build being replaced, and a replay tool, which
+/// is no part of an update.
 void write_old_build(const fs::path& dir) {
     write_file(dir / "aion2-combat-meter.exe", "old exe");
     write_file(dir / "aion2meter-replay.exe", "old replay");
@@ -310,28 +311,30 @@ TEST_CASE(Update, InstallsAndAppliesARelease) {
     TEST_ASSERT_TRUE(github.progress_reported.load());
     TEST_ASSERT_TRUE(updater.status().progress > 0.99f);
 
-    // Staged beside the build, which is untouched until applied.
+    // Staged beside the build, which is untouched until applied. Only the exe comes
+    // out of the zip, whatever else it holds.
     const fs::path staged = staging_dir(install.path);
     TEST_ASSERT_EQ(read_file(staged / "aion2-combat-meter.exe"), expected_exe());
-    TEST_ASSERT_EQ(read_file(staged / "aion2meter-replay.exe"), expected_replay());
+    TEST_ASSERT_FALSE(fs::exists(staged / "aion2meter-replay.exe"));
     TEST_ASSERT_FALSE(fs::exists(staged / "notes.txt"));
     TEST_ASSERT_EQ(read_file(install.path / "aion2-combat-meter.exe"), std::string("old exe"));
 
     TEST_ASSERT_TRUE(updater.apply_staged());
     TEST_ASSERT_EQ(updater.state(), UpdateState::RestartPending);
     TEST_ASSERT_EQ(read_file(install.path / "aion2-combat-meter.exe"), expected_exe());
-    TEST_ASSERT_EQ(read_file(install.path / "aion2meter-replay.exe"), expected_replay());
     TEST_ASSERT_EQ(read_file(install.path / backup_name("aion2-combat-meter.exe")), std::string("old exe"));
-    TEST_ASSERT_EQ(read_file(install.path / backup_name("aion2meter-replay.exe")), std::string("old replay"));
     TEST_ASSERT_FALSE(fs::exists(staged));
+    // The replay tool is left as it was.
+    TEST_ASSERT_EQ(read_file(install.path / "aion2meter-replay.exe"), std::string("old replay"));
+    TEST_ASSERT_FALSE(fs::exists(install.path / backup_name("aion2meter-replay.exe")));
 
     // A second apply has nothing to apply.
     TEST_ASSERT_FALSE(updater.apply_staged());
 
     remove_update_leftovers(install.path);
     TEST_ASSERT_FALSE(fs::exists(install.path / backup_name("aion2-combat-meter.exe")));
-    TEST_ASSERT_FALSE(fs::exists(install.path / backup_name("aion2meter-replay.exe")));
     TEST_ASSERT_EQ(read_file(install.path / "aion2-combat-meter.exe"), expected_exe());
+    TEST_ASSERT_EQ(read_file(install.path / "aion2meter-replay.exe"), std::string("old replay"));
 }
 
 TEST_CASE(Update, ArchiveWithDataDescriptorsInstalls) {
@@ -345,7 +348,7 @@ TEST_CASE(Update, ArchiveWithDataDescriptorsInstalls) {
     updater.install();
     updater.wait_idle();
     TEST_ASSERT_EQ(updater.state(), UpdateState::Ready);
-    TEST_ASSERT_EQ(read_file(staging_dir(install.path) / "aion2meter-replay.exe"), expected_replay());
+    TEST_ASSERT_EQ(read_file(staging_dir(install.path) / "aion2-combat-meter.exe"), expected_exe());
 }
 
 TEST_CASE(Update, ChecksumMismatchStagesNothing) {
@@ -369,11 +372,11 @@ TEST_CASE(Update, ChecksumMismatchStagesNothing) {
     TEST_ASSERT_FALSE(updater.apply_staged());
 }
 
-TEST_CASE(Update, ArchiveMissingAFileFails) {
+TEST_CASE(Update, ArchiveWithoutTheExeFails) {
     const ScratchDir install("aion2_update_missing");
     write_old_build(install.path);
     FakeGitHub github;
-    github.offer(kZipExeOnly);
+    github.offer(kZipWithoutExe);
     Updater updater(install.path, github.fetch());
     updater.check_now();
     updater.wait_idle();
@@ -382,8 +385,9 @@ TEST_CASE(Update, ArchiveMissingAFileFails) {
 
     const UpdateStatus status = updater.status();
     TEST_ASSERT_EQ(status.state, UpdateState::Failed);
-    TEST_ASSERT_TRUE(status.error.find("aion2meter-replay.exe") != std::string::npos);
+    TEST_ASSERT_TRUE(status.error.find("aion2-combat-meter.exe") != std::string::npos);
     TEST_ASSERT_FALSE(fs::exists(staging_dir(install.path)));
+    TEST_ASSERT_EQ(read_file(install.path / "aion2-combat-meter.exe"), std::string("old exe"));
 }
 
 TEST_CASE(Update, DownloadFailureFails) {
@@ -402,14 +406,13 @@ TEST_CASE(Update, DownloadFailureFails) {
 }
 
 TEST_CASE(Update, ApplyRollsBackOnAnyFailedStep) {
-    // The renames, in order: exe aside, new exe in, replay tool aside, new one in.
-    for (int failing = 1; failing <= 4; ++failing) {
+    // The renames, in order: the exe aside, the new exe in.
+    for (int failing = 1; failing <= 2; ++failing) {
         const ScratchDir install("aion2_update_rollback");
         write_old_build(install.path);
         const fs::path staged = staging_dir(install.path);
         fs::create_directories(staged);
         write_file(staged / "aion2-combat-meter.exe", "new exe");
-        write_file(staged / "aion2meter-replay.exe", "new replay");
 
         int calls = 0;
         const RenameFn flaky_rename = [&](const fs::path& from, const fs::path& to) {
@@ -421,90 +424,57 @@ TEST_CASE(Update, ApplyRollsBackOnAnyFailedStep) {
         const std::string error = apply_staged_update(install.path, staged, "1.0.0", flaky_rename);
         TEST_ASSERT_FALSE(error.empty());
         TEST_ASSERT_EQ(read_file(install.path / "aion2-combat-meter.exe"), std::string("old exe"));
-        TEST_ASSERT_EQ(read_file(install.path / "aion2meter-replay.exe"), std::string("old replay"));
         TEST_ASSERT_EQ(read_file(staged / "aion2-combat-meter.exe"), std::string("new exe"));
-        TEST_ASSERT_EQ(read_file(staged / "aion2meter-replay.exe"), std::string("new replay"));
         TEST_ASSERT_FALSE(fs::exists(install.path / "aion2-combat-meter.exe.1.0.0.old"));
     }
 }
 
-TEST_CASE(Update, ApplyNeedsBothStagedFiles) {
+TEST_CASE(Update, ApplyNeedsTheStagedExe) {
     const ScratchDir install("aion2_update_partial");
     write_old_build(install.path);
     const fs::path staged = staging_dir(install.path);
     fs::create_directories(staged);
-    write_file(staged / "aion2-combat-meter.exe", "new exe");
 
     TEST_ASSERT_FALSE(apply_staged_update(install.path, staged, "1.0.0").empty());
     TEST_ASSERT_EQ(read_file(install.path / "aion2-combat-meter.exe"), std::string("old exe"));
-    TEST_ASSERT_EQ(read_file(staged / "aion2-combat-meter.exe"), std::string("new exe"));
+    TEST_ASSERT_FALSE(fs::exists(install.path / "aion2-combat-meter.exe.1.0.0.old"));
 }
 
 TEST_CASE(Update, ApplyNumbersABackupItCannotReplace) {
-    // A backup from an earlier update that could not be removed, as a replay tool
+    // A backup from an earlier update that could not be removed, as an old build
     // still running; a non-empty folder stands in for it here.
     const ScratchDir install("aion2_update_numbered");
     write_old_build(install.path);
-    fs::create_directories(install.path / "aion2meter-replay.exe.1.0.0.old");
-    write_file(install.path / "aion2meter-replay.exe.1.0.0.old" / "held", "x");
+    fs::create_directories(install.path / "aion2-combat-meter.exe.1.0.0.old");
+    write_file(install.path / "aion2-combat-meter.exe.1.0.0.old" / "held", "x");
     const fs::path staged = staging_dir(install.path);
     fs::create_directories(staged);
     write_file(staged / "aion2-combat-meter.exe", "new exe");
-    write_file(staged / "aion2meter-replay.exe", "new replay");
-
-    TEST_ASSERT_TRUE(apply_staged_update(install.path, staged, "1.0.0").empty());
-    TEST_ASSERT_EQ(read_file(install.path / "aion2meter-replay.exe"), std::string("new replay"));
-    TEST_ASSERT_EQ(read_file(install.path / "aion2meter-replay.exe.1.0.0.2.old"), std::string("old replay"));
-    TEST_ASSERT_EQ(read_file(install.path / "aion2-combat-meter.exe.1.0.0.old"), std::string("old exe"));
-}
-
-TEST_CASE(Update, MissingLiveFileIsMovedIn) {
-    // A folder whose replay tool was deleted still takes the update.
-    const ScratchDir install("aion2_update_missing_live");
-    write_file(install.path / "aion2-combat-meter.exe", "old exe");
-    const fs::path staged = staging_dir(install.path);
-    fs::create_directories(staged);
-    write_file(staged / "aion2-combat-meter.exe", "new exe");
-    write_file(staged / "aion2meter-replay.exe", "new replay");
 
     TEST_ASSERT_TRUE(apply_staged_update(install.path, staged, "1.0.0").empty());
     TEST_ASSERT_EQ(read_file(install.path / "aion2-combat-meter.exe"), std::string("new exe"));
-    TEST_ASSERT_EQ(read_file(install.path / "aion2meter-replay.exe"), std::string("new replay"));
-    TEST_ASSERT_EQ(read_file(install.path / "aion2-combat-meter.exe.1.0.0.old"), std::string("old exe"));
-    TEST_ASSERT_FALSE(fs::exists(install.path / "aion2meter-replay.exe.1.0.0.old"));
+    TEST_ASSERT_EQ(read_file(install.path / "aion2-combat-meter.exe.1.0.0.2.old"), std::string("old exe"));
 }
 
-TEST_CASE(Update, ApplyRollsBackAMovedInFile) {
-    // With no replay tool to move aside, the renames are: exe aside, new exe in,
-    // new replay tool in. The last one failing puts everything back.
-    const ScratchDir install("aion2_update_rollback_missing");
-    write_file(install.path / "aion2-combat-meter.exe", "old exe");
+TEST_CASE(Update, MissingLiveFileIsMovedIn) {
+    // A folder whose exe was renamed or deleted by hand still takes the update.
+    const ScratchDir install("aion2_update_missing_live");
     const fs::path staged = staging_dir(install.path);
     fs::create_directories(staged);
     write_file(staged / "aion2-combat-meter.exe", "new exe");
-    write_file(staged / "aion2meter-replay.exe", "new replay");
 
-    int calls = 0;
-    const RenameFn flaky_rename = [&](const fs::path& from, const fs::path& to) {
-        if (++calls == 3) return false;
-        std::error_code ec;
-        fs::rename(from, to, ec);
-        return !ec;
-    };
-    TEST_ASSERT_FALSE(apply_staged_update(install.path, staged, "1.0.0", flaky_rename).empty());
-    TEST_ASSERT_EQ(read_file(install.path / "aion2-combat-meter.exe"), std::string("old exe"));
-    TEST_ASSERT_FALSE(fs::exists(install.path / "aion2meter-replay.exe"));
+    TEST_ASSERT_TRUE(apply_staged_update(install.path, staged, "1.0.0").empty());
+    TEST_ASSERT_EQ(read_file(install.path / "aion2-combat-meter.exe"), std::string("new exe"));
     TEST_ASSERT_FALSE(fs::exists(install.path / "aion2-combat-meter.exe.1.0.0.old"));
-    TEST_ASSERT_EQ(read_file(staged / "aion2-combat-meter.exe"), std::string("new exe"));
-    TEST_ASSERT_EQ(read_file(staged / "aion2meter-replay.exe"), std::string("new replay"));
 }
 
 TEST_CASE(Update, LeftoverCleanupTouchesOnlyBackups) {
     const ScratchDir install("aion2_update_leftovers");
     write_old_build(install.path);
     write_file(install.path / "aion2-combat-meter.exe.1.0.0.old", "a");
-    write_file(install.path / "aion2meter-replay.exe.1.0.0.2.old", "b");
-    write_file(install.path / "other.dll.1.0.0.old", "c");
+    write_file(install.path / "aion2-combat-meter.exe.1.0.0.2.old", "b");
+    // Not the updater's: it never replaces the replay tool.
+    write_file(install.path / "aion2meter-replay.exe.1.0.0.old", "c");
     write_file(install.path / "aion2-combat-meter.exe.old.txt", "d");
     write_file(install.path / "config.json", "{}");
     fs::create_directories(staging_dir(install.path));
@@ -512,12 +482,13 @@ TEST_CASE(Update, LeftoverCleanupTouchesOnlyBackups) {
 
     remove_update_leftovers(install.path);
     TEST_ASSERT_FALSE(fs::exists(install.path / "aion2-combat-meter.exe.1.0.0.old"));
-    TEST_ASSERT_FALSE(fs::exists(install.path / "aion2meter-replay.exe.1.0.0.2.old"));
+    TEST_ASSERT_FALSE(fs::exists(install.path / "aion2-combat-meter.exe.1.0.0.2.old"));
     TEST_ASSERT_FALSE(fs::exists(staging_dir(install.path)));
-    TEST_ASSERT_TRUE(fs::exists(install.path / "other.dll.1.0.0.old"));
+    TEST_ASSERT_TRUE(fs::exists(install.path / "aion2meter-replay.exe.1.0.0.old"));
     TEST_ASSERT_TRUE(fs::exists(install.path / "aion2-combat-meter.exe.old.txt"));
     TEST_ASSERT_TRUE(fs::exists(install.path / "config.json"));
     TEST_ASSERT_EQ(read_file(install.path / "aion2-combat-meter.exe"), std::string("old exe"));
+    TEST_ASSERT_EQ(read_file(install.path / "aion2meter-replay.exe"), std::string("old replay"));
 
     // An unknown folder is no error.
     remove_update_leftovers({});

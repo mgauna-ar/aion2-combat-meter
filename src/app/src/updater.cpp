@@ -22,7 +22,7 @@ bool rename_file(const fs::path& from, const fs::path& to) {
 }
 
 /// "<name>.<tag>.old", or a numbered one when that is taken by a backup that
-/// could not be removed, such as a replay tool still running.
+/// could not be removed, such as an old build still running.
 fs::path free_backup_path(const fs::path& install_dir, std::string_view name, std::string_view tag) {
     const std::string stem = std::string(name) + "." + std::string(tag);
     std::error_code ec;

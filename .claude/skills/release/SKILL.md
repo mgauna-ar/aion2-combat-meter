@@ -30,8 +30,11 @@ git push origin vX.Y.Z
 
 The `release` job in `.github/workflows/ci.yml` runs only on such a tag, after every
 other job has passed. It checks the tag (less its `v`) against `AION2_VERSION_STRING`,
-refuses one that disagrees, then publishes the zip and `SHA256SUMS.txt` with generated
-notes. Tag runs are never cancelled.
+refuses one that disagrees, then publishes three assets with generated notes:
+- `aion2-combat-meter-windows-x64.zip`, what the updater installs;
+- `aion2meter-replay.exe`, the replay tool, outside the zip and the updater;
+- `SHA256SUMS.txt` for both, with bare file names, so `sha256sum -c SHA256SUMS.txt`
+  works in the folder they were downloaded to. Tag runs are never cancelled.
 
 ## 3. Check what was published
 
@@ -64,25 +67,28 @@ for exactly what they were built to find:
 - **The asset** is named `aion2-combat-meter-windows-x64.zip`, CPack's
   `CPACK_PACKAGE_FILE_NAME`, and is attached to this repository's release, so its URL
   lies under `https://github.com/mgauna-ar/aion2-combat-meter/releases/download/`.
-- **The executables** `aion2-combat-meter.exe` and `aion2meter-replay.exe` sit at the
-  archive's root (`CPACK_INCLUDE_TOPLEVEL_DIRECTORY OFF`), stored or deflated, without
-  Zip64. Both must be there: an update is all or nothing.
+- **The exe** `aion2-combat-meter.exe` sits at the archive's root
+  (`CPACK_INCLUDE_TOPLEVEL_DIRECTORY OFF`), stored or deflated, without Zip64. It is
+  `UPDATE_FILES`; an update fails without it.
 - **GitHub's asset digest** is how the download is verified. A release without one is
   announced but cannot be installed from the app.
 - **The repository** is public: the API shows no anonymous caller a private one's
   releases.
 
-Renaming the asset, nesting the executables in a folder, renaming an executable,
-moving the repository, or a new tag scheme strands every copy already installed. They
-would have to update by hand. A change to any of them needs a release that still ships
-the old shape, and a way for old copies to reach the new one.
+Renaming the asset, nesting the exe in a folder, renaming the exe, moving the
+repository, or a new tag scheme strands every copy already installed. So does adding
+a file to `UPDATE_FILES` that later releases stop shipping: every copy built with it
+requires it in the zip. Stranded copies would have to update by hand. A change to any
+of them needs a release that still ships the old shape, and a way for old copies to
+reach the new one.
 
 ## The archive's contents
 
 The `install()` rules in `CMakeLists.txt` are the only definition: CI packages with
 `cpack --config build/CPackConfig.cmake -G ZIP -C Release -B dist`, so a release and a
-local `cpack` run on Windows are the same zip. A file the release should ship is an
+local `cpack` run on Windows are the same zip. A file the zip should hold is an
 `install()` rule, never a copy step in the workflow. The updater takes only
-`UPDATE_FILES` out of it; README and LICENSE are there for whoever unzips it by hand.
+`UPDATE_FILES` out of it, and that is all it holds. The replay tool is copied next to
+the zip in the `SHA-256 of the Release Files` step and published beside it.
 
 The workflow's token is `contents: read`; only the `release` job gets `contents: write`.

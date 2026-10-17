@@ -89,7 +89,9 @@ these rules:
 2. **Get the release.** Download `aion2-combat-meter-windows-x64.zip` from
    [Releases](https://github.com/mgauna-ar/aion2-combat-meter/releases/latest), check it
    against `SHA256SUMS.txt`, and unzip it into a folder of its own, anywhere you can
-   write to: the meter updates itself there.
+   write to: the meter updates itself there. The zip holds `aion2-combat-meter.exe`
+   alone. The replay tool, `aion2meter-replay.exe`, is a separate download on the same
+   page, for troubleshooting.
 3. **Set the game to Borderless Windowed.** An exclusive fullscreen game hides every
    other window, this one included.
 4. **Run `aion2-combat-meter.exe`.** The app window opens, the overlay shows up in the
@@ -242,7 +244,8 @@ run the meter as administrator.
 - **Ping reducer or VPN (ExitLag, GearUP and the like):** Npcap needs its loopback
   support (reinstall with it ticked). Also check `capture.game_process`.
 - **Another port:** if the game moved off port 13328, record a capture in Wireshark
-  and run `aion2meter-replay` on it. It lists every flow it decoded as the game.
+  and run `aion2meter-replay` on it (a separate download on the release page). It lists
+  every flow it decoded as the game.
 
 **I can't see the overlay in game**
 Use Borderless Windowed. If it is hidden, press Ctrl+Alt+H. Shown only in combat or only
@@ -268,9 +271,11 @@ cannot see the whole fight. Only the hits it did see are counted.
 When a new version is out, a tray notification says so and the sidebar shows **Update
 available**. Open **Settings → Updates** and click **Update & restart**. The meter
 downloads the release, checks it against the SHA-256 GitHub publishes for it, replaces
-its two executables and restarts; a fight still going is not saved. **Check now** checks
+its executable and restarts; a fight still going is not saved. **Check now** checks
 at any time.
-- The old executables stay next to the new ones as `*.old` until the next start.
+- The old executable stays next to the new one as `*.old` until the next start.
+- The replay tool is not part of an update: download it again from the release page
+  when you need a newer one.
 - If the update can't write to the meter's folder (under `Program Files`, say), run the
   meter as administrator once, or download the zip and unzip it over the old one.
 - A release with no published checksum is announced but not installed: download it from

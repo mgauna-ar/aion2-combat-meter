@@ -420,15 +420,16 @@ public: GitHub's API shows a private repository's releases to no anonymous calle
     digest for it. The download must match that digest before anything is unpacked.
   - A URL from the API is followed or opened only under this repository's prefixes
     (`update_check.hpp`), and `os::open_url()` opens nothing but `https://`.
-  - Only `UPDATE_FILES` (the two executables) come out of the zip, by exact name, each
-    checked against its size and CRC. README and LICENSE stay as they are.
+  - Only `UPDATE_FILES` (the meter's exe) come out of the zip, by exact name, each
+    checked against its size and CRC. The zip holds nothing else; the replay tool is
+    a release asset of its own, which the updater never touches.
 - **Rename aside, never overwrite.**
   - A running exe can be renamed but not overwritten or deleted. The download is
     staged in `.aion2-combat-meter-update/` inside the install folder, so moving it in
     is a rename on one volume.
   - `apply_staged_update()` renames each live file to `<name>.<old version>.old`,
     moves the new one in, and undoes every step on any failure. A file the folder
-    lacks (a deleted replay tool) is just moved in.
+    lacks (renamed or deleted by hand) is just moved in.
   - `remove_update_leftovers()` deletes the staging folder and those backups at every
     start, best effort: a backup still running stays for a later start.
 - **The relaunch waits on the lock, not the process.** Once the files are swapped,
@@ -441,8 +442,8 @@ public: GitHub's API shows a private repository's releases to no anonymous calle
   `notifications`. The tray menu gets no update item; installing lives in Settings,
   behind a confirmation, and a sidebar pill points there.
 - **A release is a contract with every installed copy.** The asset's name, the
-  executables at the zip's root, the tag scheme and GitHub's digest are what old
-  versions look for. Changing any of them strands every copy already installed
+  exe at the zip's root, the tag scheme and GitHub's digest are what old versions
+  look for. Changing any of them strands every copy already installed
   (skill `release`).
 
 ---
