@@ -44,7 +44,9 @@ Heal. Dungeon and boss names were right, and so were the classes from skill code
   they live is unknown.
 - **Map names:** dungeons are named from a public database's dungeon ids
   (`src/meter/data/maps.tsv`), which the game turned out to send. Open-world zones have
-  no public ids, so they show theirs ("Map 1010") until named by hand.
+  no public ids, so they show theirs ("Map 1010") until named by hand. So do the newer
+  dungeons the database gives no id for yet, such as the Lv.99 Awakening tiers and
+  Ascension.
 - **Boss threshold:** an enemy with 1,000,000 max HP or more counts as a boss
   (`meter.boss_min_max_hp`). One dungeon's bosses had 5.2M–9.9M, its trash under
   450,000 and open-world mobs about 120,000; other dungeons are unchecked.

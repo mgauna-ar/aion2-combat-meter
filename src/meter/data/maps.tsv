@@ -3,9 +3,12 @@
 # here sit at 910000 and up.
 #
 # Source: aion2.app's dungeon pages (aion2.app/db/dungeons/<name>), retrieved
-# 2026-10-17: one row per difficulty tier, keyed by the tier's id. Unchecked: no
-# capture has shown a map load yet, so these are assumed, not known, to be the
-# ids 21 36 carries, and no second source gives tier ids to compare with.
+# 2026-11-05: one row per difficulty tier, keyed by the tier's id. Checked once:
+# a capture's dungeon came as 600072, Vakron Sky Island (Conquest), the run it
+# was, so the tier ids are the ids 21 36 carries. No second source gives tier
+# ids to compare with. Some dungeons the site lists have no tier ids on their
+# pages (the Lv.99 Awakening tiers, Ascension, Legion and more): they show as
+# "Map <id>" until a capture shows their id.
 #
 # Open-world zones have no public ids. The game's own files cannot be read for
 # them (they are encrypted), and no site lists numeric ids for open-world maps.
@@ -14,12 +17,15 @@
 # Regenerate with tools/gen_map_table.py.
 600001	Krao Cave (Conquest)
 600002	Krao Cave (Exploration)
+600004	Krao Cave (Conquest [Hard])
 600011	Urugugu Canyon (Exploration)
 600012	Urugugu Canyon (Conquest)
+600013	Urugugu Canyon (Conquest [Hard])
 600021	Fire Temple (Exploration)
 600022	Fire Temple (Conquest)
 600031	Draupnir (Exploration)
 600032	Draupnir (Conquest)
+600033	Draupnir (Conquest [Hard])
 600041	Dying Dramata's Nest (Exploration)
 600042	Dying Dramata's Nest (Conquest)
 600051	Deus Research Base (Exploration)
@@ -32,7 +38,9 @@
 600068	Shattered Arkanis (Stage 3)
 600071	Vakron Sky Island (Exploration)
 600072	Vakron Sky Island (Conquest)
-600082	Abyssal Forge: Ludra
+600073	Vakron Sky Island (Conquest [Hard])
+600082	Abyssal Forge: Ludra (Conquest)
+600083	Abyssal Forge: Ludra (Conquest [Hard])
 600091	Ferocious Horn Den (Exploration)
 600092	Ferocious Horn Den (Conquest)
 600121	Cradle of Nihility (Exploration)

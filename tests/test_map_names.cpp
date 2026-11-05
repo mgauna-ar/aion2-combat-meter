@@ -5,14 +5,25 @@
 using namespace aion2;
 using namespace aion2::meter;
 
-// The ids below are aion2.app's dungeon tier ids, as maps.tsv lists them. Whether 21 36
-// carries the same ids is unchecked (AGENTS.md).
+// The ids below are aion2.app's dungeon tier ids, as maps.tsv lists them. A capture's
+// dungeon came as 600072, the tier it was: 21 36 carries the same ids (AGENTS.md).
 
 TEST_CASE(MapNames, EachTierHasItsOwnRow) {
     TEST_ASSERT_EQ(std::string(map_name(600002)), std::string("Krao Cave (Exploration)"));
     TEST_ASSERT_EQ(std::string(map_name(600001)), std::string("Krao Cave (Conquest)"));
     TEST_ASSERT_EQ(std::string(map_name(610052)), std::string("Deus Research Base (Stage 4)"));
     TEST_ASSERT_EQ(map_label(620021), std::string("Chalice of Muspel (Conquest [Hard])"));
+}
+
+TEST_CASE(MapNames, HardTiersHaveTheirOwnIds) {
+    // Krao Cave's skips 600003: tier ids follow no pattern, so none is guessed.
+    TEST_ASSERT_EQ(std::string(map_name(600004)), std::string("Krao Cave (Conquest [Hard])"));
+    TEST_ASSERT(map_name(600003).empty());
+    TEST_ASSERT_EQ(std::string(map_name(600073)), std::string("Vakron Sky Island (Conquest [Hard])"));
+    // The raid's page gained a Hard tier, so its normal one now says which it is.
+    TEST_ASSERT_EQ(std::string(map_name(600082)), std::string("Abyssal Forge: Ludra (Conquest)"));
+    TEST_ASSERT_EQ(std::string(map_name(600083)), std::string("Abyssal Forge: Ludra (Conquest [Hard])"));
+    TEST_ASSERT(is_dungeon(600083));
 }
 
 TEST_CASE(MapNames, AOneTierPageKeepsItsOwnName) {
