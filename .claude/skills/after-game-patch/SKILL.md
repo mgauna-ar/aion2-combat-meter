@@ -63,6 +63,9 @@ A patch can add dungeons or tiers. Maps the meter cannot name read "Map 600001".
    Add list pages if the site shows more than three.
 2. **Rebuild the table.** Run `python3 tools/gen_map_table.py --import-pages /tmp/dungeons/pages`.
    It rewrites `src/meter/data/maps.tsv` above its `# By hand` line, and `map_table.inc`.
+   It names each page that has no tier ids. Some do (the Lv.99 Awakening tiers,
+   Ascension, Legion and more, at the time of writing), so the list alone is no failure.
+   A dungeon that had ids and is now on it means the page's layout moved.
 3. **Check the diff.** New tiers are expected. An id that moved to another dungeon is
    not, and means the ids were renumbered.
 

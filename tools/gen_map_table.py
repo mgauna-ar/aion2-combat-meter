@@ -85,6 +85,10 @@ def import_pages(folder):
         with open(page, encoding="utf-8") as f:
             name, tiers = page_tiers(f.read())
         if not name or not tiers:
+            # aion2.app lists some dungeons whose page gives no tiers (the Lv.99 Awakening
+            # tiers, Ascension, Legion and more): say which, for the next refresh to check.
+            print(f"{os.path.basename(page)}: no tier ids ({name or 'no name'}); skipped",
+                  file=sys.stderr)
             continue
         for tier_id, tier in tiers:
             # A one-tier page's name already says which (Chamber of the Dead (Challenge)).
@@ -100,6 +104,7 @@ def import_pages(folder):
     if not rows:
         sys.exit(f"no dungeon tiers found in {folder}")
     today = datetime.date.today().isoformat()
+    hand = hand_section(TSV)  # read before the TSV is truncated below
     with open(TSV, "w", encoding="utf-8", newline="\n") as f:
         f.write(
             "# AION 2 map names by map id, as the map load (21 36) carries it. By the\n"
@@ -107,9 +112,12 @@ def import_pages(folder):
             "# here sit at 910000 and up.\n"
             "#\n"
             f"# Source: aion2.app's dungeon pages (aion2.app/db/dungeons/<name>), retrieved\n"
-            f"# {today}: one row per difficulty tier, keyed by the tier's id. Unchecked: no\n"
-            "# capture has shown a map load yet, so these are assumed, not known, to be the\n"
-            "# ids 21 36 carries, and no second source gives tier ids to compare with.\n"
+            f"# {today}: one row per difficulty tier, keyed by the tier's id. Checked once:\n"
+            "# a capture's dungeon came as 600072, Vakron Sky Island (Conquest), the run it\n"
+            "# was, so the tier ids are the ids 21 36 carries. No second source gives tier\n"
+            "# ids to compare with. Some dungeons the site lists have no tier ids on their\n"
+            "# pages (the Lv.99 Awakening tiers, Ascension, Legion and more): they show as\n"
+            "# \"Map <id>\" until a capture shows their id.\n"
             "#\n"
             "# Open-world zones have no public ids. The game's own files cannot be read for\n"
             "# them (they are encrypted), and no site lists numeric ids for open-world maps.\n"
