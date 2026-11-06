@@ -32,7 +32,7 @@ window (Ctrl+X) shows, but for every party member:
 
 ## 🚧 Status
 
-Version 0.1. The decoder started from the community's notes on the Global client's
+Version 0.2. The decoder started from the community's notes on the Global client's
 protocol and has been checked against two real captures: 30 seconds of open-world
 mobs, then a full dungeon run with three boss kills.
 
