@@ -120,7 +120,8 @@ src/protocol/    aion2::proto
 src/game/        aion2::game   what the game is, for every plugin
     plugin.hpp (game::Plugin: events and ticks in), classes, class_codes,
     skill_names (data/skills.tsv → skill_table.inc; effect names too),
-    map_names (data/maps.tsv → map_table.inc), npc_names (data/npcs.tsv → npc_table.inc)
+    map_names (data/maps.tsv → map_table.inc), npc_names (data/npcs.tsv → npc_table.inc),
+    effect_book (the protocol's rules for effects: each plugin that reads them keeps one)
 plugins/combat_meter/  aion2::meter (include prefix meter/; its AGENTS.md and README.md)
     types, combatant_registry, encounter_engine, meter_settings, fight_json,
     history_store, pull_grouping

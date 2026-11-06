@@ -7,108 +7,38 @@
 
 namespace aion2::auras {
 
-namespace {
+void AuraTracker::on_heartbeat(uint64_t server_ms, Micros ts) noexcept { m_book.on_heartbeat(server_ms, ts); }
 
-/// A stated end further than this from the stated duration is not believed: the
-/// record's duration, from its arrival, stands in. Renewals ran up to 1.4 s apart.
-constexpr Micros kExpirySlack = 5 * kMicrosPerSecond;
+void AuraTracker::on_applied(const proto::BuffApplied& b, Micros ts) { (void)m_book.on_applied(b, ts); }
 
-[[nodiscard]] bool runs_at(const auto& instance, Micros now) noexcept {
-    return instance.permanent || instance.expires_at > now;
-}
+void AuraTracker::on_removed(const proto::BuffRemoved& b) { (void)m_book.on_removed(b); }
 
-} // namespace
+void AuraTracker::on_death(EntityId id) { (void)m_book.on_death(id); }
 
-void AuraTracker::on_heartbeat(uint64_t server_ms, Micros ts) noexcept {
-    m_server_offset = static_cast<int64_t>(server_ms * kMicrosPerMilli) - static_cast<int64_t>(ts);
-    m_have_offset = true;
-}
-
-Micros AuraTracker::expiry(const proto::BuffApplied& b, Micros ts) const noexcept {
-    const Micros stated = ts + b.duration_ms * kMicrosPerMilli;
-    if (!m_have_offset || b.expires_server_ms == 0) return stated;
-    const int64_t at = static_cast<int64_t>(b.expires_server_ms * kMicrosPerMilli) - m_server_offset;
-    if (at <= static_cast<int64_t>(ts)) return stated;
-    const auto end = static_cast<Micros>(at);
-    const Micros apart = end > stated ? end - stated : stated - end;
-    return apart > kExpirySlack ? stated : end;
-}
-
-void AuraTracker::on_applied(const proto::BuffApplied& b, Micros ts) {
-    auto& on = m_on[b.target];
-    if (!b.permanent && b.duration_ms == 0) {
-        // A marker that ends as it starts.
-        on.erase(b.instance);
-        return;
-    }
-    if (on.size() >= kMaxInstancesPerEntity && !on.contains(b.instance)) return;
-    Instance& i = on[b.instance];
-    i.buff_id = b.buff_id;
-    i.source_skill = b.source_skill;
-    i.caster = b.caster;
-    i.permanent = b.permanent;
-    i.duration_ms = b.duration_ms;
-    i.expires_at = b.permanent ? 0 : expiry(b, ts);
-    i.updated_at = ts;
-}
-
-void AuraTracker::on_removed(const proto::BuffRemoved& b) {
-    const auto on = m_on.find(b.target);
-    if (on == m_on.end()) return;
-    // The one that ends soonest: a permanent one only when nothing else is left.
-    auto pick = on->second.end();
-    for (auto it = on->second.begin(); it != on->second.end(); ++it) {
-        if (it->second.buff_id != b.buff_id) continue;
-        if (pick == on->second.end() ||
-            std::tuple(it->second.permanent, it->second.expires_at) <
-                std::tuple(pick->second.permanent, pick->second.expires_at)) {
-            pick = it;
-        }
-    }
-    if (pick != on->second.end()) on->second.erase(pick);
-    if (on->second.empty()) m_on.erase(on);
-}
-
-void AuraTracker::on_death(EntityId id) { m_on.erase(id); }
-
-void AuraTracker::on_map_load(Micros ts) {
-    const Micros keep_from = ts > kMapLoadLead ? ts - kMapLoadLead : 0;
-    for (auto on = m_on.begin(); on != m_on.end();) {
-        std::erase_if(on->second, [&](const auto& kv) { return kv.second.updated_at < keep_from; });
-        on = on->second.empty() ? m_on.erase(on) : std::next(on);
-    }
-}
+void AuraTracker::on_map_load(Micros ts) { (void)m_book.on_map_load(ts); }
 
 void AuraTracker::prune(Micros now, const Entities& entities) {
+    m_book.prune(now);
     const EntityId local = entities.local();
-    for (auto on = m_on.begin(); on != m_on.end();) {
-        std::erase_if(on->second, [&](const auto& kv) { return !runs_at(kv.second, now); });
-        if (on->first == local && local != 0) {
-            for (const auto& [instance, i] : on->second) {
-                if (m_seen.size() >= kMaxSeen) break;
-                if (entities.is_enemy(i.caster)) continue;
-                m_seen.try_emplace(game::effect_key(i.buff_id, i.source_skill),
-                                   game::effect_label(i.buff_id, i.source_skill));
-            }
-        }
-        on = on->second.empty() ? m_on.erase(on) : std::next(on);
+    if (local == 0) return;
+    const game::EffectBook::Instances* on = m_book.on(local);
+    if (on == nullptr) return;
+    for (const auto& [instance, i] : *on) {
+        if (m_seen.size() >= kMaxSeen) break;
+        if (entities.is_enemy(i.caster)) continue;
+        m_seen.try_emplace(game::effect_key(i.buff_id, i.source_skill), game::effect_label(i.buff_id, i.source_skill));
     }
 }
 
-size_t AuraTracker::instances_on(EntityId id, Micros now) const {
-    const auto on = m_on.find(id);
-    if (on == m_on.end()) return 0;
-    return static_cast<size_t>(
-        std::count_if(on->second.begin(), on->second.end(), [&](const auto& kv) { return runs_at(kv.second, now); }));
-}
+size_t AuraTracker::instances_on(EntityId id, Micros now) const { return m_book.instances_on(id, now); }
 
 std::vector<AuraEntry> AuraTracker::entries(EntityId id, Micros now, const Entities& entities,
                                             bool only_mine) const {
     std::vector<AuraEntry> out;
-    const auto on = m_on.find(id);
-    if (on == m_on.end()) return out;
-    for (const auto& [instance, i] : on->second) {
-        if (!runs_at(i, now)) continue;
+    const game::EffectBook::Instances* on = m_book.on(id);
+    if (on == nullptr) return out;
+    for (const auto& [instance, i] : *on) {
+        if (!i.runs_at(now)) continue;
         const bool mine = entities.mine(i.caster);
         if (only_mine && !mine) continue;
         const auto same = std::find_if(out.begin(), out.end(), [&](const AuraEntry& e) {

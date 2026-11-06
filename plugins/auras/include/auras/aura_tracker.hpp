@@ -3,6 +3,7 @@
 #include "auras/cooldowns.hpp"
 #include "auras/entities.hpp"
 #include "common/micros.hpp"
+#include "game/effect_book.hpp"
 #include "protocol/events.hpp"
 
 #include <cstddef>
@@ -64,25 +65,22 @@ struct AuraSnapshot {
 };
 
 /**
- * @brief The effects on every entity in view, from 2a 38, 2b 38 and 1a 92.
+ * @brief The effects on every entity in view, from 2a 38, 2b 38 and 1a 92, as the
+ * aura overlay shows them.
  *
- * Each application is an instance, so an effect applied again while it runs
- * stacks; 1a 92 names the effect but not the instance, and takes the one that ends
- * soonest. An instance ends at the time its record states, in the server's clock,
- * brought onto the capture clock through the last heartbeat, so a replay shows what
- * the live meter did. Ids belong to a map, so a map load forgets the effects of the
- * map before; the new map's own come up to a second ahead of its load (21 36), and
- * stay.
+ * The protocol's rules for effects (instances are stacks, the stated end, 1a 92
+ * taking the soonest, deaths and map loads) are game::EffectBook's, which the
+ * combat meter shares; this adds the overlay's view of them and the watch list.
  */
 class AuraTracker {
 public:
     /// Most effects kept on one entity; a misread flood stops here.
-    static constexpr size_t kMaxInstancesPerEntity = 128;
+    static constexpr size_t kMaxInstancesPerEntity = game::EffectBook::kMaxInstancesPerEntity;
     /// Most effects remembered as seen on the local player.
     static constexpr size_t kMaxSeen = 256;
     /// How far ahead of its 21 36 a map's first effects can come: 0.4 s in the second
     /// capture. A map load keeps what was put on or renewed this close before it.
-    static constexpr Micros kMapLoadLead = 2 * kMicrosPerSecond;
+    static constexpr Micros kMapLoadLead = game::EffectBook::kMapLoadLead;
 
     void on_heartbeat(uint64_t server_ms, Micros ts) noexcept;
     void on_applied(const proto::BuffApplied& b, Micros ts);
@@ -103,27 +101,10 @@ public:
     [[nodiscard]] size_t instances_on(EntityId id, Micros now) const;
 
 private:
-    struct Instance {
-        uint32_t buff_id{0};
-        uint32_t source_skill{0};
-        EntityId caster{0};
-        bool permanent{false};
-        Micros expires_at{0};
-        uint64_t duration_ms{0};
-        /// When it was put on or last renewed.
-        Micros updated_at{0};
-    };
-
-    /// When an effect stated to end at `server_ms` ends on the capture clock.
-    [[nodiscard]] Micros expiry(const proto::BuffApplied& b, Micros ts) const noexcept;
     [[nodiscard]] std::vector<AuraEntry> entries(EntityId id, Micros now, const Entities& entities,
                                                  bool only_mine) const;
 
-    /// By entity, then by instance.
-    std::unordered_map<EntityId, std::map<uint32_t, Instance>> m_on;
-    /// The server clock less the capture clock, in µs, from the last heartbeat.
-    int64_t m_server_offset{0};
-    bool m_have_offset{false};
+    game::EffectBook m_book;
     std::map<uint32_t, std::string> m_seen;
 };
 
