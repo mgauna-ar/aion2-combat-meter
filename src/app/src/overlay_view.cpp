@@ -1,6 +1,7 @@
 #include "app/overlay_view.hpp"
 
 #include "app/display_format.hpp"
+#include "app/game_icons.hpp"
 #include "app/imgui_guard.hpp"
 #include "common/time_format.hpp"
 #include "game/map_names.hpp"
@@ -74,12 +75,16 @@ void draw_rows(const meter::FightSummary& f, const OverlaySettings& s, float sca
     float numbers_w = 0;
     for (const auto& c : cols) numbers_w += c.width;
     const float name_w = std::max(40.0f * scale, width - rank_w - numbers_w);
+    // The class emblem starts the name column, a text line square; every row keeps
+    // its place, so the names line up.
+    const float emblem = line;
+    const float name_x = origin.x + rank_w + emblem + 4.0f * scale;
 
     // Header.
     float y = origin.y;
     const ImU32 dim = u32(colors::TextDim);
     dl->AddText(ImVec2(origin.x, y), dim, "#");
-    dl->AddText(ImVec2(origin.x + rank_w, y), dim, "Player");
+    dl->AddText(ImVec2(name_x, y), dim, "Player");
     float x = origin.x + rank_w + name_w;
     for (const auto& c : cols) {
         x += c.width;
@@ -106,10 +111,15 @@ void draw_rows(const meter::FightSummary& f, const OverlaySettings& s, float sca
         std::snprintf(rank_buf, sizeof(rank_buf), "%d", rank);
         dl->AddText(ImVec2(origin.x + 2.0f * scale, ty), dim, rank_buf);
 
+        const int icon = class_icon(row.cls);
+        draw_icon(dl, icon, origin.x + rank_w, y + (row_h - 1.0f * scale - emblem) * 0.5f, emblem);
+        // A class with no emblem (the Brawler) keeps its letters.
         std::string label = row.name;
-        if (row.cls != game::AionClass::Unknown) label = std::string(game::class_short(row.cls)) + " " + label;
-        dl->AddText(ImVec2(origin.x + rank_w, ty), u32(row.is_local ? colors::Accent : colors::Text),
-                    fit(label, name_w - 6.0f * scale).c_str());
+        if (icon == kNoIcon && row.cls != game::AionClass::Unknown) {
+            label = std::string(game::class_short(row.cls)) + " " + label;
+        }
+        dl->AddText(ImVec2(name_x, ty), u32(row.is_local ? colors::Accent : colors::Text),
+                    fit(label, origin.x + rank_w + name_w - name_x - 6.0f * scale).c_str());
 
         x = origin.x + rank_w + name_w;
         const ImU32 text = u32(colors::Text);

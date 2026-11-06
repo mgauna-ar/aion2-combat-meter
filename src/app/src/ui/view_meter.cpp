@@ -1,6 +1,7 @@
 #include "app/ui/views.hpp"
 
 #include "app/display_format.hpp"
+#include "app/game_icons.hpp"
 #include "app/ui/icons.hpp"
 #include "app/ui/page.hpp"
 #include "app/ui/widgets.hpp"
@@ -147,6 +148,17 @@ void cell(int column, uint32_t color, const std::string& text) {
     text_colored_u32(color, "%s", text.c_str());
 }
 
+/// A skill's icon, then its name; nothing for a column dropped for width. A skill
+/// without an icon keeps the space, so the names line up.
+void skill_cell(int column, uint32_t code) {
+    if (!ImGui::TableSetColumnIndex(column)) return;
+    const float side = ImGui::GetTextLineHeight();
+    const ImVec2 p = ImGui::GetCursorScreenPos();
+    draw_icon(ImGui::GetWindowDrawList(), skill_icon(code), p.x, p.y, side);
+    ImGui::SetCursorScreenPos(ImVec2(p.x + side + m(6.0f), p.y));
+    text_colored_u32(colors::TextBody, "%s", game::skill_label(code).c_str());
+}
+
 /// The row's player: a selectable across the row, which opens their breakdown.
 void name_cell(int column, const meter::CombatantTotals& c, meter::EntityId& selected, const char* tab) {
     ImGui::TableSetColumnIndex(column);
@@ -230,7 +242,7 @@ void damage_breakdown(const meter::CombatantTotals& c, meter::EntityId& selected
             row_progress_bar(static_cast<float>(static_cast<double>(s.damage) / static_cast<double>(top)),
                              row_color_u32(c));
             const uint64_t direct = s.damage - std::min(s.damage, s.tick_damage);
-            cell(0, colors::TextBody, game::skill_label(s.code));
+            skill_cell(0, s.code);
             if (ImGui::IsItemHovered()) ImGui::SetTooltip("Skill code %u", s.code);
             cell(1, colors::TextPrimary, format_amount(s.damage));
             cell(2, colors::TextMuted, share(s.damage, c.damage));
@@ -264,7 +276,7 @@ void damage_tab(const meter::FightSummary& f, AppViewState& state) {
     const meter::CombatantTotals* open = find_row(f, state.damage_player);
     const Column cols[] = {
         {"#", 24.0f, nullptr, 12},
-        {"Class", 46.0f, "From the skills the player used.", 7},
+        {"Class", 64.0f, "From the skills the player used.", 7},
         {"Player", 0.0f, "Select a player for their skills.", 0},
         {"DPS", 60.0f, "Damage per second, from the fight's first hit to its last.", 1},
         {"Damage", 64.0f, "Direct hits and DoT ticks.", 2},
@@ -329,7 +341,7 @@ void healing_tab(const meter::FightSummary& f, AppViewState& state) {
     if (open != nullptr && open->healing == 0) open = nullptr;
     const Column cols[] = {
         {"#", 24.0f, nullptr, 6},
-        {"Class", 46.0f, nullptr, 5},
+        {"Class", 64.0f, nullptr, 5},
         {"Player", 0.0f, "Select a player for their heals by skill.", 0},
         {"HPS", 60.0f, "Healing per second, over the fight's length.", 1},
         {"Healing", 64.0f, "All of it, as the game's own window counts it: no overheal split.", 2},
@@ -370,7 +382,7 @@ void healing_tab(const meter::FightSummary& f, AppViewState& state) {
             ImGui::TableNextRow();
             row_progress_bar(static_cast<float>(static_cast<double>(s.amount) / static_cast<double>(top)),
                              colors::Success);
-            cell(0, colors::TextBody, game::skill_label(s.code));
+            skill_cell(0, s.code);
             cell(1, colors::TextPrimary, format_amount(s.amount));
             cell(2, colors::TextMuted, share(s.amount, open->healing));
             cell(3, colors::TextMuted, number(s.hits));
@@ -397,7 +409,7 @@ void taken_tab(const meter::FightSummary& f, AppViewState& state) {
     if (open != nullptr && open->damage_taken == 0) open = nullptr;
     const Column cols[] = {
         {"#", 24.0f, nullptr, 7},
-        {"Class", 46.0f, nullptr, 6},
+        {"Class", 64.0f, nullptr, 6},
         {"Player", 0.0f, "Select a player for what hit them.", 0},
         {"Taken", 64.0f, "Enemy hits and ticks that landed on the player.", 1},
         {"HIT", 40.0f, "Direct hits taken.", 2},

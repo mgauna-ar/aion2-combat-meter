@@ -1,5 +1,7 @@
 #include "app/ui/widgets.hpp"
 
+#include "app/game_icons.hpp"
+
 #ifdef HAVE_IMGUI
 #include "imgui_internal.h"
 #include <algorithm>
@@ -476,6 +478,16 @@ void class_badge(game::AionClass cls) {
     char text[8]{};
     const std::string_view label = game::class_short(cls);
     std::snprintf(text, sizeof(text), "%.*s", static_cast<int>(label.size()), label.data());
+
+    if (const int icon = class_icon(cls); icon != kNoIcon) {
+        const float side = ImGui::GetTextLineHeight();
+        const ImVec2 p = ImGui::GetCursorScreenPos();
+        draw_icon(ImGui::GetWindowDrawList(), icon, p.x, p.y, side);
+        ImGui::Dummy(ImVec2(side, side));
+        ImGui::SameLine(0.0f, m(5.0f));
+        text_colored_u32(color, "%s", text);
+        return;
+    }
 
     const ImVec2 size = ImGui::CalcTextSize(text);
     const float width = m(40.0f);

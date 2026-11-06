@@ -16,6 +16,7 @@
 #include "app/app_frame.hpp"
 #include "app/app_settings.hpp"
 #include "app/aura_view.hpp"
+#include "app/game_icons.hpp"
 #include "app/overlay_view.hpp"
 #include "app/ui/theme.hpp"
 #include "capture/capture_file.hpp"
@@ -98,6 +99,8 @@ bool setup_imgui(const std::string& font) {
         std::fprintf(stderr, "cannot load font %s\n", font.c_str());
         return false;
     }
+    // As overlay_window.cpp's rebuild_fonts does.
+    app::build_atlas_with_icons(*io.Fonts, std::round(kBaseFontSize * kScale));
     g_font_texture = atlas_texture();
     // The style overlay_window.cpp sets up.
     ImGuiStyle style;

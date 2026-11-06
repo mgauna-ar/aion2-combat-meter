@@ -1,5 +1,6 @@
 #include "overlay_window.hpp"
 
+#include "app/game_icons.hpp"
 #include "common/os/logger.hpp"
 
 #include <dwmapi.h>
@@ -228,6 +229,8 @@ void OverlayWindow::rebuild_fonts(float scale) {
     } else {
         io.FontGlobalScale = 1.0f;
     }
+    // Class emblems and skill icons, a text line tall as drawn, in the font's texture.
+    build_atlas_with_icons(*io.Fonts, std::round(kBaseFontSize * scale));
     // The atlas texture is rebuilt by the next NewFrame.
     ImGui_ImplDX11_InvalidateDeviceObjects();
 

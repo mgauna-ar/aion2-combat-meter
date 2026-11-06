@@ -62,25 +62,20 @@ std::string skill_label(uint32_t code) {
     return "Skill " + std::to_string(code);
 }
 
-namespace {
-
-/// The skill that names an effect (effect_name's choice), or 0.
-uint32_t naming_skill(uint32_t buff_id, uint32_t source_skill) noexcept {
+uint32_t effect_skill(uint32_t buff_id, uint32_t source_skill) noexcept {
     if (source_skill != 0 && !skill_name(source_skill).empty()) return source_skill;
     const uint32_t skill = buff_id / 10;
     if (skill < kClassCodeMin || skill > kClassCodeMax || skill_name(skill).empty()) return 0;
     return skill;
 }
 
-} // namespace
-
 std::string_view effect_name(uint32_t buff_id, uint32_t source_skill) noexcept {
-    const uint32_t skill = naming_skill(buff_id, source_skill);
+    const uint32_t skill = effect_skill(buff_id, source_skill);
     return skill != 0 ? skill_name(skill) : std::string_view{};
 }
 
 uint32_t effect_key(uint32_t buff_id, uint32_t source_skill) noexcept {
-    const uint32_t skill = naming_skill(buff_id, source_skill);
+    const uint32_t skill = effect_skill(buff_id, source_skill);
     return skill != 0 ? skill_key(skill) : buff_id;
 }
 

@@ -1,6 +1,7 @@
 #include "app/aura_view.hpp"
 
 #include "app/display_format.hpp"
+#include "app/game_icons.hpp"
 #include "app/imgui_guard.hpp"
 #include "game/skill_names.hpp"
 
@@ -144,10 +145,15 @@ void draw_entries(const std::vector<const auras::AuraEntry*>& entries, Micros no
                           2.0f * scale);
 
         const float ty = y + (row_h - line) * 0.5f - 0.5f * scale;
+        // The skill's icon, then the name; an effect without one (a monster's) keeps
+        // the space, so the names line up.
+        draw_icon(dl, effect_icon(e->buff_id, e->source_skill), origin.x + 2.0f * scale,
+                  y + (row_h - 1.0f * scale - line) * 0.5f, line);
+        const float label_x = origin.x + line + 6.0f * scale;
         std::string label = e->label;
         if (e->stacks > 1) label += " x" + std::to_string(e->stacks);
-        dl->AddText(ImVec2(origin.x + 4.0f * scale, ty), u32(colors::Text),
-                    fit(label, width - time_w - 8.0f * scale).c_str());
+        dl->AddText(ImVec2(label_x, ty), u32(colors::Text),
+                    fit(label, row_max.x - time_w - label_x - 4.0f * scale).c_str());
         const ImVec2 size = ImGui::CalcTextSize(left.c_str());
         dl->AddText(ImVec2(row_max.x - 4.0f * scale - size.x, ty), u32(colors::Text), left.c_str());
 
@@ -185,8 +191,10 @@ void draw_cooldowns(const std::vector<const auras::CooldownEntry*>& entries, Mic
         dl->AddRectFilled(row_min, ImVec2(row_min.x + width * fraction, row_max.y), u32(colors::Warn, 0.40f),
                           2.0f * scale);
         const float ty = y + (row_h - line) * 0.5f - 0.5f * scale;
-        dl->AddText(ImVec2(origin.x + 4.0f * scale, ty), u32(colors::Text),
-                    fit(c->label, width - time_w - 8.0f * scale).c_str());
+        draw_icon(dl, skill_icon(c->skill), origin.x + 2.0f * scale, y + (row_h - 1.0f * scale - line) * 0.5f, line);
+        const float label_x = origin.x + line + 6.0f * scale;
+        dl->AddText(ImVec2(label_x, ty), u32(colors::Text),
+                    fit(c->label, row_max.x - time_w - label_x - 4.0f * scale).c_str());
         const std::string time = (c->exact ? "" : "~") + format_time_left(left);
         const ImVec2 size = ImGui::CalcTextSize(time.c_str());
         dl->AddText(ImVec2(row_max.x - 4.0f * scale - size.x, ty), u32(colors::Text), time.c_str());

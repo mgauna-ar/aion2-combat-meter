@@ -28,6 +28,11 @@ namespace aion2::game {
 /// The name, or "Skill <code>" for a code not in the table.
 [[nodiscard]] std::string skill_label(uint32_t code);
 
+/// The skill that names an effect (proto::BuffApplied): the skill that applied it,
+/// when the record names one the table lists, else the skill its id points to (the
+/// id over ten). 0 for neither: monster, item and system effects.
+[[nodiscard]] uint32_t effect_skill(uint32_t buff_id, uint32_t source_skill = 0) noexcept;
+
 /// An effect's name (proto::BuffApplied): the skill that applied it, when the record
 /// names one the table lists, else the skill its id points to (the id over ten:
 /// Undefeated Mantra's 181900411 is 18190041). Empty for neither: monster, item and

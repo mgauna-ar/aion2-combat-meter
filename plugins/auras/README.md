@@ -10,10 +10,12 @@ of the app window's **Auras** page; switching it on shows its overlay.
 ## The overlay
 
 A second window you place like the meter's (unlock with Ctrl+Alt+L, drag, resize):
-- **Your effects:** each is a bar showing what share of its time is left, with the
-  seconds on the right. Green bars are an ally's buffs, blue ones yours, red ones an
+- **Your effects:** each is a bar, led by the icon of the skill behind it, showing what
+  share of its time is left, with the seconds on the right. A monster's effect has no
+  icon. Green bars are an ally's buffs, blue ones yours, red ones an
   enemy's debuffs. Stacks show as "x2".
-- **Your cooldowns:** amber bars under "Cooldowns", with "~" on an estimate. A skill
+- **Your cooldowns:** amber bars under "Cooldowns", each with its skill's icon, and "~"
+  on an estimate. A skill
   with a second use ("+1 consecutive use") shows only once both are spent.
 - **Yours on your target:** under "On <enemy>": the biggest enemy you (or your summons)
   hit in the last 10 seconds, so in a boss fight with adds, the boss.

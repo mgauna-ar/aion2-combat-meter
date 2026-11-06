@@ -43,7 +43,10 @@ those snapshot ids: no handle either. AION 2 has anti-cheat, and the user cares
 about account safety: when in doubt, don't.
 
 **Third-party code:** copy none: this repository is MIT, and its code is its own.
-Facts about the protocol from the community's published notes are fine.
+Facts about the protocol from the community's published notes are fine. **Game art** is
+NCSOFT's: the class emblems and skill icons are bundled as data
+(`game_icon_sheet.inc`), taken from aion2.app, outside the MIT licence (README,
+License).
 
 ---
 
@@ -77,6 +80,8 @@ Facts about the protocol from the community's published notes are fine.
      `tests/lz4_test_encoder.hpp`.
    - So are the updater's SHA-256 and zip reader (`sha256`, `archive/`, ported from
      ffxiv-hub). HTTPS is Windows' own WinHTTP.
+   - The icon sheet is raw DEFLATE, decoded once by that same `archive::inflate`, and
+     painted into each window's font atlas: no image library, no second texture.
 5. **Privacy.**
    - Captures and fight records hold character names.
    - `*.pcap*` and `tests/fixtures/local/` are gitignored.
@@ -130,7 +135,9 @@ src/app/         aion2::app
     HAVE_IMGUI),
     overlay_visibility, app_frame (the app window's contents),
     update_check (release parsing, versions, the update balloon) and updater (check,
-    download, stage, swap), both ported from ffxiv-hub
+    download, stage, swap), both ported from ffxiv-hub,
+    game_icons (class emblems and skill icons from game_icon_sheet.inc, painted into
+    each window's font atlas at its text size)
     src/ui/      the app window's pages (a page per plugin, opened by plugin_page's
                  header and master switch), theme, widgets and Lucide icons (ported from
                  ffxiv-hub; ImGui, behind HAVE_IMGUI)
@@ -140,7 +147,10 @@ tools/synth/     aion2meter-synth: writes the tests' made-up boss fight as a pca
 tools/screenshots/  renders docs/images from overlay_view and app_frame (software rasterizer from
                  ffxiv-hub), in UTC; --all also draws the pages the README does not show
 tools/check_forbidden_apis.sh, tools/gen_app_icon.py, tools/embed_icon_font.py
-tools/gen_skill_table.py         skills.tsv → skill_table.inc (`make test` checks they agree)
+tools/gen_skill_table.py         skills.tsv → skill_table.inc (`make test` checks they agree);
+                                 the TSV's third column names each skill's icon
+tools/gen_icon_sheet.py          aion2.app's class emblems and skill icons → game_icon_sheet.inc
+                                 (`make test` checks its index against skills.tsv)
 tools/gen_map_table.py           maps.tsv → map_table.inc (the same)
 tools/gen_npc_table.py           aion2.app's monster and NPC pages → npcs.tsv → npc_table.inc
 tools/gen_cooldown_table.py      aion2.app's skill pages → cooldowns.tsv → cooldown_table.inc

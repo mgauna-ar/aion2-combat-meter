@@ -5,16 +5,28 @@
 
 namespace aion2::app {
 
+namespace {
+
+constexpr Rgb hex(uint32_t rgb) noexcept {
+    return {static_cast<float>((rgb >> 16) & 0xFF) / 255.0f, static_cast<float>((rgb >> 8) & 0xFF) / 255.0f,
+            static_cast<float>(rgb & 0xFF) / 255.0f};
+}
+
+} // namespace
+
+/// The game's own: each class's party emblem (game_icons), in the bright tone it
+/// reads in on a dark background, as tools/gen_icon_sheet.py samples it. The
+/// Brawler has no such emblem yet and keeps a red of its own.
 Rgb class_color(game::AionClass cls) noexcept {
     switch (cls) {
-        case game::AionClass::Gladiator: return {0.80f, 0.52f, 0.30f};
-        case game::AionClass::Templar: return {0.62f, 0.68f, 0.78f};
-        case game::AionClass::Assassin: return {0.68f, 0.40f, 0.85f};
-        case game::AionClass::Ranger: return {0.45f, 0.78f, 0.35f};
-        case game::AionClass::Sorcerer: return {0.35f, 0.55f, 0.95f};
-        case game::AionClass::Spiritmaster: return {0.80f, 0.45f, 0.75f};
-        case game::AionClass::Cleric: return {0.95f, 0.88f, 0.55f};
-        case game::AionClass::Chanter: return {0.30f, 0.80f, 0.75f};
+        case game::AionClass::Gladiator: return hex(0x6EB7C9);
+        case game::AionClass::Templar: return hex(0x7EA0F9);
+        case game::AionClass::Assassin: return hex(0x7EB775);
+        case game::AionClass::Ranger: return hex(0x5CAC8A);
+        case game::AionClass::Sorcerer: return hex(0xAE84E8);
+        case game::AionClass::Spiritmaster: return hex(0xC060C1);
+        case game::AionClass::Cleric: return hex(0xE3CA77);
+        case game::AionClass::Chanter: return hex(0xE1A359);
         case game::AionClass::Brawler: return {0.88f, 0.36f, 0.32f};
         case game::AionClass::Unknown: break;
     }

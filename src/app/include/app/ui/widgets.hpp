@@ -160,8 +160,9 @@ struct StatTileSpec {
 /// (a null entry shows nothing).
 void stat_tile_row(const StatTileSpec* tiles, size_t count, const char* const* tooltips = nullptr);
 
-/// A class's three-letter badge in its colour, for a combatant row; "?" while the
-/// class is not known.
+/// A class for a combatant row: the game's emblem and the class's three letters in
+/// its colour, or a three-letter badge for a class without an emblem; "?" while
+/// the class is not known.
 void class_badge(game::AionClass cls);
 
 /// Centered placeholder for a table or graph with nothing in it yet.
