@@ -24,7 +24,7 @@ constexpr uint64_t kSwitchExtraHits = 0x20;
 /// The block after the damage type, by layout 4..7. Layout 4's is a hit id (u32)
 /// and a count (u32); the longer ones put the modifiers, a byte and the direction
 /// in front. Layout 6's was seen in a real capture, followed by the 00 pad; 5 and 7
-/// are as NOIA2, a maintained public meter, reads them.
+/// are as the community's notes give them, unconfirmed.
 constexpr std::array<size_t, 4> kBlockSize{8, 12, 10, 14};
 constexpr uint64_t kDamageTypeCrit = 3;
 /// The skill code of a tick is the skill id times this.

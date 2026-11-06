@@ -35,9 +35,8 @@ hide condition) compares `GetWindowThreadProcessId` of the foreground window wit
 those snapshot ids: no handle either. AION 2 has anti-cheat, and the user cares
 about account safety: when in doubt, don't.
 
-**Third-party code:** do not copy code from the community AION 2 meters. They are
-GPL-3.0 and this repository is MIT. Facts about the protocol from their notes are fine;
-the code is ours.
+**Third-party code:** copy none: this repository is MIT, and its code is its own.
+Facts about the protocol from the community's published notes are fine.
 
 ---
 
@@ -202,13 +201,13 @@ BACK, FRNT, MULT and BLOC share matched it exactly.
   - **Damage type:** 3 is a crit; 2 otherwise in the second capture.
   - **Block:** layout 4 has 8 bytes: a hit id (u32, counting up) and a count (u32).
     Layouts 5, 6 and 7 have 12, 10 and 14 bytes (6 seen in a capture; 5 and 7 as
-    NOIA2 reads them), starting with the modifiers (0x02 block, 0x04 perfect, 0x08
+    the community's notes give them), starting with the modifiers (0x02 block, 0x04 perfect, 0x08
     double, 0x20 heavy; 0x80 seen, meaning unknown), a byte (00 in every record of
     the second capture), and the direction (1 back, 2 front, 0 none). Layout 4
     carries no modifiers or direction.
     - 0x02 was the notes' "parry". Its count was the game's BLOC (11 of 862), skill
       by skill: the target blocked the hit.
-    waffle_meter reads the flag byte as rotated by a 2026-07 patch, and says a
+    Other notes read the flag byte as rotated by a 2026-07 patch, and say a
     lifesteal varint of 1–3 bytes can come before the direction; neither is
     confirmed here.
   - **Damage:** an optional 00 pad, then a scalar varint (about 10,000: 10,000 for a

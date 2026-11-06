@@ -422,8 +422,7 @@ The meter decodes the server's side of the game connection: TCP port 13328.
   opcodes. `AGENTS.md` describes the layouts and lists what is still unknown.
 
 These facts come from the AION 2 community's published notes on the Global client. The
-decoder and everything else here are written from scratch, and no code is taken from
-the GPL meters.
+decoder and everything else here are written from scratch.
 
 ## License
 
