@@ -1,451 +1,452 @@
 # AION 2 skill names by skill code, as damage (04 38) and tick (05 38) records
 # carry them. A code is 8 digits: the first two are the class (11 Gladiator to
 # 18 Chanter, 19 Brawler), code / 10000 is the skill, and the low four digits a
-# variant. A variant without a row of its own takes its skill's name.
+# variant. A variant without a row of its own takes its skill's name. The
+# third column, when there is one, names the skill's icon, which
+# tools/gen_icon_sheet.py packs for the app.
 #
-# Source: aion2.app's skill database (aion2.app/db/skills), retrieved 2026-10-16;
+# Source: aion2.app's skill database (aion2.app/db/skills), retrieved 2026-11-06;
 # the site says its data comes from NCSOFT's official AION 2 API. English
 # names as the site lists them. Regenerate with tools/gen_skill_table.py.
-1001	Glide
-1002	Flight
-1003	Scan
-1004	Mount
-1005	Substance Morph
-1006	Daevanion
-1007	Buoyancy
-1008	Sprint
-1009	Divine Heal
-1101	Dash
-1102	Quick Gliding
-1201	Divine Power Increase
-1202	Divine Heal Increase
-1203	Divine Power Boost
-4001	Dodge
-4020	Equip Gladiator Weapon
-8000	Test_PLATE Equippable
-9079	DP Nezekan's Blessing
-9865	Vicious Strike
-9868	Pummel
-9871	Punishing Benediction
-4900202	Capture Lugi!
-4900220	Fake Detector
-11000000	Equip Gladiator Weapon
-11000100	Dodge
-11010000	Rending Blow
-11020000	Keen Strike
-11030000	Rupture Strike
-11040000	Wrathful Strike
-11050000	Crushing Wave
-11060000	Frenzied Wave
-11080000	Blade Toss
-11090000	Blade Dance
-11100000	Ruinous Blow
-11110000	Focused Block
-11120000	Blood Absorption
-11130000	Armor of Balance
-11140000	Intimidating Roar
-11170000	Overhead Slam
-11170037	Overhead Slam
-11180000	Reckless Strike
-11190000	Leaping Slam
-11200000	Ankle Slice
-11210000	Ankle Smash
-11230000	Rush
-11240000	Wrath Wave
-11250000	Zikel's Blessing
-11260000	Defiance
-11270000	Survival Stance
-11280000	Sword Aura Rampage
-11290000	Mocking Blade
-11300000	Aerial Snare
-11300037	Forced Fall
-11310000	Doom Advent
-11320000	Wrath Burst
-11330000	Madness Blow
-11340000	Lifestealing Blade
-11350000	Wrathful Strike
-11360000	Rush Strike
-11370000	Forced Fall
-11380000	Tenaciousness
-11390000	Rage Burst
-11400000	Lunge Stance
-11410000	Wave Armor
-11420000	Smashing Blow
-11430000	Forced Restraint
-11440000	Upward Strike
-11450000	Fracturing Rush
-11460000	Destructive Rush
-11470000	Unsheathing Rush
-11700000	Assault Strike
-11710000	Survival Stance
-11720000	Protection Armor
-11730000	Blood Absorption
-11740000	Identify Weakness
-11750000	Attack Preparation
-11760000	Impact Hit
-11770000	Destructive Impulse
-11780000	Experienced Counterstrike
-11790000	Survival Willpower
-11800000	Murderous Burst
-12000100	Dodge
-12010000	Vicious Strike
-12020000	Decisive Strike
-12030000	Desperate Strike
-12040000	Pummel
-12060000	Punishing Strike
-12070000	Doom Shield
-12090000	Punishment
-12100000	Shield Smite
-12110000	Shield of Protection
-12120000	Taunt
-12130000	Poach
-12190000	Second Skin
-12200000	Armor of Balance
-12220000	Grapple
-12230000	Noble Armor
-12240000	Judgment
-12250000	Comrade in Arms
-12260000	Defiance
-12270000	Debilitating Smash
-12300000	Annihilate
-12310000	Empyrean Lord's Punishment
-12320000	Nezekan's Shield
-12330000	Capture
-12340000	Flash Rampage
-12350000	Warding Strike
-12410000	Executing Blade
-12420000	Blade Storm
-12430000	Shield Rush
-12440000	Threatening Blow
-12450000	Battlefield Banner
-12700000	Assault Fury
-12710000	Enhance Health
-12720000	Warding Shield
-12730000	Punishing Benediction
-12740000	Ironclad Defense
-12750000	Guarding Seal
-12760000	Impact Hit
-12770000	Insulting Roar
-12780000	Fury
-12790000	Survival Willpower
-12800000	Block Pain
-13000100	Dodge
-13010000	Quick Slice
-13020000	Throw Shadowblade
-13030000	Breaking Slice
-13040000	Swift Slice
-13050000	Flash Slice
-13060000	Ambush
-13070000	Shadowstrike
-13080000	Evasion Stance
-13090000	Shadowblade Pursuit
-13100000	Savage Roar
-13110000	Savage Back Kick
-13120000	Savage Smash
-13130000	Insignia Explosion
-13140000	Shadowstep
-13150000	Frenzied Accord
-13160000	Apply Poison
-13170000	Surging Bloodlust
-13180000	Shadow Walk
-13210000	Whirlwind Slice
-13220000	Shadow Fall
-13220037	Shadow Fall
-13230000	Aerial Bind
-13240000	Aerial Slaughter
-13250000	Smoke Bomb
-13260000	Defiance
-13270000	Savage Fang
-13280000	Spiral Slice
-13290000	Prepare to Assassinate
-13300000	Triniel's Dagger
-13310000	Illusive Clone
-13330000	Storm Slice
-13340000	Storm Rampage
-13350000	Heart Gore
-13350007	Heart Gore
-13360000	Infiltrate
-13370000	Evasion Contract
-13380000	Dark Strike
-13390000	Swift Contract
-13700000	Assault Ambush
-13710000	Heightened Sixth Sense
-13720000	Exploit Weakness
-13730000	Apply Poison
-13740000	Rear Smite
-13750000	Assault Stance
-13760000	Impact Hit
-13770000	Ambush Stance
-13780000	Defense Break
-13790000	Revitalization Contract
-13800000	Determination
-14000100	Dodge
-14010000	Deadshot
-14020000	Snipe
-14030000	Rapid Fire
-14040000	Spiral Arrow
-14050000	Drill Dart
-14050007	Drill Dart
-14060000	Griffon Arrow
-14070000	Suppressing Arrow
-14080000	Burst Arrow
-14090000	Marking Shot
-14100000	Tempest Arrow
-14110000	Gale Arrow
-14120000	Ambush Kick
-14130000	Snare Shot
-14140000	Shackling Arrow
-14150000	Illusory Arrow
-14160000	Sealing Arrow
-14170000	Explosion Trap
-14180000	Ensnaring Trap
-14190000	Stealth
-14200000	Guerilla Strike
-14210000	Eye of Rapid Burst
-14220000	Bow of Blessing
-14230000	Explosive Arrow
-14240000	Afterimage
-14250000	Hunters Resolve_active
-14260000	Defiance
-14270000	Arrow Storm
-14290000	Arrow of Space-time
-14300000	Dust Arrow
-14310000	Vaizel's Authority
-14320000	Impact Kick
-14330000	Arrow Scattershot
-14340000	Tempest Shot
-14350000	Mother Nature's Breath
-14360000	Explosive Arrow
-14370000	Lightning Arrow
-14380000	Supporting Fire
-14700000	Assault Smite
-14710000	Vigilant Eye
-14720000	Concentrated Fire
-14730000	Wind Vigor
-14740000	Focused Eye
-14750000	Hunter's Resolve
-14760000	Unyielding Resolve
-14770000	Rooting Eye
-14780000	Melee Fire
-14790000	Revitalization Contract
-14800000	Hunter's Soul
-15000000	Equip Sorcerer Weapon
-15000100	Dodge
-15010000	Flame Scattershot
-15020000	Firebomb
-15030000	Burst
-15040000	Firestorm
-15050000	Blaze
-15060000	Hellfire
-15080000	Cold Snap
-15090000	Ice Chain
-15100000	Cold Wave
-15110000	Winter's Shackles
-15120000	Glacial Smite
-15130000	Soul Freeze
-15140000	Curse: Tree
-15150000	Frost
-15160000	Steel Barrier
-15180000	Vaizel's Wisdom
-15200000	Cold Storm
-15210000	Flame Arrow
-15220000	Frost Burst
-15220037	Frost Burst
-15230000	Arctic Armor
-15240000	Defiance
-15250000	Pyroclasm
-15270000	Summon Flame
-15280000	Bittercold Wind
-15290000	Illusion
-15300000	Lumiel's Space
-15310000	Wish of Concentration
-15320000	Delayed Explosion
-15330000	Winter's Illusion
-15340000	Curse: Old Tree
-15350000	Magic Energy Blast
-15360000	Divine Burst
-15380000	Lumiel's Authority
-15390000	Fire Wall
-15400000	Element Enhancement
-15410000	Hibernation
-15410057	Remove Hibernation
-15700000	Assault Bombardment
-15710000	Fire Mark
-15720000	Robe of Earth
-15730000	Cold Snap
-15740000	Robe of Flame
-15750000	Robe of Cold
-15760000	Absorb Essence
-15770000	Grace of Resistance
-15780000	Grace of Enhancement
-15790000	Revitalization Contract
-15800000	Vitality Evaporation
-16000000	Spiritmaster Weapon Equip
-16000100	Dodge
-16009999	Return: All Spirits
-16010000	Cold Shock
-16020000	Vacuum Explosion
-16030000	Earth Tremor
-16040000	Combustion
-16050000	Ashy Call
-16060000	Siphon
-16070000	Soul's Cry
-16080000	Cry of Terror
-16090000	Magic Backflow
-16100000	Summon: Fire Spirit
+1001	Glide	ICON_CO_SKILL_004
+1002	Flight	ICON_CO_SKILL_011
+1003	Scan	ICON_CO_SKILL_009
+1004	Mount	ICON_CO_SKILL_010
+1005	Substance Morph	ICON_CO_SKILL_012
+1006	Daevanion	ICON_CO_SKILL_013
+1007	Buoyancy	ICON_DV_SKILL_003
+1008	Sprint	ICON_CO_SKILL_003
+1009	Divine Heal	ICON_CO_SKILL_014
+1101	Dash	ICON_CO_SKILL_007
+1102	Quick Gliding	ICON_CO_SKILL_006
+1201	Divine Power Increase	ICON_CO_SKILL_015
+1202	Divine Heal Increase	ICON_CO_SKILL_016
+1203	Divine Power Boost	ICON_CO_SKILL_017
+4001	Dodge	ICON_CO_SKILL_001
+4020	Equip Gladiator Weapon	ICON_TE_SKILL_001
+8000	Test_PLATE Equippable	ICON_TE_SKILL_001
+9079	DP Nezekan's Blessing	ICON_TE_SKILL_005
+9865	Vicious Strike	ICON_TE_SKILL_001
+9868	Pummel	ICON_TE_SKILL_006
+9871	Punishing Benediction	ICON_TE_SKILL_Passive_003
+4900202	Capture Lugi!	ICON_FE_Masquerade_Skill_ThrowTrap
+4900220	Fake Detector	ICON_FE_Masquerade_Skill_Search
+11000000	Equip Gladiator Weapon	ICON_TE_SKILL_001
+11000100	Dodge	ICON_CO_SKILL_001
+11010000	Rending Blow	ICON_GL_SKILL_001
+11020000	Keen Strike	ICON_GL_SKILL_002
+11030000	Rupture Strike	ICON_GL_SKILL_003
+11040000	Wrathful Strike	ICON_GL_SKILL_004
+11050000	Crushing Wave	ICON_GL_SKILL_005
+11060000	Frenzied Wave	ICON_GL_SKILL_006
+11080000	Blade Toss	ICON_GL_SKILL_008
+11090000	Blade Dance	ICON_GL_SKILL_009
+11100000	Ruinous Blow	ICON_GL_SKILL_010
+11110000	Focused Block	ICON_GL_SKILL_011
+11120000	Blood Absorption	ICON_GL_SKILL_012
+11130000	Armor of Balance	ICON_GL_SKILL_013
+11140000	Intimidating Roar	ICON_GL_SKILL_014
+11170000	Overhead Slam	ICON_GL_SKILL_017
+11170037	Overhead Slam	ICON_GL_SKILL_017
+11180000	Reckless Strike	ICON_GL_SKILL_018
+11190000	Leaping Slam	ICON_GL_SKILL_019
+11200000	Ankle Slice	ICON_GL_SKILL_020
+11210000	Ankle Smash	ICON_GL_SKILL_021
+11230000	Rush	ICON_GL_SKILL_015
+11240000	Wrath Wave	ICON_GL_SKILL_007
+11250000	Zikel's Blessing	ICON_GL_SKILL_024
+11260000	Defiance	ICON_CO_SKILL_002
+11270000	Survival Stance	ICON_GL_SKILL_026
+11280000	Sword Aura Rampage	ICON_TE_SKILL_034
+11290000	Mocking Blade	ICON_GL_SKILL_028
+11300000	Aerial Snare	ICON_GL_SKILL_015
+11300037	Forced Fall	ICON_GL_SKILL_016
+11310000	Doom Advent	ICON_GL_SKILL_030
+11320000	Wrath Burst	ICON_GL_SKILL_044
+11330000	Madness Blow	ICON_GL_SKILL_015
+11340000	Lifestealing Blade	ICON_GL_SKILL_034
+11350000	Wrathful Strike	ICON_GL_SKILL_019
+11360000	Rush Strike	ICON_GL_SKILL_036
+11370000	Forced Fall	ICON_GL_SKILL_016
+11380000	Tenaciousness	ICON_GL_SKILL_038
+11390000	Rage Burst	ICON_GL_SKILL_039
+11400000	Lunge Stance	ICON_GL_SKILL_040
+11410000	Wave Armor	ICON_GL_SKILL_041
+11420000	Smashing Blow	ICON_GL_SKILL_042
+11430000	Forced Restraint	ICON_GL_SKILL_043
+11440000	Upward Strike	ICON_TE_SKILL_016
+11450000	Fracturing Rush	ICON_GL_SKILL_045
+11460000	Destructive Rush	ICON_GL_SKILL_046
+11470000	Unsheathing Rush	ICON_GL_SKILL_047
+11700000	Assault Strike	ICON_CO_SKILL_003
+11710000	Survival Stance	ICON_GL_SKILL_Passive_001
+11720000	Protection Armor	ICON_GL_SKILL_Passive_002
+11730000	Blood Absorption	ICON_GL_SKILL_Passive_003
+11740000	Identify Weakness	ICON_GL_SKILL_Passive_004
+11750000	Attack Preparation	ICON_GL_SKILL_Passive_005
+11760000	Impact Hit	ICON_GL_SKILL_Passive_006
+11770000	Destructive Impulse	ICON_GL_SKILL_Passive_007
+11780000	Experienced Counterstrike	ICON_GL_SKILL_Passive_008
+11790000	Survival Willpower	ICON_GL_SKILL_Passive_009
+11800000	Murderous Burst	ICON_GL_SKILL_Passive_010
+12000100	Dodge	ICON_CO_SKILL_001
+12010000	Vicious Strike	ICON_TE_SKILL_001
+12020000	Decisive Strike	ICON_TE_SKILL_002
+12030000	Desperate Strike	ICON_TE_SKILL_003
+12040000	Pummel	ICON_TE_SKILL_006
+12060000	Punishing Strike	ICON_TE_SKILL_014
+12070000	Doom Shield	ICON_TE_SKILL_007
+12090000	Punishment	ICON_TE_SKILL_009
+12100000	Shield Smite	ICON_TE_SKILL_010
+12110000	Shield of Protection	ICON_TE_SKILL_011
+12120000	Taunt	ICON_TE_SKILL_012
+12130000	Poach	ICON_TE_SKILL_013
+12190000	Second Skin	ICON_TE_SKILL_018
+12200000	Armor of Balance	ICON_GL_SKILL_013
+12220000	Grapple	ICON_TE_SKILL_021
+12230000	Noble Armor	ICON_TE_SKILL_022
+12240000	Judgment	ICON_TE_SKILL_004
+12250000	Comrade in Arms	ICON_TE_SKILL_024
+12260000	Defiance	ICON_CO_SKILL_002
+12270000	Debilitating Smash	ICON_TE_SKILL_025
+12300000	Annihilate	ICON_TE_SKILL_028
+12310000	Empyrean Lord's Punishment	ICON_TE_SKILL_029
+12320000	Nezekan's Shield	ICON_TE_SKILL_030
+12330000	Capture	ICON_TE_SKILL_033
+12340000	Flash Rampage	ICON_GL_SKILL_027
+12350000	Warding Strike	ICON_TE_SKILL_035
+12410000	Executing Blade	ICON_TE_SKILL_041
+12420000	Blade Storm	ICON_TE_SKILL_023
+12430000	Shield Rush	ICON_TE_SKILL_015
+12440000	Threatening Blow	ICON_TE_SKILL_044
+12450000	Battlefield Banner	ICON_TE_SKILL_045
+12700000	Assault Fury	ICON_CO_SKILL_003
+12710000	Enhance Health	ICON_TE_SKILL_Passive_001
+12720000	Warding Shield	ICON_TE_SKILL_Passive_002
+12730000	Punishing Benediction	ICON_TE_SKILL_Passive_003
+12740000	Ironclad Defense	ICON_TE_SKILL_Passive_004
+12750000	Guarding Seal	ICON_TE_SKILL_Passive_005
+12760000	Impact Hit	ICON_GL_SKILL_Passive_006
+12770000	Insulting Roar	ICON_TE_SKILL_Passive_007
+12780000	Fury	ICON_TE_SKILL_Passive_008
+12790000	Survival Willpower	ICON_GL_SKILL_Passive_009
+12800000	Block Pain	ICON_TE_SKILL_Passive_010
+13000100	Dodge	ICON_CO_SKILL_001
+13010000	Quick Slice	ICON_AS_SKILL_001
+13020000	Throw Shadowblade	ICON_AS_SKILL_031
+13030000	Breaking Slice	ICON_AS_SKILL_003
+13040000	Swift Slice	ICON_AS_SKILL_004
+13050000	Flash Slice	ICON_AS_SKILL_005
+13060000	Ambush	ICON_AS_SKILL_006
+13070000	Shadowstrike	ICON_AS_SKILL_007
+13080000	Evasion Stance	ICON_AS_SKILL_024
+13090000	Shadowblade Pursuit	ICON_AS_SKILL_017
+13100000	Savage Roar	ICON_AS_SKILL_009
+13110000	Savage Back Kick	ICON_AS_SKILL_010
+13120000	Savage Smash	ICON_AS_SKILL_011
+13130000	Insignia Explosion	ICON_AS_SKILL_013
+13140000	Shadowstep	ICON_AS_SKILL_014
+13150000	Frenzied Accord	ICON_AS_SKILL_015
+13160000	Apply Poison	ICON_AS_SKILL_014
+13170000	Surging Bloodlust	ICON_AS_SKILL_015
+13180000	Shadow Walk	ICON_AS_SKILL_016
+13210000	Whirlwind Slice	ICON_AS_SKILL_019
+13220000	Shadow Fall	ICON_AS_SKILL_020
+13220037	Shadow Fall	ICON_AS_SKILL_020
+13230000	Aerial Bind	ICON_AS_SKILL_026
+13240000	Aerial Slaughter	ICON_AS_SKILL_021
+13250000	Smoke Bomb	ICON_AS_SKILL_023
+13260000	Defiance	ICON_CO_SKILL_002
+13270000	Savage Fang	ICON_AS_SKILL_025
+13280000	Spiral Slice	ICON_AS_SKILL_022
+13290000	Prepare to Assassinate	ICON_AS_SKILL_027
+13300000	Triniel's Dagger	ICON_AS_SKILL_028
+13310000	Illusive Clone	ICON_AS_SKILL_029
+13330000	Storm Slice	ICON_AS_SKILL_033
+13340000	Storm Rampage	ICON_AS_SKILL_034
+13350000	Heart Gore	ICON_AS_SKILL_035
+13350007	Heart Gore	ICON_AS_SKILL_035
+13360000	Infiltrate	ICON_AS_SKILL_036
+13370000	Evasion Contract	ICON_AS_SKILL_039
+13380000	Dark Strike	ICON_AS_SKILL_038
+13390000	Swift Contract	ICON_AS_SKILL_037
+13700000	Assault Ambush	ICON_CO_SKILL_003
+13710000	Heightened Sixth Sense	ICON_AS_SKILL_Passive_001
+13720000	Exploit Weakness	ICON_AS_SKILL_Passive_002
+13730000	Apply Poison	ICON_AS_SKILL_Passive_003
+13740000	Rear Smite	ICON_AS_SKILL_Passive_004
+13750000	Assault Stance	ICON_AS_SKILL_Passive_006
+13760000	Impact Hit	ICON_AS_SKILL_Passive_011
+13770000	Ambush Stance	ICON_AS_SKILL_Passive_007
+13780000	Defense Break	ICON_AS_SKILL_Passive_008
+13790000	Revitalization Contract	ICON_AS_SKILL_Passive_009
+13800000	Determination	ICON_AS_SKILL_Passive_010
+14000100	Dodge	ICON_CO_SKILL_001
+14010000	Deadshot	ICON_RA_SKILL_002
+14020000	Snipe	ICON_RA_SKILL_001
+14030000	Rapid Fire	ICON_RA_SKILL_003
+14040000	Spiral Arrow	ICON_RA_SKILL_004
+14050000	Drill Dart	ICON_RA_SKILL_005
+14050007	Drill Dart	ICON_RA_SKILL_005
+14060000	Griffon Arrow	ICON_RA_SKILL_006
+14070000	Suppressing Arrow	ICON_RA_SKILL_007
+14080000	Burst Arrow	ICON_RA_SKILL_008
+14090000	Marking Shot	ICON_RA_SKILL_031
+14100000	Tempest Arrow	ICON_RA_SKILL_010
+14110000	Gale Arrow	ICON_RA_SKILL_011
+14120000	Ambush Kick	ICON_RA_SKILL_012
+14130000	Snare Shot	ICON_RA_SKILL_013
+14140000	Shackling Arrow	ICON_RA_SKILL_014
+14150000	Illusory Arrow	ICON_RA_SKILL_015
+14160000	Sealing Arrow	ICON_RA_SKILL_016
+14170000	Explosion Trap	ICON_RA_SKILL_017
+14180000	Ensnaring Trap	ICON_RA_SKILL_018
+14190000	Stealth	ICON_RA_SKILL_019
+14200000	Guerilla Strike	ICON_RA_SKILL_020
+14210000	Eye of Rapid Burst	ICON_RA_SKILL_021
+14220000	Bow of Blessing	ICON_RA_SKILL_030
+14230000	Explosive Arrow	ICON_RA_SKILL_023
+14240000	Afterimage	ICON_RA_SKILL_024
+14250000	Hunters Resolve_active	ICON_RA_SKILL_025
+14260000	Defiance	ICON_CO_SKILL_002
+14270000	Arrow Storm	ICON_RA_SKILL_026
+14290000	Arrow of Space-time	ICON_RA_SKILL_028
+14300000	Dust Arrow	ICON_RA_SKILL_029
+14310000	Vaizel's Authority	ICON_RA_SKILL_022
+14320000	Impact Kick	ICON_RA_SKILL_032
+14330000	Arrow Scattershot	ICON_RA_SKILL_033
+14340000	Tempest Shot	ICON_RA_SKILL_034
+14350000	Mother Nature's Breath	ICON_RA_SKILL_035
+14360000	Explosive Arrow	ICON_RA_SKILL_023
+14370000	Lightning Arrow	ICON_RA_SKILL_037
+14380000	Supporting Fire	ICON_RA_SKILL_038
+14700000	Assault Smite	ICON_CO_SKILL_003
+14710000	Vigilant Eye	ICON_RA_SKILL_Passive_004
+14720000	Concentrated Fire	ICON_RA_SKILL_Passive_003
+14730000	Wind Vigor	ICON_RA_SKILL_Passive_006
+14740000	Focused Eye	ICON_RA_SKILL_Passive_001
+14750000	Hunter's Resolve	ICON_RA_SKILL_Passive_011
+14760000	Unyielding Resolve	ICON_RA_SKILL_Passive_012
+14770000	Rooting Eye	ICON_RA_SKILL_Passive_008
+14780000	Melee Fire	ICON_RA_SKILL_Passive_013
+14790000	Revitalization Contract	ICON_AS_SKILL_Passive_009
+14800000	Hunter's Soul	ICON_RA_SKILL_Passive_007
+15000000	Equip Sorcerer Weapon	ICON_SO_SKILL_012
+15000100	Dodge	ICON_CO_SKILL_001
+15010000	Flame Scattershot	ICON_SO_SKILL_001
+15020000	Firebomb	ICON_SO_SKILL_002
+15030000	Burst	ICON_SO_SKILL_003
+15040000	Firestorm	ICON_SO_SKILL_004
+15050000	Blaze	ICON_SO_SKILL_005
+15060000	Hellfire	ICON_SO_SKILL_006
+15080000	Cold Snap	ICON_SO_SKILL_008
+15090000	Ice Chain	ICON_SO_SKILL_009
+15100000	Cold Wave	ICON_SO_SKILL_010
+15110000	Winter's Shackles	ICON_SO_SKILL_011
+15120000	Glacial Smite	ICON_SO_SKILL_012
+15130000	Soul Freeze	ICON_SO_SKILL_013
+15140000	Curse: Tree	ICON_SO_SKILL_014
+15150000	Frost	ICON_SO_SKILL_015
+15160000	Steel Barrier	ICON_SO_SKILL_016
+15180000	Vaizel's Wisdom	ICON_SO_SKILL_018
+15200000	Cold Storm	ICON_SO_SKILL_019
+15210000	Flame Arrow	ICON_SO_SKILL_020
+15220000	Frost Burst	ICON_SO_SKILL_022
+15220037	Frost Burst	ICON_SO_SKILL_022
+15230000	Arctic Armor	ICON_SO_SKILL_021
+15240000	Defiance	ICON_CO_SKILL_002
+15250000	Pyroclasm	ICON_SO_SKILL_023
+15270000	Summon Flame	ICON_SO_SKILL_024
+15280000	Bittercold Wind	ICON_SO_SKILL_025
+15290000	Illusion	ICON_SO_SKILL_026
+15300000	Lumiel's Space	ICON_SO_SKILL_017
+15310000	Wish of Concentration	ICON_SO_SKILL_028
+15320000	Delayed Explosion	ICON_SO_SKILL_032
+15330000	Winter's Illusion	ICON_SO_SKILL_033
+15340000	Curse: Old Tree	ICON_SO_SKILL_014
+15350000	Magic Energy Blast	ICON_SO_SKILL_024
+15360000	Divine Burst	ICON_SO_SKILL_036
+15380000	Lumiel's Authority	ICON_SO_SKILL_038
+15390000	Fire Wall	ICON_SO_SKILL_039
+15400000	Element Enhancement	ICON_SO_SKILL_040
+15410000	Hibernation	ICON_SO_SKILL_041
+15410057	Remove Hibernation	ICON_SO_SKILL_041_A
+15700000	Assault Bombardment	ICON_CO_SKILL_003
+15710000	Fire Mark	ICON_SO_SKILL_Passive_002
+15720000	Robe of Earth	ICON_SO_SKILL_Passive_006
+15730000	Cold Snap	ICON_SO_SKILL_Passive_003
+15740000	Robe of Flame	ICON_SO_SKILL_Passive_004
+15750000	Robe of Cold	ICON_SO_SKILL_Passive_005
+15760000	Absorb Essence	ICON_SO_SKILL_Passive_001
+15770000	Grace of Resistance	ICON_SO_SKILL_038
+15780000	Grace of Enhancement	ICON_SO_SKILL_Passive_007
+15790000	Revitalization Contract	ICON_AS_SKILL_Passive_009
+15800000	Vitality Evaporation	ICON_SO_SKILL_Passive_008
+16000000	Spiritmaster Weapon Equip	ICON_TE_TEMP_020_Effect_001
+16000100	Dodge	ICON_CO_SKILL_001
+16009999	Return: All Spirits	ICON_EL_SKILL_029
+16010000	Cold Shock	ICON_EL_SKILL_001
+16020000	Vacuum Explosion	ICON_EL_SKILL_002
+16030000	Earth Tremor	ICON_EL_SKILL_003
+16040000	Combustion	ICON_EL_SKILL_004
+16050000	Ashy Call	ICON_EL_SKILL_005
+16060000	Siphon	ICON_EL_SKILL_006
+16070000	Soul's Cry	ICON_EL_SKILL_007
+16080000	Cry of Terror	ICON_EL_SKILL_008
+16090000	Magic Backflow	ICON_EL_SKILL_009
+16100000	Summon: Fire Spirit	ICON_EL_SKILL_010
 16107000	Use Spirit Summon Skill
-16110000	Summon: Water Spirit
-16120000	Summon: Wind Spirit
-16130000	Summon: Earth Spirit
-16140000	Jointstrike: Curse
-16150000	Jointstrike: Corrode
-16151100	Fire Spirit: Rage Burst
-16151200	Fire Spirit: Rage Burst
-16151300	Fire Spirit: Rage Burst
-16151400	Fire Spirit: Rage Burst
-16152100	Water Spirit: Ice Chain
-16152200	Water Spirit: Ice Chain
-16152300	Water Spirit: Ice Chain
-16152400	Water Spirit: Ice Chain
-16153100	Earth Spirit: Taunt
-16153200	Earth Spirit: Taunt
-16153300	Earth Spirit: Taunt
-16153400	Earth Spirit: Taunt
-16154100	Wind Spirit: Gale
-16154200	Wind Spirit: Gale
-16154300	Wind Spirit: Gale
-16154400	Wind Spirit: Gale
-16155100	Ancient Spirit: Break
-16160000	Spirit Protection
-16170000	Command: Proxy
-16180000	Spirit Momentum
-16190000	Enhance: Spirit's Benediction
-16200000	Defiance
-16210000	Curse of Despair
-16220000	Cursed Cloud
-16230000	Seize Magic
-16240000	Jointstrike: Destructive Attack
-16250000	Summon: Ancient Spirit
+16110000	Summon: Water Spirit	ICON_EL_SKILL_011
+16120000	Summon: Wind Spirit	ICON_EL_SKILL_012
+16130000	Summon: Earth Spirit	ICON_EL_SKILL_013
+16140000	Jointstrike: Curse	ICON_EL_SKILL_014
+16150000	Jointstrike: Corrode	ICON_EL_SKILL_015
+16151100	Fire Spirit: Rage Burst	ICON_EL_SKILL_015
+16151200	Fire Spirit: Rage Burst	ICON_EL_SKILL_015
+16151300	Fire Spirit: Rage Burst	ICON_EL_SKILL_015
+16151400	Fire Spirit: Rage Burst	ICON_EL_SKILL_015
+16152100	Water Spirit: Ice Chain	ICON_EL_SKILL_015
+16152200	Water Spirit: Ice Chain	ICON_EL_SKILL_015
+16152300	Water Spirit: Ice Chain	ICON_EL_SKILL_015
+16152400	Water Spirit: Ice Chain	ICON_EL_SKILL_015
+16153100	Earth Spirit: Taunt	ICON_EL_SKILL_015
+16153200	Earth Spirit: Taunt	ICON_EL_SKILL_015
+16153300	Earth Spirit: Taunt	ICON_EL_SKILL_015
+16153400	Earth Spirit: Taunt	ICON_EL_SKILL_015
+16154100	Wind Spirit: Gale	ICON_EL_SKILL_015
+16154200	Wind Spirit: Gale	ICON_EL_SKILL_015
+16154300	Wind Spirit: Gale	ICON_EL_SKILL_015
+16154400	Wind Spirit: Gale	ICON_EL_SKILL_015
+16155100	Ancient Spirit: Break	ICON_EL_SKILL_015
+16160000	Spirit Protection	ICON_TE_SKILL_005
+16170000	Command: Proxy	ICON_EL_SKILL_017
+16180000	Spirit Momentum	ICON_TE_SKILL_019
+16190000	Enhance: Spirit's Benediction	ICON_EL_SKILL_019
+16200000	Defiance	ICON_CO_SKILL_002
+16210000	Curse of Despair	ICON_EL_SKILL_021
+16220000	Cursed Cloud	ICON_EL_SKILL_022
+16230000	Seize Magic	ICON_EL_SKILL_023
+16240000	Jointstrike: Destructive Attack	ICON_EL_SKILL_024
+16250000	Summon: Ancient Spirit	ICON_EL_SKILL_025
 16257000	Use Spirit Summon Skill
-16260000	Magic Block
-16270000	Elemental Replenishment
-16280000	Continuous Impact
-16290000	Dismiss: Fire Spirit
-16290001	Dismiss: Water Spirit
-16290002	Dismiss: Earth Spirit
-16290003	Dismiss: Wind Spirit
-16290004	Dismiss: Ancient Spirit
-16300000	Elemental Fusion
-16300001	Elemental Fusion
-16310000	Extract Vitality
-16330000	Dimensional Control
-16340000	Rapid Scattershot
-16350000	Soul Decimation
-16360000	Kaisinel's Power
-16370000	Flame Blessing
-16700000	Assault Terror
-16710000	Spirit Strike
-16720000	Spirit Protection
-16730000	Spirit's Descent
-16740000	Corrode
-16750000	Spirit Revitalization
-16760000	Mental Focus
-16770000	Spirit Communion
-16780000	Element Unification
-16790000	Revitalization Contract
-16800000	Consecutive Countercurrent
-17000100	Dodge
-17010000	Earth's Retribution
-17020000	Thunder and Lightning
-17030000	Discharge
-17040000	Judgment Thunder
-17050000	Divine Punishment
-17060000	Bolt
-17070000	Chain of Torment
-17080000	Debilitating Mark
-17090000	Light of Regeneration
-17100000	Healing Light
-17120000	Radiant Recovery
-17150000	Divine Aura
-17160000	Benevolence
-17190000	Root
-17240000	Defiance
-17270000	Salvation
-17280000	Power Burst
-17290000	Absolution
-17300000	Voice of Doom
-17320000	Blessing of Regeneration
-17350000	Condemnation
-17370000	Lightning Strike Scattershot
-17390000	Summon Resurrection
-17400000	Earth Punishment
-17410000	Light of Protection
-17420000	Yustiel's Power
-17430000	Prayer of Amplification
-17440000	Noble Aura
-17700000	Assault Mark
-17710000	Warm Benediction
-17720000	Empyrean Lords' Benediction
-17730000	Empyrean Lord's Grace
-17740000	Healing Enhancement
-17750000	Immortal Veil
-17760000	Heal Block
-17770000	Prayer of Concentration
-17780000	Earth's Grace
-17790000	Survival Willpower
-17800000	Radiant Benediction
-18000100	Dodge
-18010000	Onslaught
-18020000	Resonance Crush
-18030000	Bolt Crush
-18040000	Incandescent Blow
-18050000	Bursting Blow
-18060000	Impactful Crush
-18070000	Crushing Blow
-18080000	Wave Blow
-18080037	Wave Blow
-18090000	Rushing Smash
-18100000	Dark Crush
-18120000	Recuperation
-18130000	Fracturing Blow
-18140000	Focused Defense
-18150000	Heat Wave Blow
-18160000	Sprint Mantra
-18170000	Healing Touch
-18190000	Undefeated Mantra
-18200000	Defiance
-18210000	Tremor Crush
-18220000	Obliterate
-18230000	Ensnaring Mark
-18240000	Impeding Authority
-18250000	Power of the Storm
-18290000	Spinning Strike
-18300000	Gust Rampage
-18330000	Marchutan's Wrath
-18370000	Storm Chain
-18390000	Surging Strike
-18400000	Piercing Strike
-18410000	Crushing Strike
-18420000	Guardian Blessing
-18440000	Barrier Spell
-18700000	Assault Shock
-18710000	Blessing of Life
-18720000	Crossguard
-18730000	Protection Circle
-18740000	Inspiring Spell
-18750000	Attack Preparation
-18760000	Impact Hit
-18770000	Raging Spell
-18780000	Earth's Promise
-18790000	Survival Willpower
-18800000	Wind's Promise
-19000100	Dodge
-19090000	Smite Ground
-19130000	Rampage
-19140000	Rampage
-19280000	Rage
-19350000	Focused Block
-19450000	Defiance
-19460000	Flash Step
-19760000	Impact Hit
-19790000	Revitalization Contract
+16260000	Magic Block	ICON_EL_SKILL_026
+16270000	Elemental Replenishment	ICON_TE_SKILL_003
+16280000	Continuous Impact	ICON_CL_SKILL_030
+16290000	Dismiss: Fire Spirit	ICON_EL_SKILL_029
+16290001	Dismiss: Water Spirit	ICON_EL_SKILL_029
+16290002	Dismiss: Earth Spirit	ICON_EL_SKILL_029
+16290003	Dismiss: Wind Spirit	ICON_EL_SKILL_029
+16290004	Dismiss: Ancient Spirit	ICON_EL_SKILL_029
+16300000	Elemental Fusion	ICON_EL_SKILL_030
+16300001	Elemental Fusion	ICON_EL_SKILL_030
+16310000	Extract Vitality	ICON_TE_SKILL_003
+16330000	Dimensional Control	ICON_EL_SKILL_033
+16340000	Rapid Scattershot	ICON_EL_SKILL_034
+16350000	Soul Decimation	ICON_TE_SKILL_003
+16360000	Kaisinel's Power	ICON_EL_SKILL_036
+16370000	Flame Blessing	ICON_EL_SKILL_037
+16700000	Assault Terror	ICON_CO_SKILL_003
+16710000	Spirit Strike	ICON_EL_SKILL_Passive_004
+16720000	Spirit Protection	ICON_EL_SKILL_Passive_002
+16730000	Spirit's Descent	ICON_EL_SKILL_Passive_003
+16740000	Corrode	ICON_EL_SKILL_Passive_012
+16750000	Spirit Revitalization	ICON_EL_SKILL_Passive_011
+16760000	Mental Focus	ICON_EL_SKILL_Passive_006
+16770000	Spirit Communion	ICON_EL_SKILL_Passive_007
+16780000	Element Unification	ICON_EL_SKILL_Passive_008
+16790000	Revitalization Contract	ICON_AS_SKILL_Passive_009
+16800000	Consecutive Countercurrent	ICON_EL_SKILL_Passive_013
+17000100	Dodge	ICON_CO_SKILL_001
+17010000	Earth's Retribution	ICON_CL_SKILL_001
+17020000	Thunder and Lightning	ICON_CL_SKILL_002
+17030000	Discharge	ICON_CL_SKILL_003
+17040000	Judgment Thunder	ICON_CL_SKILL_004
+17050000	Divine Punishment	ICON_CL_SKILL_005
+17060000	Bolt	ICON_CL_SKILL_006
+17070000	Chain of Torment	ICON_CL_SKILL_007
+17080000	Debilitating Mark	ICON_CL_SKILL_008
+17090000	Light of Regeneration	ICON_CL_SKILL_009
+17100000	Healing Light	ICON_CL_SKILL_010
+17120000	Radiant Recovery	ICON_CL_SKILL_012
+17150000	Divine Aura	ICON_CL_SKILL_015
+17160000	Benevolence	ICON_CL_SKILL_047
+17190000	Root	ICON_CL_SKILL_019
+17240000	Defiance	ICON_CO_SKILL_002
+17270000	Salvation	ICON_CL_SKILL_026
+17280000	Power Burst	ICON_CL_SKILL_027
+17290000	Absolution	ICON_CL_SKILL_028
+17300000	Voice of Doom	ICON_CL_SKILL_029
+17320000	Blessing of Regeneration	ICON_CL_SKILL_032
+17350000	Condemnation	ICON_CL_SKILL_035
+17370000	Lightning Strike Scattershot	ICON_CL_SKILL_037
+17390000	Summon Resurrection	ICON_CL_SKILL_039
+17400000	Earth Punishment	ICON_CL_SKILL_040
+17410000	Light of Protection	ICON_CL_SKILL_041
+17420000	Yustiel's Power	ICON_CL_SKILL_042
+17430000	Prayer of Amplification	ICON_CL_SKILL_044
+17440000	Noble Aura	ICON_CL_SKILL_046
+17700000	Assault Mark	ICON_CO_SKILL_003
+17710000	Warm Benediction	ICON_CL_SKILL_Passive_001
+17720000	Empyrean Lords' Benediction	ICON_CL_SKILL_Passive_002
+17730000	Empyrean Lord's Grace	ICON_CL_SKILL_Passive_012
+17740000	Healing Enhancement	ICON_CL_SKILL_Passive_003
+17750000	Immortal Veil	ICON_CL_SKILL_Passive_011
+17760000	Heal Block	ICON_CL_SKILL_Passive_005
+17770000	Prayer of Concentration	ICON_CL_SKILL_Passive_006
+17780000	Earth's Grace	ICON_CL_SKILL_Passive_008
+17790000	Survival Willpower	ICON_GL_SKILL_Passive_009
+17800000	Radiant Benediction	ICON_CL_SKILL_Passive_007
+18000100	Dodge	ICON_CO_SKILL_001
+18010000	Onslaught	ICON_CH_SKILL_001
+18020000	Resonance Crush	ICON_CH_SKILL_002
+18030000	Bolt Crush	ICON_CH_SKILL_003
+18040000	Incandescent Blow	ICON_CH_SKILL_004
+18050000	Bursting Blow	ICON_CH_SKILL_005
+18060000	Impactful Crush	ICON_CH_SKILL_006
+18070000	Crushing Blow	ICON_CH_SKILL_007
+18080000	Wave Blow	ICON_CH_SKILL_008
+18080037	Wave Blow	ICON_CH_SKILL_008
+18090000	Rushing Smash	ICON_CH_SKILL_009
+18100000	Dark Crush	ICON_CH_SKILL_010
+18120000	Recuperation	ICON_CH_SKILL_013
+18130000	Fracturing Blow	ICON_CH_SKILL_043
+18140000	Focused Defense	ICON_CH_SKILL_014
+18150000	Heat Wave Blow	ICON_CH_SKILL_015
+18160000	Sprint Mantra	ICON_CH_SKILL_016
+18170000	Healing Touch	ICON_CH_SKILL_017
+18190000	Undefeated Mantra	ICON_CH_SKILL_019
+18200000	Defiance	ICON_CO_SKILL_002
+18210000	Tremor Crush	ICON_CH_SKILL_021
+18220000	Obliterate	ICON_CH_SKILL_022
+18230000	Ensnaring Mark	ICON_CH_SKILL_023
+18240000	Impeding Authority	ICON_CH_SKILL_024
+18250000	Power of the Storm	ICON_CH_SKILL_025
+18290000	Spinning Strike	ICON_CH_SKILL_029
+18300000	Gust Rampage	ICON_CH_SKILL_030
+18330000	Marchutan's Wrath	ICON_CH_SKILL_033
+18370000	Storm Chain	ICON_CH_SKILL_037
+18390000	Surging Strike	ICON_CH_SKILL_039
+18400000	Piercing Strike	ICON_CH_SKILL_040
+18410000	Crushing Strike	ICON_CH_SKILL_041
+18420000	Guardian Blessing	ICON_CH_SKILL_042
+18440000	Barrier Spell	ICON_CH_SKILL_044
+18700000	Assault Shock	ICON_CO_SKILL_003
+18710000	Blessing of Life	ICON_CH_SKILL_Passive_012
+18720000	Crossguard	ICON_CH_SKILL_Passive_002
+18730000	Protection Circle	ICON_CH_SKILL_Passive_001
+18740000	Inspiring Spell	ICON_CH_SKILL_Passive_011
+18750000	Attack Preparation	ICON_GL_SKILL_Passive_005
+18760000	Impact Hit	ICON_GL_SKILL_Passive_006
+18770000	Raging Spell	ICON_CH_SKILL_Passive_007
+18780000	Earth's Promise	ICON_CH_SKILL_Passive_010
+18790000	Survival Willpower	ICON_GL_SKILL_Passive_009
+18800000	Wind's Promise	ICON_CH_SKILL_Passive_008
+19000100	Dodge	ICON_CO_SKILL_001
+19090000	Smite Ground	ICON_GT_SKILL_009
+19130000	Rampage	ICON_GT_SKILL_013
+19280000	Rage	ICON_GT_SKILL_028
+19350000	Focused Block	ICON_GT_SKILL_035
+19450000	Defiance	ICON_CO_SKILL_002
+19460000	Flash Step	ICON_GT_SKILL_046
+19760000	Impact Hit	ICON_GT_SKILL_Passive_006
+19790000	Revitalization Contract	ICON_GT_SKILL_Passive_009

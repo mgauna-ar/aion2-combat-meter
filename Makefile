@@ -65,7 +65,7 @@ ASAN_FLAGS = -fsanitize=address,undefined -fno-sanitize-recover=undefined \
 
 all: test replay
 
-test: aion2_test_runner check-headers check-ui check-forbidden check-skills check-cooldowns check-maps check-npcs replay-smoke
+test: aion2_test_runner check-headers check-ui check-forbidden check-skills check-icons check-cooldowns check-maps check-npcs replay-smoke
 	./aion2_test_runner
 
 replay: aion2meter-replay
@@ -193,6 +193,11 @@ check-forbidden:
 check-skills:
 	@python3 tools/gen_skill_table.py --check
 
+# game_icon_sheet.inc packs the icons skills.tsv names; this fails when its index and
+# the TSV's icon column differ (the pixels need the downloaded images to rebuild).
+check-icons:
+	@python3 tools/gen_icon_sheet.py --check
+
 # cooldown_table.inc is generated from plugins/auras/data/cooldowns.tsv, the same way.
 check-cooldowns:
 	@python3 tools/gen_cooldown_table.py --check
@@ -258,4 +263,4 @@ clean:
 
 FORCE:
 
-.PHONY: all test replay tsan asan clean check-ui check-headers check-forbidden check-skills check-cooldowns check-maps check-npcs fixtures replay-smoke golden screenshots FORCE
+.PHONY: all test replay tsan asan clean check-ui check-headers check-forbidden check-skills check-icons check-cooldowns check-maps check-npcs fixtures replay-smoke golden screenshots FORCE

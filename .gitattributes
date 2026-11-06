@@ -6,3 +6,7 @@
 *.ico binary
 *.pcap binary
 *.pcapng binary
+
+# The icon sheet is generated (tools/gen_icon_sheet.py) and megabytes of numbers:
+# a diff of it says nothing.
+src/app/src/game_icon_sheet.inc -diff linguist-generated

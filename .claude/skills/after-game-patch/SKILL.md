@@ -44,9 +44,23 @@ A patch can add or rename skills. Rows the meter cannot name read "Skill 1234567
    ```
    Stop at the first page that lists no skills.
 2. **Rebuild the table.** Run `python3 tools/gen_skill_table.py --import-pages /tmp/skills`.
-   It rewrites `src/game/data/skills.tsv` and `skill_table.inc`.
+   It rewrites `src/game/data/skills.tsv` (names, and each skill's icon) and
+   `skill_table.inc`. A skill the pages list with no English name keeps the name the
+   TSV had (the Brawler's, since 2026-11).
 3. **Check the diff.** Renamed rows are expected. A class whose codes stopped starting
    with its two digits (`class_of_skill`) is not, and means the codes were renumbered.
+4. **Rebuild the icons**, when the icon column changed (`make test`'s `check-icons`
+   fails until they are). Download every image the sheet needs, then pack them; it
+   needs Pillow with WebP (`pip install pillow`):
+   ```bash
+   mkdir -p /tmp/icons/skills /tmp/icons/classes
+   python3 tools/gen_icon_sheet.py --urls > /tmp/icons/urls.txt
+   while IFS=$'\t' read -r dest url; do [ -s "/tmp/icons/$dest" ] || curl -sSfL -o "/tmp/icons/$dest" "$url"; sleep 0.5; done < /tmp/icons/urls.txt
+   python3 tools/gen_icon_sheet.py --icons /tmp/icons --preview /tmp/icons/sheet.png
+   ```
+   Look over `sheet.png`: the emblems first, then every skill icon. The class colours
+   it prints are the emblems' own; `class_color` (`src/app/src/display_format.cpp`)
+   takes them, so a changed one goes there too. Then re-run `make screenshots`.
 
 ## 4. Refresh the map names
 

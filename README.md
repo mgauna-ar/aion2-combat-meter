@@ -335,4 +335,7 @@ app window's icons are a subset of [Lucide](https://lucide.dev) (ISC), embedded 
 `src/app/include/app/ui/icons_font.inl` by `tools/embed_icon_font.py`. Skill, dungeon,
 monster and NPC names come from aion2.app's database (see `src/game/data/skills.tsv`,
 `maps.tsv` and `npcs.tsv`), and so do skill cooldowns (`plugins/auras/data/cooldowns.tsv`).
-AION 2 is a trademark of NCSOFT. This project is not affiliated with NCSOFT.
+The class emblems and skill icons are NCSOFT's own art, as aion2.app serves it, packed
+into `src/app/src/game_icon_sheet.inc` by `tools/gen_icon_sheet.py`. The MIT licence
+does not cover them. AION 2 is a trademark of NCSOFT. This project is not affiliated
+with NCSOFT.

@@ -1,6 +1,7 @@
 #include "app/ui/theme.hpp"
 
 #include "app/display_format.hpp"
+#include "app/game_icons.hpp"
 #include "app/imgui_guard.hpp"
 #include "app/ui/icon_font.hpp"
 
@@ -131,6 +132,8 @@ void setup_fonts_and_theme(const std::string& regular_ttf, const std::string& bo
     ImFont* bold = bold_ttf.empty() ? nullptr : io.Fonts->AddFontFromFileTTF(bold_ttf.c_str(), size, &cfg);
     if (bold != nullptr) load_icon_font(size);
     set_bold_font(bold != nullptr ? bold : io.Fonts->Fonts[0]);
+    // Class emblems and skill icons, a text line tall, in the same texture as the text.
+    build_atlas_with_icons(*io.Fonts, size);
 
     set_ui_scale(dpi_scale);
     apply_slate_theme();

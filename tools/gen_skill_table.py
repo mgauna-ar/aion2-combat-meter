@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Skill names: src/game/data/skills.tsv to src/game/src/skill_table.inc.
 
-The TSV is the source of truth: one `code<TAB>name` per line, `#` for comments.
-The .inc is generated from it and committed, so the build never runs Python.
+The TSV is the source of truth: one `code<TAB>name[<TAB>icon]` per line, `#` for
+comments. The icon is the skill's icon on aion2.app (ICON_AS_SKILL_001), which
+tools/gen_icon_sheet.py packs for the app; the .inc here holds the names only. It
+is generated from the TSV and committed, so the build never runs Python.
 
 Usage:
   python3 tools/gen_skill_table.py            write skill_table.inc from the TSV
@@ -34,7 +36,11 @@ PLACEHOLDERS = {
 }
 
 
-def read_tsv(path):
+ICON = re.compile(r"ICON_\w+")
+
+
+def read_rows(path):
+    """{code: (name, icon)}, the icon "" for a skill without one."""
     rows = {}
     with open(path, encoding="utf-8") as f:
         for n, line in enumerate(f, 1):
@@ -42,13 +48,20 @@ def read_tsv(path):
             if not line or line.startswith("#"):
                 continue
             parts = line.split("\t")
-            if len(parts) != 2 or not parts[0].isdigit() or not parts[1]:
-                sys.exit(f"{path}:{n}: expected code<TAB>name")
+            if len(parts) not in (2, 3) or not parts[0].isdigit() or not parts[1]:
+                sys.exit(f"{path}:{n}: expected code<TAB>name[<TAB>icon]")
+            icon = parts[2] if len(parts) == 3 else ""
+            if icon and not ICON.fullmatch(icon):
+                sys.exit(f"{path}:{n}: icon {icon!r} is not an ICON_ name")
             code = int(parts[0])
             if code in rows:
                 sys.exit(f"{path}:{n}: code {code} listed twice")
-            rows[code] = parts[1]
+            rows[code] = (parts[1], icon)
     return rows
+
+
+def read_tsv(path):
+    return {code: name for code, (name, _) in read_rows(path).items()}
 
 
 def c_string(s):
@@ -76,6 +89,9 @@ def render_inc(rows):
 
 def import_pages(folder):
     rows = {}
+    # Skills the pages list without an English name: the site dropped the Brawler's
+    # (2026-11) while still listing them, so a name already in the TSV stays.
+    unnamed = {}
     pages = sorted(glob.glob(os.path.join(folder, "page*.html")))
     if not pages:
         sys.exit(f"no page*.html in {folder}")
@@ -85,22 +101,36 @@ def import_pages(folder):
         for m in re.finditer(r'href="/db/skills/(\d+)"[^>]*>(.*?)</a>', s, re.S):
             parts = [html.unescape(" ".join(p.split())) for p in re.split(r"<[^>]+>", m.group(2))]
             parts = [p for p in parts if p]
+            icon = re.search(r'/db-item-icons/(ICON_\w+)\.webp', m.group(2))
+            icon = icon.group(1) if icon else ""
             if parts and parts[0] not in PLACEHOLDERS:
-                rows[int(m.group(1))] = parts[0]
+                rows[int(m.group(1))] = (parts[0], icon)
+            else:
+                unnamed[int(m.group(1))] = icon
+    kept = 0
+    if os.path.exists(TSV):
+        for code, (name, _) in read_rows(TSV).items():
+            if code in unnamed and code not in rows:
+                rows[code] = (name, unnamed[code])
+                kept += 1
+    if kept:
+        print(f"kept the TSV's name for {kept} skills the pages list unnamed")
     today = datetime.date.today().isoformat()
     with open(TSV, "w", encoding="utf-8", newline="\n") as f:
         f.write(
             "# AION 2 skill names by skill code, as damage (04 38) and tick (05 38) records\n"
             "# carry them. A code is 8 digits: the first two are the class (11 Gladiator to\n"
             "# 18 Chanter, 19 Brawler), code / 10000 is the skill, and the low four digits a\n"
-            "# variant. A variant without a row of its own takes its skill's name.\n"
+            "# variant. A variant without a row of its own takes its skill's name. The\n"
+            "# third column, when there is one, names the skill's icon, which\n"
+            "# tools/gen_icon_sheet.py packs for the app.\n"
             "#\n"
             f"# Source: aion2.app's skill database (aion2.app/db/skills), retrieved {today};\n"
             "# the site says its data comes from NCSOFT's official AION 2 API. English\n"
             "# names as the site lists them. Regenerate with tools/gen_skill_table.py.\n"
         )
-        for code, name in sorted(rows.items()):
-            f.write(f"{code}\t{name}\n")
+        for code, (name, icon) in sorted(rows.items()):
+            f.write(f"{code}\t{name}\t{icon}\n" if icon else f"{code}\t{name}\n")
     print(f"wrote {len(rows)} skills to {os.path.relpath(TSV, ROOT)}")
 
 

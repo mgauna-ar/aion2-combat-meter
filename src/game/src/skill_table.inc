@@ -437,7 +437,6 @@
 {19000100u, "Dodge"},
 {19090000u, "Smite Ground"},
 {19130000u, "Rampage"},
-{19140000u, "Rampage"},
 {19280000u, "Rage"},
 {19350000u, "Focused Block"},
 {19450000u, "Defiance"},
