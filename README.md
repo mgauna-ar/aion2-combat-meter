@@ -33,7 +33,7 @@ each with its own page in the app window and its own switch:
 
 ## 🚧 Status
 
-Version 0.2. The decoder started from the community's notes on the Global client's
+Version 0.3. The decoder started from the community's notes on the Global client's
 protocol and has been checked against two real captures: 30 seconds of open-world
 mobs, then a full dungeon run with three boss kills.
 
