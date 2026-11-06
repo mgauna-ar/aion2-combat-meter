@@ -8,6 +8,7 @@
 #include "aion2/version.hpp"
 #include "app/app_runtime.hpp"
 #include "app/app_settings.hpp"
+#include "app/aura_view.hpp"
 #include "app/overlay_visibility.hpp"
 #include "app/updater.hpp"
 #include "capture/file_source.hpp"
@@ -151,12 +152,19 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
 
     app::win32::OverlayWindow window;
     std::string window_error;
-    if (!window.create(settings.overlay, window_error)) {
+    if (!window.create(app::win32::placement_of(settings.overlay), L"AION 2 Combat Meter", true, window_error)) {
         os::Logger::error(window_error);
         MessageBoxW(nullptr, os::to_wide(window_error).c_str(), L"AION 2 Combat Meter", MB_OK | MB_ICONERROR);
         runtime.stop();
         return 1;
     }
+    // The aura overlay is a second window like it, without the hotkeys; the meter
+    // runs on without it.
+    app::win32::OverlayWindow aura_window;
+    std::string aura_error;
+    const bool have_auras =
+        aura_window.create(app::win32::placement_of(settings.auras), L"AION 2 Combat Meter Auras", false, aura_error);
+    if (!have_auras) os::Logger::error(aura_error);
     // The app window is a convenience: without it the overlay and the tray still work.
     app::win32::AppWindow app_window;
     std::string app_error;
@@ -172,9 +180,12 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
         if (!why.empty()) os::Logger::warn("cannot save config.json: " + why);
         settings_dirty = false;
     };
+    // Ctrl+Alt+L and the tray lock or unlock both overlays together.
     const auto set_locked = [&](bool locked) {
         settings.overlay.locked = locked;
         window.set_locked(locked);
+        settings.auras.locked = locked;
+        if (have_auras) aura_window.set_locked(locked);
         settings_dirty = true;
     };
     // The window follows overlay_shown() each frame; this is the user's switch.
@@ -215,6 +226,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     // whether it shows is decided each frame.
     const auto apply_overlay = [&] {
         if (window.locked() != settings.overlay.locked) window.set_locked(settings.overlay.locked);
+        if (have_auras && aura_window.locked() != settings.auras.locked) aura_window.set_locked(settings.auras.locked);
     };
 
     window.on_hotkey = [&](app::win32::Hotkey key) {
@@ -230,6 +242,14 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
         settings.overlay.y = r.top;
         settings.overlay.width = r.right - r.left;
         settings.overlay.height = r.bottom - r.top;
+        settings_dirty = true;
+    };
+    aura_window.on_geometry_changed = [&] {
+        const RECT r = aura_window.screen_rect();
+        settings.auras.x = r.left;
+        settings.auras.y = r.top;
+        settings.auras.width = r.right - r.left;
+        settings.auras.height = r.bottom - r.top;
         settings_dirty = true;
     };
 
@@ -307,6 +327,10 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     uint64_t history_revision = 0;
     bool was_recording = false;
     auto last_housekeeping = Clock::now();
+    // When the snapshot on view arrived: the aura bars count down from it.
+    const pipeline::LiveSnapshot* aura_snapshot = nullptr;
+    auto aura_snapshot_at = Clock::now();
+    const auto started = Clock::now();
 
     while (running) {
         MSG msg;
@@ -382,6 +406,12 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
                 settings.overlay.y = -1;
                 save_now();
             }
+            if (actions.reset_aura_position && have_auras) {
+                aura_window.reset_position();
+                settings.auras.x = -1;
+                settings.auras.y = -1;
+                save_now();
+            }
             open_target(actions.open);
             if (actions.check_updates) updater.check_now();
             if (actions.install_update) updater.install();
@@ -410,17 +440,55 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
             input.source_status = runtime.source_status();
             input.recording = runtime.recording();
             input.settings = &settings.overlay;
-            input.scale = settings.overlay.scale;
-            const app::OverlayActions actions = window.render(input);
+            const app::OverlayActions actions = window.render(settings.overlay.scale, [&](float scale) {
+                input.scale = scale;
+                return app::draw_overlay(input);
+            });
 
             if (actions.end_fight) runtime.request_end_fight();
-            if (actions.lock) set_locked(true);
+            if (actions.lock) {
+                settings.overlay.locked = true;
+                window.set_locked(true);
+                settings_dirty = true;
+            }
             if (actions.open_app) open_app();
+        }
+
+        if (have_auras) {
+            if (const bool shown = app::auras_shown(settings.auras, settings.overlay, conditions);
+                shown != aura_window.visible()) {
+                aura_window.set_visible(shown);
+            }
+            if (snapshot.get() != aura_snapshot) {
+                aura_snapshot = snapshot.get();
+                aura_snapshot_at = Clock::now();
+            }
+            if (aura_window.visible()) {
+                app::AuraFrameInput input;
+                input.snapshot = snapshot.get();
+                input.settings = &settings.auras;
+                if (snapshot != nullptr) {
+                    const auto since = std::chrono::duration_cast<std::chrono::microseconds>(Clock::now() - aura_snapshot_at);
+                    input.now = app::aura_display_time(snapshot->now, static_cast<Micros>(since.count()));
+                }
+                input.pulse_s = std::chrono::duration<double>(Clock::now() - started).count();
+                const app::OverlayActions actions = aura_window.render(settings.auras.scale, [&](float scale) {
+                    input.scale = scale;
+                    return app::draw_auras(input);
+                });
+                if (actions.lock) {
+                    settings.auras.locked = true;
+                    aura_window.set_locked(true);
+                    settings_dirty = true;
+                }
+                if (actions.open_app) open_app();
+            }
         }
 
         if (Clock::now() - last_housekeeping >= kHousekeeping) {
             last_housekeeping = Clock::now();
             window.keep_on_top();
+            if (have_auras) aura_window.keep_on_top();
             if (settings.overlay.hide_when_game_unfocused) {
                 game_pids = capture::game_process_ids(settings.capture.game_process);
             }
@@ -434,7 +502,8 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
             if (settings_dirty) save_now();
         }
 
-        const auto budget = window.visible() || (have_app && app_window.visible()) ? kVisibleFrame : kHiddenFrame;
+        const bool drawing = window.visible() || (have_auras && aura_window.visible()) || (have_app && app_window.visible());
+        const auto budget = drawing ? kVisibleFrame : kHiddenFrame;
         const auto spent = Clock::now() - frame_start;
         if (spent < budget) std::this_thread::sleep_for(budget - spent);
     }
@@ -443,6 +512,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     updater.stop();
     runtime.stop();
     app_window.destroy();
+    aura_window.destroy();
     window.destroy();
     tray.destroy();
     os::Logger::info("exit");

@@ -42,6 +42,14 @@ constexpr uint8_t kValuesOther = 2;
 /// kind 2's u64 values, which carry their own HP.
 constexpr uint8_t kValuesBoth = 3;
 constexpr uint8_t kStatHp = 0;
+/// 2a 38 / 2b 38's kind byte: 0x11, or 0x13 with the applying skill (a u32) after
+/// the level. No other was seen in 13,887 records.
+constexpr uint8_t kBuffKind = 0x11;
+constexpr uint8_t kBuffHasSkill = 0x02;
+/// A duration of all ones: the effect does not end.
+constexpr uint64_t kBuffPermanent = ~uint64_t{0};
+/// Most entries one 47 38 is believed to carry: every one seen had one.
+constexpr uint8_t kMaxCooldownEntries = 16;
 
 enum class Record : uint8_t { Damage, CastMarker, Failed };
 
@@ -223,6 +231,39 @@ std::optional<RemainingHp> read_entity_values(ByteReader& r) {
     return v;
 }
 
+/// 2a 38 and 2b 38: target, (2a 38 only: a byte, 01 in every record), kind,
+/// instance varint, effect u32, duration u64 (ms, all ones for no end), expiry u64
+/// (server ms), caster varint, level u8, (kind 0x13: skill u32), a byte (00 or 02),
+/// and a position (three f32). The record must end there: a longer one is a layout
+/// not seen yet.
+std::optional<BuffApplied> read_buff(ByteReader& r, bool renewed) {
+    BuffApplied b;
+    b.renewed = renewed;
+    b.target = normalize_entity_id(r.varint());
+    if (!renewed) (void)r.u8();
+    const uint8_t kind = r.u8();
+    const uint64_t instance = r.varint();
+    b.buff_id = r.u32le();
+    const uint64_t duration = r.u64le();
+    b.expires_server_ms = r.u64le();
+    b.caster = normalize_entity_id(r.varint());
+    b.level = r.u8();
+    if ((kind & kBuffHasSkill) != 0) b.source_skill = r.u32le();
+    (void)r.u8();
+    const float x = r.f32le();
+    const float y = r.f32le();
+    const float z = r.f32le();
+    if (!r.ok() || !r.at_end() || (kind & ~kBuffHasSkill) != kBuffKind || b.target == 0 ||
+        instance > UINT32_MAX || !plausible_coordinate(x) || !plausible_coordinate(y) || !plausible_coordinate(z)) {
+        return std::nullopt;
+    }
+    b.instance = static_cast<uint32_t>(instance);
+    b.permanent = duration == kBuffPermanent;
+    b.duration_ms = b.permanent ? 0 : duration;
+    if (b.permanent) b.expires_server_ms = 0;
+    return b;
+}
+
 std::optional<PartyRoster> read_party(std::span<const uint8_t> body) {
     ByteReader r(body);
     r.skip(4);  // party key
@@ -292,6 +333,11 @@ void PacketParser::parse(const Frame& frame, std::vector<ParsedEvent>& out) {
         case opcode::Tick:
         case opcode::PartyRoster:
         case opcode::RemainingHp:
+        case opcode::SkillUse:
+        case opcode::CooldownSet:
+        case opcode::BuffAdd:
+        case opcode::BuffRenew:
+        case opcode::BuffRemove:
             if (parse_known(frame, out)) {
                 ++m_stats.decoded;
             } else {
@@ -378,6 +424,45 @@ bool PacketParser::parse_known(const Frame& frame, std::vector<ParsedEvent>& out
             const auto values = read_entity_values(r);
             if (!values) return false;
             emit(*values);
+            return true;
+        }
+        case opcode::SkillUse: {
+            // Three bytes (00 00 00 in 1,154 of 1,176), then the skill.
+            r.skip(3);
+            const uint32_t skill = r.u32le();
+            if (!r.ok() || !r.at_end() || skill == 0) return false;
+            emit(SkillUsed{skill});
+            return true;
+        }
+        case opcode::CooldownSet: {
+            const uint8_t count = r.u8();
+            if (!r.ok() || count == 0 || count > kMaxCooldownEntries) return false;
+            std::vector<CooldownSet> entries;
+            for (uint8_t i = 0; i < count; ++i) {
+                CooldownSet c;
+                c.skill = r.u32le();
+                const uint64_t remaining = r.varint();
+                if (!r.ok() || remaining > UINT32_MAX) return false;
+                c.remaining_ms = static_cast<uint32_t>(remaining);
+                entries.push_back(c);
+            }
+            if (!r.at_end()) return false;
+            for (const CooldownSet& c : entries) emit(c);
+            return true;
+        }
+        case opcode::BuffAdd:
+        case opcode::BuffRenew: {
+            const auto buff = read_buff(r, frame.opcode == opcode::BuffRenew);
+            if (!buff) return false;
+            emit(*buff);
+            return true;
+        }
+        case opcode::BuffRemove: {
+            BuffRemoved b;
+            b.target = normalize_entity_id(r.varint());
+            b.buff_id = r.u32le();
+            if (!r.ok() || !r.at_end() || b.target == 0) return false;
+            emit(b);
             return true;
         }
         default:

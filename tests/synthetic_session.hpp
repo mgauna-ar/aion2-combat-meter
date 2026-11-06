@@ -125,6 +125,35 @@ inline Session boss_session() {
     s.max_hp = 20'000;
     script.emplace_back(0.007, opcode_frame(proto::opcode::Spawn, spawn_body(s)));
 
+    // Effects, with the server's stated ends: Ariel's own buffs, Zikel's on her, and
+    // her curse on the boss, renewed while it lasts. Real skill codes, so they show
+    // with their names.
+    const auto effect = [&](double t, uint64_t target, uint64_t caster, uint32_t instance, uint32_t skill,
+                            int64_t duration_ms, bool renewed) {
+        BuffSpec e;
+        e.target = target;
+        e.caster = caster;
+        e.instance = instance;
+        e.skill = skill;
+        e.buff_id = skill * 10 + 1;
+        e.level = 10;
+        e.duration_ms = duration_ms;
+        e.expires_server_ms = kStartMs + static_cast<uint64_t>(t * 1000.0) + static_cast<uint64_t>(duration_ms);
+        script.emplace_back(t, opcode_frame(renewed ? proto::opcode::BuffRenew : proto::opcode::BuffAdd,
+                                            buff_body(e, renewed)));
+    };
+    effect(4.0, kMe, kMe, 1, 15'180'001, 60'000, false);      // Vaizel's Wisdom
+    effect(22.0, kMe, kMe, 2, 15'230'001, 15'000, false);     // Arctic Armor
+    effect(26.0, kMe, kAlly2, 3, 16'770'001, 8'000, false);   // Spirit Communion
+    effect(5.0, boss, kMe, 1, 15'320'001, 10'000, false);     // Delayed Explosion
+    for (int i = 1; i < 6; ++i) effect(5.0 + 10.0 * i, boss, kMe, 1, 15'320'001, 10'000, true);
+    // Ariel's skill uses, whose cooldowns the aura overlay estimates, and one the
+    // server cuts and so states.
+    script.emplace_back(12.0, opcode_frame(proto::opcode::SkillUse, skill_use_body(15'060'230)));   // Hellfire, 45 s
+    script.emplace_back(22.0, opcode_frame(proto::opcode::SkillUse, skill_use_body(15'230'010)));   // Arctic Armor, 90 s
+    script.emplace_back(25.0, opcode_frame(proto::opcode::CooldownSet, cooldown_body(15'060'000, 22'000)));
+    script.emplace_back(28.8, opcode_frame(proto::opcode::SkillUse, skill_use_body(15'040'030)));   // Firestorm, 5 s
+
     uint64_t boss_taken = 0;
     bool dead = false;
     // Real skill codes, so classes and skill names come out as they would in game:

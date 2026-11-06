@@ -86,7 +86,28 @@ A patch can add monsters and NPCs. Ones the meter cannot name read "NPC #2345678
 3. **Check the diff.** New ids are expected. A known id under another name is not, and
    means the ids were renumbered.
 
-## 6. Check and ship
+## 6. Refresh the cooldowns
+
+A patch can change a cooldown or a specialty. The aura overlay's cooldowns start from
+`src/meter/data/cooldowns.tsv`; a stale row makes them run long or short until the
+meter learns the skill's quickest reuse again.
+
+1. **Download the pages.** Each class's list gives its skills' pages (Elementalist and
+   Gladiator have a second list page at the time of writing; add one for any class
+   whose list shows 60):
+   ```bash
+   mkdir -p /tmp/cooldowns/list /tmp/cooldowns/pages
+   for c in Gladiator Templar Assassin Ranger Sorcerer Elementalist Cleric Chanter Fighter; do for p in 1 2; do curl -sSL -o "/tmp/cooldowns/list/$c-$p.html" "https://aion2.app/db/skills?class=$c&page=$p"; sleep 1; done; done
+   grep -oh 'href="/db/skills/[0-9]*"' /tmp/cooldowns/list/*.html | grep -oE '[0-9]{8}' | sort -u > /tmp/cooldowns/ids.txt
+   while read -r id; do curl -sSL -o "/tmp/cooldowns/pages/$id.html" "https://aion2.app/db/skills/$id"; sleep 1; done < /tmp/cooldowns/ids.txt
+   ```
+2. **Rebuild the table.** Run `python3 tools/gen_cooldown_table.py --import-pages /tmp/cooldowns/pages`.
+   It rewrites `src/meter/data/cooldowns.tsv` and `cooldown_table.inc`.
+3. **Check the diff.** Changed cooldowns and cuts are expected. Every row turning
+   A or S, or every cut vanishing, means the page's layout moved: look at one page's
+   specialty rows and the importer's patterns.
+
+## 7. Check and ship
 
 1. Run `make fixtures`. Re-pin any `.expected.txt` whose change you have checked against
    the ground truth.

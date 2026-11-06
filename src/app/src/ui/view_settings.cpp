@@ -69,7 +69,7 @@ void hotkeys_card() {
         const char* keys;
         const char* what;
     } rows[] = {
-        {"Ctrl+Alt+L", "Lock or unlock the overlay"},
+        {"Ctrl+Alt+L", "Lock or unlock the overlays"},
         {"Ctrl+Alt+H", "Hide or show the overlay"},
         {"Ctrl+Alt+R", "End the current fight"},
     };

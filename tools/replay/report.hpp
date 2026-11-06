@@ -20,6 +20,9 @@ namespace aion2::replay {
 struct ReportOptions {
     bool opcodes{false};
     bool events{false};
+    /// Effects, the local player's skill uses and cooldown changes: --events leaves
+    /// them out, at some 16,000 a dungeon run.
+    bool auras{false};
     bool fights{false};
     /// Each player's skills, healing and damage taken under their fight's table.
     bool skills{false};

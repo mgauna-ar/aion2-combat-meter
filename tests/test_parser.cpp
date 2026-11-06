@@ -455,3 +455,121 @@ TEST_CASE(Parser, IgnoredOpcodesAreNeitherDecodedNorUnknown) {
     TEST_ASSERT_EQ(p.stats().unknown, uint64_t{0});
     TEST_ASSERT_EQ(p.stats().frames, uint64_t{2});
 }
+
+// --- Effects, skill uses and cooldowns (2a 38, 2b 38, 1a 92, 01 38, 47 38) ---
+
+TEST_CASE(Parser, BuffRenewAsTheCaptureHasIt) {
+    // A Chanter's Undefeated Mantra renewed on a party member: kind 0x13, so the
+    // applying skill (18190041) follows the level (20).
+    PacketParser p;
+    const Bytes body = {0xd9, 0x3c, 0x13, 0x33, 0x7b, 0x94, 0xd7, 0x0a, 0x60, 0x09, 0x00, 0x00, 0x00,
+                        0x00, 0x00, 0x00, 0xb9, 0xd1, 0x45, 0x4a, 0xa1, 0x01, 0x00, 0x00, 0xd9, 0x3c,
+                        0x14, 0xd9, 0x8e, 0x15, 0x01, 0x02, 0x4b, 0x2c, 0xd5, 0xc7, 0x37, 0x4f, 0xca,
+                        0xc7, 0x00, 0x90, 0xab, 0x46};
+    const auto b = only<BuffApplied>(parse_one(p, opcode::BuffRenew, body));
+    TEST_ASSERT_EQ(b.target, EntityId{7769});
+    TEST_ASSERT_EQ(b.caster, EntityId{7769});
+    TEST_ASSERT_EQ(b.instance, uint32_t{0x33});
+    TEST_ASSERT_EQ(b.buff_id, uint32_t{181'900'411});
+    TEST_ASSERT_EQ(b.source_skill, uint32_t{18'190'041});
+    TEST_ASSERT_EQ(unsigned{b.level}, 20u);
+    TEST_ASSERT_EQ(b.duration_ms, uint64_t{2400});
+    TEST_ASSERT_EQ(b.expires_server_ms, uint64_t{0x01A14A45D1B9});
+    TEST_ASSERT(b.renewed);
+    TEST_ASSERT(!b.permanent);
+    TEST_ASSERT_EQ(p.stats().decoded, uint64_t{1});
+}
+
+TEST_CASE(Parser, PermanentBuffAsTheCaptureHasIt) {
+    // A login effect on the local player: 2a 38's extra 01, kind 0x11 (no skill),
+    // and a duration of all ones.
+    PacketParser p;
+    const Bytes body = {0xc3, 0x12, 0x01, 0x11, 0x01, 0xeb, 0x2e, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,
+                        0xff, 0xff, 0xff, 0xff, 0x80, 0x75, 0xd5, 0x2a, 0xbb, 0x03, 0x00, 0x00, 0xc3,
+                        0x12, 0x01, 0x00, 0x30, 0x99, 0xd7, 0xc7, 0xa9, 0x64, 0xca, 0xc7, 0x00, 0x30,
+                        0xab, 0x46};
+    const auto b = only<BuffApplied>(parse_one(p, opcode::BuffAdd, body));
+    TEST_ASSERT_EQ(b.target, EntityId{2371});
+    TEST_ASSERT_EQ(b.buff_id, uint32_t{12011});
+    TEST_ASSERT_EQ(b.source_skill, uint32_t{0});
+    TEST_ASSERT(b.permanent);
+    TEST_ASSERT_EQ(b.duration_ms, uint64_t{0});
+    TEST_ASSERT_EQ(b.expires_server_ms, uint64_t{0});
+    TEST_ASSERT(!b.renewed);
+}
+
+TEST_CASE(Parser, BuffBuilderRoundTrips) {
+    PacketParser p;
+    BuffSpec s;
+    s.target = 300;
+    s.caster = 70'000;  // a three-byte varint
+    s.instance = 190;
+    s.buff_id = 127'300'021;
+    s.skill = 12'730'002;
+    s.level = 9;
+    s.duration_ms = 10'000;
+    s.expires_server_ms = 1'792'000'010'000;
+    const auto b = only<BuffApplied>(parse_one(p, opcode::BuffAdd, buff_body(s)));
+    TEST_ASSERT_EQ(b.caster, EntityId{70'000});
+    TEST_ASSERT_EQ(b.instance, uint32_t{190});
+    TEST_ASSERT_EQ(b.source_skill, uint32_t{12'730'002});
+    TEST_ASSERT_EQ(b.expires_server_ms, uint64_t{1'792'000'010'000});
+
+    s.skill = 0;  // kind 0x11
+    const auto plain = only<BuffApplied>(parse_one(p, opcode::BuffRenew, buff_body(s, true)));
+    TEST_ASSERT_EQ(plain.source_skill, uint32_t{0});
+    TEST_ASSERT_EQ(plain.duration_ms, uint64_t{10'000});
+    TEST_ASSERT(plain.renewed);
+}
+
+TEST_CASE(Parser, BuffOfAnUnseenShapeFails) {
+    PacketParser p;
+    BuffSpec s;
+    s.target = 300;
+    s.caster = 300;
+    s.buff_id = 200;
+    s.duration_ms = 300;
+    Bytes longer = buff_body(s);
+    longer.push_back(0x00);  // a field not seen yet
+    TEST_ASSERT(parse_one(p, opcode::BuffAdd, longer).empty());
+    Bytes kind = buff_body(s);
+    kind[3] = 0x15;  // after target (2 bytes) and the 01: a kind not seen
+    TEST_ASSERT(parse_one(p, opcode::BuffAdd, kind).empty());
+    TEST_ASSERT_EQ(p.stats().failed, uint64_t{2});
+    TEST_ASSERT_EQ(p.stats().failures_by_opcode.at(opcode::BuffAdd), uint64_t{2});
+}
+
+TEST_CASE(Parser, BuffRemoveSkillUseAndCooldown) {
+    PacketParser p;
+    const Bytes removed = {0xa3, 0x41, 0xb3, 0x93, 0xd7, 0x0a};  // as the capture has it
+    const auto r = only<BuffRemoved>(parse_one(p, opcode::BuffRemove, removed));
+    TEST_ASSERT_EQ(r.target, EntityId{8355});
+    TEST_ASSERT_EQ(r.buff_id, uint32_t{181'900'211});
+
+    const Bytes use = {0x00, 0x00, 0x00, 0x64, 0x1b, 0xb7, 0x00};
+    TEST_ASSERT_EQ(only<SkillUsed>(parse_one(p, opcode::SkillUse, use)).skill, uint32_t{12'000'100});
+
+    const Bytes cd = {0x01, 0x30, 0x72, 0xbc, 0x00, 0xb0, 0x9f, 0x01};
+    const auto c = only<CooldownSet>(parse_one(p, opcode::CooldownSet, cd));
+    TEST_ASSERT_EQ(c.skill, uint32_t{12'350'000});
+    TEST_ASSERT_EQ(c.remaining_ms, uint32_t{20'400});
+
+    Bytes two = {0x02};
+    for (const auto& [skill, ms] : {std::pair{12'350'000u, 450u}, std::pair{12'300'000u, 0u}}) {
+        put_le32(two, skill);
+        put_varint(two, ms);
+    }
+    const auto both = parse_one(p, opcode::CooldownSet, two);
+    TEST_ASSERT_EQ(both.size(), size_t{2});
+    TEST_ASSERT_EQ(std::get<CooldownSet>(both[1].event).skill, uint32_t{12'300'000});
+    TEST_ASSERT_EQ(only<CooldownSet>(parse_one(p, opcode::CooldownSet, cooldown_body(12'240'000, 1500))).remaining_ms,
+                   uint32_t{1500});
+    TEST_ASSERT_EQ(only<SkillUsed>(parse_one(p, opcode::SkillUse, skill_use_body(12'240'340))).skill,
+                   uint32_t{12'240'340});
+    TEST_ASSERT_EQ(only<BuffRemoved>(parse_one(p, opcode::BuffRemove, buff_remove_body(70'000, 3015))).target,
+                   EntityId{70'000});
+
+    const Bytes truncated = {0x01, 0x30, 0x72, 0xbc};
+    TEST_ASSERT(parse_one(p, opcode::CooldownSet, truncated).empty());
+    TEST_ASSERT_EQ(p.stats().failed, uint64_t{1});
+}

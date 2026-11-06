@@ -28,4 +28,18 @@ namespace aion2::meter {
 /// The name, or "Skill <code>" for a code not in the table.
 [[nodiscard]] std::string skill_label(uint32_t code);
 
+/// An effect's name (proto::BuffApplied): the skill that applied it, when the record
+/// names one the table lists, else the skill its id points to (the id over ten:
+/// Undefeated Mantra's 181900411 is 18190041). Empty for neither: monster, item and
+/// system effects. In the second capture 78% of effects got a name.
+[[nodiscard]] std::string_view effect_name(uint32_t buff_id, uint32_t source_skill = 0) noexcept;
+
+/// effect_name, or "Effect <id>".
+[[nodiscard]] std::string effect_label(uint32_t buff_id, uint32_t source_skill = 0);
+
+/// What makes two effects the same one to a player: the skill_key of the skill that
+/// names it (so Undefeated Mantra from any Chanter, at any level, is one), else the
+/// effect id. A watch list holds these.
+[[nodiscard]] uint32_t effect_key(uint32_t buff_id, uint32_t source_skill = 0) noexcept;
+
 } // namespace aion2::meter

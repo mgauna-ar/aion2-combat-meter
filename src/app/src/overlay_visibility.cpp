@@ -11,4 +11,12 @@ bool overlay_shown(const OverlaySettings& s, const OverlayConditions& now) noexc
     return true;
 }
 
+bool auras_shown(const AuraSettings& a, const OverlaySettings& o, const OverlayConditions& now) noexcept {
+    if (!a.visible) return false;
+    if (!a.locked) return true;
+    if (o.hide_when_game_unfocused && !now.game_in_front) return false;
+    if (o.show_in_dungeons_only && !now.in_dungeon) return false;
+    return true;
+}
+
 } // namespace aion2::app

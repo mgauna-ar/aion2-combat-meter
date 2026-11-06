@@ -40,7 +40,9 @@ void usage() {
                  "  --fights          a table per fight: damage, DPS, crits, boss, end reason\n"
                  "  --skills          --fights, and each player's skills, healing and damage\n"
                  "                    taken\n"
-                 "  --events          every decoded event but heartbeats, one per line\n"
+                 "  --events          every decoded event but heartbeats and --auras', one per line\n"
+                 "  --auras           effects put on and taken off, and the local player's skill\n"
+                 "                    uses and cooldown changes\n"
                  "  --opcodes         count, body sizes and parse failures per opcode\n"
                  "  --unknown         hex dump frames the parser does not read or failed on\n"
                  "  --dump OPS        hex dump frames of these opcodes: hex, comma separated\n"
@@ -86,6 +88,8 @@ bool parse_args(int argc, char** argv, Options& opt) {
             opt.report.skills = true;
         } else if (arg == "--events") {
             opt.report.events = true;
+        } else if (arg == "--auras") {
+            opt.report.auras = true;
         } else if (arg == "--opcodes") {
             opt.report.opcodes = true;
         } else if (arg == "--unknown") {

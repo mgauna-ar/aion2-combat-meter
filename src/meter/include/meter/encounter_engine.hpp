@@ -1,6 +1,7 @@
 #pragma once
 
 #include "common/micros.hpp"
+#include "meter/aura_tracker.hpp"
 #include "meter/combatant_registry.hpp"
 #include "meter/meter_settings.hpp"
 #include "meter/types.hpp"
@@ -56,6 +57,9 @@ public:
     [[nodiscard]] uint64_t recent_revision() const noexcept { return m_recent_revision; }
 
     [[nodiscard]] const CombatantRegistry& registry() const noexcept { return m_registry; }
+    /// The effects on the local player, theirs on the live fight's boss, and their
+    /// cooldowns.
+    [[nodiscard]] AuraSnapshot auras(Micros now) const;
     [[nodiscard]] uint32_t map_id() const noexcept { return m_map_id; }
     [[nodiscard]] Micros last_event_ts() const noexcept { return m_last_event_ts; }
     [[nodiscard]] uint64_t last_server_ms() const noexcept { return m_last_server_ms; }
@@ -115,6 +119,9 @@ private:
     void on_values(const proto::RemainingHp& v, Micros ts);
     void on_death(EntityId id, Micros ts);
     void on_map(const proto::MapLoad& m, uint32_t connection, Micros ts);
+    /// Before a skill use or cooldown of the local player's: a new character's
+    /// cooldowns start from nothing learned.
+    void on_own_cooldown();
     /// A hit from the player side on an enemy, credited to its resolved player.
     void credit(EntityId actor, EntityId target, uint64_t amount, uint32_t skill, const proto::Damage* direct,
                 Micros ts);
@@ -137,6 +144,10 @@ private:
 
     MeterSettings m_settings;
     CombatantRegistry m_registry;
+    AuraTracker m_auras;
+    CooldownTracker m_cooldowns;
+    /// The character m_cooldowns learned from; another one starts afresh.
+    CharacterId m_cooldown_character{0};
     std::optional<Fight> m_fight;
     uint64_t m_next_fight_id{1};
     uint32_t m_map_id{0};

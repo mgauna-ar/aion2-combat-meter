@@ -24,4 +24,10 @@ struct OverlayConditions {
 /// always be found and dragged back.
 [[nodiscard]] bool overlay_shown(const OverlaySettings& settings, const OverlayConditions& now) noexcept;
 
+/// Whether the aura overlay shows now: its own switch first, then, while it is
+/// locked, the meter overlay's hide_when_game_unfocused and show_in_dungeons_only.
+/// Its effects matter out of combat too, so show_in_combat_only does not apply.
+[[nodiscard]] bool auras_shown(const AuraSettings& auras, const OverlaySettings& overlay,
+                               const OverlayConditions& now) noexcept;
+
 } // namespace aion2::app
