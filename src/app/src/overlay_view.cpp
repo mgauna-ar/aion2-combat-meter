@@ -3,7 +3,7 @@
 #include "app/display_format.hpp"
 #include "app/imgui_guard.hpp"
 #include "common/time_format.hpp"
-#include "meter/map_names.hpp"
+#include "game/map_names.hpp"
 
 #ifdef HAVE_IMGUI
 
@@ -107,7 +107,7 @@ void draw_rows(const meter::FightSummary& f, const OverlaySettings& s, float sca
         dl->AddText(ImVec2(origin.x + 2.0f * scale, ty), dim, rank_buf);
 
         std::string label = row.name;
-        if (row.cls != meter::AionClass::Unknown) label = std::string(meter::class_short(row.cls)) + " " + label;
+        if (row.cls != game::AionClass::Unknown) label = std::string(game::class_short(row.cls)) + " " + label;
         dl->AddText(ImVec2(origin.x + rank_w, ty), u32(row.is_local ? colors::Accent : colors::Text),
                     fit(label, name_w - 6.0f * scale).c_str());
 
@@ -280,7 +280,7 @@ OverlayActions draw_overlay(const OverlayFrameInput& in) {
         if (in.snapshot != nullptr && in.snapshot->capture != pipeline::CaptureState::Waiting) {
             if (!in.snapshot->local_name.empty()) footer = in.snapshot->local_name;
             if (in.snapshot->map_id != 0) {
-                footer += (footer.empty() ? "" : "  ") + meter::map_label(in.snapshot->map_id);
+                footer += (footer.empty() ? "" : "  ") + game::map_label(in.snapshot->map_id);
             }
             if (in.snapshot->capture == pipeline::CaptureState::Quiet) footer += "  (no game traffic)";
         } else {

@@ -4,6 +4,8 @@
 #include "capture/capture_file.hpp"
 #include "pipeline/pipeline.hpp"
 
+#include <functional>
+
 using namespace aion2;
 using namespace aion2::pipeline;
 using namespace aion2::test::synthetic;
@@ -11,18 +13,28 @@ using namespace aion2::test::synthetic;
 namespace {
 
 /// Runs `bytes` (a capture file) through a pipeline, as aion2meter-replay does.
-std::vector<meter::FightSummary> replay(const Bytes& bytes, Pipeline& p) {
+/// `before` sees each packet's time first.
+std::vector<meter::FightSummary> replay(const Bytes& bytes, Pipeline& p,
+                                        const std::function<void(Micros)>& before = {}) {
     std::string error;
     auto reader = capture::CaptureFileReader::from_bytes(bytes, error);
     if (!reader) throw std::runtime_error(error);
     capture::CapturedPacket pkt;
     Micros last = 0;
     while (reader->next(pkt)) {
+        if (before) before(pkt.ts);
         p.on_packet(pkt.link_type, pkt.data, pkt.ts);
         last = pkt.ts;
     }
     p.tick(last + 60 * kMicrosPerSecond);
     return p.take_finished();
+}
+
+PipelineOptions only(bool meter, bool auras) {
+    PipelineOptions o;
+    o.plugins.combat_meter = meter;
+    o.plugins.auras = auras;
+    return o;
 }
 
 } // namespace
@@ -91,4 +103,44 @@ TEST_CASE(Pipeline, ReplayIsDeterministic) {
     TEST_ASSERT_EQ(fa.size(), fb.size());
     TEST_ASSERT_EQ(fa[0].total_damage, fb[0].total_damage);
     TEST_ASSERT_EQ(fa[0].end_ts, fb[0].end_ts);
+}
+
+TEST_CASE(Pipeline, APluginSwitchedOffGetsNothing) {
+    const Session session = boss_session();
+    const Micros end = kStartMs * kMicrosPerMilli + 80 * kMicrosPerSecond;
+
+    Pipeline both;
+    const auto fights = replay(session.pcapng, both);
+    TEST_ASSERT_EQ(fights.size(), size_t{1});
+    TEST_ASSERT(!both.snapshot(end).auras.seen.empty());
+
+    Pipeline meter_only(only(true, false));
+    const auto same = replay(session.pcapng, meter_only);
+    TEST_ASSERT_EQ(same.size(), size_t{1});
+    TEST_ASSERT_EQ(same[0].total_damage, fights[0].total_damage);
+    TEST_ASSERT(meter_only.snapshot(end).auras == auras::AuraSnapshot{});
+
+    Pipeline auras_only(only(false, true));
+    TEST_ASSERT(replay(session.pcapng, auras_only).empty());
+    TEST_ASSERT(auras_only.snapshot(end).fight.id == 0);
+    TEST_ASSERT(auras_only.snapshot(end).auras.seen == both.snapshot(end).auras.seen);
+}
+
+TEST_CASE(Pipeline, SwitchingTheMeterOffEndsItsFightAndTheAurasForget) {
+    const Session session = boss_session();
+    const Micros cut = kStartMs * kMicrosPerMilli + from_seconds(session.truth.first_hit_s + 1.0);
+    Pipeline p;
+    bool switched = false;
+    const auto fights = replay(session.pcapng, p, [&](Micros ts) {
+        if (switched || ts < cut) return;
+        switched = true;
+        TEST_ASSERT(p.snapshot(ts).fight.live);
+        TEST_ASSERT(!p.snapshot(ts).auras.seen.empty());
+        p.set_plugins(aion2::plugins::PluginSwitches{false, false}, ts);
+        TEST_ASSERT(p.snapshot(ts).auras == auras::AuraSnapshot{});
+    });
+    TEST_ASSERT(switched);
+    TEST_ASSERT_EQ(fights.size(), size_t{1});
+    TEST_ASSERT(fights[0].end_reason == meter::EndReason::Manual);
+    TEST_ASSERT(fights[0].total_damage < session.truth.boss_damage);
 }

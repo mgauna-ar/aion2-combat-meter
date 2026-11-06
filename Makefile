@@ -7,13 +7,16 @@ endif
 CXXFLAGS = -std=c++20 -Wall -Wextra -Wpedantic -Werror
 
 # Each layer compiles against only the include roots of the layers AGENTS.md lets
-# it depend on, so an #include across a layer does not compile. The replay tool
-# sits on the pipeline; the tests see everything.
+# it depend on, so an #include across a layer does not compile. Each plugin sees
+# the game layer and not the other plugin. The replay tool sits on the pipeline;
+# the tests see everything.
 COMMON_INC = -Iinclude -Isrc/common/include
 CAPTURE_INC = $(COMMON_INC) -Isrc/capture/include
 PROTOCOL_INC = $(COMMON_INC) -Isrc/protocol/include
-METER_INC = $(PROTOCOL_INC) -Isrc/meter/include
-PIPELINE_INC = $(COMMON_INC) -Isrc/capture/include -Isrc/protocol/include -Isrc/meter/include \
+GAME_INC = $(PROTOCOL_INC) -Isrc/game/include
+METER_INC = $(GAME_INC) -Iplugins/combat_meter/include
+AURAS_INC = $(GAME_INC) -Iplugins/auras/include
+PIPELINE_INC = $(GAME_INC) -Isrc/capture/include -Iplugins/combat_meter/include -Iplugins/auras/include \
                -Isrc/pipeline/include
 APP_INC = $(PIPELINE_INC) -Isrc/app/include
 TOOLS_INC = $(PIPELINE_INC)
@@ -24,27 +27,32 @@ layer_inc = $(strip \
     $(if $(filter include/% src/common/%,$(1)),$(COMMON_INC), \
     $(if $(filter src/capture/%,$(1)),$(CAPTURE_INC), \
     $(if $(filter src/protocol/%,$(1)),$(PROTOCOL_INC), \
-    $(if $(filter src/meter/%,$(1)),$(METER_INC), \
+    $(if $(filter src/game/%,$(1)),$(GAME_INC), \
+    $(if $(filter plugins/combat_meter/%,$(1)),$(METER_INC), \
+    $(if $(filter plugins/auras/%,$(1)),$(AURAS_INC), \
     $(if $(filter src/pipeline/%,$(1)),$(PIPELINE_INC), \
     $(if $(filter src/app/%,$(1)),$(APP_INC), \
     $(if $(filter tools/synth/%,$(1)),$(TEST_INC), \
     $(if $(filter tools/%,$(1)),$(TOOLS_INC), \
-    $(TEST_INC))))))))))
+    $(TEST_INC))))))))))))
 
 # Recorded in each variant's flags stamp, so a change of include roots rebuilds.
-LAYER_INC_STAMP = $(COMMON_INC) | $(CAPTURE_INC) | $(PROTOCOL_INC) | $(METER_INC) | $(PIPELINE_INC) | \
-                  $(APP_INC) | $(TOOLS_INC) | $(TEST_INC)
+LAYER_INC_STAMP = $(COMMON_INC) | $(CAPTURE_INC) | $(PROTOCOL_INC) | $(GAME_INC) | $(METER_INC) | \
+                  $(AURAS_INC) | $(PIPELINE_INC) | $(APP_INC) | $(TOOLS_INC) | $(TEST_INC)
 
 COMMON_SRCS = $(wildcard src/common/src/*.cpp) $(wildcard src/common/src/*/*.cpp)
 # capture/src/os holds the Win32 capture edge; off Windows it compiles to its mocks.
 CAPTURE_SRCS = $(wildcard src/capture/src/*.cpp) $(wildcard src/capture/src/os/*.cpp)
 PROTOCOL_SRCS = $(wildcard src/protocol/src/*.cpp)
-METER_SRCS = $(wildcard src/meter/src/*.cpp)
+GAME_SRCS = $(wildcard src/game/src/*.cpp)
+METER_SRCS = $(wildcard plugins/combat_meter/src/*.cpp)
+AURAS_SRCS = $(wildcard plugins/auras/src/*.cpp)
 PIPELINE_SRCS = $(wildcard src/pipeline/src/*.cpp)
 # src/app/src/win32 (WinMain, the windows, hotkeys) only builds on Windows; src/app/src/ui
 # is the desktop window's ImGui pages, which build everywhere.
 APP_SRCS = $(wildcard src/app/src/*.cpp) $(wildcard src/app/src/ui/*.cpp)
-LIB_SRCS = $(COMMON_SRCS) $(CAPTURE_SRCS) $(PROTOCOL_SRCS) $(METER_SRCS) $(PIPELINE_SRCS) $(APP_SRCS)
+LIB_SRCS = $(COMMON_SRCS) $(CAPTURE_SRCS) $(PROTOCOL_SRCS) $(GAME_SRCS) $(METER_SRCS) $(AURAS_SRCS) $(PIPELINE_SRCS) \
+           $(APP_SRCS)
 
 TEST_SRCS = $(wildcard tests/*.cpp)
 REPLAY_SRCS = $(wildcard tools/replay/*.cpp)
@@ -156,7 +164,8 @@ build/check-ui/flags: FORCE
 # a common header that only the app includes could reach into app/ unseen. It also
 # keeps each header self-contained. One stamp per header, as check-ui.
 HEADERS = $(shell find include src/common/include src/capture/include src/protocol/include \
-                       src/meter/include src/pipeline/include src/app/include tests \
+                       src/game/include plugins/combat_meter/include plugins/auras/include \
+                       src/pipeline/include src/app/include tests \
                        -name '*.hpp' 2>/dev/null)
 HEADER_CHECK_STAMPS = $(patsubst %.hpp,build/check-headers/%.ok,$(HEADERS))
 
@@ -180,18 +189,19 @@ build/check-headers/flags: FORCE
 check-forbidden:
 	@sh tools/check_forbidden_apis.sh
 
-# skill_table.inc is generated from src/meter/data/skills.tsv; this fails when the two differ.
+# skill_table.inc is generated from src/game/data/skills.tsv; this fails when the two differ.
 check-skills:
 	@python3 tools/gen_skill_table.py --check
 
+# cooldown_table.inc is generated from plugins/auras/data/cooldowns.tsv, the same way.
 check-cooldowns:
 	@python3 tools/gen_cooldown_table.py --check
 
-# map_table.inc is generated from src/meter/data/maps.tsv, the same way.
+# map_table.inc is generated from src/game/data/maps.tsv, the same way.
 check-maps:
 	@python3 tools/gen_map_table.py --check
 
-# npc_table.inc is generated from src/meter/data/npcs.tsv, the same way.
+# npc_table.inc is generated from src/game/data/npcs.tsv, the same way.
 check-npcs:
 	@python3 tools/gen_npc_table.py --check
 

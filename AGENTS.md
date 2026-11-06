@@ -2,7 +2,14 @@
 
 The rules, architecture and invariants for anyone, agent or human, working on
 `aion2-combat-meter`. It follows the conventions of `ffxiv-hub`, which several parts
-were ported from.
+were ported from, its plugin layout among them.
+
+Each feature is a plugin with rules of its own, next to it. Read them before touching
+a plugin:
+- [`plugins/combat_meter/AGENTS.md`](plugins/combat_meter/AGENTS.md): fights, sides,
+  the boss, the history;
+- [`plugins/auras/AGENTS.md`](plugins/auras/AGENTS.md): effects, the target, the
+  cooldown estimates.
 
 Occasional procedures are skills under `.claude/skills/`:
 - `decode-capture`: check and fix the decoder against a real capture. The decoder
@@ -77,9 +84,11 @@ Facts about the protocol from the community's published notes are fine.
      `tests/synthetic_session.hpp`, with invented names.
    - The log records entity ids, never names.
 6. **Documentation stays in sync.**
-   - A change to behaviour, a config key, the layering or a protocol fact updates
-     `README.md` and this file in the same change.
-   - Each config key is documented once, in README's Configuration.
+   - A change to the app, the layering or a protocol fact updates `README.md` and this
+     file in the same change; a change to a plugin's behaviour or keys updates that
+     plugin's `AGENTS.md` and `README.md`.
+   - Each config key is documented once: the app's in README's Configuration, a
+     plugin's in its own README.
    - Anything a README picture shows means re-running `make screenshots`.
 
 ---
@@ -88,6 +97,8 @@ Facts about the protocol from the community's published notes are fine.
 
 ```
 include/aion2/version.hpp        the one place the version is written (CMake, app.rc, CI tag check)
+include/aion2/plugin_registry.hpp  every plugin's id, name, description, config section and
+                                 default switch (Plugins), and the switches themselves
 src/common/      aion2::config, aion2::os, aion2::common
     config/      json (ported), key_table (ported), json_file (atomic write)
     os/          logger, paths, single_instance, unique_handle, local_time (ported), tray_icon,
@@ -101,20 +112,27 @@ src/capture/     aion2::capture
 src/protocol/    aion2::proto
     byte_reader, lz4_block, frame_decoder, opcodes.hpp, events.hpp, entity_id, identity,
     packet_parser
-src/meter/       aion2::meter
-    types, class_codes, skill_names (data/skills.tsv → skill_table.inc),
-    map_names (data/maps.tsv → map_table.inc), npc_names (data/npcs.tsv → npc_table.inc),
-    combatant_registry, encounter_engine, aura_tracker (effects on everyone in view),
-    cooldowns (data/cooldowns.tsv → cooldown_table.inc, and the local player's tracker),
-    meter_settings, fight_json, history_store
-src/pipeline/    aion2::pipeline   stream_demux (flows -> frames), pipeline (all of it)
+src/game/        aion2::game   what the game is, for every plugin
+    plugin.hpp (game::Plugin: events and ticks in), classes, class_codes,
+    skill_names (data/skills.tsv → skill_table.inc; effect names too),
+    map_names (data/maps.tsv → map_table.inc), npc_names (data/npcs.tsv → npc_table.inc)
+plugins/combat_meter/  aion2::meter (include prefix meter/; its AGENTS.md and README.md)
+    types, combatant_registry, encounter_engine, meter_settings, fight_json,
+    history_store, pull_grouping
+plugins/auras/   aion2::auras (include prefix auras/; its AGENTS.md and README.md)
+    aura_plugin, entities (who is who), aura_tracker (effects on everyone in view),
+    cooldowns (data/cooldowns.tsv → cooldown_table.inc, and the local player's tracker)
+src/pipeline/    aion2::pipeline   stream_demux (flows -> frames), pipeline (parser, then
+                 each plugin switched on)
 src/app/         aion2::app
     app_settings, app_runtime (threads, history, recording), display_format,
-    overlay_view and aura_view (the two overlays; ImGui, behind HAVE_IMGUI),
+    overlay_view (the Combat Meter's overlay) and aura_view (the Auras'; ImGui, behind
+    HAVE_IMGUI),
     overlay_visibility, app_frame (the app window's contents),
     update_check (release parsing, versions, the update balloon) and updater (check,
     download, stage, swap), both ported from ffxiv-hub
-    src/ui/      the app window's pages, theme, widgets and Lucide icons (ported from
+    src/ui/      the app window's pages (a page per plugin, opened by plugin_page's
+                 header and master switch), theme, widgets and Lucide icons (ported from
                  ffxiv-hub; ImGui, behind HAVE_IMGUI)
     src/win32/   main.cpp, app_window, overlay_window: Windows only
 tools/replay/    aion2meter-replay (every platform)
@@ -127,14 +145,13 @@ tools/gen_map_table.py           maps.tsv → map_table.inc (the same)
 tools/gen_npc_table.py           aion2.app's monster and NPC pages → npcs.tsv → npc_table.inc
 tools/gen_cooldown_table.py      aion2.app's skill pages → cooldowns.tsv → cooldown_table.inc
                                  (the same)
-                                 (the same)
 tests/           TEST_CASE framework (ported), one test_<concern>.cpp per area
 ```
 
-**Dependencies run one way:** common ← capture; common ← protocol ← meter;
-capture + meter ← pipeline ← app.
+**Dependencies run one way:** common ← capture; common ← protocol ← game ← each
+plugin; capture + the plugins ← pipeline ← app. Neither plugin depends on the other.
 - The Makefile's `layer_inc` and CMake's per-target include roots enforce it: an
-  `#include` across it does not compile.
+  `#include` across it, one plugin's header in the other included, does not compile.
 - `make check-headers` compiles every header alone, against its own layer's roots.
 
 ---
@@ -146,7 +163,7 @@ capture + meter ← pipeline ← app.
 | Capture (one per Npcap adapter, or the FileSource thread) | its pcap handle | `BoundedQueue<OwnedPacket>` (8192), `try_push` only. A full queue drops and counts, and the drop shows up as a TCP gap. |
 | Npcap watcher | the loopback filter text | a mutex plus an atomic generation counter. Each capture thread applies a new filter itself between `pcap_next_ex` calls, because a pcap handle is not shared. |
 | Engine (`AppRuntime::run`) | `Pipeline`, `HistoryStore` writes, the recorder | publishes `LiveSnapshot` into a `SnapshotSlot` every 200 ms of capture time, and whenever the queue runs dry. |
-| UI (`wWinMain`) | the three windows (the app window, the meter overlay and the aura overlay, each with its own ImGui context), the tray, `AppSettings`, the `Updater` | reads snapshots and the history index (copied under a mutex). Requests go to the engine as atomics: end fight, recording on/off, clear history. New meter and history settings go through `AppRuntime::update_settings`, under the mutex; the engine applies them on its next pass. |
+| UI (`wWinMain`) | the three windows (the app window, the meter overlay and the aura overlay, each with its own ImGui context), the tray, `AppSettings`, the `Updater` | reads snapshots and the history index (copied under a mutex). Requests go to the engine as atomics: end fight, recording on/off, clear history. New meter and history settings and the plugin switches go through `AppRuntime::update_settings`, under the mutex; the engine applies them on its next pass. |
 | Updater worker (one at a time) | the check or the download | `Updater::status()`, copied under its mutex, which the UI reads each frame. Staged files are moved into place on the UI thread (`apply_staged`). `stop()` cancels a download and joins, before the engine stops. |
 
 `make tsan` runs the suite under ThreadSanitizer. The `AppRuntime` tests drive real
@@ -172,8 +189,9 @@ BACK, FRNT, MULT and BLOC share matched it exactly.
   takes any flow once 3 heartbeats prove it is the game (`detect_relays`).
 - Entering a dungeon opens a new connection, to another server; leaving it, another
   back to the town's. Each is its own flow, with its own framing state. The demux
-  numbers them (`Frame::connection`, carried into `ParsedEvent`), and the engine tells
-  a new run of a dungeon from a reload within one by it (Meter rules, Fight end).
+  numbers them (`Frame::connection`, carried into `ParsedEvent`), and the plugins tell
+  a new run of a dungeon from a reload within one by it
+  (plugins/combat_meter/AGENTS.md, Fight end).
 - Reassembly (`TcpReassembler`): a hole waits 300 ms, or until 1 MiB queues behind it,
   then is a gap. A segment more than 4 MiB ahead is ignored as a stray, unless nothing
   else arrives for 300 ms: then the capture lost that much, and the stream skips there.
@@ -241,7 +259,7 @@ BACK, FRNT, MULT and BLOC share matched it exactly.
   - `code / 10000` is the skill; the low four digits are a variant (12240340 and
     12240347 are both Judgment).
   - A spirit's attacks (1699xxxx) carry its summoner's class digits and have no name.
-  - Names come from `src/meter/data/skills.tsv`, taken from aion2.app's skill
+  - Names come from `src/game/data/skills.tsv`, taken from aion2.app's skill
     database. Checked against the first capture: every Templar and Elementalist code
     resolved to that class.
 - **Tick `05 38`:** target varint, effect u8, actor varint, a varint of unknown meaning,
@@ -285,7 +303,7 @@ BACK, FRNT, MULT and BLOC share matched it exactly.
     - The 10-HP and 3-HP ones are traps around that player, which the others break
       1 damage a hit. The game's window counts neither those hits nor their damage.
     - Read as the code, the name's first bytes made "NPC #1818840325" and the like.
-  - **Npc code:** the u32 after the mask, or after the name. Names come from `src/meter/data/npcs.tsv`
+  - **Npc code:** the u32 after the mask, or after the name. Names come from `src/game/data/npcs.tsv`
     (aion2.app's 7,545 monsters and 3,719 NPCs; metabot.gg agrees on the bosses
     compared): seven digits, 2,000,002 to 2,990,928, one id per level or difficulty.
     - Checked against the first capture: all 10 mob spawns carried a listed code
@@ -307,7 +325,7 @@ BACK, FRNT, MULT and BLOC share matched it exactly.
   - Death `42 36`: id varint. For a mob it comes about 4 s after 00 8D says HP 0: the
     corpse going. HP 0 is the death.
   - Map load `21 36`: load count u32, map id u32. Ids 600000–700000 are instances.
-    - Names come from `src/meter/data/maps.tsv`. It holds aion2.app's dungeon tier
+    - Names come from `src/game/data/maps.tsv`. It holds aion2.app's dungeon tier
       ids: one row per difficulty, such as Krao Cave 600002 (Exploration) and 600001
       (Conquest), with Awakening tiers at 910000 and up, outside the instance range.
       The second capture's dungeon came as 600072, which the table names Vakron Sky
@@ -335,7 +353,7 @@ BACK, FRNT, MULT and BLOC share matched it exactly.
     the local player's again, both lists in one: kind 1's, then a count and kind 2's,
     which carry their own HP.
 
-**Effects, skill uses and cooldowns** (the aura overlay's; checked on the second
+**Effects, skill uses and cooldowns** (the Auras plugin's; checked on the second
 capture, where all 17,182 records parse):
 - **Effect put on `2a 38` / renewed `2b 38`:** target varint, (2a 38 only: a byte, 01
   in all 4,008), kind u8, instance varint, effect u32, duration u64 (ms; all ones for no
@@ -384,7 +402,7 @@ capture, where all 17,182 records parse):
 - multi-record `04 38` packets;
 - misses, and the target's endurance, regeneration and invincibility (above);
 - where the class is in 33 36 / 45 36, and what their "class" u32 and 33 36's extra
-  u16 hold (`meter/class_codes.cpp` is empty; skill codes give the class instead);
+  u16 hold (`game/class_codes.cpp` is empty; skill codes give the class instead);
 - tick effects 08 and 38;
 - what `0e 92` (an id and a byte, as often as 1a 92) means, and the byte before 2a 38's
   kind;
@@ -393,10 +411,10 @@ capture, where all 17,182 records parse):
   specialties picked, do not explain the second capture alone: Shield Smite (10 s, no
   cut picked) came back after 8.85 s, which needs 11.5% or more, while Warding Strike's
   exact 47 38 figures (25 s after its cut, done in 23.1 s) allow about 7.6%. Which
-  `4a 36` stat is Illusion is unknown. The meter learns each skill's figure instead
-  (Meter rules, Cooldowns);
+  `4a 36` stat is Illusion is unknown. The Auras plugin learns each skill's figure
+  instead (plugins/auras/AGENTS.md, Cooldowns);
 - whether a skill with a second use ("+1 consecutive use") recharges each use on its
-  own, as the meter assumes, or both at once;
+  own, as the Auras plugin assumes, or both at once;
 - whether the game's Total Heal counts heals before a fight's first hit: the meter's
   healing came to 97% of it;
 - what the 5-HP object (2,920,366, kind 14, no name) the party broke in the second
@@ -419,17 +437,17 @@ capture, where all 17,182 records parse):
   kept theirs across the 14 minutes the local player spent in the dungeon (22 of 23; one
   came back with a new id). A party whose Ranger and Elementalist shared one row,
   the name switching from pull to pull, points to reuse. The meter assumes both
-  (Meter rules, Sides).
+  (plugins/combat_meter/AGENTS.md, Sides).
 - whether a teleport or a revive within a dungeon sends a 21 36, and over which
   connection. Re-entering the same dungeon straight away did, as the runs that shared
   one visit showed, and runs then split once every load was taken for a new one. The
-  meter takes the same map over the same connection for a reload within a run, and
+  plugins take the same map over the same connection for a reload within a run, and
   over a new connection for a new run, since entering a dungeon opened one in the
   second capture. A run still split in two, or two runs in one, would prove it
   wrong;
 - how a player of the other faction is told apart, for PvP: perhaps 45 36's mask.
   Until then they are players like the party, so a PvP fight starts nothing and a
-  hit on them counts for nothing (Meter rules, Party and Healing).
+  hit on them counts for nothing (plugins/combat_meter/AGENTS.md, Party and Healing).
 
 **The client's own files cannot fill in names.** They were checked on the Steam install
 in 2026-10.
@@ -442,138 +460,39 @@ in 2026-10.
 
 ---
 
-## ⚔️ Meter rules (`src/meter`)
+## 🧩 Plugins
 
-- **Sides** (`CombatantRegistry`):
-  - Identity packets make players. Spawns make NPCs, or player objects for summon and
-    effect kinds.
-  - A summon's side is the player side, whoever owns it, and its spawn makes the owner
-    a player before any name arrives.
-  - Ids the meter was never told about get their side from the hits they trade: PvE
-    damage only crosses sides.
-  - Hits between two unknown ids are held (up to 4096) and settled when either end
-    becomes known.
-  - A hit with a spawned NPC settles the other end as a player, over any earlier
-    inference: mobs do not fight mobs, and 04 38 also carries heals between players.
-  - 00 8D's own values make the local player, shown as "You" until 33 36 names them.
-  - With no anchor at all, an id in the folded range is guessed to be an enemy.
-  - **Ids belong to the map, and the server hands them out again.** A player's id on
-    one map can be another player's, or an NPC's, on the next. So rows belong to
-    characters (name@server), not ids:
-    - an id is one character at a time: the last identity for it says which;
-    - a hit goes to its id's row for the character the id was then, and the summary
-      joins a character's rows. An id named after it hit joins its character. Ids are
-      never joined to each other, so two characters never share a row;
-    - a map load, or a reload within a run, leaves players stale rather than
-      dropping them, since their names may have come before it. A spawn on a stale id makes it the spawn, and a character named on a
-      new id leaves its stale one. On the map they were named on, two ids can share a
-      name;
-    - the local player's name follows 00 8D's own values to their new id.
-  - A scanned identity names no one (Protocol, Identity). One that took a stale
-    party member's name, after a load, made the meter forget the member's id, and
-    the member fell out of the party.
-  - A map load drops NPCs, summons and inferred sides; a reload within a run keeps
-    them.
-- **Classes:** from the skill codes a player uses (their summons' count too), unless an
-  identity packet's class code names one.
-- **Party:** with a roster, only its names count, and the local player.
-  - With none, it depends on the map. In an instance (`MapLoad::is_instance`) every
-    player counts: only the group gets in. In the open world, or on a map the meter
-    did not see load, only the local player does, so a crowd at a world boss stays
-    out.
-  - Non-party hits still lower the boss's HP estimate, but never start or extend a
-    fight.
-- **Healing and damage taken** count only during a fight, and never start or extend
-  one.
-  - Healing: heal ticks to anyone on the player side (effect 30's included), and 04 38
-    records from a player (not a summon) to a party member. A record to anyone else
-    may be a PvP hit. It is the total, like the game's: no overheal split.
-  - Damage taken: an enemy's hits and ticks on a player. A summon's HP is its own.
-  - Both are booked for party members by the roster and the local player; with no
-    roster, for players already in the fight, so strangers nearby stay out.
-- **Skills:** each player's damage, healing and damage taken are kept per skill, keyed
-  by `skill_key()`: variants of one skill share a row.
-- **Hits** (`HitCounts`, the game's columns): direct hits, and of them crits (CRI),
-  perfect (PERF), double (DOUB), back (BACK), front (FRNT), multi-hits (MULT: a
-  record with the 0x20 tail, one hit however many strikes) and blocked (BLOC).
-  History files before the block was known saved it as `"parry"`, which still loads.
-- **Aimed mechanics:** a spawn aimed at a player (Spawn::aimed_at), such as a trap the
-  party breaks, takes no damage that counts: hits on it are neither damage nor hits,
-  and never start or extend a fight, as in the game's window. Its hits on players are
-  damage taken.
-- **Fight start:** a direct hit that lands, from the player side on an enemy. A DoT tick
-  never starts a fight.
-- **Fight end:** the boss's death (00 8D HP 0 or 42 36, after `kill_grace_s`, unless a
-  bigger boss was hit during the grace), a map load (the same map's included when it
-  comes over a new connection: running a dungeon again, straight back in; not over the
-  same one, a teleport or a revive within the run), idle time with no party hit (`idle_timeout_s`, or
-  `boss_idle_timeout_s` while a boss stands), no traffic (`capture_lost_s`), a wipe
-  (when enabled) or by hand.
-  - A dead player stays dead for the wipe check while their DoTs and summons keep
-    hitting; their own direct hit, or 00 8D HP above 0, revives them.
-  - Duration runs from the first hit to the last, floored at 1 s for DPS.
-- **Boss:** the damaged enemy with the most max HP. It is a boss if that max HP is at
-  least `boss_min_max_hp`.
-  - Calibrated on one dungeon: its bosses had 5.22M–9.86M max HP, its trash
-    203k–435k. Undamaged adds and mechanics can share the boss's max HP; they never
-    win, having taken no damage.
-  - Its name comes from its spawn's npc code (`npc_label`): "NPC #code" when the table
-    does not list it, "#id" when it was never seen spawning. The label is saved with
-    the fight, so a fight keeps the name it had.
-  - Its HP is the server's figure (00 8D) once one arrives. Before that, it is the spawn
-    HP minus all damage seen since the spawn, shown with `~`.
-  - A mob that spawned before the meter started has no max HP; the most 00 8D HP seen
-    stands in for it.
-  - **Partial:** a killed boss that lost less than `partial_damage_ratio` of its HP (by
-    00 8D) with a hit seen since the HP figure before marks the fight partial. It is
-    HP against HP: damage and HP are not in the same units. A boss that leaves view
-    and spawns again keeps the loss counted so far; its spawn HP is one more figure.
-- **History:**
-  - What is saved: boss fights, and fights of at least `min_saved_duration_s`. With
-    `save_only_dungeons`, only in a dungeon (`is_dungeon`: a row above maps.tsv's
-    `# By hand` line, so not map 0, an open-world zone, or a map added by hand).
-  - Each fight is one JSON file (`"v":2`; version 1 files still load, without the
-    breakdowns), written atomically, plus a line appended to `index.jsonl`.
-  - Fights are grouped by map visit (`visit_ts`): every map load starts one but a
-    reload within a run (the same map over the same connection), so each run of a
-    dungeon is its own. So does the first fight after the meter starts.
-  - A cut-off index line is skipped. A missing index is rebuilt from the files.
-  - Pruning keeps `history.max_fights`, in batches of 50.
-  - Clearing (the app window's trash button) deletes the fight records and the index,
-    on the engine thread; other files in the folder stay.
-- **Auras** (`AuraTracker`, owned by the engine; `aura_view` draws them):
-  - Every entity's effects are kept, by instance, from 2a 38, 2b 38 and 1a 92. A 1a 92
-    takes the instance of that effect that ends soonest.
-  - An instance ends at its record's stated end, brought onto the capture clock by the
-    last heartbeat (One clock): a replay shows what the live meter did. An end more
-    than 5 s from the stated duration is not believed, and the duration stands in.
-  - A death drops the entity's effects. A map load (a reload within a run too, since
-    ids may change) drops every instance not put on or renewed in the 2 s before it.
-  - The snapshot carries the local player's effects (an enemy's marked hostile, their
-    own and their summons' marked mine) and their own on the live fight's boss.
-  - It also carries every helpful effect seen on the local player this session, which
-    is what the watch list offers. Enemies' debuffs are left out.
-  - Stacks: instances of one effect from one caster are one entry, ending with the
-    last of them. Two Chanters' mantras are two entries.
-  - The overlay counts down between snapshots on the wall clock, at most 250 ms past
-    the snapshot's own time (`aura_display_time`): drawing only, never the engine.
-- **Cooldowns** (`CooldownTracker`, the local player's only; estimates, shown with `~`):
-  - A use (01 38) starts `listed_cooldown_ms`: `cooldowns.tsv`'s figure (aion2.app's,
-    the same at every level) less the "−Ns cooldown" specialties in play. An active
-    skill's are the picks its cast code's variant digits name; a stigma's, the first n
-    it unlocked, n its tens digit.
-  - The estimate then shortens to the quickest reuse seen this session, which is where
-    the game's cooldown reduction shows. A gap with a 47 38 in it (a cut or a reset)
-    teaches nothing, nor one under half the figure (a triggered Judgment).
-  - A 47 38 sets what is left, exactly.
-  - A "+1 consecutive use" specialty gives a second use: each recharges on its own, the
-    skill shows only once both are cooling, and it learns nothing from its gaps.
-  - Another local character starts from nothing learned.
-  - aion2.app's Brawler pages list no specialties (2026-11): Brawler cooldowns start
-    from the listed figure, and every Brawler row reads as an active skill.
-  - Checked on the second capture: over 274 uses of 12 skills, 13 came while the
-    estimate still ran, by at most 0.65 s (0.2 s on average). Each was a reuse
-    quicker than any before it, which the estimate then took.
+Each feature the capture feeds is a plugin, laid out as ffxiv-hub's are: one exe, one
+capture, one tray and one updater, around them.
+
+| Plugin | Directory | What | Default |
+|---|---|---|---|
+| Combat Meter | `plugins/combat_meter` | fights: damage, healing, damage taken, the boss, the history; the meter overlay | on |
+| Auras | `plugins/auras` | effects on the local player and theirs on their target, their cooldowns; the aura overlay | off |
+
+- **One table names them.** `include/aion2/plugin_registry.hpp` holds each plugin's id,
+  name, description, config section and default switch; the sidebar, the dashboard,
+  the plugin pages and `config.json` read them there and nowhere else.
+- **A plugin is a `game::Plugin`.** It takes parsed events and capture-time ticks on
+  the engine thread, and keeps its own record of whatever it needs (the Auras plugin
+  its own `Entities`, not the meter's registry). It depends on `src/protocol` and
+  `src/game` only, never on another plugin, which the include roots enforce. Shared
+  game knowledge (names, classes) goes in `src/game`.
+- **Every plugin is switchable.** Its master switch is `plugin_enabled` in its config
+  section, on its page's header (`render_plugin_header`); while off, the page shows
+  only the panel that turns it back on (`render_plugin_disabled_gate`). Off means the
+  pipeline feeds it no events and no ticks, and its overlay hides. Switching it off
+  takes effect on the engine thread through `AppRuntime::update_settings`
+  (`Pipeline::set_plugins`): the meter ends its live fight, the auras forget everything.
+- **A plugin's page** opens with its header and switch, then its own settings, then its
+  overlay's, as ffxiv-hub orders them. Overlays it draws are separate windows of the
+  app (`win32/overlay_window`), each shown by its plugin's switch and its own hide
+  conditions (`overlay_visibility`). Ctrl+Alt+L locks every overlay: that is the app's.
+- **The dashboard stays plugin-agnostic:** capture, the plugin list from the table,
+  recording, files. A plugin's figures belong on its own page.
+- **A new plugin** gets a descriptor in the table, a directory under `plugins/` with its
+  `AGENTS.md` and `README.md`, its layer in the Makefile's `layer_inc` and in CMake,
+  its member in `Pipeline`, its page, and its keys in its own config section.
 
 ---
 

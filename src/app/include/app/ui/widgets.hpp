@@ -162,7 +162,7 @@ void stat_tile_row(const StatTileSpec* tiles, size_t count, const char* const* t
 
 /// A class's three-letter badge in its colour, for a combatant row; "?" while the
 /// class is not known.
-void class_badge(meter::AionClass cls);
+void class_badge(game::AionClass cls);
 
 /// Centered placeholder for a table or graph with nothing in it yet.
 void empty_state(const char* icon, const char* title, const char* hint);

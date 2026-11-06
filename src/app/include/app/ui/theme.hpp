@@ -114,7 +114,7 @@ void set_bold_font(ImFont* font);
 [[nodiscard]] ImFont* bold_font();
 
 /// A class's colour (display_format.hpp's, packed), at `alpha`.
-[[nodiscard]] uint32_t class_color_u32(meter::AionClass cls, float alpha = 1.0f);
+[[nodiscard]] uint32_t class_color_u32(game::AionClass cls, float alpha = 1.0f);
 
 /// Loads the window's fonts, regular and bold, each with the icon glyphs merged
 /// in, at 16 px times `dpi_scale`, and applies the theme. A font file that does

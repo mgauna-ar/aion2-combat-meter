@@ -16,6 +16,7 @@ pipeline::PipelineOptions pipeline_options(const AppSettings& s) {
     o.demux.server_port = static_cast<uint16_t>(s.capture.server_port);
     o.demux.any_port = s.capture.detect_relays;
     o.meter = s.meter;
+    o.plugins = s.plugins;
     return o;
 }
 
@@ -74,7 +75,7 @@ void AppRuntime::run() {
             last_packet = now;
         }
 
-        apply_requests();
+        apply_requests(now);
         const bool ended = m_end_fight_requested.exchange(false);
         if (ended) m_pipeline.end_fight(meter::EndReason::Manual, now);
 
@@ -123,21 +124,24 @@ void AppRuntime::handle_recording(Micros now) {
     }
 }
 
-void AppRuntime::update_settings(const meter::MeterSettings& meter, const HistorySettings& history) {
+void AppRuntime::update_settings(const meter::MeterSettings& meter, const HistorySettings& history,
+                                 const aion2::plugins::PluginSwitches& plugins) {
     std::lock_guard<std::mutex> lock(m_mutex);
-    m_pending_settings.emplace(meter, history);
+    m_pending_settings = PendingSettings{meter, history, plugins};
 }
 
-void AppRuntime::apply_requests() {
-    std::optional<std::pair<meter::MeterSettings, HistorySettings>> pending;
+void AppRuntime::apply_requests(Micros now) {
+    std::optional<PendingSettings> pending;
     {
         std::lock_guard<std::mutex> lock(m_mutex);
         pending.swap(m_pending_settings);
     }
     if (pending) {
-        m_settings.meter = pending->first;
-        m_settings.history = pending->second;
+        m_settings.meter = pending->meter;
+        m_settings.history = pending->history;
+        m_settings.plugins = pending->plugins;
         m_pipeline.set_meter_settings(m_settings.meter);
+        m_pipeline.set_plugins(m_settings.plugins, now);
     }
     if (m_clear_history_requested.exchange(false)) {
         const size_t removed = m_store.clear();

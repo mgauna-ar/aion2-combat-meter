@@ -5,24 +5,24 @@
 
 namespace aion2::app {
 
-Rgb class_color(meter::AionClass cls) noexcept {
+Rgb class_color(game::AionClass cls) noexcept {
     switch (cls) {
-        case meter::AionClass::Gladiator: return {0.80f, 0.52f, 0.30f};
-        case meter::AionClass::Templar: return {0.62f, 0.68f, 0.78f};
-        case meter::AionClass::Assassin: return {0.68f, 0.40f, 0.85f};
-        case meter::AionClass::Ranger: return {0.45f, 0.78f, 0.35f};
-        case meter::AionClass::Sorcerer: return {0.35f, 0.55f, 0.95f};
-        case meter::AionClass::Spiritmaster: return {0.80f, 0.45f, 0.75f};
-        case meter::AionClass::Cleric: return {0.95f, 0.88f, 0.55f};
-        case meter::AionClass::Chanter: return {0.30f, 0.80f, 0.75f};
-        case meter::AionClass::Brawler: return {0.88f, 0.36f, 0.32f};
-        case meter::AionClass::Unknown: break;
+        case game::AionClass::Gladiator: return {0.80f, 0.52f, 0.30f};
+        case game::AionClass::Templar: return {0.62f, 0.68f, 0.78f};
+        case game::AionClass::Assassin: return {0.68f, 0.40f, 0.85f};
+        case game::AionClass::Ranger: return {0.45f, 0.78f, 0.35f};
+        case game::AionClass::Sorcerer: return {0.35f, 0.55f, 0.95f};
+        case game::AionClass::Spiritmaster: return {0.80f, 0.45f, 0.75f};
+        case game::AionClass::Cleric: return {0.95f, 0.88f, 0.55f};
+        case game::AionClass::Chanter: return {0.30f, 0.80f, 0.75f};
+        case game::AionClass::Brawler: return {0.88f, 0.36f, 0.32f};
+        case game::AionClass::Unknown: break;
     }
     return colors::Unknown;
 }
 
 Rgb row_color(const meter::CombatantTotals& row) noexcept {
-    if (row.cls != meter::AionClass::Unknown) return class_color(row.cls);
+    if (row.cls != game::AionClass::Unknown) return class_color(row.cls);
     return row.is_local ? colors::Local : colors::Unknown;
 }
 

@@ -1,9 +1,9 @@
 #include "test_framework.hpp"
 
-#include "meter/map_names.hpp"
+#include "game/map_names.hpp"
 
 using namespace aion2;
-using namespace aion2::meter;
+using namespace aion2::game;
 
 // The ids below are aion2.app's dungeon tier ids, as maps.tsv lists them. A capture's
 // dungeon came as 600072, the tier it was: 21 36 carries the same ids (AGENTS.md).

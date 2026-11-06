@@ -18,7 +18,7 @@ NETWORK='WinHttp|winhttp\.h|wininet|InternetOpen|InternetConnect|URLDownloadTo|W
 NETWORK_HOME='src/common/src/os/http_client.cpp'
 
 search() {
-    grep -rnE "$1" include src tools tests \
+    grep -rnE "$1" include src plugins tools tests \
         --include='*.cpp' --include='*.hpp' --include='*.h' --include='*.c' \
         2>/dev/null | grep -v '^src/third_party/'
 }

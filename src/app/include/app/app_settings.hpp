@@ -1,5 +1,6 @@
 #pragma once
 
+#include "aion2/plugin_registry.hpp"
 #include "common/config/json.hpp"
 #include "common/config/key_table.hpp"
 #include "meter/meter_settings.hpp"
@@ -12,7 +13,8 @@
 
 namespace aion2::app {
 
-/// Every key below is documented once, in README.md ("Configuration").
+/// Every key below is documented once: the app's in README.md ("Configuration"), a
+/// plugin's in its own README (plugins/<name>/README.md).
 struct CaptureSettings {
     int server_port{13328};
     /// Not in the key table: a string. Read and written by hand in app_settings.cpp.
@@ -52,18 +54,17 @@ struct OverlaySettings {
     /// next one, it applies only while the overlay is locked, so an unlocked one
     /// can always be found and dragged back.
     bool show_in_combat_only{false};
-    /// Only in a dungeon (meter::is_dungeon), while locked.
+    /// Only in a dungeon (game::is_dungeon), while locked.
     bool show_in_dungeons_only{false};
     float hide_after_combat_s{5.0f};
     /// Hidden while neither the game nor one of the meter's windows is in front.
     bool hide_when_game_unfocused{false};
 };
 
-/// The aura overlay: the effects on the local player, and theirs on the boss, in a
-/// window of its own (aura_view.hpp).
+/// The Auras plugin's overlay: the effects on the local player, and theirs on the
+/// enemy they fight, in a window of its own (aura_view.hpp). The plugin's master
+/// switch (AppSettings::plugins) shows and hides it.
 struct AuraSettings {
-    /// Off until turned on in the app's Auras page.
-    bool visible{false};
     /// Locked: click-through, and cannot be moved or resized.
     bool locked{false};
     /// Of the background only; text and bars stay opaque.
@@ -76,19 +77,23 @@ struct AuraSettings {
     int height{300};
     /// Enemies' effects on the local player.
     bool show_debuffs{true};
-    /// The local player's effects on the live fight's boss.
+    /// The local player's effects on the enemy they fight (auras::Entities::target).
     bool show_target{true};
     /// Effects with no end: passive skills' and the ones a login puts on.
     bool show_permanent{false};
     /// Effects shorter than this are left out: a dodge's mark, a cast's state.
     float min_duration_s{1.0f};
-    /// The local player's cooldowns, estimated (meter::CooldownTracker).
+    /// The local player's cooldowns, estimated (auras::CooldownTracker).
     bool show_cooldowns{true};
     /// Cooldowns shorter than this are left out: Dodge's, a combo's.
     float min_cooldown_s{3.0f};
-    /// Effects (meter::effect_key) to flag while they are not on the local player.
+    /// Effects (game::effect_key) to flag while they are not on the local player.
     /// Not in the key table: a list. Read and written by hand in app_settings.cpp.
     std::vector<uint32_t> watch;
+    /// As the meter overlay's: while locked, only in a dungeon, and hidden while
+    /// neither the game nor one of the meter's windows is in front.
+    bool show_in_dungeons_only{false};
+    bool hide_when_game_unfocused{false};
 };
 
 struct HistorySettings {
@@ -116,6 +121,11 @@ struct WindowSettings {
 };
 
 struct AppSettings {
+    /// Each plugin's master switch, `plugin_enabled` in its section (the descriptor's
+    /// config_section). Not in the key tables: written by hand in app_settings.cpp,
+    /// which also reads the Auras plugin's older `auras.visible`. Spelled from aion2::
+    /// for the same reason as `meter` below.
+    aion2::plugins::PluginSwitches plugins;
     WindowSettings window;
     CaptureSettings capture;
     OverlaySettings overlay;
@@ -159,8 +169,7 @@ inline constexpr std::array<config::ConfigKey<OverlaySettings>, 25> kOverlayKeys
     config::field<OverlaySettings, &OverlaySettings::show_in_dungeons_only>("show_in_dungeons_only"),
 }};
 
-inline constexpr std::array<config::ConfigKey<AuraSettings>, 14> kAuraKeys{{
-    config::field<AuraSettings, &AuraSettings::visible>("visible"),
+inline constexpr std::array<config::ConfigKey<AuraSettings>, 15> kAuraKeys{{
     config::field<AuraSettings, &AuraSettings::locked>("locked"),
     config::field<AuraSettings, &AuraSettings::opacity>("opacity"),
     config::field<AuraSettings, &AuraSettings::scale>("scale"),
@@ -174,6 +183,8 @@ inline constexpr std::array<config::ConfigKey<AuraSettings>, 14> kAuraKeys{{
     config::field<AuraSettings, &AuraSettings::min_duration_s>("min_duration_s"),
     config::field<AuraSettings, &AuraSettings::show_cooldowns>("show_cooldowns"),
     config::field<AuraSettings, &AuraSettings::min_cooldown_s>("min_cooldown_s"),
+    config::field<AuraSettings, &AuraSettings::show_in_dungeons_only>("show_in_dungeons_only"),
+    config::field<AuraSettings, &AuraSettings::hide_when_game_unfocused>("hide_when_game_unfocused"),
 }};
 
 /// Most effects a watch list holds.

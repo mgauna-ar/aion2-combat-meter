@@ -471,10 +471,10 @@ void stat_tile_row(const StatTileSpec* tiles, size_t count, const char* const* t
     }
 }
 
-void class_badge(meter::AionClass cls) {
-    const uint32_t color = cls == meter::AionClass::Unknown ? colors::TextDim : class_color_u32(cls);
+void class_badge(game::AionClass cls) {
+    const uint32_t color = cls == game::AionClass::Unknown ? colors::TextDim : class_color_u32(cls);
     char text[8]{};
-    const std::string_view label = meter::class_short(cls);
+    const std::string_view label = game::class_short(cls);
     std::snprintf(text, sizeof(text), "%.*s", static_cast<int>(label.size()), label.data());
 
     const ImVec2 size = ImGui::CalcTextSize(text);

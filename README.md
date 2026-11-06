@@ -8,23 +8,24 @@
 **A party DPS meter for AION 2 that draws on top of the game, without touching it.**
 
 It reads the game's own network traffic as it reaches your PC and works out who hit
-what, with which skill, for how much. It shows what the game's own Combat Analysis
-window (Ctrl+X) shows, but for every party member:
+what, with which skill, for how much. What it does with that comes in two plugins,
+each with its own page in the app window and its own switch:
 
-- **An overlay** over the game with the live fight: the party ranked by DPS, the boss's
-  HP and the fight timer. It can show only in combat, or only in dungeons.
-- **An aura overlay**, if you turn it on: your buffs and debuffs and yours on the boss,
-  each as a bar with the time it has left, and a warning when a buff you watch for
-  (a Chanter's mantra, say) is not on you.
-- **An app window** with the details: damage, hit counts, crit, perfect, double, back
-  and front rates for each player and each of their skills; healing; damage taken; and
-  every saved fight, grouped by visit to a map, one entry per dungeon run. Every setting
-  is there too.
+- **[Combat Meter](plugins/combat_meter/README.md)** (on): what the game's own Combat
+  Analysis window (Ctrl+X) shows, but for every party member. An overlay over the game
+  has the live fight: the party ranked by DPS, the boss's HP and the fight timer. The
+  app window has the details: damage, hit counts, crit, perfect, double, back and front
+  rates for each player and each of their skills; healing; damage taken; and every
+  saved fight, grouped by visit to a map, one entry per dungeon run.
+- **[Auras](plugins/auras/README.md)** (off until you switch it on): your buffs and
+  debuffs and yours on the enemy you fight, each as a bar with the time it has left,
+  your cooldowns, and a warning when a buff you watch for (a Chanter's mantra, say) is
+  not on you, in an overlay of their own.
 
 ![The overlay during a boss fight: three players ranked by DPS, the boss's HP bar and the fight timer](docs/images/overlay-live.png)
 
 [Status](#-status) · [Account safety](#%EF%B8%8F-account-safety) · [Quick start](#-quick-start) ·
-[Controls](#-controls) · [Configuration](#%EF%B8%8F-configuration) ·
+[Plugins](#-plugins) · [Controls](#-controls) · [Configuration](#%EF%B8%8F-configuration) ·
 [Troubleshooting](#-troubleshooting) · [Recording a capture](#-recording-a-capture) ·
 [Building](#-building-from-source)
 
@@ -41,21 +42,16 @@ that run, your damage, hits and every per-skill CRI, PERF, DOUB, BACK, FRNT, MUL
 BLOC share matched the game's window exactly. Healing came to 97% of the game's Total
 Heal. Dungeon and boss names were right, and so were the classes from skill codes.
 
-**Auras:** buffs and debuffs come with the server's own durations and end times, so
-their bars are exact. About four in five have a name from the skill table; monster,
-item and system effects show as "Effect <number>". Your cooldowns are estimates,
-marked "~": the server sends none when you use a skill, so the meter starts from
-aion2.app's figure less the specialties you picked, and shortens it to your quickest
-reuse as you play (that is where your cooldown reduction shows). Over 274 uses on the
-dungeon capture, no estimate ran more than 0.65 s long. When
-the server does say what is left (after a cut or a reset), the bar is exact.
+**Auras:** effects' bars are exact, from the server's own end times; cooldowns are
+estimates, marked "~", which ran at most 0.65 s long over 274 uses on the dungeon
+capture ([how exact](plugins/auras/README.md#how-exact-it-is)).
 
 **Still open** (more captures help, `.claude/skills/decode-capture`):
 - **Misses and defences:** the game also counts missed hits (ACC) and the target's
   endurance, regeneration and invincibility. The capture had none of them, so where
   they live is unknown.
 - **Map names:** dungeons are named from a public database's dungeon ids
-  (`src/meter/data/maps.tsv`), which the game turned out to send. Open-world zones have
+  (`src/game/data/maps.tsv`), which the game turned out to send. Open-world zones have
   no public ids, so they show theirs ("Map 1010") until named by hand. So do the newer
   dungeons the database gives no id for yet, such as the Lv.99 Awakening tiers and
   Ascension.
@@ -104,56 +100,38 @@ these rules:
    page, for troubleshooting.
 3. **Set the game to Borderless Windowed.** An exclusive fullscreen game hides every
    other window, this one included.
-4. **Run `aion2-combat-meter.exe`.** The app window opens, the overlay shows up in the
-   top-left corner, and the meter sits in the tray. Hit something.
+4. **Run `aion2-combat-meter.exe`.** The app window opens, the meter overlay shows up
+   in the top-left corner, and the meter sits in the tray. Hit something. For the aura
+   overlay, switch the Auras plugin on, on its page.
 
 The exe is not code-signed, so SmartScreen or antivirus software may warn about it.
 Capture tools often get flagged. CI builds every release from source, and the zip's
 SHA-256 is published with it.
 
+## 🧩 Plugins
+
+| Plugin | Shows | At first |
+|---|---|---|
+| [⚔️ Combat Meter](plugins/combat_meter/README.md) | The party's damage, healing and damage taken, fight by fight; the meter overlay and the saved fights. | On |
+| [✨ Auras](plugins/auras/README.md) | Your buffs, debuffs and cooldowns, and yours on the enemy you fight; the aura overlay. | Off |
+
+Each has a page in the app window's sidebar, with its switch at the top right. A plugin
+switched off reads nothing and draws no overlay; its page offers only the button that
+turns it back on. Each plugin's README covers its overlay, its page and its settings.
+
 ## 🎮 Controls
 
 | Hotkey | Does |
 |---|---|
-| Ctrl+Alt+L | Lock or unlock both overlays. Locked, clicks pass through to the game, and the overlays cannot be moved. |
+| Ctrl+Alt+L | Lock or unlock every overlay. Locked, clicks pass through to the game, and the overlays cannot be moved. |
 | Ctrl+Alt+H | Hide or show the meter overlay. |
 | Ctrl+Alt+R | End the current fight now. |
 
-**The overlay** shows the live fight only: the party ranked, the boss's HP and the
-timer. Saved fights and every setting are in the app window.
-
-**While unlocked:**
-- Drag the empty part of the header to move the overlay.
-- Drag the corner grip to resize it.
-- Use the header buttons: **End**, **App** (open the app window) and **Lock**.
-- Hover a row for that player's hit rates, healing and max hit.
-
-**Hiding it:** under the app's Combat Meter > Settings, the overlay can show only in
-combat (staying up a few seconds after, 5 by default), and hide while the game is not
-in front. Both apply only while it is locked, so an unlocked overlay can always be
-found and dragged back.
-
-**The aura overlay** is off until you turn it on under Combat Meter > Settings > Auras.
-It is a second window you place like the first:
-- **Your effects:** each is a bar showing what share of its time is left, with the
-  seconds on the right. Green bars are an ally's buffs, blue ones yours, red ones an
-  enemy's debuffs. Stacks show as "x2".
-- **Your cooldowns:** amber bars under "Cooldowns", with "~" on an estimate. A skill
-  with a second use ("+1 consecutive use") shows only once both are spent.
-- **Yours on the boss:** under "On <boss>", during a fight.
-- **The watch list:** *Aura watch list* in the same tab lists every buff seen on you
-  this session. A buff you switch on there shows as a red "Missing: <name>" line while
-  it is not on you.
-- **What it leaves out:** effects shorter than a second (a dodge's mark), and passives'
-  effects, which never end. Both are settings.
-- **Hiding it:** locked, it hides with the meter overlay's "game not in front" and "only
-  in dungeons" settings, but not "only in combat", since buffs matter between fights too.
-
-![The aura overlay mid-fight: a missing watched buff, three buffs with their time left, two cooldowns, and the player's curse on the boss](docs/images/overlay-auras.png)
-
-**The app window** opens at start, and from the tray icon. Its sidebar has three pages:
-- **Dashboard:** what the capture sees, recording, and the meter's files.
-- **Combat Meter:** the live fight and the saved ones.
+**The app window** opens at start, and from the tray icon. Its sidebar has a page for
+each plugin between two of the app's own:
+- **Dashboard:** what the capture sees, which plugins are on, recording, and the
+  meter's files.
+- **Combat Meter** and **Auras:** each plugin's page.
 - **Settings:** the window, Start with Windows, notifications, the capture and updates.
 
 Changes are saved as you make them. Closing the window hides it to the tray (or quits,
@@ -162,36 +140,11 @@ with *Close to tray* off); starting the meter again while it runs opens it.
 The tray icon's menu opens the window, does all of the above, and also opens the
 history and recordings folders, `config.json` and the log.
 
-**How fights are cut:**
-- **Start:** a fight starts on the party's first hit on an enemy. Breaking a boss's trap
-  around a party member (1 damage a hit) counts for nothing, as in the game's own window.
-- **End:** it ends 2 s after the boss dies (so the last DoT ticks count), on a loading
-  screen (entering the same dungeon again too), or after 10 s without a party hit. While a boss is still standing, the wait
-  is 30 s instead, to cover phases where it can't be hit.
-- **Duration:** a fight's time runs from the first hit to the last, so the wait before
-  a fight is called never lowers its DPS.
-- **Saving:** boss fights and fights longer than 20 s are saved, and listed on the app
-  window's Combat Meter page, grouped by map visit: each run of a dungeon is its own
-  entry, and a teleport or revive inside a run stays in it. *Save only dungeon fights* keeps the open world out.
-
-**Who counts as party:**
-- In a party, only its members are listed. Pets and summons count for their owner.
-- Out of a party, only you are listed in the open world, so a crowd at a world boss
-  stays out. In a dungeon only your group can be there, so every player is listed.
-- Your own row always shows on the overlay: when you rank below the rows it shows, you
-  take the last one, with your rank.
-- Healing between two players counts only when it lands on the party, since a PvP hit
-  looks the same.
-
-![The app window's Combat Meter page: saved fights by map visit on the left, the selected fight's ranking with the in-game window's hit columns, and one player's skills below](docs/images/app-damage.png)
-
-![The Combat Meter page's Settings tab: the overlay, its visibility, fight tracking and saved fights](docs/images/app-settings.png)
-
 ## ⚙️ Configuration
 
 The settings live in `%APPDATA%\aion2-combat-meter\config.json`. The app window's
 Settings pages edit them and save as you go; the file is written with defaults on
-first run, and is also saved when you move, resize, lock or hide the overlay. Edit it
+first run, and is also saved when you move, resize, lock or hide an overlay. Edit it
 by hand only while the meter is closed. Out-of-range values are clamped.
 
 **app**
@@ -214,61 +167,10 @@ by hand only while the meter is closed. Out-of-range values are clamped.
 | `game_process` | `Aion2.exe` | The game's executable, used to find its connection. Third-party guides report this name; nothing official confirms it. If it is wrong, the meter still captures port 13328 on every adapter, but it cannot follow a ping reducer's relay. |
 | `detect_relays` | true | Also watch other TCP flows for the game's heartbeat, for ping reducers and VPNs that relay the game on another port. |
 
-**overlay**
-
-| Key | Default | Meaning |
-|---|---|---|
-| `visible` | true | Shown at start. |
-| `locked` | false | Click-through and fixed in place. |
-| `opacity` | 0.80 | Background opacity, 0 to 1. Text stays opaque. |
-| `scale` | 1.0 | Size, 0.6 to 2.5, on top of the monitor's DPI scaling. |
-| `x`, `y`, `width`, `height` | -1, -1, 430, 250 | Position and size in screen pixels. -1, -1 places it near the top-left; other negative values are on a monitor left of or above the main one. |
-| `show_share`, `show_crit`, `show_back`, `show_max_hit` | true, true, true, false | Optional columns: share of the damage, crit, back-attack rate, biggest hit. |
-| `show_hits`, `show_perfect`, `show_double`, `show_front`, `show_multi`, `show_block`, `show_heal` | false | More optional columns: hits, perfect and double rates, front-attack rate, multi-hit and blocked rates, healing. |
-| `class_bars` | true | Bars in each player's class colour; off, all in one colour. |
-| `max_rows` | 8 | Players shown, best first, 1 to 24. Your own row is always one of them. |
-| `show_in_combat_only` | false | Show the overlay only during a fight, and for `hide_after_combat_s` after it. Applies only while locked. |
-| `hide_after_combat_s` | 5 | Seconds it stays up after a fight, to read the result. |
-| `hide_when_game_unfocused` | false | Hide it while neither the game nor the meter's window is in front. Applies only while locked. |
-| `show_in_dungeons_only` | false | Show the overlay only in a dungeon: one of `src/meter/data/maps.tsv`'s dungeon tiers. Hidden in the open world, the Abyss, battlefields, and before the first loading screen. Applies only while locked. |
-
-**meter**
-
-| Key | Default | Meaning |
-|---|---|---|
-| `idle_timeout_s` | 10 | No party hit for this long ends a fight. |
-| `boss_idle_timeout_s` | 30 | The same while a boss is still standing. |
-| `capture_lost_s` | 15 | No game traffic for this long ends a fight. |
-| `kill_grace_s` | 2 | Hits after the boss dies still count for this long. |
-| `boss_min_max_hp` | 1000000 | Max HP that makes an enemy a boss. One dungeon's bosses had 5.2M–9.9M, its trash under 450,000. |
-| `min_saved_duration_s` | 20 | A fight with no boss is saved if it lasts at least this long. |
-| `save_only_dungeons` | false | Save only fights in a dungeon, as `overlay.show_in_dungeons_only` tells them. A dungeon the meter cannot name (its fights read "Map <number>") counts as not one. |
-| `partial_damage_ratio` | 0.7 | A boss that dies having lost less than this share of its HP with hits the meter saw (by the game's own HP updates) marks the fight "partial data". |
-| `wipe_detection` | false | End the fight when every party member is dead. Off until real captures show how revives look on the wire. |
-| `memory_history` | 10 | Finished fights kept in memory. |
-
-**auras**
-
-| Key | Default | Meaning |
-|---|---|---|
-| `visible` | false | Show the aura overlay. |
-| `locked` | false | Click-through and fixed in place. |
-| `opacity` | 0.55 | Background opacity, 0 to 1. Bars and text stay opaque. |
-| `scale` | 1.0 | Size, 0.6 to 2.5, on top of the monitor's DPI scaling. |
-| `x`, `y`, `width`, `height` | -1, -1, 280, 300 | Position and size in screen pixels. -1, -1 places it under the meter overlay's default spot. |
-| `show_debuffs` | true | Enemies' effects on you. |
-| `show_target` | true | Your effects on the fight's boss. |
-| `show_permanent` | false | Effects that never end: passive skills' and the ones a login puts on. |
-| `min_duration_s` | 1.0 | Effects shorter than this are left out, 0 to 60. |
-| `show_cooldowns` | true | Your cooldowns, estimated. |
-| `min_cooldown_s` | 3.0 | Cooldowns shorter than this are left out (Dodge's, a combo's), 0 to 120. |
-| `watch` | `[]` | Effects to flag while they are not on you: the skill codes the *Aura watch list* stores, at most 64. |
-
-**history**
-
-| Key | Default | Meaning |
-|---|---|---|
-| `max_fights` | 500 | Saved fights kept on disk; the oldest are deleted first. |
+**Each plugin's own keys** are in its section of the same file, and in its README:
+[Combat Meter](plugins/combat_meter/README.md#configuration) (`meter`, `overlay`,
+`history`) and [Auras](plugins/auras/README.md#configuration) (`auras`). Each section's
+`plugin_enabled` is that plugin's switch.
 
 **Files the meter writes:**
 - Saved fights: `%APPDATA%\aion2-combat-meter\history\`, one JSON file per fight plus
@@ -294,10 +196,11 @@ run the meter as administrator.
   every flow it decoded as the game.
 
 **I can't see the overlay in game**
-Use Borderless Windowed. If it is hidden, press Ctrl+Alt+H. Shown only in combat or only
-in dungeons, or hidden while the game is not in front (its Visibility settings), a
-locked overlay stays out of sight until those allow it; unlock it (Ctrl+Alt+L) to see
-it at once. A dungeon the meter cannot name ("Map <number>") counts as not one.
+Use Borderless Windowed, and check its plugin is switched on. If the meter overlay is
+hidden, press Ctrl+Alt+H. Shown only in combat or only in dungeons, or hidden while the
+game is not in front (its visibility settings), a locked overlay stays out of sight
+until those allow it; unlock it (Ctrl+Alt+L) to see it at once. A dungeon the meter
+cannot name ("Map <number>") counts as not one.
 
 **My party shows as #12345 instead of names**
 The game sends names mostly on loading screens. Start the meter before you log in or
@@ -355,7 +258,7 @@ make test
 That runs:
 - the unit tests;
 - a compile of every header on its own;
-- an ImGui syntax check of the overlay;
+- an ImGui syntax check of the overlays and the app window;
 - the forbidden-API check;
 - a replay of a made-up boss fight against `tests/golden/synthetic_fights.txt`.
 
@@ -419,7 +322,8 @@ The meter decodes the server's side of the game connection: TCP port 13328.
 - **Heartbeat:** about twenty a second. It carries the server clock, and the decoder
   uses it to find frame boundaries again after lost packets.
 - **Where the details live:** `src/protocol/include/protocol/opcodes.hpp` holds the
-  opcodes. `AGENTS.md` describes the layouts and lists what is still unknown.
+  opcodes. `AGENTS.md` describes the layouts and lists what is still unknown; each
+  plugin's own `AGENTS.md` what it makes of them.
 
 These facts come from the AION 2 community's published notes on the Global client. The
 decoder and everything else here are written from scratch.
@@ -429,6 +333,6 @@ decoder and everything else here are written from scratch.
 MIT, see [LICENSE](LICENSE). Dear ImGui is MIT (`src/third_party/imgui/LICENSE.txt`). The
 app window's icons are a subset of [Lucide](https://lucide.dev) (ISC), embedded in
 `src/app/include/app/ui/icons_font.inl` by `tools/embed_icon_font.py`. Skill, dungeon,
-monster and NPC names come from aion2.app's database (see `src/meter/data/skills.tsv`,
-`maps.tsv` and `npcs.tsv`).
+monster and NPC names come from aion2.app's database (see `src/game/data/skills.tsv`,
+`maps.tsv` and `npcs.tsv`), and so do skill cooldowns (`plugins/auras/data/cooldowns.tsv`).
 AION 2 is a trademark of NCSOFT. This project is not affiliated with NCSOFT.

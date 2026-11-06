@@ -331,7 +331,6 @@ int main(int argc, char** argv) {
     // Ariel's buffs, cooldowns and curse on the boss mid-fight, and a buff she
     // watches for missing (Wish of Concentration).
     app::AuraSettings aura_settings;
-    aura_settings.visible = true;
     aura_settings.locked = true;
     aura_settings.watch = {15'310'000};
     Scene auras{"overlay-auras.png", 280.0f, 230.0f, live.snapshot};
@@ -353,6 +352,13 @@ int main(int argc, char** argv) {
     shown_settings.overlay.locked = true;
     shown_settings.overlay.show_in_combat_only = true;
     ok = render_app(settings_page, shown_settings, out_dir) && ok;
+    // The Auras plugin's page, switched on, with the overlay's settings above.
+    AppScene auras_page{"app-auras.png", done.snapshot, damage.history, {}};
+    auras_page.view.page = app::AppPage::Auras;
+    app::AppSettings auras_settings = app_settings;
+    auras_settings.plugins.auras = true;
+    auras_settings.auras = aura_settings;
+    ok = render_app(auras_page, auras_settings, out_dir) && ok;
     if (all) {
         AppScene healing = damage;
         healing.file = "app-healing.png";

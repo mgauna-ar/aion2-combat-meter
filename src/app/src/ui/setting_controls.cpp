@@ -22,7 +22,7 @@ void on_edit(AppActions& out, Applies applies) {
 void on_release(AppActions& out, Applies applies) {
     out.save_settings = true;
     if (applies == Applies::Overlay) out.overlay_changed = true;
-    if (applies == Applies::Meter) out.meter_changed = true;
+    if (applies == Applies::Engine) out.engine_changed = true;
 }
 
 template <typename Slide>

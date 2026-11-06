@@ -15,19 +15,18 @@ struct OverlayConditions {
     /// that cannot be told (no game process found), so a condition never hides the
     /// overlay on a guess.
     bool game_in_front{true};
-    /// The map is a dungeon (meter::is_dungeon). False before any map load.
+    /// The map is a dungeon (game::is_dungeon). False before any map load.
     bool in_dungeon{false};
 };
 
-/// Whether the overlay shows now. `visible` (Ctrl+Alt+H) rules first. The other
-/// conditions apply only while the overlay is locked: an unlocked overlay can
-/// always be found and dragged back.
-[[nodiscard]] bool overlay_shown(const OverlaySettings& settings, const OverlayConditions& now) noexcept;
+/// Whether the meter overlay shows now. The Combat Meter plugin switched off hides
+/// it; then `visible` (Ctrl+Alt+H) rules. The other conditions apply only while the
+/// overlay is locked: an unlocked overlay can always be found and dragged back.
+[[nodiscard]] bool overlay_shown(const AppSettings& settings, const OverlayConditions& now) noexcept;
 
-/// Whether the aura overlay shows now: its own switch first, then, while it is
-/// locked, the meter overlay's hide_when_game_unfocused and show_in_dungeons_only.
-/// Its effects matter out of combat too, so show_in_combat_only does not apply.
-[[nodiscard]] bool auras_shown(const AuraSettings& auras, const OverlaySettings& overlay,
-                               const OverlayConditions& now) noexcept;
+/// Whether the aura overlay shows now: the Auras plugin's master switch first, then,
+/// while it is locked, its own hide_when_game_unfocused and show_in_dungeons_only.
+/// Its effects matter out of combat too, so it has no show_in_combat_only.
+[[nodiscard]] bool auras_shown(const AppSettings& settings, const OverlayConditions& now) noexcept;
 
 } // namespace aion2::app

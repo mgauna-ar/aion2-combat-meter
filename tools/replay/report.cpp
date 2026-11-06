@@ -2,9 +2,9 @@
 
 #include "hex_dump.hpp"
 
-#include "meter/map_names.hpp"
-#include "meter/npc_names.hpp"
-#include "meter/skill_names.hpp"
+#include "game/map_names.hpp"
+#include "game/npc_names.hpp"
+#include "game/skill_names.hpp"
 #include "protocol/opcodes.hpp"
 
 #include <algorithm>
@@ -31,7 +31,7 @@ const char* role_name(pipeline::FlowRole role) {
 /// capture investigation works from it.
 std::string name_suffix(std::string_view name) { return name.empty() ? std::string() : " " + std::string(name); }
 
-std::string map_suffix(uint32_t map_id) { return name_suffix(meter::map_name(map_id)); }
+std::string map_suffix(uint32_t map_id) { return name_suffix(game::map_name(map_id)); }
 
 std::string modifiers(uint8_t m, bool crit, uint8_t direction) {
     std::string out;
@@ -65,7 +65,7 @@ std::string Report::who(uint32_t id, const meter::CombatantRegistry& registry) c
     if (c != nullptr) {
         label = name(c->name, id);
     } else if (a != nullptr && a->npc_code != 0) {
-        label = meter::npc_label(a->npc_code);
+        label = game::npc_label(a->npc_code);
     } else {
         label = "#" + std::to_string(id);
     }
@@ -119,7 +119,7 @@ void Report::on_event(const proto::ParsedEvent& pe, const meter::CombatantRegist
             if constexpr (std::is_same_v<T, proto::BuffApplied>) {
                 std::printf("%+.3f  %s %s <- %s  %s (effect %u", t, e.renewed ? "buff~    " : "buff+    ",
                             who(e.target, reg).c_str(), who(e.caster, reg).c_str(),
-                            meter::effect_label(e.buff_id, e.source_skill).c_str(), e.buff_id);
+                            game::effect_label(e.buff_id, e.source_skill).c_str(), e.buff_id);
                 if (e.source_skill != 0) std::printf(", skill %u lv %u", e.source_skill, unsigned{e.level});
                 std::printf(") instance %u ", e.instance);
                 if (e.permanent) {
@@ -129,11 +129,11 @@ void Report::on_event(const proto::ParsedEvent& pe, const meter::CombatantRegist
                 }
             } else if constexpr (std::is_same_v<T, proto::BuffRemoved>) {
                 std::printf("%+.3f  buff-     %s  %s (effect %u)\n", t, who(e.target, reg).c_str(),
-                            meter::effect_label(e.buff_id).c_str(), e.buff_id);
+                            game::effect_label(e.buff_id).c_str(), e.buff_id);
             } else if constexpr (std::is_same_v<T, proto::SkillUsed>) {
-                std::printf("%+.3f  use       %s (%u)\n", t, meter::skill_label(e.skill).c_str(), e.skill);
+                std::printf("%+.3f  use       %s (%u)\n", t, game::skill_label(e.skill).c_str(), e.skill);
             } else if constexpr (std::is_same_v<T, proto::CooldownSet>) {
-                std::printf("%+.3f  cooldown  %s (%u) %.2f s left\n", t, meter::skill_label(e.skill).c_str(), e.skill,
+                std::printf("%+.3f  cooldown  %s (%u) %.2f s left\n", t, game::skill_label(e.skill).c_str(), e.skill,
                             static_cast<double>(e.remaining_ms) / 1000.0);
             } else if constexpr (std::is_same_v<T, proto::Heartbeat>) {
                 // Twenty a second: the flow summary counts them.
@@ -143,7 +143,7 @@ void Report::on_event(const proto::ParsedEvent& pe, const meter::CombatantRegist
                             e.class_code);
             } else if constexpr (std::is_same_v<T, proto::Spawn>) {
                 std::printf("%+.3f  spawn     %u kind %02x npc %u%s", t, e.id, unsigned{e.kind}, e.npc_code,
-                            name_suffix(meter::npc_name(e.npc_code)).c_str());
+                            name_suffix(game::npc_name(e.npc_code)).c_str());
                 if (e.has_hp) std::printf(" hp %" PRIu64 "/%" PRIu64, e.cur_hp, e.max_hp);
                 if (e.owner != 0) std::printf(" owner %u", e.owner);
                 if (!e.aimed_at.empty()) {
@@ -202,7 +202,7 @@ void Report::on_fight(const meter::FightSummary& f) {
     for (const auto& c : f.combatants) {
         std::printf("  %-2d %-16s %-4s %12" PRIu64 " %10.1f %5.1f%% %6" PRIu64 " %6.1f %6.1f %9" PRIu64 "%s\n", ++rank,
                     name(c.name.starts_with('#') ? std::string() : c.name, c.id).c_str(),
-                    std::string(meter::class_short(c.cls)).c_str(), c.damage, c.dps, 100.0 * c.share, c.hits.hits,
+                    std::string(game::class_short(c.cls)).c_str(), c.damage, c.dps, 100.0 * c.share, c.hits.hits,
                     100.0 * c.crit_rate(), 100.0 * c.back_rate(), c.max_hit, c.is_local ? "  (you)" : "");
     }
     if (m_opt.skills) {
@@ -216,7 +216,7 @@ void Report::on_fight(const meter::FightSummary& f) {
 
 void Report::print_breakdown(const meter::CombatantTotals& c) const {
     const std::string who = name(c.name.starts_with('#') ? std::string() : c.name, c.id);
-    std::printf("  %s: %s\n", who.c_str(), std::string(meter::class_name(c.cls)).c_str());
+    std::printf("  %s: %s\n", who.c_str(), std::string(game::class_name(c.cls)).c_str());
     if (!c.skills.empty()) {
         std::printf("    %-26s %9s %6s %5s %5s %6s %6s %6s %6s %6s %6s %6s %8s\n", "skill", "damage", "share", "hits",
                     "ticks", "crit%", "perf%", "dbl%", "back%", "frnt%", "mult%", "blk%", "max");
@@ -225,7 +225,7 @@ void Report::print_breakdown(const meter::CombatantTotals& c) const {
         const double share = c.damage == 0 ? 0.0 : 100.0 * static_cast<double>(s.damage) / static_cast<double>(c.damage);
         std::printf("    %-26.26s %9" PRIu64 " %5.1f%% %5" PRIu64 " %5" PRIu64
                     " %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f %8" PRIu64 "\n",
-                    meter::skill_label(s.code).c_str(), s.damage, share, s.hits.hits, s.ticks,
+                    game::skill_label(s.code).c_str(), s.damage, share, s.hits.hits, s.ticks,
                     100.0 * s.hits.rate(&meter::HitCounts::crits), 100.0 * s.hits.rate(&meter::HitCounts::perfect),
                     100.0 * s.hits.rate(&meter::HitCounts::doubles), 100.0 * s.hits.rate(&meter::HitCounts::back),
                     100.0 * s.hits.rate(&meter::HitCounts::front), 100.0 * s.hits.rate(&meter::HitCounts::multi),
@@ -234,7 +234,7 @@ void Report::print_breakdown(const meter::CombatantTotals& c) const {
     if (c.healing > 0) {
         std::printf("    healing %" PRIu64 " (%.1f hps, %" PRIu64 " heals)\n", c.healing, c.hps, c.heal_hits);
         for (const auto& s : c.heal_skills) {
-            std::printf("      %-26.26s %9" PRIu64 " %5" PRIu64 " heals\n", meter::skill_label(s.code).c_str(), s.amount,
+            std::printf("      %-26.26s %9" PRIu64 " %5" PRIu64 " heals\n", game::skill_label(s.code).c_str(), s.amount,
                         s.hits);
         }
     }
@@ -242,8 +242,8 @@ void Report::print_breakdown(const meter::CombatantTotals& c) const {
         std::printf("    taken %" PRIu64 " (%" PRIu64 " hits, %.1f%% crit)\n", c.damage_taken, c.taken.hits,
                     100.0 * c.taken.rate(&meter::HitCounts::crits));
         for (const auto& s : c.taken_by) {
-            const std::string from = s.source_npc != 0 ? meter::npc_label(s.source_npc) : std::string("?");
-            std::printf("      %-26.26s %-24s %9" PRIu64 " %5" PRIu64 " hits\n", meter::skill_label(s.code).c_str(),
+            const std::string from = s.source_npc != 0 ? game::npc_label(s.source_npc) : std::string("?");
+            std::printf("      %-26.26s %-24s %9" PRIu64 " %5" PRIu64 " hits\n", game::skill_label(s.code).c_str(),
                         from.c_str(), s.amount, s.hits);
         }
     }

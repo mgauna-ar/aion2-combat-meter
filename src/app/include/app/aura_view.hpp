@@ -2,8 +2,8 @@
 
 #include "app/app_settings.hpp"
 #include "app/overlay_view.hpp"
+#include "auras/aura_tracker.hpp"
 #include "common/micros.hpp"
-#include "meter/aura_tracker.hpp"
 #include "pipeline/pipeline.hpp"
 
 #include <cstdint>
@@ -36,12 +36,12 @@ inline constexpr Micros kAuraDisplayLead = 250 * kMicrosPerMilli;
 /// The effects one side of the overlay lists at `now`, after the settings' filters:
 /// running, long enough, permanent only when asked, and (`self`) an enemy's only
 /// with show_debuffs.
-[[nodiscard]] std::vector<const meter::AuraEntry*> shown_auras(const std::vector<meter::AuraEntry>& entries,
+[[nodiscard]] std::vector<const auras::AuraEntry*> shown_auras(const std::vector<auras::AuraEntry>& entries,
                                                                const AuraSettings& settings, Micros now, bool self);
 
 /// The cooldowns the overlay lists at `now`: running, at least min_cooldown_s long,
 /// and none with show_cooldowns off.
-[[nodiscard]] std::vector<const meter::CooldownEntry*> shown_cooldowns(const std::vector<meter::CooldownEntry>& entries,
+[[nodiscard]] std::vector<const auras::CooldownEntry*> shown_cooldowns(const std::vector<auras::CooldownEntry>& entries,
                                                                        const AuraSettings& settings, Micros now);
 
 /// A watched effect the local player lacks.
@@ -54,7 +54,7 @@ struct MissingEffect {
 
 /// The watch list's effects not on the local player at `now`, in the list's order.
 /// Labels come from the effects seen this session, else the skill table.
-[[nodiscard]] std::vector<MissingEffect> missing_effects(const meter::AuraSnapshot& auras,
+[[nodiscard]] std::vector<MissingEffect> missing_effects(const auras::AuraSnapshot& auras,
                                                          const std::vector<uint32_t>& watch, Micros now);
 
 /// "2m05", "12", "4.5": the time left on a bar.
@@ -62,7 +62,7 @@ struct MissingEffect {
 
 /// Draws the aura overlay as one ImGui window filling the display, into the frame
 /// the caller has begun: missing watched effects, the effects on the local player,
-/// theirs on the boss, and their cooldowns. A no-op where ImGui is not built
+/// theirs on their target, and their cooldowns. A no-op where ImGui is not built
 /// (HAVE_IMGUI unset).
 OverlayActions draw_auras(const AuraFrameInput& input);
 

@@ -1,7 +1,8 @@
 #pragma once
 
+#include "aion2/plugin_registry.hpp"
+#include "auras/aura_plugin.hpp"
 #include "common/micros.hpp"
-#include "meter/aura_tracker.hpp"
 #include "meter/encounter_engine.hpp"
 #include "meter/meter_settings.hpp"
 #include "meter/types.hpp"
@@ -33,6 +34,8 @@ struct PipelineOptions {
     /// Spelled from aion2:: because GCC rejects a member named `meter` after an
     /// unqualified `meter::` in the same class ("changes meaning").
     aion2::meter::MeterSettings meter;
+    /// The plugins fed; all of them unless the app's settings say otherwise.
+    aion2::plugins::PluginSwitches plugins{aion2::plugins::ALL_ON};
 };
 
 /// Where the capture stands, for the overlay's status line.
@@ -57,16 +60,19 @@ struct LiveSnapshot {
     Micros now{0};
     proto::ParseStats parse;
     meter::CaptureQuality capture_totals;
-    /// The aura overlay's: effects on the local player, and theirs on the boss.
-    meter::AuraSnapshot auras;
+    /// The Auras plugin's: effects on the local player, and theirs on the enemy they
+    /// fight. Empty while the plugin is off.
+    aion2::auras::AuraSnapshot auras;
 };
 
 /**
- * @brief Captured packets to fights: demux, frame decoder, parser and engine.
+ * @brief Captured packets to the plugins: demux, frame decoder, parser, then each
+ * plugin switched on (the combat meter's engine, the auras).
  *
  * One instance runs on one thread: the live engine thread, or the replay tool.
  * Both drive it the same way, on the capture clock, so a replay of a recording
- * reproduces the live meter's fights exactly.
+ * reproduces the live meter's fights exactly. A plugin switched off gets no events
+ * and no ticks.
  */
 class Pipeline final : private proto::FrameSink {
 public:
@@ -84,6 +90,11 @@ public:
     /// Packets the capture threads dropped, cumulative.
     void set_dropped_packets(uint64_t dropped) noexcept { m_dropped = dropped; }
     void set_meter_settings(const meter::MeterSettings& settings) { m_engine.set_settings(settings); }
+    /// Switches plugins on and off at capture time `now`. The meter switched off ends
+    /// its live fight first; the auras switched off forget what they knew, since they
+    /// will miss what happens meanwhile.
+    void set_plugins(const aion2::plugins::PluginSwitches& on, Micros now);
+    [[nodiscard]] const aion2::plugins::PluginSwitches& plugin_switches() const noexcept { return m_plugins; }
 
     /// Fights finished since the last call, oldest first.
     [[nodiscard]] std::vector<meter::FightSummary> take_finished() { return m_engine.take_finished(); }
@@ -98,6 +109,7 @@ public:
     [[nodiscard]] const StreamDemux& demux() const noexcept { return m_demux; }
     [[nodiscard]] const proto::PacketParser& parser() const noexcept { return m_parser; }
     [[nodiscard]] const meter::EncounterEngine& engine() const noexcept { return m_engine; }
+    [[nodiscard]] const aion2::auras::AuraPlugin& aura_plugin() const noexcept { return m_auras; }
 
 private:
     void on_frame(const proto::Frame& frame) override;
@@ -106,6 +118,8 @@ private:
     StreamDemux m_demux;
     proto::PacketParser m_parser;
     meter::EncounterEngine m_engine;
+    aion2::auras::AuraPlugin m_auras;
+    aion2::plugins::PluginSwitches m_plugins;
     std::vector<proto::ParsedEvent> m_events;
     uint64_t m_dropped{0};
     Micros m_last_tick{0};

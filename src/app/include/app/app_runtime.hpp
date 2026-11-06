@@ -54,9 +54,11 @@ public:
     [[nodiscard]] uint64_t snapshot_revision() const { return m_snapshot.revision(); }
 
     void request_end_fight() noexcept { m_end_fight_requested = true; }
-    /// New fight-tracking and history settings, from the settings page. The engine
-    /// thread applies them on its next pass; a fight under way keeps going under them.
-    void update_settings(const meter::MeterSettings& meter, const HistorySettings& history);
+    /// New fight-tracking and history settings and plugin switches, from the
+    /// settings pages. The engine thread applies them on its next pass; a fight under
+    /// way keeps going under them, unless the Combat Meter was switched off.
+    void update_settings(const meter::MeterSettings& meter, const HistorySettings& history,
+                         const aion2::plugins::PluginSwitches& plugins);
     /// Deletes every saved fight. The history revision moves once it is done.
     void request_clear_history() noexcept { m_clear_history_requested = true; }
     /// Starts or stops writing everything captured to a pcapng in captures_dir().
@@ -80,7 +82,7 @@ private:
     void handle_recording(Micros now);
     void save_finished();
     /// Engine thread: settings from update_settings(), and a clear request.
-    void apply_requests();
+    void apply_requests(Micros now);
     void reload_history();
     void publish(Micros now);
     void set_status(std::string status);
@@ -110,8 +112,13 @@ private:
     std::atomic<uint64_t> m_history_revision{0};
     std::string m_status;
     std::string m_recording_path;
+    struct PendingSettings {
+        meter::MeterSettings meter;
+        HistorySettings history;
+        aion2::plugins::PluginSwitches plugins;
+    };
     /// From update_settings(), until the engine thread takes them.
-    std::optional<std::pair<meter::MeterSettings, HistorySettings>> m_pending_settings;
+    std::optional<PendingSettings> m_pending_settings;
 };
 
 } // namespace aion2::app
