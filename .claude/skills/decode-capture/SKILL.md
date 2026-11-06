@@ -1,6 +1,6 @@
 ---
 name: decode-capture
-description: Check and fix the AION 2 decoder against a real capture. Use when a .pcap/.pcapng recorded from the game is available, when replay shows parse failures, resyncs or wrong numbers, or when filling in unknowns (class codes, the damage scale, npc codes, boss_min_max_hp) - including any work on src/protocol/src/packet_parser.cpp, src/protocol/include/protocol/opcodes.hpp or src/meter/src/class_codes.cpp.
+description: Check and fix the AION 2 decoder against a real capture. Use when a .pcap/.pcapng recorded from the game is available, when replay shows parse failures, resyncs or wrong numbers, or when filling in unknowns (class codes, the damage scale, npc codes, boss_min_max_hp) - including any work on src/protocol/src/packet_parser.cpp, src/protocol/include/protocol/opcodes.hpp or src/game/src/class_codes.cpp.
 ---
 
 # Decode a real capture
@@ -57,7 +57,7 @@ make replay
 
 **Check each layout against the ground truth:**
 - **Own identity:** the own identity event carries the character's id. Its `class` code
-  goes into `src/meter/src/class_codes.cpp` (an entry per class seen).
+  goes into `src/game/src/class_codes.cpp` (an entry per class seen).
 - **Damage:** the damage events for that id should show the hit numbers noted in step 1.
   - If the amounts are off by a field, look at `read_damage_record`: the "optional 00
     pad" and the scalar varint are the likeliest culprits.
@@ -69,7 +69,7 @@ make replay
 - **Loads within a run:** a `map` event inside a dungeon run (a teleport, a revive)
   should name the same `connection` as the load that entered it; a new run, a new
   one. The engine keeps or splits runs by that (AGENTS.md, Fight end).
-- **Map ids:** a `map` event prints the name `src/meter/data/maps.tsv` gives its id.
+- **Map ids:** a `map` event prints the name `src/game/data/maps.tsv` gives its id.
   - Every map event starts a new visit. Ask the user to run one dungeon twice,
     straight back in, and to use a teleport inside it: the re-entry should show a
     `map` event with the same id (note its load count), and the teleport none. A
@@ -83,7 +83,7 @@ make replay
     (`?focus=zone:622`). If an open-world id matches the zone the user stood in, those
     are map ids after all: note it in AGENTS.md.
 - **Spawn:** a boss spawn's `hp` should be its max HP. Its `npc` field prints the
-  name `src/meter/data/npcs.tsv` gives it.
+  name `src/game/data/npcs.tsv` gives it.
   - The name should be the boss the user fought. Mobs were checked in the first
     capture; no boss has been yet.
   - If the name is wrong, or missing for a mob the site lists, search the spawn body

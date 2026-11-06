@@ -2,8 +2,9 @@
 
 namespace aion2::app {
 
-bool overlay_shown(const OverlaySettings& s, const OverlayConditions& now) noexcept {
-    if (!s.visible) return false;
+bool overlay_shown(const AppSettings& settings, const OverlayConditions& now) noexcept {
+    const OverlaySettings& s = settings.overlay;
+    if (!settings.plugins.combat_meter || !s.visible) return false;
     if (!s.locked) return true;
     if (s.show_in_combat_only && !now.fight_live && now.seconds_since_fight >= s.hide_after_combat_s) return false;
     if (s.hide_when_game_unfocused && !now.game_in_front) return false;
@@ -11,11 +12,12 @@ bool overlay_shown(const OverlaySettings& s, const OverlayConditions& now) noexc
     return true;
 }
 
-bool auras_shown(const AuraSettings& a, const OverlaySettings& o, const OverlayConditions& now) noexcept {
-    if (!a.visible) return false;
+bool auras_shown(const AppSettings& settings, const OverlayConditions& now) noexcept {
+    const AuraSettings& a = settings.auras;
+    if (!settings.plugins.auras) return false;
     if (!a.locked) return true;
-    if (o.hide_when_game_unfocused && !now.game_in_front) return false;
-    if (o.show_in_dungeons_only && !now.in_dungeon) return false;
+    if (a.hide_when_game_unfocused && !now.game_in_front) return false;
+    if (a.show_in_dungeons_only && !now.in_dungeon) return false;
     return true;
 }
 

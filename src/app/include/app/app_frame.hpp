@@ -1,7 +1,7 @@
 #pragma once
 
-// The desktop window's contents: a sidebar and three pages (Dashboard, Combat
-// Meter, App Settings), drawn with ImGui into a frame the caller has begun. Like
+// The desktop window's contents: a sidebar and its pages (the Dashboard, a page per
+// plugin, the app's Settings), drawn with ImGui into a frame the caller has begun. Like
 // the overlay it reads its inputs, edits only the settings it is handed, and
 // reports everything else as actions, so the Win32 window that hosts it stays
 // small and the screenshot tool can draw it on the Mac.
@@ -19,7 +19,7 @@
 
 namespace aion2::app {
 
-enum class AppPage : uint8_t { Dashboard, Meter, Settings };
+enum class AppPage : uint8_t { Dashboard, Meter, Auras, Settings };
 
 /// What the window remembers between frames.
 struct AppViewState {
@@ -64,8 +64,8 @@ struct AppActions {
     bool save_settings{false};
     /// Apply the overlay settings to the overlay window now (a preview while dragging).
     bool overlay_changed{false};
-    /// Hand the meter and history settings to the engine.
-    bool meter_changed{false};
+    /// Hand the meter and history settings and the plugin switches to the engine.
+    bool engine_changed{false};
     std::optional<bool> start_with_windows;
     bool end_fight{false};
     bool toggle_recording{false};

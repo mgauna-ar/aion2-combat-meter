@@ -1,9 +1,9 @@
 #include "test_framework.hpp"
 
-#include "meter/skill_names.hpp"
+#include "game/skill_names.hpp"
 
 using namespace aion2;
-using namespace aion2::meter;
+using namespace aion2::game;
 
 // The codes below are from the first real capture: a Templar and an Elementalist
 // with a spirit.

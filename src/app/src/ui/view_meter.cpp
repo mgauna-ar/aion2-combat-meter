@@ -5,10 +5,10 @@
 #include "app/ui/page.hpp"
 #include "app/ui/widgets.hpp"
 #include "common/time_format.hpp"
-#include "meter/map_names.hpp"
-#include "meter/npc_names.hpp"
+#include "game/map_names.hpp"
+#include "game/npc_names.hpp"
+#include "game/skill_names.hpp"
 #include "meter/pull_grouping.hpp"
-#include "meter/skill_names.hpp"
 
 #ifdef HAVE_IMGUI
 #include <algorithm>
@@ -44,7 +44,7 @@ struct Shown {
 };
 
 uint32_t row_color_u32(const meter::CombatantTotals& c) {
-    if (c.cls != meter::AionClass::Unknown) return class_color_u32(c.cls);
+    if (c.cls != game::AionClass::Unknown) return class_color_u32(c.cls);
     return c.is_local ? colors::Accent : colors::TextMuted;
 }
 
@@ -230,7 +230,7 @@ void damage_breakdown(const meter::CombatantTotals& c, meter::EntityId& selected
             row_progress_bar(static_cast<float>(static_cast<double>(s.damage) / static_cast<double>(top)),
                              row_color_u32(c));
             const uint64_t direct = s.damage - std::min(s.damage, s.tick_damage);
-            cell(0, colors::TextBody, meter::skill_label(s.code));
+            cell(0, colors::TextBody, game::skill_label(s.code));
             if (ImGui::IsItemHovered()) ImGui::SetTooltip("Skill code %u", s.code);
             cell(1, colors::TextPrimary, format_amount(s.damage));
             cell(2, colors::TextMuted, share(s.damage, c.damage));
@@ -370,7 +370,7 @@ void healing_tab(const meter::FightSummary& f, AppViewState& state) {
             ImGui::TableNextRow();
             row_progress_bar(static_cast<float>(static_cast<double>(s.amount) / static_cast<double>(top)),
                              colors::Success);
-            cell(0, colors::TextBody, meter::skill_label(s.code));
+            cell(0, colors::TextBody, game::skill_label(s.code));
             cell(1, colors::TextPrimary, format_amount(s.amount));
             cell(2, colors::TextMuted, share(s.amount, open->healing));
             cell(3, colors::TextMuted, number(s.hits));
@@ -438,8 +438,8 @@ void taken_tab(const meter::FightSummary& f, AppViewState& state) {
             ImGui::TableNextRow();
             row_progress_bar(static_cast<float>(static_cast<double>(s.amount) / static_cast<double>(top)),
                              colors::Danger);
-            cell(0, colors::TextBody, meter::skill_label(s.code));
-            cell(1, colors::TextMuted, s.source_npc != 0 ? meter::npc_label(s.source_npc) : std::string("-"));
+            cell(0, colors::TextBody, game::skill_label(s.code));
+            cell(1, colors::TextMuted, s.source_npc != 0 ? game::npc_label(s.source_npc) : std::string("-"));
             cell(2, colors::TextPrimary, format_amount(s.amount));
             cell(3, colors::TextMuted, share(s.amount, open->damage_taken));
             cell(4, colors::TextMuted, number(s.hits));
@@ -633,7 +633,7 @@ void rail(const AppFrameInput& in, AppViewState& state, AppActions& out, const s
             // that the user's own folding wins.
             ImGui::SetNextItemOpen(gi == 0 || holds_selection, ImGuiCond_Once);
             const Micros started = g.visit_ts != 0 ? g.visit_ts : history[g.pulls.back().index].start_ts;
-            const std::string map = meter::map_label(g.map_id);
+            const std::string map = game::map_label(g.map_id);
             const std::string clock = common::local_clock(started);
             const bool open = visit_header(map, clock);
             if (ImGui::IsItemHovered()) {
@@ -667,7 +667,7 @@ void top_bar(const Shown& shown, AppActions& out) {
     begin_card("##TopBar", ImVec2(0.0f, 0.0f), opts);
     const meter::FightSummary& f = *shown.fight;
     std::string title = f.live ? "Live fight" : "Last fight";
-    if (shown.entry != nullptr) title = meter::map_label(f.map_id) + "  -  Fight #" + std::to_string(shown.number);
+    if (shown.entry != nullptr) title = game::map_label(f.map_id) + "  -  Fight #" + std::to_string(shown.number);
     if (f.boss.present()) title += "  -  " + std::string(f.boss.is_boss ? "Boss " : "") + f.boss.label;
     ImGui::PushFont(bold_font());
     text_colored_u32(colors::TextPrimary, "%s", title.c_str());
@@ -754,72 +754,6 @@ void overlay_card(const AppFrameInput& in, AppActions& out) {
     end_settings_card();
 }
 
-void auras_card(const AppFrameInput& in, AppActions& out) {
-    begin_settings_card("##set_auras", ICON_SPARKLE, "AURAS", colors::Violet);
-    AuraSettings& a = in.settings->auras;
-    setting_switch("Show the aura overlay", "Your buffs and debuffs, and yours on the boss, as bars.", &a.visible, out,
-                   Applies::Overlay);
-    setting_switch("Lock", "Click-through and fixed in place. Ctrl+Alt+L locks or unlocks both overlays.", &a.locked,
-                   out, Applies::Overlay);
-    setting_slider("Opacity", "Of its background; the bars stay solid.", &a.opacity, 0.0f, 1.0f, "%.2f", out,
-                   Applies::Overlay);
-    setting_slider("Scale", "On top of the monitor's own scaling.", &a.scale, 0.6f, 2.5f, "%.2fx", out,
-                   Applies::Overlay);
-    setting_switch("Debuffs on you", "Enemies' effects on you, in red.", &a.show_debuffs, out);
-    setting_switch("Yours on the boss", "Your effects on the fight's boss, under your own.", &a.show_target, out);
-    setting_switch("Permanent effects", "Passive skills' effects, which never end.", &a.show_permanent, out);
-    setting_slider("Shortest effect", "Shorter ones are left out: a dodge's mark, a cast's state.",
-                   &a.min_duration_s, 0.0f, 10.0f, "%.1f s", out);
-    setting_switch("Your cooldowns", "Estimates (~): the listed cooldown less your specialties, learned as you play.",
-                   &a.show_cooldowns, out);
-    setting_slider("Shortest cooldown", "Shorter ones are left out: Dodge's, a combo's.", &a.min_cooldown_s, 0.0f, 30.0f,
-                   "%.0f s", out);
-    begin_setting_row("Position", "Back to its spot under the meter overlay's.");
-    if (button(ICON_RESET "  Reset position##auras", ButtonKind::Secondary, ButtonSize::Fit)) {
-        out.reset_aura_position = true;
-    }
-    end_setting_row();
-    ImGui::PushTextWrapPos(0.0f);
-    text_dim("Locked, it hides with the overlay's \"game not in front\" and \"only in dungeons\".");
-    ImGui::PopTextWrapPos();
-    end_settings_card();
-}
-
-void aura_watch_card(const AppFrameInput& in, AppActions& out) {
-    begin_settings_card("##set_aura_watch", ICON_CHECKLIST, "AURA WATCH LIST", colors::Violet);
-    AuraSettings& a = in.settings->auras;
-    ImGui::PushTextWrapPos(0.0f);
-    text_dim("Flagged on the aura overlay while they are not on you: a Chanter's mantra, a buff you keep up.");
-    ImGui::PopTextWrapPos();
-
-    // The effects seen on you this session, then any watched one not seen yet.
-    std::vector<std::pair<uint32_t, std::string>> choices;
-    if (in.snapshot != nullptr) {
-        for (const meter::SeenEffect& e : in.snapshot->auras.seen) choices.emplace_back(e.key, e.label);
-    }
-    for (const uint32_t key : a.watch) {
-        const bool listed = std::any_of(choices.begin(), choices.end(), [&](const auto& c) { return c.first == key; });
-        if (listed) continue;
-        const std::string_view name = meter::skill_name(key);
-        choices.emplace_back(key, name.empty() ? "Effect " + std::to_string(key) : std::string(name));
-    }
-    if (choices.empty()) text_dim("Effects show up here once the meter has seen them on you.");
-    for (const auto& [key, label] : choices) {
-        const auto it = std::find(a.watch.begin(), a.watch.end(), key);
-        bool watched = it != a.watch.end();
-        ImGui::PushID(static_cast<int>(key));
-        if (setting_switch(label.c_str(), nullptr, &watched, out)) {
-            if (!watched) {
-                a.watch.erase(std::find(a.watch.begin(), a.watch.end(), key));
-            } else if (a.watch.size() < kMaxWatchedEffects) {
-                a.watch.push_back(key);
-            }
-        }
-        ImGui::PopID();
-    }
-    end_settings_card();
-}
-
 void visibility_card(const AppFrameInput& in, AppActions& out) {
     begin_settings_card("##set_visibility", ICON_EYE, "OVERLAY VISIBILITY", colors::Violet);
     OverlaySettings& o = in.settings->overlay;
@@ -869,16 +803,16 @@ void tracking_card(const AppFrameInput& in, AppActions& out) {
     begin_settings_card("##set_tracking", ICON_TIMER, "FIGHT TRACKING", colors::Warning);
     meter::MeterSettings& s = in.settings->meter;
     setting_slider("Idle end", "No party hit for this long ends a fight.", &s.idle_timeout_s, 2.0, 120.0, "%.0f s",
-                   out, Applies::Meter);
+                   out, Applies::Engine);
     setting_slider("Idle end with a boss up", "The same while a boss still stands: phases it can't be hit.",
-                   &s.boss_idle_timeout_s, s.idle_timeout_s, 300.0, "%.0f s", out, Applies::Meter);
+                   &s.boss_idle_timeout_s, s.idle_timeout_s, 300.0, "%.0f s", out, Applies::Engine);
     setting_slider("Kill grace", "Hits this long after the boss dies still count.", &s.kill_grace_s, 0.0, 10.0,
-                   "%.1f s", out, Applies::Meter);
+                   "%.1f s", out, Applies::Engine);
     setting_slider("Shortest fight saved", "A fight with no boss is saved if it lasts this long.",
-                   &s.min_saved_duration_s, 0.0, 600.0, "%.0f s", out, Applies::Meter);
+                   &s.min_saved_duration_s, 0.0, 600.0, "%.0f s", out, Applies::Engine);
     setting_switch("Save only dungeon fights",
                    "Keeps the open world out. A dungeon shown as \"Map <number>\" is not one the meter knows.",
-                   &s.save_only_dungeons, out, Applies::Meter);
+                   &s.save_only_dungeons, out, Applies::Engine);
 
     begin_setting_row("Boss HP", "Max HP that makes an enemy a boss. A guess until captures calibrate it.");
     uint64_t hp = s.boss_min_max_hp;
@@ -888,21 +822,21 @@ void tracking_card(const AppFrameInput& in, AppActions& out) {
     }
     if (ImGui::IsItemDeactivatedAfterEdit()) {
         out.save_settings = true;
-        out.meter_changed = true;
+        out.engine_changed = true;
     }
     end_setting_row();
 
     setting_slider("Partial data under", "A killed boss that lost less than this share of its HP with hits seen.",
-                   &s.partial_damage_ratio, 0.0, 1.0, "%.2f", out, Applies::Meter);
+                   &s.partial_damage_ratio, 0.0, 1.0, "%.2f", out, Applies::Engine);
     setting_switch("Wipe ends the fight", "When every party member is dead. Off until captures show revives.",
-                   &s.wipe_detection, out, Applies::Meter);
+                   &s.wipe_detection, out, Applies::Engine);
     end_settings_card();
 }
 
 void history_card(const AppFrameInput& in, AppActions& out) {
     begin_settings_card("##set_history", ICON_HISTORY, "SAVED FIGHTS", colors::Success);
     setting_slider("Fights kept", "The oldest are deleted first.", &in.settings->history.max_fights, 10, 5000, "%d", out,
-                   Applies::Meter);
+                   Applies::Engine);
     if (button(ICON_FOLDER "  Open folder")) out.open = OpenTarget::History;
     end_settings_card();
 }
@@ -915,8 +849,6 @@ void settings_tab(const AppFrameInput& in, AppActions& out) {
         {[&] { visibility_card(in, out); }},
         {[&] { history_card(in, out); }},
         {[&] { columns_card(in, out); }},
-        {[&] { auras_card(in, out); }},
-        {[&] { aura_watch_card(in, out); }},
     };
     render_settings_grid(sections, std::size(sections));
 }
@@ -950,7 +882,9 @@ void pull_view(const AppFrameInput& in, AppViewState& state, AppActions& out, co
 } // namespace
 
 void render_meter_page(const AppFrameInput& in, AppViewState& state, AppActions& out) {
-    page_header(ICON_SWORDS, "Combat Meter", "Every fight, live and saved, for the whole party");
+    render_plugin_header(in, out, plugins::PluginId::CombatMeter, plugin_icon(plugins::PluginId::CombatMeter),
+                         "Every fight, live and saved, for the whole party");
+    if (render_plugin_disabled_gate(in, out, plugins::PluginId::CombatMeter)) return;
 
     const std::vector<meter::HistoryEntry> none;
     const auto& history = in.history != nullptr ? *in.history : none;

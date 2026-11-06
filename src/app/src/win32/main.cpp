@@ -21,7 +21,7 @@
 #include "common/os/process_launch.hpp"
 #include "common/os/single_instance.hpp"
 #include "common/os/tray_icon.hpp"
-#include "meter/map_names.hpp"
+#include "game/map_names.hpp"
 
 #include <shellapi.h>
 
@@ -152,18 +152,20 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
 
     app::win32::OverlayWindow window;
     std::string window_error;
-    if (!window.create(app::win32::placement_of(settings.overlay), L"AION 2 Combat Meter", true, window_error)) {
+    if (!window.create(app::win32::placement_of(settings.overlay, settings.plugins.combat_meter), L"AION 2 Combat Meter",
+                       true, window_error)) {
         os::Logger::error(window_error);
         MessageBoxW(nullptr, os::to_wide(window_error).c_str(), L"AION 2 Combat Meter", MB_OK | MB_ICONERROR);
         runtime.stop();
         return 1;
     }
-    // The aura overlay is a second window like it, without the hotkeys; the meter
-    // runs on without it.
+    // The Auras plugin's overlay is a second window like it, without the hotkeys; the
+    // meter runs on without it. Each shows only while its plugin is switched on.
     app::win32::OverlayWindow aura_window;
     std::string aura_error;
     const bool have_auras =
-        aura_window.create(app::win32::placement_of(settings.auras), L"AION 2 Combat Meter Auras", false, aura_error);
+        aura_window.create(app::win32::placement_of(settings.auras, settings.plugins.auras), L"AION 2 Combat Meter Auras",
+                           false, aura_error);
     if (!have_auras) os::Logger::error(aura_error);
     // The app window is a convenience: without it the overlay and the tray still work.
     app::win32::AppWindow app_window;
@@ -180,7 +182,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
         if (!why.empty()) os::Logger::warn("cannot save config.json: " + why);
         settings_dirty = false;
     };
-    // Ctrl+Alt+L and the tray lock or unlock both overlays together.
+    // Ctrl+Alt+L and the tray lock or unlock every overlay together.
     const auto set_locked = [&](bool locked) {
         settings.overlay.locked = locked;
         window.set_locked(locked);
@@ -384,7 +386,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
             const app::AppActions actions = app_window.render(input, app_view);
 
             if (actions.overlay_changed) apply_overlay();
-            if (actions.meter_changed) runtime.update_settings(settings.meter, settings.history);
+            if (actions.engine_changed) runtime.update_settings(settings.meter, settings.history, settings.plugins);
             if (actions.save_settings) {
                 save_now();
             } else if (actions.settings_changed) {
@@ -429,8 +431,8 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
             conditions.seconds_since_fight = std::chrono::duration<double>(Clock::now() - *last_live).count();
         }
         conditions.game_in_front = game_in_front(game_pids);
-        conditions.in_dungeon = snapshot != nullptr && meter::is_dungeon(snapshot->map_id);
-        if (const bool shown = app::overlay_shown(settings.overlay, conditions); shown != window.visible()) {
+        conditions.in_dungeon = snapshot != nullptr && game::is_dungeon(snapshot->map_id);
+        if (const bool shown = app::overlay_shown(settings, conditions); shown != window.visible()) {
             window.set_visible(shown);
         }
 
@@ -455,7 +457,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
         }
 
         if (have_auras) {
-            if (const bool shown = app::auras_shown(settings.auras, settings.overlay, conditions);
+            if (const bool shown = app::auras_shown(settings, conditions);
                 shown != aura_window.visible()) {
                 aura_window.set_visible(shown);
             }
@@ -489,7 +491,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
             last_housekeeping = Clock::now();
             window.keep_on_top();
             if (have_auras) aura_window.keep_on_top();
-            if (settings.overlay.hide_when_game_unfocused) {
+            if (settings.overlay.hide_when_game_unfocused || settings.auras.hide_when_game_unfocused) {
                 game_pids = capture::game_process_ids(settings.capture.game_process);
             }
             std::string tip = "AION 2 Combat Meter";

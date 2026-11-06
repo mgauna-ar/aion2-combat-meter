@@ -44,7 +44,7 @@ A patch can add or rename skills. Rows the meter cannot name read "Skill 1234567
    ```
    Stop at the first page that lists no skills.
 2. **Rebuild the table.** Run `python3 tools/gen_skill_table.py --import-pages /tmp/skills`.
-   It rewrites `src/meter/data/skills.tsv` and `skill_table.inc`.
+   It rewrites `src/game/data/skills.tsv` and `skill_table.inc`.
 3. **Check the diff.** Renamed rows are expected. A class whose codes stopped starting
    with its two digits (`class_of_skill`) is not, and means the codes were renumbered.
 
@@ -62,7 +62,7 @@ A patch can add dungeons or tiers. Maps the meter cannot name read "Map 600001".
    ```
    Add list pages if the site shows more than three.
 2. **Rebuild the table.** Run `python3 tools/gen_map_table.py --import-pages /tmp/dungeons/pages`.
-   It rewrites `src/meter/data/maps.tsv` above its `# By hand` line, and `map_table.inc`.
+   It rewrites `src/game/data/maps.tsv` above its `# By hand` line, and `map_table.inc`.
    It names each page that has no tier ids. Some do (the Lv.99 Awakening tiers,
    Ascension, Legion and more, at the time of writing), so the list alone is no failure.
    A dungeon that had ids and is now on it means the page's layout moved.
@@ -81,16 +81,16 @@ A patch can add monsters and NPCs. Ones the meter cannot name read "NPC #2345678
    for p in $(seq 1 62); do curl -sSL -o /tmp/npcs/npcs-$p.html "https://aion2.app/db/npcs?page=$p"; sleep 1; done
    ```
 2. **Rebuild the table.** Run `python3 tools/gen_npc_table.py --import-pages /tmp/npcs`.
-   It rewrites `src/meter/data/npcs.tsv` and `npc_table.inc`, and warns when a list came
+   It rewrites `src/game/data/npcs.tsv` and `npc_table.inc`, and warns when a list came
    out shorter than the site says it is (a page missing or cut off).
 3. **Check the diff.** New ids are expected. A known id under another name is not, and
    means the ids were renumbered.
 
 ## 6. Refresh the cooldowns
 
-A patch can change a cooldown or a specialty. The aura overlay's cooldowns start from
-`src/meter/data/cooldowns.tsv`; a stale row makes them run long or short until the
-meter learns the skill's quickest reuse again.
+A patch can change a cooldown or a specialty. The Auras plugin's cooldowns start from
+`plugins/auras/data/cooldowns.tsv`; a stale row makes them run long or short until the
+plugin learns the skill's quickest reuse again.
 
 1. **Download the pages.** Each class's list gives its skills' pages (Elementalist and
    Gladiator have a second list page at the time of writing; add one for any class
@@ -102,7 +102,7 @@ meter learns the skill's quickest reuse again.
    while read -r id; do curl -sSL -o "/tmp/cooldowns/pages/$id.html" "https://aion2.app/db/skills/$id"; sleep 1; done < /tmp/cooldowns/ids.txt
    ```
 2. **Rebuild the table.** Run `python3 tools/gen_cooldown_table.py --import-pages /tmp/cooldowns/pages`.
-   It rewrites `src/meter/data/cooldowns.tsv` and `cooldown_table.inc`.
+   It rewrites `plugins/auras/data/cooldowns.tsv` and `cooldown_table.inc`.
 3. **Check the diff.** Changed cooldowns and cuts are expected. Every row turning
    A or S, or every cut vanishing, means the page's layout moved: look at one page's
    specialty rows and the importer's patterns.

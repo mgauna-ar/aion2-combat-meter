@@ -42,9 +42,11 @@ struct OverlayPlacement {
     int default_y{160};
 };
 
-[[nodiscard]] OverlayPlacement placement_of(const OverlaySettings& s);
-/// Under the meter overlay's default spot.
-[[nodiscard]] OverlayPlacement placement_of(const AuraSettings& s);
+/// An overlay starts hidden while its plugin is switched off (`plugin_enabled`); after
+/// that, overlay_shown() and auras_shown() decide each frame.
+[[nodiscard]] OverlayPlacement placement_of(const OverlaySettings& s, bool plugin_enabled);
+/// Under the meter overlay's default spot. The Auras plugin's switch is its only one.
+[[nodiscard]] OverlayPlacement placement_of(const AuraSettings& s, bool plugin_enabled);
 
 /**
  * @brief A transparent, always-on-top, non-activating window for the meter.

@@ -33,7 +33,7 @@ inline constexpr Rgb Local{0.30f, 0.58f, 1.00f};
 } // namespace colors
 
 /// The class's colour for bars and labels.
-[[nodiscard]] Rgb class_color(meter::AionClass cls) noexcept;
+[[nodiscard]] Rgb class_color(game::AionClass cls) noexcept;
 /// A row's bar: the class colour, the accent for the local player whose class is
 /// not known, and grey for anyone else's.
 [[nodiscard]] Rgb row_color(const meter::CombatantTotals& row) noexcept;

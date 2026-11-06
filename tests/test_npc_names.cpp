@@ -1,9 +1,9 @@
 #include "test_framework.hpp"
 
-#include "meter/npc_names.hpp"
+#include "game/npc_names.hpp"
 
 using namespace aion2;
-using namespace aion2::meter;
+using namespace aion2::game;
 
 // The codes below are aion2.app's, as npcs.tsv lists them.
 

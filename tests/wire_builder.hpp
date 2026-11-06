@@ -215,7 +215,7 @@ inline Bytes own_identity_body(uint64_t id, std::string_view name, uint16_t serv
 struct SpawnSpec {
     uint64_t raw_id{2'000'123};
     uint8_t kind{0x10};
-    /// Seven digits, like the game's (src/meter/data/npcs.tsv); this one is invented.
+    /// Seven digits, like the game's (src/game/data/npcs.tsv); this one is invented.
     uint32_t npc_code{2'345'678};
     uint64_t cur_hp{1'000'000};
     uint64_t max_hp{1'000'000};

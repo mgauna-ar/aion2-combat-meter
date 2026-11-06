@@ -11,8 +11,8 @@ namespace {
 constexpr const char* kWindow = "app";
 constexpr const char* kCapture = "capture";
 constexpr const char* kOverlay = "overlay";
-constexpr const char* kAuras = "auras";
-constexpr const char* kMeter = "meter";
+constexpr const char* kAuras = aion2::plugins::AURAS.config_section;
+constexpr const char* kMeter = aion2::plugins::COMBAT_METER.config_section;
 constexpr const char* kHistory = "history";
 
 /// An executable name: letters, digits, dot, dash, underscore and space only, so a
@@ -39,6 +39,27 @@ std::vector<uint32_t> read_watch(const config::JsonValue& json) {
         if (out.size() == kMaxWatchedEffects) break;
     }
     return out;
+}
+
+/// The Auras plugin's switch before it was a plugin: `auras.visible`, the overlay's
+/// own switch in 0.2.0. A file written since has `plugin_enabled` instead.
+constexpr const char* kLegacyAurasVisible = "visible";
+
+void write_switches(const aion2::plugins::PluginSwitches& on, config::JsonValue& root) {
+    for (const auto& d : aion2::plugins::ALL) root[d.config_section][aion2::plugins::MASTER_SWITCH_KEY] = on.enabled(d.id);
+}
+
+aion2::plugins::PluginSwitches read_switches(const config::JsonValue& root) {
+    aion2::plugins::PluginSwitches on;
+    for (const auto& d : aion2::plugins::ALL) {
+        const config::JsonValue& section = root[d.config_section];
+        if (section[aion2::plugins::MASTER_SWITCH_KEY].is_bool()) {
+            on.set(d.id, section[aion2::plugins::MASTER_SWITCH_KEY].as_bool());
+        } else if (d.id == aion2::plugins::PluginId::Auras && section[kLegacyAurasVisible].is_bool()) {
+            on.set(d.id, section[kLegacyAurasVisible].as_bool());
+        }
+    }
+    return on;
 }
 
 } // namespace
@@ -95,11 +116,13 @@ config::JsonValue settings_to_json(const AppSettings& s) {
     config::JsonValue history;
     config::write_keys<HistorySettings>(kHistoryKeys, s.history, history);
     root[kHistory] = std::move(history);
+    write_switches(s.plugins, root);
     return root;
 }
 
 AppSettings settings_from_json(const config::JsonValue& json) {
     AppSettings s;
+    s.plugins = read_switches(json);
     config::read_keys<WindowSettings>(kWindowKeys, json[kWindow], s.window);
     config::read_keys<CaptureSettings>(kCaptureKeys, json[kCapture], s.capture);
     if (json[kCapture]["game_process"].is_string()) s.capture.game_process = json[kCapture]["game_process"].as_string();

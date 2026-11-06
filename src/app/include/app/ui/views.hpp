@@ -3,6 +3,7 @@
 // The desktop window's pages, and the settings rows they share. Called by
 // draw_app() between its sidebar and the end of the frame.
 
+#include "aion2/plugin_registry.hpp"
 #include "app/app_frame.hpp"
 #include "app/imgui_guard.hpp"
 
@@ -14,7 +15,22 @@ namespace aion2::app::ui {
 
 void render_dashboard(const AppFrameInput& in, AppViewState& state, AppActions& out);
 void render_meter_page(const AppFrameInput& in, AppViewState& state, AppActions& out);
+void render_auras_page(const AppFrameInput& in, AppViewState& state, AppActions& out);
 void render_settings_page(const AppFrameInput& in, AppViewState& state, AppActions& out);
+
+/// A plugin's icon and page, for the sidebar and the dashboard.
+[[nodiscard]] const char* plugin_icon(plugins::PluginId id) noexcept;
+[[nodiscard]] AppPage plugin_page(plugins::PluginId id) noexcept;
+
+/// A plugin page's title band: its icon, its name from the descriptor table, a
+/// subtitle, and its master switch on the right, so the switch is in the same place
+/// on every plugin's page. Flipping it saves and reaches the engine at once.
+void render_plugin_header(const AppFrameInput& in, AppActions& out, plugins::PluginId id, const char* icon,
+                          const char* subtitle);
+
+/// Draws the "switched off" panel, with the one button that brings the plugin back,
+/// and returns true when the caller should draw nothing else.
+[[nodiscard]] bool render_plugin_disabled_gate(const AppFrameInput& in, AppActions& out, plugins::PluginId id);
 
 /// What else a settings row's edit must reach, besides config.json.
 enum class Applies : uint8_t {
@@ -23,7 +39,7 @@ enum class Applies : uint8_t {
     /// The overlay window, at once: shown while a slider is dragged.
     Overlay,
     /// The engine thread, through AppRuntime::update_settings, once let go of.
-    Meter,
+    Engine,
 };
 
 /// A settings row with a switch that edits `value` in place. Returns true when it

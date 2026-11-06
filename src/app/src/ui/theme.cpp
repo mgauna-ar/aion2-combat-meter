@@ -33,7 +33,7 @@ void set_bold_font(ImFont* font) { g_bold_font = font; }
 
 ImFont* bold_font() { return g_bold_font; }
 
-uint32_t class_color_u32(meter::AionClass cls, float alpha) {
+uint32_t class_color_u32(game::AionClass cls, float alpha) {
     const Rgb c = class_color(cls);
     const auto channel = [](float v) { return static_cast<uint32_t>(std::lround(std::clamp(v, 0.0f, 1.0f) * 255.0f)); };
     return colors::rgb(channel(c.r), channel(c.g), channel(c.b), channel(alpha));

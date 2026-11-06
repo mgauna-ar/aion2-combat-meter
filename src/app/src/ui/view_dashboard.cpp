@@ -4,7 +4,7 @@
 #include "app/ui/icons.hpp"
 #include "app/ui/page.hpp"
 #include "app/ui/widgets.hpp"
-#include "meter/map_names.hpp"
+#include "game/map_names.hpp"
 
 #ifdef HAVE_IMGUI
 #include <cinttypes>
@@ -105,6 +105,22 @@ void files_card(const AppFrameInput& in, AppActions& out) {
     end_settings_card();
 }
 
+void plugins_card(const AppFrameInput& in, AppViewState& state) {
+    begin_settings_card("##dash_plugins", ICON_PLUG, "PLUGINS", colors::Accent);
+    for (const plugins::PluginDescriptor& d : plugins::ALL) {
+        const bool on = in.settings != nullptr && in.settings->plugins.enabled(d.id);
+        ImGui::PushID(static_cast<int>(d.id));
+        begin_setting_row(d.name, d.description);
+        pill(on ? "On" : "Off", on ? colors::Success : colors::TextDim);
+        ImGui::SameLine(0.0f, m(8.0f));
+        if (button(plugin_icon(d.id), ButtonKind::Secondary, ButtonSize::Icon)) state.page = plugin_page(d.id);
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Open %s", d.name);
+        end_setting_row();
+        ImGui::PopID();
+    }
+    end_settings_card();
+}
+
 void safety_card() {
     begin_settings_card("##dash_safety", ICON_SHIELD, "PASSIVE ONLY", colors::Success);
     ImGui::PushTextWrapPos(0.0f);
@@ -117,8 +133,8 @@ void safety_card() {
 
 } // namespace
 
-void render_dashboard(const AppFrameInput& in, AppViewState&, AppActions& out) {
-    page_header(ICON_DASHBOARD, "Dashboard", "What the capture sees, and recordings");
+void render_dashboard(const AppFrameInput& in, AppViewState& state, AppActions& out) {
+    page_header(ICON_DASHBOARD, "Dashboard", "What the capture sees, the plugins, and recordings");
     ImGui::Dummy(ImVec2(0.0f, m(4.0f)));
 
     const CaptureLook look = capture_look(in.snapshot);
@@ -126,7 +142,7 @@ void render_dashboard(const AppFrameInput& in, AppViewState&, AppActions& out) {
     const std::string character = s != nullptr && !s->local_name.empty() ? s->local_name : "Not seen yet";
     // The map's name when the table has its id, else the id itself.
     const uint32_t map_id = s != nullptr ? s->map_id : 0;
-    const std::string_view map_name = meter::map_name(map_id);
+    const std::string_view map_name = game::map_name(map_id);
     std::string map = "-";
     std::string map_detail = "No map load seen yet";
     if (!map_name.empty()) {
@@ -136,13 +152,17 @@ void render_dashboard(const AppFrameInput& in, AppViewState&, AppActions& out) {
         map = std::to_string(map_id);
         map_detail = "No name for this id yet";
     }
-    const std::string fights = std::to_string(in.history != nullptr ? in.history->size() : 0);
+    size_t plugins_on = 0;
+    for (const plugins::PluginDescriptor& d : plugins::ALL) {
+        if (in.settings != nullptr && in.settings->plugins.enabled(d.id)) ++plugins_on;
+    }
+    const std::string plugins_label = std::to_string(plugins_on) + " of " + std::to_string(plugins::ALL.size());
     const StatTileSpec tiles[] = {
         {"##tile_capture", ICON_ACTIVITY, "CAPTURE", look.label, look.color, look.detail, colors::Accent},
         {"##tile_char", ICON_TARGET, "CHARACTER", character.c_str(), colors::TextPrimary, "From the game's traffic",
          colors::Violet},
         {"##tile_map", ICON_CROSSHAIR, "MAP", map.c_str(), colors::TextPrimary, map_detail.c_str(), colors::Warning},
-        {"##tile_saved", ICON_HISTORY, "SAVED FIGHTS", fights.c_str(), colors::TextPrimary, "Boss fights and long ones",
+        {"##tile_plugins", ICON_PLUG, "PLUGINS ON", plugins_label.c_str(), colors::TextPrimary, "Switched on their pages",
          colors::Success},
     };
     stat_tile_row(tiles, sizeof(tiles) / sizeof(tiles[0]));
@@ -150,6 +170,7 @@ void render_dashboard(const AppFrameInput& in, AppViewState&, AppActions& out) {
 
     const SettingsSection sections[] = {
         {[&] { capture_card(in); }},
+        {[&] { plugins_card(in, state); }},
         {[&] { recording_card(in, out); }},
         {[&] { files_card(in, out); }},
         {[&] { safety_card(); }},

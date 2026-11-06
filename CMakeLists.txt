@@ -53,9 +53,10 @@ endif()
 find_package(Threads REQUIRED)
 
 # -----------------------------------------------------------------------------
-# Layers (AGENTS.md): common <- capture, protocol <- meter <- pipeline <- app.
-# Each publishes only its own include root, so an #include across the layering
-# does not compile.
+# Layers (AGENTS.md): common <- capture, protocol <- game <- each plugin
+# (plugins/combat_meter, plugins/auras) <- pipeline <- app. Each publishes only its
+# own include root, so an #include across the layering does not compile, and
+# neither plugin links the other.
 # -----------------------------------------------------------------------------
 file(GLOB_RECURSE AION2_COMMON_SOURCES CONFIGURE_DEPENDS src/common/src/*.cpp)
 add_library(aion2_common STATIC ${AION2_COMMON_SOURCES})
@@ -81,15 +82,25 @@ add_library(aion2_protocol STATIC ${AION2_PROTOCOL_SOURCES})
 target_include_directories(aion2_protocol PUBLIC src/protocol/include)
 target_link_libraries(aion2_protocol PUBLIC aion2_common PRIVATE aion2_warnings)
 
-file(GLOB AION2_METER_SOURCES CONFIGURE_DEPENDS src/meter/src/*.cpp)
+file(GLOB AION2_GAME_SOURCES CONFIGURE_DEPENDS src/game/src/*.cpp)
+add_library(aion2_game STATIC ${AION2_GAME_SOURCES})
+target_include_directories(aion2_game PUBLIC src/game/include)
+target_link_libraries(aion2_game PUBLIC aion2_protocol PRIVATE aion2_warnings)
+
+file(GLOB AION2_METER_SOURCES CONFIGURE_DEPENDS plugins/combat_meter/src/*.cpp)
 add_library(aion2_meter STATIC ${AION2_METER_SOURCES})
-target_include_directories(aion2_meter PUBLIC src/meter/include)
-target_link_libraries(aion2_meter PUBLIC aion2_protocol PRIVATE aion2_warnings)
+target_include_directories(aion2_meter PUBLIC plugins/combat_meter/include)
+target_link_libraries(aion2_meter PUBLIC aion2_game PRIVATE aion2_warnings)
+
+file(GLOB AION2_AURAS_SOURCES CONFIGURE_DEPENDS plugins/auras/src/*.cpp)
+add_library(aion2_auras STATIC ${AION2_AURAS_SOURCES})
+target_include_directories(aion2_auras PUBLIC plugins/auras/include)
+target_link_libraries(aion2_auras PUBLIC aion2_game PRIVATE aion2_warnings)
 
 file(GLOB AION2_PIPELINE_SOURCES CONFIGURE_DEPENDS src/pipeline/src/*.cpp)
 add_library(aion2_pipeline STATIC ${AION2_PIPELINE_SOURCES})
 target_include_directories(aion2_pipeline PUBLIC src/pipeline/include)
-target_link_libraries(aion2_pipeline PUBLIC aion2_capture aion2_meter PRIVATE aion2_warnings)
+target_link_libraries(aion2_pipeline PUBLIC aion2_capture aion2_meter aion2_auras PRIVATE aion2_warnings)
 
 # Dear ImGui with its Win32 and DX11 backends: Windows only. Its headers are SYSTEM
 # includes, so our warnings-as-errors leaves them alone.

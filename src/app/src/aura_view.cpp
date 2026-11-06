@@ -2,7 +2,7 @@
 
 #include "app/display_format.hpp"
 #include "app/imgui_guard.hpp"
-#include "meter/skill_names.hpp"
+#include "game/skill_names.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -12,7 +12,7 @@ namespace aion2::app {
 
 namespace {
 
-[[nodiscard]] bool running(const meter::AuraEntry& e, Micros now) noexcept {
+[[nodiscard]] bool running(const auras::AuraEntry& e, Micros now) noexcept {
     return e.permanent || e.expires_at > now;
 }
 
@@ -22,11 +22,11 @@ Micros aura_display_time(Micros snapshot_now, Micros since_arrival) noexcept {
     return snapshot_now + std::min(since_arrival, kAuraDisplayLead);
 }
 
-std::vector<const meter::AuraEntry*> shown_auras(const std::vector<meter::AuraEntry>& entries,
+std::vector<const auras::AuraEntry*> shown_auras(const std::vector<auras::AuraEntry>& entries,
                                                  const AuraSettings& s, Micros now, bool self) {
-    std::vector<const meter::AuraEntry*> out;
+    std::vector<const auras::AuraEntry*> out;
     const auto min_ms = static_cast<uint64_t>(std::max(0.0f, s.min_duration_s) * 1000.0f);
-    for (const meter::AuraEntry& e : entries) {
+    for (const auras::AuraEntry& e : entries) {
         if (!running(e, now)) continue;
         if (e.permanent ? !s.show_permanent : e.duration_ms < min_ms) continue;
         if (self && e.hostile && !s.show_debuffs) continue;
@@ -35,30 +35,30 @@ std::vector<const meter::AuraEntry*> shown_auras(const std::vector<meter::AuraEn
     return out;
 }
 
-std::vector<const meter::CooldownEntry*> shown_cooldowns(const std::vector<meter::CooldownEntry>& entries,
+std::vector<const auras::CooldownEntry*> shown_cooldowns(const std::vector<auras::CooldownEntry>& entries,
                                                          const AuraSettings& s, Micros now) {
-    std::vector<const meter::CooldownEntry*> out;
+    std::vector<const auras::CooldownEntry*> out;
     if (!s.show_cooldowns) return out;
     const auto min_ms = static_cast<uint64_t>(std::max(0.0f, s.min_cooldown_s) * 1000.0f);
-    for (const meter::CooldownEntry& c : entries) {
+    for (const auras::CooldownEntry& c : entries) {
         if (c.ready_at > now && c.duration_ms >= min_ms) out.push_back(&c);
     }
     return out;
 }
 
-std::vector<MissingEffect> missing_effects(const meter::AuraSnapshot& auras, const std::vector<uint32_t>& watch,
+std::vector<MissingEffect> missing_effects(const auras::AuraSnapshot& auras, const std::vector<uint32_t>& watch,
                                            Micros now) {
     std::vector<MissingEffect> out;
     for (const uint32_t key : watch) {
         const bool on = std::any_of(auras.on_self.begin(), auras.on_self.end(),
-                                    [&](const meter::AuraEntry& e) { return e.key == key && running(e, now); });
+                                    [&](const auras::AuraEntry& e) { return e.key == key && running(e, now); });
         if (on) continue;
         MissingEffect m{key, {}};
         const auto seen = std::find_if(auras.seen.begin(), auras.seen.end(),
-                                       [&](const meter::SeenEffect& s) { return s.key == key; });
+                                       [&](const auras::SeenEffect& s) { return s.key == key; });
         if (seen != auras.seen.end()) {
             m.label = seen->label;
-        } else if (const std::string_view name = meter::skill_name(key); !name.empty()) {
+        } else if (const std::string_view name = game::skill_name(key); !name.empty()) {
             m.label = std::string(name);
         } else {
             m.label = "Effect " + std::to_string(key);
@@ -112,7 +112,7 @@ std::string fit(const std::string& s, float width) {
 }
 
 /// A bar's colour: an enemy's effect red, the local player's own blue, an ally's green.
-Rgb aura_color(const meter::AuraEntry& e) {
+Rgb aura_color(const auras::AuraEntry& e) {
     if (e.hostile) return colors::BossHp;
     if (e.mine) return colors::Accent;
     return colors::Good;
@@ -120,7 +120,7 @@ Rgb aura_color(const meter::AuraEntry& e) {
 
 /// One bar per effect: its share of its duration left, its name and stacks, and the
 /// time left on the right.
-void draw_entries(const std::vector<const meter::AuraEntry*>& entries, Micros now, float scale, bool interactive) {
+void draw_entries(const std::vector<const auras::AuraEntry*>& entries, Micros now, float scale, bool interactive) {
     ImDrawList* dl = ImGui::GetWindowDrawList();
     const float line = ImGui::GetTextLineHeight();
     const float row_h = line + 5.0f * scale;
@@ -128,7 +128,7 @@ void draw_entries(const std::vector<const meter::AuraEntry*>& entries, Micros no
     const ImVec2 origin = ImGui::GetCursorScreenPos();
     const float time_w = ImGui::CalcTextSize("00m00").x + 6.0f * scale;
     float y = origin.y;
-    for (const meter::AuraEntry* e : entries) {
+    for (const auras::AuraEntry* e : entries) {
         const ImVec2 row_min(origin.x, y);
         const ImVec2 row_max(origin.x + width, y + row_h - 1.0f * scale);
         dl->AddRectFilled(row_min, row_max, u32(colors::Text, 0.04f), 2.0f * scale);
@@ -165,7 +165,7 @@ void section_title(const std::string& title) { ImGui::TextColored(rgba(colors::T
 
 /// One bar per cooldown: the share of it left, the skill, and the time to ready,
 /// "~" before an estimate.
-void draw_cooldowns(const std::vector<const meter::CooldownEntry*>& entries, Micros now, float scale,
+void draw_cooldowns(const std::vector<const auras::CooldownEntry*>& entries, Micros now, float scale,
                     bool interactive) {
     ImDrawList* dl = ImGui::GetWindowDrawList();
     const float line = ImGui::GetTextLineHeight();
@@ -174,7 +174,7 @@ void draw_cooldowns(const std::vector<const meter::CooldownEntry*>& entries, Mic
     const ImVec2 origin = ImGui::GetCursorScreenPos();
     const float time_w = ImGui::CalcTextSize("~00m00").x + 6.0f * scale;
     float y = origin.y;
-    for (const meter::CooldownEntry* c : entries) {
+    for (const auras::CooldownEntry* c : entries) {
         const ImVec2 row_min(origin.x, y);
         const ImVec2 row_max(origin.x + width, y + row_h - 1.0f * scale);
         dl->AddRectFilled(row_min, row_max, u32(colors::Text, 0.04f), 2.0f * scale);
@@ -247,7 +247,7 @@ OverlayActions draw_auras(const AuraFrameInput& in) {
             ImGui::Separator();
         }
 
-        const meter::AuraSnapshot* auras = in.snapshot != nullptr ? &in.snapshot->auras : nullptr;
+        const auras::AuraSnapshot* auras = in.snapshot != nullptr ? &in.snapshot->auras : nullptr;
         bool drew = false;
         if (auras != nullptr) {
             const auto missing = missing_effects(*auras, s.watch, in.now);

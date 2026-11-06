@@ -23,7 +23,7 @@ struct Identity {
     EntityId id{0};
     std::string name;
     uint16_t server{0};
-    /// The wire's class code; meter::class_from_code names it.
+    /// The wire's class code; game::class_from_code names it.
     uint32_t class_code{0};
     bool own{false};
     /// Found by scanning an unknown packet rather than read from 33 36 / 45 36. The
@@ -39,7 +39,7 @@ struct Spawn {
     uint8_t kind{0};
     /// The three bytes after the id.
     uint32_t mask{0};
-    /// What it is: a monster's or NPC's id, as src/meter/data/npcs.tsv lists them
+    /// What it is: a monster's or NPC's id, as src/game/data/npcs.tsv lists them
     /// (seven digits). A summon's code is not listed.
     uint32_t npc_code{0};
     /// The player a boss mechanic is aimed at, by name, when the mask's third byte

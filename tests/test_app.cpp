@@ -99,14 +99,17 @@ TEST_CASE(AppSettings, RoundTripAndSanitize) {
 
 TEST_CASE(AppSettings, AurasRoundTripWithTheirWatchList) {
     AppSettings s;
-    s.auras.visible = true;
+    s.plugins.auras = true;
     s.auras.locked = true;
+    s.auras.hide_when_game_unfocused = true;
     s.auras.x = 300;
     s.auras.min_duration_s = 2.5f;
     s.auras.watch = {18'190'000, 3'539'981'065u};
     const AppSettings back = settings_from_json(settings_to_json(s));
-    TEST_ASSERT(back.auras.visible);
+    TEST_ASSERT(back.plugins.auras);
     TEST_ASSERT(back.auras.locked);
+    TEST_ASSERT(back.auras.hide_when_game_unfocused);
+    TEST_ASSERT_FALSE(back.auras.show_in_dungeons_only);
     TEST_ASSERT_EQ(back.auras.x, 300);
     TEST_ASSERT_NEAR(back.auras.min_duration_s, 2.5f, 1e-6f);
     TEST_ASSERT_EQ(back.auras.watch.size(), size_t{2});
@@ -126,32 +129,64 @@ TEST_CASE(AppSettings, AurasRoundTripWithTheirWatchList) {
     TEST_ASSERT_EQ(clean.auras.watch.size(), size_t{1});
     TEST_ASSERT_NEAR(clean.auras.min_duration_s, 60.0f, 1e-6f);
 
-    TEST_ASSERT_FALSE(AppSettings{}.auras.visible);
+    TEST_ASSERT_FALSE(AppSettings{}.plugins.auras);
+}
+
+TEST_CASE(AppSettings, EachPluginsSwitchLivesInItsSection) {
+    AppSettings s;
+    TEST_ASSERT(s.plugins.combat_meter);
+    s.plugins.combat_meter = false;
+    s.plugins.auras = true;
+    const config::JsonValue json = settings_to_json(s);
+    TEST_ASSERT_FALSE(json["meter"]["plugin_enabled"].as_bool(true));
+    TEST_ASSERT(json["auras"]["plugin_enabled"].as_bool(false));
+    // The aura overlay's old switch is no longer written.
+    TEST_ASSERT_FALSE(json["auras"].contains("visible"));
+    const AppSettings back = settings_from_json(json);
+    TEST_ASSERT_FALSE(back.plugins.combat_meter);
+    TEST_ASSERT(back.plugins.auras);
+}
+
+TEST_CASE(AppSettings, AuraOverlayOnInAnOlderFileTurnsThePluginOn) {
+    // 0.2.0 wrote auras.visible, the overlay's switch, and no plugin_enabled.
+    config::JsonValue old_file;
+    old_file["auras"]["visible"] = true;
+    TEST_ASSERT(settings_from_json(old_file).plugins.auras);
+    old_file["auras"]["visible"] = false;
+    TEST_ASSERT_FALSE(settings_from_json(old_file).plugins.auras);
+    // plugin_enabled, once written, wins.
+    old_file["auras"]["visible"] = true;
+    old_file["auras"]["plugin_enabled"] = false;
+    TEST_ASSERT_FALSE(settings_from_json(old_file).plugins.auras);
+    // Nothing at all: the meter on, the auras off.
+    const AppSettings fresh = settings_from_json(config::JsonValue{});
+    TEST_ASSERT(fresh.plugins.combat_meter);
+    TEST_ASSERT_FALSE(fresh.plugins.auras);
 }
 
 TEST_CASE(AuraView, FiltersAndTheMissingWatchList) {
     const Micros now = 1'792'152'000'000'000ULL;
-    meter::AuraSnapshot a;
-    meter::AuraEntry mantra;
+    auras::AuraSnapshot a;
+    auras::AuraEntry mantra;
     mantra.key = 18'190'000;
     mantra.label = "Undefeated Mantra";
     mantra.duration_ms = 2400;
     mantra.expires_at = now + 1'500'000;
-    meter::AuraEntry mark = mantra;
+    auras::AuraEntry mark = mantra;
     mark.key = 200;
     mark.duration_ms = 300;
     mark.expires_at = now + 200'000;
-    meter::AuraEntry passive = mantra;
+    auras::AuraEntry passive = mantra;
     passive.key = 12'710'000;
     passive.permanent = true;
     passive.expires_at = 0;
-    meter::AuraEntry debuff = mantra;
+    auras::AuraEntry debuff = mantra;
     debuff.key = 20'111'011;
     debuff.hostile = true;
     debuff.duration_ms = 180'000;
     debuff.expires_at = now + 100'000'000;
     a.on_self = {mark, mantra, debuff, passive};
-    a.seen = {meter::SeenEffect{18'190'000, "Undefeated Mantra"}, meter::SeenEffect{12'000'000, "Dodge"}};
+    a.seen = {auras::SeenEffect{18'190'000, "Undefeated Mantra"}, auras::SeenEffect{12'000'000, "Dodge"}};
 
     AuraSettings s;
     TEST_ASSERT_EQ(shown_auras(a.on_self, s, now, true).size(), size_t{2});  // not the mark, not the passive
@@ -180,7 +215,7 @@ TEST_CASE(AuraView, FiltersAndTheMissingWatchList) {
 
 TEST_CASE(AuraView, CooldownsLongEnoughAndRunning) {
     const Micros now = 1'792'152'000'000'000ULL;
-    std::vector<meter::CooldownEntry> c(3);
+    std::vector<auras::CooldownEntry> c(3);
     c[0].label = "Dodge";
     c[0].duration_ms = 500;
     c[0].ready_at = now + 300'000;
@@ -200,21 +235,35 @@ TEST_CASE(AuraView, CooldownsLongEnoughAndRunning) {
     TEST_ASSERT(shown_cooldowns(c, s, now).empty());
 }
 
-TEST_CASE(OverlayVisibility, AurasFollowTheirOwnSwitchAndTheGame) {
-    AuraSettings a;
-    OverlaySettings o;
+TEST_CASE(OverlayVisibility, AurasFollowTheirPluginAndTheirOwnConditions) {
+    AppSettings s;
+    AuraSettings& a = s.auras;
     OverlayConditions now;
-    TEST_ASSERT_FALSE(auras_shown(a, o, now));
-    a.visible = true;
-    TEST_ASSERT(auras_shown(a, o, now));
-    o.hide_when_game_unfocused = true;
-    o.show_in_combat_only = true;  // never applies to auras
-    now.game_in_front = false;
-    TEST_ASSERT(auras_shown(a, o, now));  // unlocked: always findable
+    TEST_ASSERT_FALSE(auras_shown(s, now));
+    s.plugins.auras = true;
+    TEST_ASSERT(auras_shown(s, now));
+    // The meter overlay's conditions are the meter's.
+    s.overlay.hide_when_game_unfocused = true;
+    s.overlay.show_in_combat_only = true;
+    s.overlay.locked = true;
     a.locked = true;
-    TEST_ASSERT_FALSE(auras_shown(a, o, now));
+    now.game_in_front = false;
+    TEST_ASSERT(auras_shown(s, now));
+    a.hide_when_game_unfocused = true;
+    TEST_ASSERT_FALSE(auras_shown(s, now));
+    a.locked = false;
+    TEST_ASSERT(auras_shown(s, now));  // unlocked: always findable
+    a.locked = true;
     now.game_in_front = true;
-    TEST_ASSERT(auras_shown(a, o, now));
+    TEST_ASSERT(auras_shown(s, now));
+    a.show_in_dungeons_only = true;
+    TEST_ASSERT_FALSE(auras_shown(s, now));
+    now.in_dungeon = true;
+    TEST_ASSERT(auras_shown(s, now));
+    // The meter switched off leaves the auras alone, and the other way round.
+    s.plugins.combat_meter = false;
+    TEST_ASSERT(auras_shown(s, now));
+    TEST_ASSERT_FALSE(overlay_shown(s, now));
 }
 
 TEST_CASE(AppSettings, MissingFileGivesDefaults) {
@@ -447,7 +496,7 @@ TEST_CASE(AppRuntime, NewSettingsReachTheEngine) {
     meter::MeterSettings meter;
     meter.boss_min_max_hp = UINT64_MAX;
     meter.min_saved_duration_s = 3600.0;
-    runtime.update_settings(meter, HistorySettings{});
+    runtime.update_settings(meter, HistorySettings{}, aion2::plugins::PluginSwitches{});
     std::string error;
     TEST_ASSERT(runtime.start(std::make_unique<capture::FileSource>(write_session(dir.path), 0.0), error));
     TEST_ASSERT(wait_for([&] { return runtime.source_finished(); }));
@@ -461,50 +510,56 @@ TEST_CASE(AppRuntime, NewSettingsReachTheEngine) {
 }
 
 TEST_CASE(OverlayVisibility, CombatOnlyKeepsItUpAfterAFight) {
-    OverlaySettings s;
+    AppSettings app;
+    OverlaySettings& s = app.overlay;
     s.locked = true;
     s.show_in_combat_only = true;
     s.hide_after_combat_s = 5.0f;
     OverlayConditions now;
-    TEST_ASSERT_FALSE(overlay_shown(s, now));  // no fight yet
+    TEST_ASSERT_FALSE(overlay_shown(app, now));  // no fight yet
     now.fight_live = true;
-    TEST_ASSERT(overlay_shown(s, now));
+    TEST_ASSERT(overlay_shown(app, now));
     now.fight_live = false;
     now.seconds_since_fight = 4.9;
-    TEST_ASSERT(overlay_shown(s, now));
+    TEST_ASSERT(overlay_shown(app, now));
     now.seconds_since_fight = 5.0;
-    TEST_ASSERT_FALSE(overlay_shown(s, now));
+    TEST_ASSERT_FALSE(overlay_shown(app, now));
 }
 
 TEST_CASE(OverlayVisibility, DungeonsOnly) {
-    OverlaySettings s;
+    AppSettings app;
+    OverlaySettings& s = app.overlay;
     s.show_in_dungeons_only = true;
     OverlayConditions now;
-    TEST_ASSERT(overlay_shown(s, now));  // unlocked: always findable
+    TEST_ASSERT(overlay_shown(app, now));  // unlocked: always findable
     s.locked = true;
-    TEST_ASSERT_FALSE(overlay_shown(s, now));  // no map load yet, or the open world
+    TEST_ASSERT_FALSE(overlay_shown(app, now));  // no map load yet, or the open world
     now.in_dungeon = true;
-    TEST_ASSERT(overlay_shown(s, now));
+    TEST_ASSERT(overlay_shown(app, now));
     // Both conditions must allow it.
     s.show_in_combat_only = true;
-    TEST_ASSERT_FALSE(overlay_shown(s, now));
+    TEST_ASSERT_FALSE(overlay_shown(app, now));
     now.fight_live = true;
-    TEST_ASSERT(overlay_shown(s, now));
+    TEST_ASSERT(overlay_shown(app, now));
 }
 
 TEST_CASE(OverlayVisibility, ConditionsWaitForTheLock) {
-    OverlaySettings s;
+    AppSettings app;
+    OverlaySettings& s = app.overlay;
     s.show_in_combat_only = true;
     s.hide_when_game_unfocused = true;
     OverlayConditions now;
     now.game_in_front = false;
-    TEST_ASSERT(overlay_shown(s, now));  // unlocked: always findable
+    TEST_ASSERT(overlay_shown(app, now));  // unlocked: always findable
     s.locked = true;
-    TEST_ASSERT_FALSE(overlay_shown(s, now));
+    TEST_ASSERT_FALSE(overlay_shown(app, now));
     now.fight_live = true;
-    TEST_ASSERT_FALSE(overlay_shown(s, now));  // in a fight, but the game is not in front
+    TEST_ASSERT_FALSE(overlay_shown(app, now));  // in a fight, but the game is not in front
     now.game_in_front = true;
-    TEST_ASSERT(overlay_shown(s, now));
+    TEST_ASSERT(overlay_shown(app, now));
     s.visible = false;
-    TEST_ASSERT_FALSE(overlay_shown(s, now));  // the hotkey's hide rules over all
+    TEST_ASSERT_FALSE(overlay_shown(app, now));  // the hotkey's hide rules over all
+    s.visible = true;
+    app.plugins.combat_meter = false;
+    TEST_ASSERT_FALSE(overlay_shown(app, now));  // and the plugin switched off over that
 }

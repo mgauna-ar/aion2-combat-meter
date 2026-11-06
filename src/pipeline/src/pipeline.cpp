@@ -2,7 +2,8 @@
 
 namespace aion2::pipeline {
 
-Pipeline::Pipeline(PipelineOptions options) : m_demux(options.demux), m_engine(options.meter) {}
+Pipeline::Pipeline(PipelineOptions options)
+    : m_demux(options.demux), m_engine(options.meter), m_plugins(options.plugins) {}
 
 void Pipeline::on_packet(uint32_t link, std::span<const uint8_t> data, Micros ts) {
     m_demux.on_packet(link, data, ts, *this);
@@ -24,23 +25,33 @@ void Pipeline::on_frame(const proto::Frame& frame) {
         m_frame_observer(frame, outcome);
     }
     if (m_events.empty()) return;
-    m_engine.set_capture_counters(capture_totals());
+    if (m_plugins.combat_meter) m_engine.set_capture_counters(capture_totals());
     for (const auto& e : m_events) {
         if (m_event_observer) m_event_observer(e);
-        m_engine.on_event(e);
+        if (m_plugins.combat_meter) m_engine.on_event(e);
+        if (m_plugins.auras) m_auras.on_event(e);
     }
 }
 
 void Pipeline::tick(Micros now) {
     m_last_tick = now;
     m_demux.tick(now, *this);
-    m_engine.set_capture_counters(capture_totals());
-    m_engine.tick(now);
+    if (m_plugins.combat_meter) {
+        m_engine.set_capture_counters(capture_totals());
+        m_engine.tick(now);
+    }
+    if (m_plugins.auras) m_auras.tick(now);
 }
 
 void Pipeline::end_fight(meter::EndReason reason, Micros now) {
     m_engine.set_capture_counters(capture_totals());
     m_engine.end_fight(reason, now);
+}
+
+void Pipeline::set_plugins(const aion2::plugins::PluginSwitches& on, Micros now) {
+    if (m_plugins.combat_meter && !on.combat_meter) end_fight(meter::EndReason::Manual, now);
+    if (m_plugins.auras && !on.auras) m_auras.clear();
+    m_plugins = on;
 }
 
 meter::CaptureQuality Pipeline::capture_totals() const {
@@ -71,7 +82,7 @@ LiveSnapshot Pipeline::snapshot(Micros now) const {
     s.now = now;
     s.parse = m_parser.stats();
     s.capture_totals = capture_totals();
-    s.auras = m_engine.auras(now);
+    if (m_plugins.auras) s.auras = m_auras.snapshot(now);
     return s;
 }
 
