@@ -56,10 +56,10 @@ POINT start_position(const OverlayPlacement& p) {
 
 } // namespace
 
-OverlayPlacement placement_of(const OverlaySettings& s) {
+OverlayPlacement placement_of(const OverlaySettings& s, bool plugin_enabled) {
     OverlayPlacement p;
     p.locked = s.locked;
-    p.visible = s.visible;
+    p.visible = plugin_enabled && s.visible;
     p.scale = s.scale;
     p.x = s.x;
     p.y = s.y;
@@ -68,10 +68,10 @@ OverlayPlacement placement_of(const OverlaySettings& s) {
     return p;
 }
 
-OverlayPlacement placement_of(const AuraSettings& s) {
+OverlayPlacement placement_of(const AuraSettings& s, bool plugin_enabled) {
     OverlayPlacement p;
     p.locked = s.locked;
-    p.visible = s.visible;
+    p.visible = plugin_enabled;
     p.scale = s.scale;
     p.x = s.x;
     p.y = s.y;

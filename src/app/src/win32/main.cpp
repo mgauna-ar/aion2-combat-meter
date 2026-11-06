@@ -152,7 +152,8 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
 
     app::win32::OverlayWindow window;
     std::string window_error;
-    if (!window.create(app::win32::placement_of(settings.overlay), L"AION 2 Combat Meter", true, window_error)) {
+    if (!window.create(app::win32::placement_of(settings.overlay, settings.plugins.combat_meter), L"AION 2 Combat Meter",
+                       true, window_error)) {
         os::Logger::error(window_error);
         MessageBoxW(nullptr, os::to_wide(window_error).c_str(), L"AION 2 Combat Meter", MB_OK | MB_ICONERROR);
         runtime.stop();
@@ -163,7 +164,8 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     app::win32::OverlayWindow aura_window;
     std::string aura_error;
     const bool have_auras =
-        aura_window.create(app::win32::placement_of(settings.auras), L"AION 2 Combat Meter Auras", false, aura_error);
+        aura_window.create(app::win32::placement_of(settings.auras, settings.plugins.auras), L"AION 2 Combat Meter Auras",
+                           false, aura_error);
     if (!have_auras) os::Logger::error(aura_error);
     // The app window is a convenience: without it the overlay and the tray still work.
     app::win32::AppWindow app_window;
