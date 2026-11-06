@@ -754,6 +754,72 @@ void overlay_card(const AppFrameInput& in, AppActions& out) {
     end_settings_card();
 }
 
+void auras_card(const AppFrameInput& in, AppActions& out) {
+    begin_settings_card("##set_auras", ICON_SPARKLE, "AURAS", colors::Violet);
+    AuraSettings& a = in.settings->auras;
+    setting_switch("Show the aura overlay", "Your buffs and debuffs, and yours on the boss, as bars.", &a.visible, out,
+                   Applies::Overlay);
+    setting_switch("Lock", "Click-through and fixed in place. Ctrl+Alt+L locks or unlocks both overlays.", &a.locked,
+                   out, Applies::Overlay);
+    setting_slider("Opacity", "Of its background; the bars stay solid.", &a.opacity, 0.0f, 1.0f, "%.2f", out,
+                   Applies::Overlay);
+    setting_slider("Scale", "On top of the monitor's own scaling.", &a.scale, 0.6f, 2.5f, "%.2fx", out,
+                   Applies::Overlay);
+    setting_switch("Debuffs on you", "Enemies' effects on you, in red.", &a.show_debuffs, out);
+    setting_switch("Yours on the boss", "Your effects on the fight's boss, under your own.", &a.show_target, out);
+    setting_switch("Permanent effects", "Passive skills' effects, which never end.", &a.show_permanent, out);
+    setting_slider("Shortest effect", "Shorter ones are left out: a dodge's mark, a cast's state.",
+                   &a.min_duration_s, 0.0f, 10.0f, "%.1f s", out);
+    setting_switch("Your cooldowns", "Estimates (~): the listed cooldown less your specialties, learned as you play.",
+                   &a.show_cooldowns, out);
+    setting_slider("Shortest cooldown", "Shorter ones are left out: Dodge's, a combo's.", &a.min_cooldown_s, 0.0f, 30.0f,
+                   "%.0f s", out);
+    begin_setting_row("Position", "Back to its spot under the meter overlay's.");
+    if (button(ICON_RESET "  Reset position##auras", ButtonKind::Secondary, ButtonSize::Fit)) {
+        out.reset_aura_position = true;
+    }
+    end_setting_row();
+    ImGui::PushTextWrapPos(0.0f);
+    text_dim("Locked, it hides with the overlay's \"game not in front\" and \"only in dungeons\".");
+    ImGui::PopTextWrapPos();
+    end_settings_card();
+}
+
+void aura_watch_card(const AppFrameInput& in, AppActions& out) {
+    begin_settings_card("##set_aura_watch", ICON_CHECKLIST, "AURA WATCH LIST", colors::Violet);
+    AuraSettings& a = in.settings->auras;
+    ImGui::PushTextWrapPos(0.0f);
+    text_dim("Flagged on the aura overlay while they are not on you: a Chanter's mantra, a buff you keep up.");
+    ImGui::PopTextWrapPos();
+
+    // The effects seen on you this session, then any watched one not seen yet.
+    std::vector<std::pair<uint32_t, std::string>> choices;
+    if (in.snapshot != nullptr) {
+        for (const meter::SeenEffect& e : in.snapshot->auras.seen) choices.emplace_back(e.key, e.label);
+    }
+    for (const uint32_t key : a.watch) {
+        const bool listed = std::any_of(choices.begin(), choices.end(), [&](const auto& c) { return c.first == key; });
+        if (listed) continue;
+        const std::string_view name = meter::skill_name(key);
+        choices.emplace_back(key, name.empty() ? "Effect " + std::to_string(key) : std::string(name));
+    }
+    if (choices.empty()) text_dim("Effects show up here once the meter has seen them on you.");
+    for (const auto& [key, label] : choices) {
+        const auto it = std::find(a.watch.begin(), a.watch.end(), key);
+        bool watched = it != a.watch.end();
+        ImGui::PushID(static_cast<int>(key));
+        if (setting_switch(label.c_str(), nullptr, &watched, out)) {
+            if (!watched) {
+                a.watch.erase(std::find(a.watch.begin(), a.watch.end(), key));
+            } else if (a.watch.size() < kMaxWatchedEffects) {
+                a.watch.push_back(key);
+            }
+        }
+        ImGui::PopID();
+    }
+    end_settings_card();
+}
+
 void visibility_card(const AppFrameInput& in, AppActions& out) {
     begin_settings_card("##set_visibility", ICON_EYE, "OVERLAY VISIBILITY", colors::Violet);
     OverlaySettings& o = in.settings->overlay;
@@ -849,6 +915,8 @@ void settings_tab(const AppFrameInput& in, AppActions& out) {
         {[&] { visibility_card(in, out); }},
         {[&] { history_card(in, out); }},
         {[&] { columns_card(in, out); }},
+        {[&] { auras_card(in, out); }},
+        {[&] { aura_watch_card(in, out); }},
     };
     render_settings_grid(sections, std::size(sections));
 }

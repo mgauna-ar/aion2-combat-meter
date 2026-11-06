@@ -15,6 +15,7 @@
 
 #include "app/app_frame.hpp"
 #include "app/app_settings.hpp"
+#include "app/aura_view.hpp"
 #include "app/overlay_view.hpp"
 #include "app/ui/theme.hpp"
 #include "capture/capture_file.hpp"
@@ -124,6 +125,38 @@ bool render(Scene& scene, const app::OverlaySettings& settings, const std::files
         const app::OverlayActions actions = app::draw_overlay(input);
         ImGui::Render();
         (void)actions;
+    }
+    shots::Canvas overlay(w, h, shots::Rgba{0, 0, 0, 0});
+    overlay.draw(*ImGui::GetDrawData());
+    shots::Canvas picture = shots::make_backdrop(w + 2 * kMargin, h + 2 * kMargin);
+    picture.paste(overlay, kMargin, kMargin);
+    const std::filesystem::path path = out_dir / scene.file;
+    if (!picture.write_png(path.string())) {
+        std::fprintf(stderr, "cannot write %s\n", path.string().c_str());
+        return false;
+    }
+    std::printf("wrote %s\n", path.string().c_str());
+    return true;
+}
+
+/// The aura overlay over the same backdrop, at the scene's own capture time.
+bool render_auras(Scene& scene, const app::AuraSettings& settings, const std::filesystem::path& out_dir) {
+    ImGuiIO& io = ImGui::GetIO();
+    const int w = static_cast<int>(std::lround(scene.width * kScale));
+    const int h = static_cast<int>(std::lround(scene.height * kScale));
+    app::AuraFrameInput input;
+    input.snapshot = &scene.snapshot;
+    input.settings = &settings;
+    input.scale = kScale;
+    input.now = scene.snapshot.now;
+    input.pulse_s = 0.4;  // a missing effect near its brightest
+    for (int frame = 0; frame < 3; ++frame) {
+        io.DisplaySize = ImVec2(static_cast<float>(w), static_cast<float>(h));
+        io.DeltaTime = 1.0f / 60.0f;
+        io.AddMousePosEvent(-FLT_MAX, -FLT_MAX);
+        ImGui::NewFrame();
+        (void)app::draw_auras(input);
+        ImGui::Render();
     }
     shots::Canvas overlay(w, h, shots::Rgba{0, 0, 0, 0});
     overlay.draw(*ImGui::GetDrawData());
@@ -295,6 +328,14 @@ int main(int argc, char** argv) {
 
     bool ok = render(live, settings, out_dir);
     ok = render(done, settings, out_dir) && ok;
+    // Ariel's buffs, cooldowns and curse on the boss mid-fight, and a buff she
+    // watches for missing (Wish of Concentration).
+    app::AuraSettings aura_settings;
+    aura_settings.visible = true;
+    aura_settings.locked = true;
+    aura_settings.watch = {15'310'000};
+    Scene auras{"overlay-auras.png", 280.0f, 230.0f, live.snapshot};
+    ok = render_auras(auras, aura_settings, out_dir) && ok;
     ImGuiContext* overlay_ctx = ImGui::GetCurrentContext();
 
     setup_app_imgui(font, bold);

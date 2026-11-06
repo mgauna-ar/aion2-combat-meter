@@ -13,6 +13,9 @@ window (Ctrl+X) shows, but for every party member:
 
 - **An overlay** over the game with the live fight: the party ranked by DPS, the boss's
   HP and the fight timer. It can show only in combat, or only in dungeons.
+- **An aura overlay**, if you turn it on: your buffs and debuffs and yours on the boss,
+  each as a bar with the time it has left, and a warning when a buff you watch for
+  (a Chanter's mantra, say) is not on you.
 - **An app window** with the details: damage, hit counts, crit, perfect, double, back
   and front rates for each player and each of their skills; healing; damage taken; and
   every saved fight, grouped by visit to a map, one entry per dungeon run. Every setting
@@ -37,6 +40,15 @@ mobs, then a full dungeon run with three boss kills.
 that run, your damage, hits and every per-skill CRI, PERF, DOUB, BACK, FRNT, MULT and
 BLOC share matched the game's window exactly. Healing came to 97% of the game's Total
 Heal. Dungeon and boss names were right, and so were the classes from skill codes.
+
+**Auras:** buffs and debuffs come with the server's own durations and end times, so
+their bars are exact. About four in five have a name from the skill table; monster,
+item and system effects show as "Effect <number>". Your cooldowns are estimates,
+marked "~": the server sends none when you use a skill, so the meter starts from
+aion2.app's figure less the specialties you picked, and shortens it to your quickest
+reuse as you play (that is where your cooldown reduction shows). Over 274 uses on the
+dungeon capture, no estimate ran more than 0.65 s long. When
+the server does say what is left (after a cut or a reset), the bar is exact.
 
 **Still open** (more captures help, `.claude/skills/decode-capture`):
 - **Misses and defences:** the game also counts missed hits (ACC) and the target's
@@ -103,8 +115,8 @@ SHA-256 is published with it.
 
 | Hotkey | Does |
 |---|---|
-| Ctrl+Alt+L | Lock or unlock the overlay. Locked, clicks pass through to the game, and the overlay cannot be moved. |
-| Ctrl+Alt+H | Hide or show the overlay. |
+| Ctrl+Alt+L | Lock or unlock both overlays. Locked, clicks pass through to the game, and the overlays cannot be moved. |
+| Ctrl+Alt+H | Hide or show the meter overlay. |
 | Ctrl+Alt+R | End the current fight now. |
 
 **The overlay** shows the live fight only: the party ranked, the boss's HP and the
@@ -120,6 +132,24 @@ timer. Saved fights and every setting are in the app window.
 combat (staying up a few seconds after, 5 by default), and hide while the game is not
 in front. Both apply only while it is locked, so an unlocked overlay can always be
 found and dragged back.
+
+**The aura overlay** is off until you turn it on under Combat Meter > Settings > Auras.
+It is a second window you place like the first:
+- **Your effects:** each is a bar showing what share of its time is left, with the
+  seconds on the right. Green bars are an ally's buffs, blue ones yours, red ones an
+  enemy's debuffs. Stacks show as "x2".
+- **Your cooldowns:** amber bars under "Cooldowns", with "~" on an estimate. A skill
+  with a second use ("+1 consecutive use") shows only once both are spent.
+- **Yours on the boss:** under "On <boss>", during a fight.
+- **The watch list:** *Aura watch list* in the same tab lists every buff seen on you
+  this session. A buff you switch on there shows as a red "Missing: <name>" line while
+  it is not on you.
+- **What it leaves out:** effects shorter than a second (a dodge's mark), and passives'
+  effects, which never end. Both are settings.
+- **Hiding it:** locked, it hides with the meter overlay's "game not in front" and "only
+  in dungeons" settings, but not "only in combat", since buffs matter between fights too.
+
+![The aura overlay mid-fight: a missing watched buff, three buffs with their time left, two cooldowns, and the player's curse on the boss](docs/images/overlay-auras.png)
 
 **The app window** opens at start, and from the tray icon. Its sidebar has three pages:
 - **Dashboard:** what the capture sees, recording, and the meter's files.
@@ -216,6 +246,23 @@ by hand only while the meter is closed. Out-of-range values are clamped.
 | `partial_damage_ratio` | 0.7 | A boss that dies having lost less than this share of its HP with hits the meter saw (by the game's own HP updates) marks the fight "partial data". |
 | `wipe_detection` | false | End the fight when every party member is dead. Off until real captures show how revives look on the wire. |
 | `memory_history` | 10 | Finished fights kept in memory. |
+
+**auras**
+
+| Key | Default | Meaning |
+|---|---|---|
+| `visible` | false | Show the aura overlay. |
+| `locked` | false | Click-through and fixed in place. |
+| `opacity` | 0.55 | Background opacity, 0 to 1. Bars and text stay opaque. |
+| `scale` | 1.0 | Size, 0.6 to 2.5, on top of the monitor's DPI scaling. |
+| `x`, `y`, `width`, `height` | -1, -1, 280, 300 | Position and size in screen pixels. -1, -1 places it under the meter overlay's default spot. |
+| `show_debuffs` | true | Enemies' effects on you. |
+| `show_target` | true | Your effects on the fight's boss. |
+| `show_permanent` | false | Effects that never end: passive skills' and the ones a login puts on. |
+| `min_duration_s` | 1.0 | Effects shorter than this are left out, 0 to 60. |
+| `show_cooldowns` | true | Your cooldowns, estimated. |
+| `min_cooldown_s` | 3.0 | Cooldowns shorter than this are left out (Dodge's, a combo's), 0 to 120. |
+| `watch` | `[]` | Effects to flag while they are not on you: the skill codes the *Aura watch list* stores, at most 64. |
 
 **history**
 
@@ -352,7 +399,8 @@ aion2-combat-meter.exe --replay fight.pcapng --speed 1
 |---|---|
 | `--fights` | A table per fight. |
 | `--skills` | The fight tables, and each player's skills, healing and damage taken. |
-| `--events` | Every decoded event. |
+| `--events` | Every decoded event but effects, skill uses and cooldowns. |
+| `--auras` | Effects put on and taken off, and your skill uses and cooldown changes. |
 | `--opcodes` | Counts and sizes per opcode. |
 | `--unknown` | Hex dumps of anything the parser does not read or failed on. |
 | `--dump 0438,4136` | Hex dumps of those opcodes. |
@@ -374,8 +422,7 @@ The meter decodes the server's side of the game connection: TCP port 13328.
   opcodes. `AGENTS.md` describes the layouts and lists what is still unknown.
 
 These facts come from the AION 2 community's published notes on the Global client. The
-decoder and everything else here are written from scratch, and no code is taken from
-the GPL meters.
+decoder and everything else here are written from scratch.
 
 ## License
 

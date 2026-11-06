@@ -4,6 +4,7 @@
 
 #include "app/app_runtime.hpp"
 #include "app/app_settings.hpp"
+#include "app/aura_view.hpp"
 #include "app/overlay_visibility.hpp"
 #include "app/display_format.hpp"
 #include "capture/capture_file.hpp"
@@ -94,6 +95,126 @@ TEST_CASE(AppSettings, RoundTripAndSanitize) {
     TEST_ASSERT_EQ(clean.capture.game_process, std::string("Aion2.exe"));
     TEST_ASSERT_NEAR(clean.overlay.scale, 2.5f, 1e-6f);
     TEST_ASSERT_EQ(clean.capture.server_port, 65535);
+}
+
+TEST_CASE(AppSettings, AurasRoundTripWithTheirWatchList) {
+    AppSettings s;
+    s.auras.visible = true;
+    s.auras.locked = true;
+    s.auras.x = 300;
+    s.auras.min_duration_s = 2.5f;
+    s.auras.watch = {18'190'000, 3'539'981'065u};
+    const AppSettings back = settings_from_json(settings_to_json(s));
+    TEST_ASSERT(back.auras.visible);
+    TEST_ASSERT(back.auras.locked);
+    TEST_ASSERT_EQ(back.auras.x, 300);
+    TEST_ASSERT_NEAR(back.auras.min_duration_s, 2.5f, 1e-6f);
+    TEST_ASSERT_EQ(back.auras.watch.size(), size_t{2});
+    TEST_ASSERT_EQ(back.auras.watch[1], uint32_t{3'539'981'065u});
+
+    // A hand-edited list keeps only whole u32 codes, each once.
+    config::JsonValue bad = settings_to_json(s);
+    config::JsonValue::ArrayType watch;
+    for (const config::JsonValue& v : {config::JsonValue(18'190'000), config::JsonValue(18'190'000),
+                                       config::JsonValue(-4), config::JsonValue(1.5), config::JsonValue("x"),
+                                       config::JsonValue(5e12)}) {
+        watch.push_back(v);
+    }
+    bad["auras"]["watch"] = config::JsonValue(std::move(watch));
+    bad["auras"]["min_duration_s"] = 1000.0;
+    const AppSettings clean = settings_from_json(bad);
+    TEST_ASSERT_EQ(clean.auras.watch.size(), size_t{1});
+    TEST_ASSERT_NEAR(clean.auras.min_duration_s, 60.0f, 1e-6f);
+
+    TEST_ASSERT_FALSE(AppSettings{}.auras.visible);
+}
+
+TEST_CASE(AuraView, FiltersAndTheMissingWatchList) {
+    const Micros now = 1'792'152'000'000'000ULL;
+    meter::AuraSnapshot a;
+    meter::AuraEntry mantra;
+    mantra.key = 18'190'000;
+    mantra.label = "Undefeated Mantra";
+    mantra.duration_ms = 2400;
+    mantra.expires_at = now + 1'500'000;
+    meter::AuraEntry mark = mantra;
+    mark.key = 200;
+    mark.duration_ms = 300;
+    mark.expires_at = now + 200'000;
+    meter::AuraEntry passive = mantra;
+    passive.key = 12'710'000;
+    passive.permanent = true;
+    passive.expires_at = 0;
+    meter::AuraEntry debuff = mantra;
+    debuff.key = 20'111'011;
+    debuff.hostile = true;
+    debuff.duration_ms = 180'000;
+    debuff.expires_at = now + 100'000'000;
+    a.on_self = {mark, mantra, debuff, passive};
+    a.seen = {meter::SeenEffect{18'190'000, "Undefeated Mantra"}, meter::SeenEffect{12'000'000, "Dodge"}};
+
+    AuraSettings s;
+    TEST_ASSERT_EQ(shown_auras(a.on_self, s, now, true).size(), size_t{2});  // not the mark, not the passive
+    s.show_permanent = true;
+    s.show_debuffs = false;
+    const auto shown = shown_auras(a.on_self, s, now, true);
+    TEST_ASSERT_EQ(shown.size(), size_t{2});
+    TEST_ASSERT_EQ(shown[1]->key, uint32_t{12'710'000});
+    // An enemy's effect on the boss side is not the local player's to hide.
+    TEST_ASSERT_EQ(shown_auras({debuff}, s, now, false).size(), size_t{1});
+
+    // Watched: the mantra is on; Dodge's and an unknown effect are missing.
+    const auto missing = missing_effects(a, {18'190'000, 12'000'000, 777}, now);
+    TEST_ASSERT_EQ(missing.size(), size_t{2});
+    TEST_ASSERT_EQ(missing[0].label, std::string("Dodge"));
+    TEST_ASSERT_EQ(missing[1].label, std::string("Effect 777"));
+    // Once its time is up between snapshots, the mantra counts as missing too.
+    TEST_ASSERT_EQ(missing_effects(a, {18'190'000}, now + 2'000'000).size(), size_t{1});
+
+    TEST_ASSERT_EQ(aura_display_time(now, 100'000), now + 100'000);
+    TEST_ASSERT_EQ(aura_display_time(now, 5'000'000), now + kAuraDisplayLead);
+    TEST_ASSERT_EQ(format_time_left(125 * kMicrosPerSecond), std::string("2m05"));
+    TEST_ASSERT_EQ(format_time_left(12'700'000), std::string("12"));
+    TEST_ASSERT_EQ(format_time_left(4'560'000), std::string("4.5"));
+}
+
+TEST_CASE(AuraView, CooldownsLongEnoughAndRunning) {
+    const Micros now = 1'792'152'000'000'000ULL;
+    std::vector<meter::CooldownEntry> c(3);
+    c[0].label = "Dodge";
+    c[0].duration_ms = 500;
+    c[0].ready_at = now + 300'000;
+    c[1].label = "Warding Strike";
+    c[1].duration_ms = 23'100;
+    c[1].ready_at = now + 12'000'000;
+    c[2].label = "Shield Smite";
+    c[2].duration_ms = 8'850;
+    c[2].ready_at = now - 1;  // ready
+    AuraSettings s;
+    const auto shown = shown_cooldowns(c, s, now);
+    TEST_ASSERT_EQ(shown.size(), size_t{1});
+    TEST_ASSERT_EQ(shown[0]->label, std::string("Warding Strike"));
+    s.min_cooldown_s = 0.0f;
+    TEST_ASSERT_EQ(shown_cooldowns(c, s, now).size(), size_t{2});
+    s.show_cooldowns = false;
+    TEST_ASSERT(shown_cooldowns(c, s, now).empty());
+}
+
+TEST_CASE(OverlayVisibility, AurasFollowTheirOwnSwitchAndTheGame) {
+    AuraSettings a;
+    OverlaySettings o;
+    OverlayConditions now;
+    TEST_ASSERT_FALSE(auras_shown(a, o, now));
+    a.visible = true;
+    TEST_ASSERT(auras_shown(a, o, now));
+    o.hide_when_game_unfocused = true;
+    o.show_in_combat_only = true;  // never applies to auras
+    now.game_in_front = false;
+    TEST_ASSERT(auras_shown(a, o, now));  // unlocked: always findable
+    a.locked = true;
+    TEST_ASSERT_FALSE(auras_shown(a, o, now));
+    now.game_in_front = true;
+    TEST_ASSERT(auras_shown(a, o, now));
 }
 
 TEST_CASE(AppSettings, MissingFileGivesDefaults) {

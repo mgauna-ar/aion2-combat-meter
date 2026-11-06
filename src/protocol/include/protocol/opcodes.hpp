@@ -22,6 +22,16 @@ inline constexpr uint16_t MapLoad = 0x2136;
 inline constexpr uint16_t Cast = 0x0238;
 inline constexpr uint16_t Damage = 0x0438;
 inline constexpr uint16_t Tick = 0x0538;
+/// The local player started a skill: what a cooldown runs from.
+inline constexpr uint16_t SkillUse = 0x0138;
+/// What is left of one of the local player's cooldowns, after a cut or a reset.
+inline constexpr uint16_t CooldownSet = 0x4738;
+/// An effect put on an entity (a buff, a debuff, a mantra's pulse), and an
+/// instance of one renewed.
+inline constexpr uint16_t BuffAdd = 0x2A38;
+inline constexpr uint16_t BuffRenew = 0x2B38;
+/// One instance of an effect left its target.
+inline constexpr uint16_t BuffRemove = 0x1A92;
 /// Layout not known yet: kept raw for the replay tool's --unknown dump.
 inline constexpr uint16_t RemainingHp = 0x008D;
 inline constexpr uint16_t PartyRoster = 0x0297;
@@ -42,6 +52,11 @@ inline constexpr uint16_t Bundle = 0xFFFF;
         case opcode::Cast: return "cast";
         case opcode::Damage: return "damage";
         case opcode::Tick: return "tick";
+        case opcode::SkillUse: return "skill_use";
+        case opcode::CooldownSet: return "cooldown";
+        case opcode::BuffAdd: return "buff_add";
+        case opcode::BuffRenew: return "buff_renew";
+        case opcode::BuffRemove: return "buff_remove";
         case opcode::RemainingHp: return "remaining_hp";
         case opcode::PartyRoster: return "party_roster";
         case opcode::Bundle: return "bundle";

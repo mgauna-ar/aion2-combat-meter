@@ -71,6 +71,7 @@ struct AppActions {
     bool toggle_recording{false};
     bool clear_history{false};
     bool reset_overlay_position{false};
+    bool reset_aura_position{false};
     OpenTarget open{OpenTarget::None};
     /// A saved fight to load into AppViewState::selected_fight.
     std::string load_file;

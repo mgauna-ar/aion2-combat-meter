@@ -71,6 +71,7 @@ LiveSnapshot Pipeline::snapshot(Micros now) const {
     s.now = now;
     s.parse = m_parser.stats();
     s.capture_totals = capture_totals();
+    s.auras = m_engine.auras(now);
     return s;
 }
 

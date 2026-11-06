@@ -123,6 +123,17 @@ void EncounterEngine::on_event(const proto::ParsedEvent& event) {
             using T = std::decay_t<decltype(e)>;
             if constexpr (std::is_same_v<T, proto::Heartbeat>) {
                 m_last_server_ms = e.server_ms;
+                m_auras.on_heartbeat(e.server_ms, ts);
+            } else if constexpr (std::is_same_v<T, proto::BuffApplied>) {
+                m_auras.on_applied(e, ts);
+            } else if constexpr (std::is_same_v<T, proto::BuffRemoved>) {
+                m_auras.on_removed(e);
+            } else if constexpr (std::is_same_v<T, proto::SkillUsed>) {
+                on_own_cooldown();
+                m_cooldowns.on_used(e.skill, ts);
+            } else if constexpr (std::is_same_v<T, proto::CooldownSet>) {
+                on_own_cooldown();
+                m_cooldowns.on_set(e.skill, e.remaining_ms, ts);
             } else if constexpr (std::is_same_v<T, proto::Identity>) {
                 m_registry.on_identity(e);
             } else if constexpr (std::is_same_v<T, proto::Spawn>) {
@@ -297,6 +308,7 @@ void EncounterEngine::on_values(const proto::RemainingHp& v, Micros ts) {
 
 void EncounterEngine::on_death(EntityId id, Micros ts) {
     m_registry.on_death(id);
+    m_auras.on_death(id);
     if (!m_fight) return;
     const EntityId who = m_registry.resolve(id);
     const BossSummary boss = boss_of(*m_fight);
@@ -317,6 +329,8 @@ void EncounterEngine::on_map(const proto::MapLoad& m, uint32_t connection, Micro
     // the run: the fight and the visit go on, though players may have new ids.
     const bool reload = m.map_id == m_map_id && connection != 0 && connection == m_map_connection;
     m_map_connection = connection;
+    // Ids may change on a reload too; the server sends each effect again.
+    m_auras.on_map_load(ts);
     if (reload) {
         m_registry.on_map_reload();
         return;
@@ -365,7 +379,30 @@ void EncounterEngine::check_end(Micros now) {
     }
 }
 
-void EncounterEngine::tick(Micros now) { check_end(now); }
+void EncounterEngine::tick(Micros now) {
+    check_end(now);
+    m_auras.prune(now, m_registry);
+}
+
+void EncounterEngine::on_own_cooldown() {
+    const CharacterId who = m_registry.local_character();
+    if (who == 0 || who == m_cooldown_character) return;
+    if (m_cooldown_character != 0) m_cooldowns.clear();
+    m_cooldown_character = who;
+}
+
+AuraSnapshot EncounterEngine::auras(Micros now) const {
+    EntityId target = 0;
+    std::string label;
+    if (m_fight) {
+        const BossSummary boss = boss_of(*m_fight);
+        target = boss.id;
+        label = boss.label;
+    }
+    AuraSnapshot a = m_auras.snapshot(now, m_registry, target, std::move(label));
+    a.cooldowns = m_cooldowns.snapshot(now);
+    return a;
+}
 
 void EncounterEngine::end_fight(EndReason reason, Micros now) {
     if (m_fight) finish(reason, now);

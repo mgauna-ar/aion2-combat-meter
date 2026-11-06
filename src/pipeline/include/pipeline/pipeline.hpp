@@ -1,6 +1,7 @@
 #pragma once
 
 #include "common/micros.hpp"
+#include "meter/aura_tracker.hpp"
 #include "meter/encounter_engine.hpp"
 #include "meter/meter_settings.hpp"
 #include "meter/types.hpp"
@@ -56,6 +57,8 @@ struct LiveSnapshot {
     Micros now{0};
     proto::ParseStats parse;
     meter::CaptureQuality capture_totals;
+    /// The aura overlay's: effects on the local player, and theirs on the boss.
+    meter::AuraSnapshot auras;
 };
 
 /**

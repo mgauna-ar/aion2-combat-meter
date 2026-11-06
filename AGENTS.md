@@ -35,9 +35,8 @@ hide condition) compares `GetWindowThreadProcessId` of the foreground window wit
 those snapshot ids: no handle either. AION 2 has anti-cheat, and the user cares
 about account safety: when in doubt, don't.
 
-**Third-party code:** do not copy code from the community AION 2 meters. They are
-GPL-3.0 and this repository is MIT. Facts about the protocol from their notes are fine;
-the code is ours.
+**Third-party code:** copy none: this repository is MIT, and its code is its own.
+Facts about the protocol from the community's published notes are fine.
 
 ---
 
@@ -105,11 +104,14 @@ src/protocol/    aion2::proto
 src/meter/       aion2::meter
     types, class_codes, skill_names (data/skills.tsv → skill_table.inc),
     map_names (data/maps.tsv → map_table.inc), npc_names (data/npcs.tsv → npc_table.inc),
-    combatant_registry, encounter_engine, meter_settings, fight_json, history_store
+    combatant_registry, encounter_engine, aura_tracker (effects on everyone in view),
+    cooldowns (data/cooldowns.tsv → cooldown_table.inc, and the local player's tracker),
+    meter_settings, fight_json, history_store
 src/pipeline/    aion2::pipeline   stream_demux (flows -> frames), pipeline (all of it)
 src/app/         aion2::app
     app_settings, app_runtime (threads, history, recording), display_format,
-    overlay_view (ImGui, behind HAVE_IMGUI), app_frame (the app window's contents),
+    overlay_view and aura_view (the two overlays; ImGui, behind HAVE_IMGUI),
+    overlay_visibility, app_frame (the app window's contents),
     update_check (release parsing, versions, the update balloon) and updater (check,
     download, stage, swap), both ported from ffxiv-hub
     src/ui/      the app window's pages, theme, widgets and Lucide icons (ported from
@@ -123,6 +125,8 @@ tools/check_forbidden_apis.sh, tools/gen_app_icon.py, tools/embed_icon_font.py
 tools/gen_skill_table.py         skills.tsv → skill_table.inc (`make test` checks they agree)
 tools/gen_map_table.py           maps.tsv → map_table.inc (the same)
 tools/gen_npc_table.py           aion2.app's monster and NPC pages → npcs.tsv → npc_table.inc
+tools/gen_cooldown_table.py      aion2.app's skill pages → cooldowns.tsv → cooldown_table.inc
+                                 (the same)
                                  (the same)
 tests/           TEST_CASE framework (ported), one test_<concern>.cpp per area
 ```
@@ -142,7 +146,7 @@ capture + meter ← pipeline ← app.
 | Capture (one per Npcap adapter, or the FileSource thread) | its pcap handle | `BoundedQueue<OwnedPacket>` (8192), `try_push` only. A full queue drops and counts, and the drop shows up as a TCP gap. |
 | Npcap watcher | the loopback filter text | a mutex plus an atomic generation counter. Each capture thread applies a new filter itself between `pcap_next_ex` calls, because a pcap handle is not shared. |
 | Engine (`AppRuntime::run`) | `Pipeline`, `HistoryStore` writes, the recorder | publishes `LiveSnapshot` into a `SnapshotSlot` every 200 ms of capture time, and whenever the queue runs dry. |
-| UI (`wWinMain`) | both windows (the app window and the overlay, each with its own ImGui context), the tray, `AppSettings`, the `Updater` | reads snapshots and the history index (copied under a mutex). Requests go to the engine as atomics: end fight, recording on/off, clear history. New meter and history settings go through `AppRuntime::update_settings`, under the mutex; the engine applies them on its next pass. |
+| UI (`wWinMain`) | the three windows (the app window, the meter overlay and the aura overlay, each with its own ImGui context), the tray, `AppSettings`, the `Updater` | reads snapshots and the history index (copied under a mutex). Requests go to the engine as atomics: end fight, recording on/off, clear history. New meter and history settings go through `AppRuntime::update_settings`, under the mutex; the engine applies them on its next pass. |
 | Updater worker (one at a time) | the check or the download | `Updater::status()`, copied under its mutex, which the UI reads each frame. Staged files are moved into place on the UI thread (`apply_staged`). `stop()` cancels a download and joins, before the engine stops. |
 
 `make tsan` runs the suite under ThreadSanitizer. The `AppRuntime` tests drive real
@@ -197,13 +201,13 @@ BACK, FRNT, MULT and BLOC share matched it exactly.
   - **Damage type:** 3 is a crit; 2 otherwise in the second capture.
   - **Block:** layout 4 has 8 bytes: a hit id (u32, counting up) and a count (u32).
     Layouts 5, 6 and 7 have 12, 10 and 14 bytes (6 seen in a capture; 5 and 7 as
-    NOIA2 reads them), starting with the modifiers (0x02 block, 0x04 perfect, 0x08
+    the community's notes give them), starting with the modifiers (0x02 block, 0x04 perfect, 0x08
     double, 0x20 heavy; 0x80 seen, meaning unknown), a byte (00 in every record of
     the second capture), and the direction (1 back, 2 front, 0 none). Layout 4
     carries no modifiers or direction.
     - 0x02 was the notes' "parry". Its count was the game's BLOC (11 of 862), skill
       by skill: the target blocked the hit.
-    waffle_meter reads the flag byte as rotated by a 2026-07 patch, and says a
+    Other notes read the flag byte as rotated by a 2026-07 patch, and say a
     lifesteal varint of 1–3 bytes can come before the direction; neither is
     confirmed here.
   - **Damage:** an optional 00 pad, then a scalar varint (about 10,000: 10,000 for a
@@ -331,6 +335,50 @@ BACK, FRNT, MULT and BLOC share matched it exactly.
     the local player's again, both lists in one: kind 1's, then a count and kind 2's,
     which carry their own HP.
 
+**Effects, skill uses and cooldowns** (the aura overlay's; checked on the second
+capture, where all 17,182 records parse):
+- **Effect put on `2a 38` / renewed `2b 38`:** target varint, (2a 38 only: a byte, 01
+  in all 4,008), kind u8, instance varint, effect u32, duration u64 (ms; all ones for no
+  end), end u64 (the server's Unix ms, as the heartbeat's), caster varint, level u8,
+  (kind 0x13 only: the applying skill u32), a byte (00, or 02 on most renewals), and a
+  position (three f32, the caster's or the target's). Kind 0x11 has no skill; no other
+  kind was seen.
+  - **Instances are stacks.** Each application gets the next instance number on its
+    target, and an effect applied again while it runs is a second instance (a Templar
+    debuff ran four at once). 2b 38 renews an instance by number.
+  - **The end is the truth.** It equals arrival + duration (to 50 ms) for every 2a 38,
+    but for some renewals (flag 00) it is up to 1.4 s sooner than the stated duration.
+  - **The effect id** is mostly the applying skill's code × 10 plus a digit (Undefeated
+    Mantra 18190041 → 181,900,411). 78% of effects get a name from `skills.tsv` that way
+    (`effect_name`). The rest are monster skills (7-digit codes ×10), items and system
+    effects (12011, 80001). A skill's code names the effect better than the id: one
+    Gladiator effect's id pointed at Ruinous Blow while its record named Leaping Slam.
+  - **Before the map's 21 36:** entering a map, the local player's effects for their new
+    id came 0.4 s ahead of the map load, so a map load must not drop what just arrived.
+  - **Permanent effects** are mostly passive skills', sent at login and again on each
+    map (twice, under new instance numbers).
+  - A duration of 0 (one of Judgment's) marks something that ends as it starts.
+- **Effect gone `1a 92`:** target varint, effect u32. It names the effect, not the
+  instance: a stack of three is taken off by three.
+- **Skill used `01 38`:** three bytes (00 00 00 in 1,154 of 1,176), the skill u32. Only
+  the local player's own: the hit with that skill follows 0.1 to 0.5 s later.
+- **Cooldown set `47 38`:** a count u8 (always 1), then per entry the skill u32 (the
+  base code) and the time left in ms (varint). It comes when something cuts or resets a
+  cooldown, not when one starts: every Vicious Strike hit cut Warding Strike's by 2 s
+  (its specialty "−2s [Warding Strike] cooldown on hit"), and an Annihilate reset sent 0.
+- **The skill list `13 38`** (at login and on each map, not read yet): 01, skill u32,
+  01, skill u32 again, level u8, 10, level − 10, four 00, 0a. Its levels are what set the
+  specialty slots (8: one, 12: two, 20: three).
+- **Specialties are in the cast's code.** The variant digits of the code a skill is
+  used with (01 38, 04 38) are the specialties picked: Warding Strike at level 13 is
+  cast as 12350130, specialties 1 and 3 (aion2.app's order on its page). On every skill
+  whose level the capture gave, the count of picks matched the slots.
+- **Seen, not read:** `1b 92` is a party member's HP and MP (id, cur and max HP varints,
+  MP u32 twice; 21,750 / 23,170), `1c 92` their position and legion name; `4a 36` the
+  local player's stats (id, count u8, then stat u16 and value u32 pairs); `29 37` and
+  `2a 37` movement (an id and f32 positions in the spawn's space); `18 38` / `19 38` a
+  chain skill offered and withdrawn.
+
 **Unknown or guessed. Each needs a real capture (skill `decode-capture`):**
 - whether the "optional 00 pad" can be confused with a scalar of 0;
 - multi-record `04 38` packets;
@@ -338,6 +386,17 @@ BACK, FRNT, MULT and BLOC share matched it exactly.
 - where the class is in 33 36 / 45 36, and what their "class" u32 and 33 36's extra
   u16 hold (`meter/class_codes.cpp` is empty; skill codes give the class instead);
 - tick effects 08 and 38;
+- what `0e 92` (an id and a byte, as often as 1a 92) means, and the byte before 2a 38's
+  kind;
+- **the cooldown reduction.** The game shortens cooldowns by the Illusion [Kaisinel]
+  stat (0.1% a point, capped at 60%, per metabot.gg). The table's figures, less the
+  specialties picked, do not explain the second capture alone: Shield Smite (10 s, no
+  cut picked) came back after 8.85 s, which needs 11.5% or more, while Warding Strike's
+  exact 47 38 figures (25 s after its cut, done in 23.1 s) allow about 7.6%. Which
+  `4a 36` stat is Illusion is unknown. The meter learns each skill's figure instead
+  (Meter rules, Cooldowns);
+- whether a skill with a second use ("+1 consecutive use") recharges each use on its
+  own, as the meter assumes, or both at once;
 - whether the game's Total Heal counts heals before a fight's first hit: the meter's
   healing came to 97% of it;
 - what the 5-HP object (2,920,366, kind 14, no name) the party broke in the second
@@ -482,6 +541,39 @@ in 2026-10.
   - Pruning keeps `history.max_fights`, in batches of 50.
   - Clearing (the app window's trash button) deletes the fight records and the index,
     on the engine thread; other files in the folder stay.
+- **Auras** (`AuraTracker`, owned by the engine; `aura_view` draws them):
+  - Every entity's effects are kept, by instance, from 2a 38, 2b 38 and 1a 92. A 1a 92
+    takes the instance of that effect that ends soonest.
+  - An instance ends at its record's stated end, brought onto the capture clock by the
+    last heartbeat (One clock): a replay shows what the live meter did. An end more
+    than 5 s from the stated duration is not believed, and the duration stands in.
+  - A death drops the entity's effects. A map load (a reload within a run too, since
+    ids may change) drops every instance not put on or renewed in the 2 s before it.
+  - The snapshot carries the local player's effects (an enemy's marked hostile, their
+    own and their summons' marked mine) and their own on the live fight's boss.
+  - It also carries every helpful effect seen on the local player this session, which
+    is what the watch list offers. Enemies' debuffs are left out.
+  - Stacks: instances of one effect from one caster are one entry, ending with the
+    last of them. Two Chanters' mantras are two entries.
+  - The overlay counts down between snapshots on the wall clock, at most 250 ms past
+    the snapshot's own time (`aura_display_time`): drawing only, never the engine.
+- **Cooldowns** (`CooldownTracker`, the local player's only; estimates, shown with `~`):
+  - A use (01 38) starts `listed_cooldown_ms`: `cooldowns.tsv`'s figure (aion2.app's,
+    the same at every level) less the "−Ns cooldown" specialties in play. An active
+    skill's are the picks its cast code's variant digits name; a stigma's, the first n
+    it unlocked, n its tens digit.
+  - The estimate then shortens to the quickest reuse seen this session, which is where
+    the game's cooldown reduction shows. A gap with a 47 38 in it (a cut or a reset)
+    teaches nothing, nor one under half the figure (a triggered Judgment).
+  - A 47 38 sets what is left, exactly.
+  - A "+1 consecutive use" specialty gives a second use: each recharges on its own, the
+    skill shows only once both are cooling, and it learns nothing from its gaps.
+  - Another local character starts from nothing learned.
+  - aion2.app's Brawler pages list no specialties (2026-11): Brawler cooldowns start
+    from the listed figure, and every Brawler row reads as an active skill.
+  - Checked on the second capture: over 274 uses of 12 skills, 13 came while the
+    estimate still ran, by at most 0.65 s (0.2 s on average). Each was a reuse
+    quicker than any before it, which the estimate then took.
 
 ---
 

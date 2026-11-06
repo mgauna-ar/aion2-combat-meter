@@ -27,6 +27,25 @@ enum class Hotkey : int {
     EndFight = 3,
 };
 
+/// Where an overlay window starts, and how: from OverlaySettings or AuraSettings.
+struct OverlayPlacement {
+    bool locked{false};
+    bool visible{true};
+    float scale{1.0f};
+    /// Screen position and size; x and y of -1 mean the default spot.
+    int x{-1};
+    int y{-1};
+    int width{430};
+    int height{250};
+    /// Where it goes with no saved position, and on reset_position.
+    int default_x{40};
+    int default_y{160};
+};
+
+[[nodiscard]] OverlayPlacement placement_of(const OverlaySettings& s);
+/// Under the meter overlay's default spot.
+[[nodiscard]] OverlayPlacement placement_of(const AuraSettings& s);
+
 /**
  * @brief A transparent, always-on-top, non-activating window for the meter.
  *
@@ -39,7 +58,8 @@ enum class Hotkey : int {
  * HTBOTTOMRIGHT. It is a separate window: nothing is drawn inside the game, which
  * needs borderless windowed mode for the overlay to show on top of it. It has its
  * own ImGui context, made current before every message and frame, beside the app
- * window's.
+ * window's. The meter overlay and the aura overlay are two of these; the meter's
+ * holds the global hotkeys.
  */
 class OverlayWindow {
 public:
@@ -51,7 +71,9 @@ public:
     OverlayWindow(const OverlayWindow&) = delete;
     OverlayWindow& operator=(const OverlayWindow&) = delete;
 
-    bool create(const OverlaySettings& settings, std::string& error);
+    /// `title` is the window's caption, which only window tools show. With `hotkeys`
+    /// it registers Ctrl+Alt+L, H and R, which only one window may.
+    bool create(const OverlayPlacement& placement, const wchar_t* title, bool hotkeys, std::string& error);
     void destroy();
 
     void set_locked(bool locked);
@@ -60,16 +82,16 @@ public:
     [[nodiscard]] bool visible() const noexcept { return m_visible; }
     /// Re-asserts topmost: a game going fullscreen-borderless can push it down.
     void keep_on_top();
-    /// Back to the default spot near the main monitor's top-left corner.
+    /// Back to its default spot near the main monitor's top-left corner.
     void reset_position();
     /// The window in screen pixels.
     [[nodiscard]] RECT screen_rect() const;
     /// The monitor's DPI over 96.
     [[nodiscard]] float dpi_scale() const;
 
-    /// Draws one frame. `input.scale` is the settings' scale; the monitor's DPI is
-    /// applied here.
-    OverlayActions render(OverlayFrameInput input);
+    /// Draws one frame with `draw` (draw_overlay or draw_auras), which gets the
+    /// settings' `scale` times the monitor's DPI scale.
+    OverlayActions render(float scale, const std::function<OverlayActions(float scale)>& draw);
 
     std::function<void(Hotkey)> on_hotkey;
     /// The user finished moving or resizing the window.
@@ -92,6 +114,8 @@ private:
     Microsoft::WRL::ComPtr<ID3D11RenderTargetView> m_render_target;
     bool m_locked{false};
     bool m_visible{true};
+    bool m_hotkeys{false};
+    POINT m_default{40, 160};
     float m_font_scale{0.0f};
     UINT m_resize_width{0};
     UINT m_resize_height{0};

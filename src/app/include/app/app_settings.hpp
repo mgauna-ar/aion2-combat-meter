@@ -5,8 +5,10 @@
 #include "meter/meter_settings.hpp"
 
 #include <array>
+#include <cstdint>
 #include <filesystem>
 #include <string>
+#include <vector>
 
 namespace aion2::app {
 
@@ -57,6 +59,38 @@ struct OverlaySettings {
     bool hide_when_game_unfocused{false};
 };
 
+/// The aura overlay: the effects on the local player, and theirs on the boss, in a
+/// window of its own (aura_view.hpp).
+struct AuraSettings {
+    /// Off until turned on in the app's Auras page.
+    bool visible{false};
+    /// Locked: click-through, and cannot be moved or resized.
+    bool locked{false};
+    /// Of the background only; text and bars stay opaque.
+    float opacity{0.55f};
+    float scale{1.0f};
+    /// Screen position and size; x and y of -1 place it under the meter's default spot.
+    int x{-1};
+    int y{-1};
+    int width{280};
+    int height{300};
+    /// Enemies' effects on the local player.
+    bool show_debuffs{true};
+    /// The local player's effects on the live fight's boss.
+    bool show_target{true};
+    /// Effects with no end: passive skills' and the ones a login puts on.
+    bool show_permanent{false};
+    /// Effects shorter than this are left out: a dodge's mark, a cast's state.
+    float min_duration_s{1.0f};
+    /// The local player's cooldowns, estimated (meter::CooldownTracker).
+    bool show_cooldowns{true};
+    /// Cooldowns shorter than this are left out: Dodge's, a combo's.
+    float min_cooldown_s{3.0f};
+    /// Effects (meter::effect_key) to flag while they are not on the local player.
+    /// Not in the key table: a list. Read and written by hand in app_settings.cpp.
+    std::vector<uint32_t> watch;
+};
+
 struct HistorySettings {
     /// Saved fights kept on disk; the oldest go first.
     int max_fights{500};
@@ -85,6 +119,7 @@ struct AppSettings {
     WindowSettings window;
     CaptureSettings capture;
     OverlaySettings overlay;
+    AuraSettings auras;
     /// Spelled from aion2:: because GCC rejects a member named `meter` after an
     /// unqualified `meter::` in the same class ("changes meaning").
     aion2::meter::MeterSettings meter;
@@ -123,6 +158,26 @@ inline constexpr std::array<config::ConfigKey<OverlaySettings>, 25> kOverlayKeys
     config::field<OverlaySettings, &OverlaySettings::hide_when_game_unfocused>("hide_when_game_unfocused"),
     config::field<OverlaySettings, &OverlaySettings::show_in_dungeons_only>("show_in_dungeons_only"),
 }};
+
+inline constexpr std::array<config::ConfigKey<AuraSettings>, 14> kAuraKeys{{
+    config::field<AuraSettings, &AuraSettings::visible>("visible"),
+    config::field<AuraSettings, &AuraSettings::locked>("locked"),
+    config::field<AuraSettings, &AuraSettings::opacity>("opacity"),
+    config::field<AuraSettings, &AuraSettings::scale>("scale"),
+    config::field<AuraSettings, &AuraSettings::x>("x"),
+    config::field<AuraSettings, &AuraSettings::y>("y"),
+    config::field<AuraSettings, &AuraSettings::width>("width"),
+    config::field<AuraSettings, &AuraSettings::height>("height"),
+    config::field<AuraSettings, &AuraSettings::show_debuffs>("show_debuffs"),
+    config::field<AuraSettings, &AuraSettings::show_target>("show_target"),
+    config::field<AuraSettings, &AuraSettings::show_permanent>("show_permanent"),
+    config::field<AuraSettings, &AuraSettings::min_duration_s>("min_duration_s"),
+    config::field<AuraSettings, &AuraSettings::show_cooldowns>("show_cooldowns"),
+    config::field<AuraSettings, &AuraSettings::min_cooldown_s>("min_cooldown_s"),
+}};
+
+/// Most effects a watch list holds.
+inline constexpr size_t kMaxWatchedEffects = 64;
 
 inline constexpr std::array<config::ConfigKey<HistorySettings>, 1> kHistoryKeys{{
     config::field<HistorySettings, &HistorySettings::max_fights>("max_fights"),

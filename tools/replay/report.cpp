@@ -106,12 +106,36 @@ void Report::on_frame(const proto::Frame& f, pipeline::FrameOutcome outcome) {
 }
 
 void Report::on_event(const proto::ParsedEvent& pe, const meter::CombatantRegistry& reg) {
-    if (!m_opt.events) return;
+    if (!m_opt.events && !m_opt.auras) return;
     const double t = rel(pe.ts);
+    const bool aura = std::holds_alternative<proto::BuffApplied>(pe.event) ||
+                      std::holds_alternative<proto::BuffRemoved>(pe.event) ||
+                      std::holds_alternative<proto::SkillUsed>(pe.event) ||
+                      std::holds_alternative<proto::CooldownSet>(pe.event);
+    if (aura ? !m_opt.auras : !m_opt.events) return;
     std::visit(
         [&](const auto& e) {
             using T = std::decay_t<decltype(e)>;
-            if constexpr (std::is_same_v<T, proto::Heartbeat>) {
+            if constexpr (std::is_same_v<T, proto::BuffApplied>) {
+                std::printf("%+.3f  %s %s <- %s  %s (effect %u", t, e.renewed ? "buff~    " : "buff+    ",
+                            who(e.target, reg).c_str(), who(e.caster, reg).c_str(),
+                            meter::effect_label(e.buff_id, e.source_skill).c_str(), e.buff_id);
+                if (e.source_skill != 0) std::printf(", skill %u lv %u", e.source_skill, unsigned{e.level});
+                std::printf(") instance %u ", e.instance);
+                if (e.permanent) {
+                    std::printf("permanent\n");
+                } else {
+                    std::printf("%.1f s\n", static_cast<double>(e.duration_ms) / 1000.0);
+                }
+            } else if constexpr (std::is_same_v<T, proto::BuffRemoved>) {
+                std::printf("%+.3f  buff-     %s  %s (effect %u)\n", t, who(e.target, reg).c_str(),
+                            meter::effect_label(e.buff_id).c_str(), e.buff_id);
+            } else if constexpr (std::is_same_v<T, proto::SkillUsed>) {
+                std::printf("%+.3f  use       %s (%u)\n", t, meter::skill_label(e.skill).c_str(), e.skill);
+            } else if constexpr (std::is_same_v<T, proto::CooldownSet>) {
+                std::printf("%+.3f  cooldown  %s (%u) %.2f s left\n", t, meter::skill_label(e.skill).c_str(), e.skill,
+                            static_cast<double>(e.remaining_ms) / 1000.0);
+            } else if constexpr (std::is_same_v<T, proto::Heartbeat>) {
                 // Twenty a second: the flow summary counts them.
             } else if constexpr (std::is_same_v<T, proto::Identity>) {
                 std::printf("%+.3f  identity  %s%s %u \"%s\" server %u class %u\n", t, e.own ? "own " : "",

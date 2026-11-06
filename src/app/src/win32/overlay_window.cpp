@@ -21,10 +21,10 @@ namespace aion2::app::win32 {
 namespace {
 
 constexpr const wchar_t* kWindowClass = L"Aion2CombatMeterOverlay";
-constexpr int kDefaultX = 40;
-constexpr int kDefaultY = 160;
-constexpr int kMinWidth = 200;
+constexpr int kMinWidth = 160;
 constexpr int kMinHeight = 90;
+/// The aura overlay's default spot: under the meter overlay's default one.
+constexpr int kAuraDefaultY = 440;
 
 LRESULT CALLBACK overlay_wnd_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
     if (msg == WM_NCCREATE) {
@@ -46,19 +46,45 @@ DWORD ex_style(bool locked) {
 /// The saved position if any monitor still shows its top-left corner, else the
 /// default. Only -1, -1 means unset: a monitor left of or above the main one has
 /// negative coordinates.
-POINT start_position(const OverlaySettings& s) {
-    POINT pt{s.x, s.y};
-    if ((s.x == -1 && s.y == -1) || MonitorFromPoint(pt, MONITOR_DEFAULTTONULL) == nullptr) {
-        pt = POINT{kDefaultX, kDefaultY};
+POINT start_position(const OverlayPlacement& p) {
+    POINT pt{p.x, p.y};
+    if ((p.x == -1 && p.y == -1) || MonitorFromPoint(pt, MONITOR_DEFAULTTONULL) == nullptr) {
+        pt = POINT{p.default_x, p.default_y};
     }
     return pt;
 }
 
 } // namespace
 
+OverlayPlacement placement_of(const OverlaySettings& s) {
+    OverlayPlacement p;
+    p.locked = s.locked;
+    p.visible = s.visible;
+    p.scale = s.scale;
+    p.x = s.x;
+    p.y = s.y;
+    p.width = s.width;
+    p.height = s.height;
+    return p;
+}
+
+OverlayPlacement placement_of(const AuraSettings& s) {
+    OverlayPlacement p;
+    p.locked = s.locked;
+    p.visible = s.visible;
+    p.scale = s.scale;
+    p.x = s.x;
+    p.y = s.y;
+    p.width = s.width;
+    p.height = s.height;
+    p.default_y = kAuraDefaultY;
+    return p;
+}
+
 OverlayWindow::~OverlayWindow() { destroy(); }
 
-bool OverlayWindow::create(const OverlaySettings& settings, std::string& error) {
+bool OverlayWindow::create(const OverlayPlacement& placement, const wchar_t* title, bool hotkeys,
+                           std::string& error) {
     HINSTANCE inst = GetModuleHandleW(nullptr);
     WNDCLASSEXW wc{};
     wc.cbSize = sizeof(wc);
@@ -68,13 +94,16 @@ bool OverlayWindow::create(const OverlaySettings& settings, std::string& error) 
     wc.hCursor = LoadCursorW(nullptr, IDC_ARROW);
     wc.hIcon = LoadIconW(inst, MAKEINTRESOURCEW(kIconResource));
     wc.lpszClassName = kWindowClass;
+    // The second overlay finds the class registered by the first: that call fails, harmlessly.
     RegisterClassExW(&wc);
 
-    m_locked = settings.locked;
-    m_visible = settings.visible;
-    const POINT pos = start_position(settings);
-    m_hwnd = CreateWindowExW(ex_style(m_locked), kWindowClass, L"AION 2 Combat Meter", WS_POPUP, pos.x, pos.y,
-                             std::max(settings.width, kMinWidth), std::max(settings.height, kMinHeight), nullptr,
+    m_locked = placement.locked;
+    m_visible = placement.visible;
+    m_hotkeys = hotkeys;
+    m_default = POINT{placement.default_x, placement.default_y};
+    const POINT pos = start_position(placement);
+    m_hwnd = CreateWindowExW(ex_style(m_locked), kWindowClass, title, WS_POPUP, pos.x, pos.y,
+                             std::max(placement.width, kMinWidth), std::max(placement.height, kMinHeight), nullptr,
                              nullptr, inst, this);
     if (m_hwnd == nullptr) {
         error = "cannot create the overlay window";
@@ -101,9 +130,9 @@ bool OverlayWindow::create(const OverlaySettings& settings, std::string& error) 
     ImGui::StyleColorsDark();
     ImGui_ImplWin32_Init(m_hwnd);
     ImGui_ImplDX11_Init(m_device.Get(), m_context.Get());
-    rebuild_fonts(settings.scale * dpi_scale());
+    rebuild_fonts(placement.scale * dpi_scale());
 
-    register_hotkeys();
+    if (m_hotkeys) register_hotkeys();
     ShowWindow(m_hwnd, m_visible ? SW_SHOWNOACTIVATE : SW_HIDE);
     return true;
 }
@@ -123,12 +152,15 @@ void OverlayWindow::destroy() {
     m_context.Reset();
     m_device.Reset();
     if (m_hwnd != nullptr) {
-        for (const Hotkey h : {Hotkey::ToggleLock, Hotkey::ToggleVisible, Hotkey::EndFight}) {
-            UnregisterHotKey(m_hwnd, static_cast<int>(h));
+        if (m_hotkeys) {
+            for (const Hotkey h : {Hotkey::ToggleLock, Hotkey::ToggleVisible, Hotkey::EndFight}) {
+                UnregisterHotKey(m_hwnd, static_cast<int>(h));
+            }
         }
         SetWindowLongPtrW(m_hwnd, GWLP_USERDATA, 0);
         DestroyWindow(m_hwnd);
         m_hwnd = nullptr;
+        // Fails while the other overlay still uses the class; the last one out succeeds.
         UnregisterClassW(kWindowClass, GetModuleHandleW(nullptr));
     }
 }
@@ -249,7 +281,7 @@ void OverlayWindow::keep_on_top() {
 
 void OverlayWindow::reset_position() {
     if (m_hwnd == nullptr) return;
-    SetWindowPos(m_hwnd, nullptr, kDefaultX, kDefaultY, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+    SetWindowPos(m_hwnd, nullptr, m_default.x, m_default.y, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
 }
 
 RECT OverlayWindow::screen_rect() const {
@@ -263,7 +295,7 @@ float OverlayWindow::dpi_scale() const {
     return dpi == 0 ? 1.0f : static_cast<float>(dpi) / 96.0f;
 }
 
-OverlayActions OverlayWindow::render(OverlayFrameInput input) {
+OverlayActions OverlayWindow::render(float scale_setting, const std::function<OverlayActions(float)>& draw) {
     if (m_imgui == nullptr) return {};
     ImGui::SetCurrentContext(m_imgui);
     if (m_resize_width != 0 && m_resize_height != 0) {
@@ -277,14 +309,13 @@ OverlayActions OverlayWindow::render(OverlayFrameInput input) {
         create_render_target();
         if (!m_render_target) return {};
     }
-    const float scale = input.scale * dpi_scale();
+    const float scale = scale_setting * dpi_scale();
     if (std::fabs(scale - m_font_scale) > 0.01f) rebuild_fonts(scale);
-    input.scale = scale;
 
     ImGui_ImplDX11_NewFrame();
     ImGui_ImplWin32_NewFrame();
     ImGui::NewFrame();
-    const OverlayActions actions = draw_overlay(input);
+    const OverlayActions actions = draw(scale);
     m_drag_area = actions.drag_area;
     m_resize_grip = actions.resize_grip;
     ImGui::Render();

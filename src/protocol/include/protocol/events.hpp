@@ -164,7 +164,56 @@ struct RemainingHp {
     uint64_t hp{0};
 };
 
-using Event = std::variant<Heartbeat, Identity, Spawn, Death, MapLoad, Damage, Tick, PartyRoster, RemainingHp>;
+/// 2a 38 (a new instance) or 2b 38 (one renewed): an effect on an entity. A buff
+/// applied again while it runs is a second instance, so instances are stacks.
+struct BuffApplied {
+    EntityId target{0};
+    /// Who put it there: a Chanter's mantra names the Chanter on every member it reaches.
+    EntityId caster{0};
+    /// One per application, counting up per target.
+    uint32_t instance{0};
+    /// The effect. Mostly its skill's code times ten plus a digit: Undefeated
+    /// Mantra 18190041 gives 181900411. Monster and item effects follow no pattern.
+    uint32_t buff_id{0};
+    /// The skill that applied it, when the record names one; 0 otherwise.
+    uint32_t source_skill{0};
+    /// That skill's level, as it reads; 1 for the records that name no skill.
+    uint8_t level{0};
+    /// No end: the wire's duration is all ones. Login buffs on the local player.
+    bool permanent{false};
+    /// The whole duration as the server states it, from when it was applied or
+    /// renewed. 0 for a few markers that end as they start (one of Judgment's).
+    uint64_t duration_ms{0};
+    /// When it runs out, in the server's Unix milliseconds (Heartbeat::server_ms).
+    /// The duration measured from the packet's arrival is up to 1.4 s off for some
+    /// renewals; this is not.
+    uint64_t expires_server_ms{0};
+    /// 2b 38: an instance already running was renewed.
+    bool renewed{false};
+};
+
+/// 1a 92: one instance of an effect left its target, as it ran out or was removed.
+/// It names the effect, not the instance: a stack of three takes three.
+struct BuffRemoved {
+    EntityId target{0};
+    uint32_t buff_id{0};
+};
+
+/// 01 38: the local player started a skill (their own hit with it follows 0.1 to
+/// 0.5 s later). It names no one: no one else's skills are sent this way.
+struct SkillUsed {
+    uint32_t skill{0};
+};
+
+/// 47 38: what is left of one of the local player's cooldowns, sent when something
+/// cut it (Warding Strike, 2 s a time) or reset it (0). Not sent as a cooldown starts.
+struct CooldownSet {
+    uint32_t skill{0};
+    uint32_t remaining_ms{0};
+};
+
+using Event = std::variant<Heartbeat, Identity, Spawn, Death, MapLoad, Damage, Tick, PartyRoster, RemainingHp,
+                           BuffApplied, BuffRemoved, SkillUsed, CooldownSet>;
 
 struct ParsedEvent {
     Micros ts{0};

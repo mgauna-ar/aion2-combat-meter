@@ -115,6 +115,30 @@ inline constexpr Micros kT0 = 1'792'152'000'000'000ULL;
     return v;
 }
 
+/// 2a 38: effect `buff_id` put on `target` by `caster` for `duration_ms`, ending at
+/// `expires_server_ms` on the server clock (0: the record gives none to trust).
+[[nodiscard]] inline proto::BuffApplied buff(EntityId target, EntityId caster, uint32_t instance, uint32_t buff_id,
+                                             uint64_t duration_ms, uint64_t expires_server_ms = 0,
+                                             uint32_t source_skill = 0) {
+    proto::BuffApplied b;
+    b.target = target;
+    b.caster = caster;
+    b.instance = instance;
+    b.buff_id = buff_id;
+    b.source_skill = source_skill;
+    b.level = 1;
+    b.duration_ms = duration_ms;
+    b.expires_server_ms = expires_server_ms;
+    return b;
+}
+
+/// The same, with no end: a passive's effect.
+[[nodiscard]] inline proto::BuffApplied permanent_buff(EntityId target, uint32_t instance, uint32_t buff_id) {
+    proto::BuffApplied b = buff(target, target, instance, buff_id, 0);
+    b.permanent = true;
+    return b;
+}
+
 [[nodiscard]] inline proto::PartyRoster roster(std::initializer_list<const char*> names) {
     proto::PartyRoster r;
     for (const char* n : names) r.members.push_back(proto::PartyMember{n});

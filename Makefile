@@ -57,7 +57,7 @@ ASAN_FLAGS = -fsanitize=address,undefined -fno-sanitize-recover=undefined \
 
 all: test replay
 
-test: aion2_test_runner check-headers check-ui check-forbidden check-skills check-maps check-npcs replay-smoke
+test: aion2_test_runner check-headers check-ui check-forbidden check-skills check-cooldowns check-maps check-npcs replay-smoke
 	./aion2_test_runner
 
 replay: aion2meter-replay
@@ -184,6 +184,9 @@ check-forbidden:
 check-skills:
 	@python3 tools/gen_skill_table.py --check
 
+check-cooldowns:
+	@python3 tools/gen_cooldown_table.py --check
+
 # map_table.inc is generated from src/meter/data/maps.tsv, the same way.
 check-maps:
 	@python3 tools/gen_map_table.py --check
@@ -245,4 +248,4 @@ clean:
 
 FORCE:
 
-.PHONY: all test replay tsan asan clean check-ui check-headers check-forbidden check-skills check-maps check-npcs fixtures replay-smoke golden screenshots FORCE
+.PHONY: all test replay tsan asan clean check-ui check-headers check-forbidden check-skills check-cooldowns check-maps check-npcs fixtures replay-smoke golden screenshots FORCE

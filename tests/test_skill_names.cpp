@@ -62,3 +62,14 @@ TEST_CASE(SkillNames, ClassNamesReadBothSpellings) {
     TEST_ASSERT(class_from_name("Spiritmaster") == AionClass::Spiritmaster);
     TEST_ASSERT(class_from_name("Brawler") == AionClass::Brawler);
 }
+
+TEST_CASE(SkillNames, EffectsTakeTheirSkillsName) {
+    // The applying skill first, then the skill the effect's id points to (id / 10).
+    TEST_ASSERT_EQ(std::string(effect_name(181'900'211, 18'190'021)), std::string("Undefeated Mantra"));
+    TEST_ASSERT_EQ(std::string(effect_name(181'900'211)), std::string("Undefeated Mantra"));
+    TEST_ASSERT_EQ(std::string(effect_name(111'000'071, 11'190'137)), std::string("Leaping Slam"));
+    // Monster, item and system effects: no name, and a label with the id.
+    TEST_ASSERT(effect_name(20'111'011, 2'011'101).empty());
+    TEST_ASSERT(effect_name(200).empty());
+    TEST_ASSERT_EQ(effect_label(200), std::string("Effect 200"));
+}

@@ -397,6 +397,62 @@ inline Bytes tick_body(uint64_t target, uint8_t effect, uint64_t actor, uint32_t
     return b;
 }
 
+/// 2a 38 / 2b 38: an effect on `target`. With `skill` set, the record is kind 0x13
+/// and names the skill that applied it, as a mantra's do.
+struct BuffSpec {
+    uint64_t target{0};
+    uint64_t caster{0};
+    uint32_t instance{1};
+    uint32_t buff_id{0};
+    uint32_t skill{0};
+    uint8_t level{1};
+    /// -1 for a permanent effect: the wire's all-ones duration.
+    int64_t duration_ms{0};
+    uint64_t expires_server_ms{0};
+};
+
+inline Bytes buff_body(const BuffSpec& s, bool renewed = false) {
+    Bytes b;
+    put_varint(b, s.target);
+    if (!renewed) b.push_back(0x01);
+    b.push_back(s.skill != 0 ? 0x13 : 0x11);
+    put_varint(b, s.instance);
+    put_le32(b, s.buff_id);
+    put_le64(b, static_cast<uint64_t>(s.duration_ms));
+    put_le64(b, s.expires_server_ms);
+    put_varint(b, s.caster);
+    b.push_back(s.level);
+    if (s.skill != 0) put_le32(b, s.skill);
+    b.push_back(renewed ? 0x02 : 0x00);
+    put_f32(b, -111'445.2f);
+    put_f32(b, -103'490.4f);
+    put_f32(b, 22'214.8f);
+    return b;
+}
+
+/// 1a 92: one instance of an effect left `target`.
+inline Bytes buff_remove_body(uint64_t target, uint32_t buff_id) {
+    Bytes b;
+    put_varint(b, target);
+    put_le32(b, buff_id);
+    return b;
+}
+
+/// 01 38: the local player started `skill`.
+inline Bytes skill_use_body(uint32_t skill) {
+    Bytes b = {0x00, 0x00, 0x00};
+    put_le32(b, skill);
+    return b;
+}
+
+/// 47 38: one cooldown and what is left of it.
+inline Bytes cooldown_body(uint32_t skill, uint32_t remaining_ms) {
+    Bytes b = {0x01};
+    put_le32(b, skill);
+    put_varint(b, remaining_ms);
+    return b;
+}
+
 inline Bytes death_body(uint64_t id) {
     Bytes b;
     put_varint(b, id);
