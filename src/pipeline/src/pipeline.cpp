@@ -49,7 +49,11 @@ void Pipeline::end_fight(meter::EndReason reason, Micros now) {
 }
 
 void Pipeline::set_plugins(const aion2::plugins::PluginSwitches& on, Micros now) {
-    if (m_plugins.combat_meter && !on.combat_meter) end_fight(meter::EndReason::Manual, now);
+    if (m_plugins.combat_meter && !on.combat_meter) {
+        end_fight(meter::EndReason::Manual, now);
+        // It will miss what is put on and taken off meanwhile.
+        m_engine.forget_effects();
+    }
     if (m_plugins.auras && !on.auras) m_auras.clear();
     m_plugins = on;
 }
