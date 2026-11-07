@@ -129,8 +129,9 @@ plugins/combat_meter/  aion2::meter (include prefix meter/; its AGENTS.md and RE
     history_store, pull_grouping, fight_detail (what a fight keeps beyond its totals),
     timeline, death_log, effect_uptime
 plugins/auras/   aion2::auras (include prefix auras/; its AGENTS.md and README.md)
-    aura_plugin, entities (who is who), aura_tracker (effects on everyone in view),
-    cooldowns (data/cooldowns.tsv → cooldown_table.inc, and the local player's tracker)
+    aura_plugin, entities (who is who, and the local player's HP), aura_tracker (effects
+    on everyone in view), cooldowns (data/cooldowns.tsv → cooldown_table.inc, and the
+    local player's tracker), chains (their chain skills on offer)
 src/pipeline/    aion2::pipeline   stream_demux (flows -> frames), pipeline (parser, then
                  each plugin switched on)
 src/app/         aion2::app
@@ -400,6 +401,10 @@ BACK, FRNT, MULT and BLOC share matched it exactly.
     missed. Kind 2 is anyone else's (u64); stat 0 is current HP, exact. Kind 3 is
     the local player's again, both lists in one: kind 1's, then a count and kind 2's,
     which carry their own HP.
+    - **Stat 7 is max HP.** At login and on each map the local player's came four
+      times, climbing 11,988, 17,421, 21,320, 25,373 as their gear's figures added up
+      (the same four on all three maps of the second capture), and their current HP
+      (564 records) never went above it. Others got a stat 7 twice.
 
 **Effects, skill uses and cooldowns** (the Auras plugin's; checked on the second
 capture, where all 17,182 records parse):
@@ -432,6 +437,13 @@ capture, where all 17,182 records parse):
   base code) and the time left in ms (varint). It comes when something cuts or resets a
   cooldown, not when one starts: every Vicious Strike hit cut Warding Strike's by 2 s
   (its specialty "−2s [Warding Strike] cooldown on hit"), and an Annihilate reset sent 0.
+- **Chain skill offered `18 38` / withdrawn `19 38`:** 18 38 is the skill that set it
+  off (u32, as cast), a count u8 (1 in all 437), and the skill on offer (u32); 19 38 a
+  count u8 and the skill. Only the local player's: neither names anyone.
+  - In the second capture, Vicious Strike offered Decisive Strike (118 times), Decisive
+    Strike Desperate Strike (96), and Pummel Punishing Strike (223).
+  - Every offer was withdrawn: 379 after the skill on offer was used (0.15 to 1.5 s
+    after the offer), 58 when it ran out, 3.0 to 3.1 s after. The window is not sent.
 - **The skill list `13 38`** (at login and on each map, not read yet): 01, skill u32,
   01, skill u32 again, level u8, 10, level − 10, four 00, 0a. Its levels are what set the
   specialty slots (8: one, 12: two, 20: three).
@@ -442,8 +454,7 @@ capture, where all 17,182 records parse):
 - **Seen, not read:** `1b 92` is a party member's HP and MP (id, cur and max HP varints,
   MP u32 twice; 21,750 / 23,170), `1c 92` their position and legion name; `4a 36` the
   local player's stats (id, count u8, then stat u16 and value u32 pairs); `29 37` and
-  `2a 37` movement (an id and f32 positions in the spawn's space); `18 38` / `19 38` a
-  chain skill offered and withdrawn.
+  `2a 37` movement (an id and f32 positions in the spawn's space).
 
 **Unknown or guessed. Each needs a real capture (skill `decode-capture`):**
 - whether the "optional 00 pad" can be confused with a scalar of 0;

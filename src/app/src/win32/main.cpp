@@ -474,6 +474,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
                     input.now = app::aura_display_time(snapshot->now, static_cast<Micros>(since.count()));
                 }
                 input.pulse_s = std::chrono::duration<double>(Clock::now() - started).count();
+                aura_window.set_icon_px(settings.auras.icons ? static_cast<float>(settings.auras.icon_size) : 0.0f);
                 const app::OverlayActions actions = aura_window.render(settings.auras.scale, [&](float scale) {
                     input.scale = scale;
                     return app::draw_auras(input);

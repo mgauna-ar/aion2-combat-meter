@@ -35,7 +35,7 @@ inline constexpr PluginDescriptor COMBAT_METER{
 inline constexpr PluginDescriptor AURAS{
     PluginId::Auras,
     "Auras",
-    "Your buffs and debuffs, yours on the boss, and your cooldowns, in an overlay of their own",
+    "Your buffs and debuffs, yours on the boss, your cooldowns and alerts, in an overlay of their own",
     "auras",
     false,
 };

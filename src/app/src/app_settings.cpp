@@ -79,6 +79,8 @@ void sanitize(AppSettings& s) {
     s.auras.height = std::clamp(s.auras.height, 90, 4000);
     s.auras.min_duration_s = std::clamp(s.auras.min_duration_s, 0.0f, 60.0f);
     s.auras.min_cooldown_s = std::clamp(s.auras.min_cooldown_s, 0.0f, 120.0f);
+    s.auras.icon_size = std::clamp(s.auras.icon_size, kMinAuraIcon, kMaxAuraIcon);
+    s.auras.low_hp_percent = std::clamp(s.auras.low_hp_percent, 5, 90);
     if (s.auras.watch.size() > kMaxWatchedEffects) s.auras.watch.resize(kMaxWatchedEffects);
     s.meter.idle_timeout_s = std::clamp(s.meter.idle_timeout_s, 2.0, 600.0);
     s.meter.boss_idle_timeout_s = std::clamp(s.meter.boss_idle_timeout_s, s.meter.idle_timeout_s, 1800.0);

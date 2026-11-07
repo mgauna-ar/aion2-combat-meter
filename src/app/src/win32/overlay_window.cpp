@@ -229,8 +229,10 @@ void OverlayWindow::rebuild_fonts(float scale) {
     } else {
         io.FontGlobalScale = 1.0f;
     }
-    // Class emblems and skill icons, a text line tall as drawn, in the font's texture.
-    build_atlas_with_icons(*io.Fonts, std::round(kBaseFontSize * scale));
+    // Class emblems and skill icons in the font's texture, at the size they are drawn:
+    // a text line, or the aura overlay's icon size.
+    build_atlas_with_icons(*io.Fonts, std::round((m_icon_px > 0.0f ? m_icon_px : kBaseFontSize) * scale));
+    m_built_icon_px = m_icon_px;
     // The atlas texture is rebuilt by the next NewFrame.
     ImGui_ImplDX11_InvalidateDeviceObjects();
 
@@ -313,7 +315,7 @@ OverlayActions OverlayWindow::render(float scale_setting, const std::function<Ov
         if (!m_render_target) return {};
     }
     const float scale = scale_setting * dpi_scale();
-    if (std::fabs(scale - m_font_scale) > 0.01f) rebuild_fonts(scale);
+    if (std::fabs(scale - m_font_scale) > 0.01f || m_icon_px != m_built_icon_px) rebuild_fonts(scale);
 
     ImGui_ImplDX11_NewFrame();
     ImGui_ImplWin32_NewFrame();

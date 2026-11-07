@@ -44,6 +44,21 @@ void cooldowns_card(const AppFrameInput& in, AppActions& out) {
     end_settings_card();
 }
 
+void alerts_card(const AppFrameInput& in, AppActions& out) {
+    begin_settings_card("##auras_alerts", ICON_BELL, "ALERTS", colors::Warning);
+    AuraSettings& a = in.settings->auras;
+    setting_switch("Chain skills", "Lights up a chain skill while the game offers it: Decisive Strike after Vicious Strike.",
+                   &a.show_chains, out);
+    setting_switch("Ready cooldowns",
+                   "A cooldown coming back shows \"Ready\" for a moment; as icons, ready skills stay lit.",
+                   &a.show_ready, out);
+    setting_switch("Low HP", "Flags your HP under the threshold below, as a share of your max.", &a.low_hp_alert, out);
+    if (!a.low_hp_alert) ImGui::BeginDisabled();
+    setting_slider("Low HP under", "Your HP as a share of your max.", &a.low_hp_percent, 5, 90, "%d%%", out);
+    if (!a.low_hp_alert) ImGui::EndDisabled();
+    end_settings_card();
+}
+
 void watch_card(const AppFrameInput& in, AppActions& out) {
     begin_settings_card("##auras_watch", ICON_CHECKLIST, "WATCH LIST", colors::Violet);
     AuraSettings& a = in.settings->auras;
@@ -84,6 +99,11 @@ void overlay_card(const AppFrameInput& in, AppActions& out) {
     AuraSettings& a = in.settings->auras;
     setting_switch("Lock", "Click-through and fixed in place. Ctrl+Alt+L locks or unlocks every overlay.", &a.locked,
                    out, Applies::Overlay);
+    setting_switch("Icons", "Icons in a grid, with their time left, instead of bars.", &a.icons, out, Applies::Overlay);
+    if (!a.icons) ImGui::BeginDisabled();
+    setting_slider("Icon size", "In pixels, before the scale.", &a.icon_size, kMinAuraIcon, kMaxAuraIcon, "%d px", out,
+                   Applies::Overlay);
+    if (!a.icons) ImGui::EndDisabled();
     setting_slider("Opacity", "Of its background; the bars stay solid.", &a.opacity, 0.0f, 1.0f, "%.2f", out,
                    Applies::Overlay);
     setting_slider("Scale", "On top of the monitor's own scaling.", &a.scale, 0.6f, 2.5f, "%.2fx", out,
@@ -124,8 +144,8 @@ void render_auras_page(const AppFrameInput& in, AppViewState&, AppActions& out) 
                          "Your buffs, debuffs and cooldowns, in an overlay of their own");
     if (in.settings == nullptr || render_plugin_disabled_gate(in, out, plugins::PluginId::Auras)) return;
     const SettingsSection sections[] = {
-        {[&] { effects_card(in, out); }},  {[&] { cooldowns_card(in, out); }},  {[&] { watch_card(in, out); }},
-        {[&] { overlay_card(in, out); }},  {[&] { visibility_card(in, out); }},
+        {[&] { effects_card(in, out); }}, {[&] { cooldowns_card(in, out); }},   {[&] { alerts_card(in, out); }},
+        {[&] { watch_card(in, out); }},   {[&] { overlay_card(in, out); }},      {[&] { visibility_card(in, out); }},
     };
     render_settings_grid(sections, std::size(sections));
 }

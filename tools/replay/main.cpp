@@ -49,7 +49,7 @@ void usage() {
                  "                    minute, and the average time between them\n"
                  "  --events          every decoded event but heartbeats and --auras', one per line\n"
                  "  --auras           effects put on and taken off, and the local player's skill\n"
-                 "                    uses and cooldown changes\n"
+                 "                    uses, cooldown changes and chain skills on offer\n"
                  "  --opcodes         count, body sizes and parse failures per opcode\n"
                  "  --unknown         hex dump frames the parser does not read or failed on\n"
                  "  --dump OPS        hex dump frames of these opcodes: hex, comma separated\n"

@@ -106,6 +106,12 @@ TEST_CASE(AppSettings, AurasRoundTripWithTheirWatchList) {
     s.auras.x = 300;
     s.auras.min_duration_s = 2.5f;
     s.auras.watch = {18'190'000, 3'539'981'065u};
+    s.auras.icons = true;
+    s.auras.icon_size = 48;
+    s.auras.show_chains = false;
+    s.auras.show_ready = false;
+    s.auras.low_hp_alert = false;
+    s.auras.low_hp_percent = 45;
     const AppSettings back = settings_from_json(settings_to_json(s));
     TEST_ASSERT(back.plugins.auras);
     TEST_ASSERT(back.auras.locked);
@@ -115,6 +121,12 @@ TEST_CASE(AppSettings, AurasRoundTripWithTheirWatchList) {
     TEST_ASSERT_NEAR(back.auras.min_duration_s, 2.5f, 1e-6f);
     TEST_ASSERT_EQ(back.auras.watch.size(), size_t{2});
     TEST_ASSERT_EQ(back.auras.watch[1], uint32_t{3'539'981'065u});
+    TEST_ASSERT(back.auras.icons);
+    TEST_ASSERT_EQ(back.auras.icon_size, 48);
+    TEST_ASSERT_FALSE(back.auras.show_chains);
+    TEST_ASSERT_FALSE(back.auras.show_ready);
+    TEST_ASSERT_FALSE(back.auras.low_hp_alert);
+    TEST_ASSERT_EQ(back.auras.low_hp_percent, 45);
 
     // A hand-edited list keeps only whole u32 codes, each once.
     config::JsonValue bad = settings_to_json(s);
@@ -126,9 +138,13 @@ TEST_CASE(AppSettings, AurasRoundTripWithTheirWatchList) {
     }
     bad["auras"]["watch"] = config::JsonValue(std::move(watch));
     bad["auras"]["min_duration_s"] = 1000.0;
+    bad["auras"]["icon_size"] = 500.0;
+    bad["auras"]["low_hp_percent"] = 0.0;
     const AppSettings clean = settings_from_json(bad);
     TEST_ASSERT_EQ(clean.auras.watch.size(), size_t{1});
     TEST_ASSERT_NEAR(clean.auras.min_duration_s, 60.0f, 1e-6f);
+    TEST_ASSERT_EQ(clean.auras.icon_size, kMaxAuraIcon);
+    TEST_ASSERT_EQ(clean.auras.low_hp_percent, 5);
 
     TEST_ASSERT_FALSE(AppSettings{}.plugins.auras);
 }
@@ -225,7 +241,7 @@ TEST_CASE(AuraView, CooldownsLongEnoughAndRunning) {
     c[1].ready_at = now + 12'000'000;
     c[2].label = "Shield Smite";
     c[2].duration_ms = 8'850;
-    c[2].ready_at = now - 1;  // ready
+    c[2].ready_at = now - kReadyFlash;  // ready, and no longer new
     AuraSettings s;
     const auto shown = shown_cooldowns(c, s, now);
     TEST_ASSERT_EQ(shown.size(), size_t{1});
@@ -234,6 +250,77 @@ TEST_CASE(AuraView, CooldownsLongEnoughAndRunning) {
     TEST_ASSERT_EQ(shown_cooldowns(c, s, now).size(), size_t{2});
     s.show_cooldowns = false;
     TEST_ASSERT(shown_cooldowns(c, s, now).empty());
+}
+
+TEST_CASE(AuraView, ACooldownComingBackShowsReady) {
+    const Micros now = 1'792'152'000'000'000ULL;
+    std::vector<auras::CooldownEntry> c(3);
+    c[0].skill = 12'350'000;  // back a moment ago
+    c[0].duration_ms = 23'100;
+    c[0].ready_at = now - 400'000;
+    c[1].skill = 12'100'000;  // cooling
+    c[1].duration_ms = 8'850;
+    c[1].ready_at = now + 2'000'000;
+    c[2].skill = 12'040'000;  // back long ago
+    c[2].duration_ms = 12'000;
+    c[2].ready_at = now - 60'000'000;
+    TEST_ASSERT(just_ready(c[0], now));
+    TEST_ASSERT_FALSE(just_ready(c[1], now));
+    TEST_ASSERT_FALSE(just_ready(c[2], now));
+    TEST_ASSERT_FALSE(just_ready(c[0], now - 500'000));  // not back yet
+
+    // Bars: the cooling one, and the one just back, in the snapshot's order.
+    AuraSettings s;
+    auto shown = shown_cooldowns(c, s, now);
+    TEST_ASSERT_EQ(shown.size(), size_t{2});
+    TEST_ASSERT(shown[0] == &c[0] && shown[1] == &c[1]);
+    s.show_ready = false;
+    TEST_ASSERT_EQ(shown_cooldowns(c, s, now).size(), size_t{1});
+
+    // Icons: every one, ready or not, by skill code, so each keeps its place.
+    s.icons = true;
+    s.show_ready = true;
+    shown = shown_cooldowns(c, s, now);
+    TEST_ASSERT_EQ(shown.size(), size_t{3});
+    TEST_ASSERT(shown[0] == &c[2] && shown[1] == &c[1] && shown[2] == &c[0]);
+    s.show_ready = false;
+    TEST_ASSERT_EQ(shown_cooldowns(c, s, now).size(), size_t{1});
+}
+
+TEST_CASE(AuraView, LowHpUnderTheThresholdOnly) {
+    AuraSettings s;  // 30%
+    auras::AuraSnapshot a;
+    a.hp = 6'000;
+    TEST_ASSERT(!low_hp_percent(a, s).has_value());  // max not known yet
+    a.max_hp = 25'373;
+    TEST_ASSERT_EQ(low_hp_percent(a, s).value_or(-1), 23);
+    a.hp = 7'612;  // 30.0%: not under
+    TEST_ASSERT(!low_hp_percent(a, s).has_value());
+    a.hp = 10;
+    TEST_ASSERT_EQ(low_hp_percent(a, s).value_or(-1), 1);  // never reads 0 while alive
+    a.hp = 0;
+    TEST_ASSERT(!low_hp_percent(a, s).has_value());  // dead: nothing to warn of
+    a.hp = 6'000;
+    s.low_hp_percent = 20;
+    TEST_ASSERT(!low_hp_percent(a, s).has_value());
+    s.low_hp_percent = 30;
+    s.low_hp_alert = false;
+    TEST_ASSERT(!low_hp_percent(a, s).has_value());
+}
+
+TEST_CASE(AuraView, TilesWrapAcrossTheWindow) {
+    TEST_ASSERT(tile_layout(264.0f, 36.0f, 4.0f, 7) == (TileLayout{6, 2}));  // 6 * 36 + 5 * 4 = 236
+    TEST_ASSERT(tile_layout(276.0f, 36.0f, 4.0f, 7) == (TileLayout{7, 1}));  // exactly 7
+    TEST_ASSERT(tile_layout(20.0f, 36.0f, 4.0f, 3) == (TileLayout{1, 3}));   // narrower than one
+    TEST_ASSERT(tile_layout(264.0f, 36.0f, 4.0f, 0) == (TileLayout{6, 0}));
+    TEST_ASSERT_EQ(tile_initials("Delayed Explosion"), std::string("DE"));
+    TEST_ASSERT_EQ(tile_initials("poison"), std::string("Po"));
+    TEST_ASSERT_EQ(tile_initials("Effect 2920107"), std::string("E2"));
+    TEST_ASSERT_EQ(tile_initials(""), std::string("?"));
+    // An icon has room for less than a bar.
+    TEST_ASSERT_EQ(format_tile_time(82 * kMicrosPerSecond), std::string("1m"));
+    TEST_ASSERT_EQ(format_tile_time(17'400'000), std::string("17"));
+    TEST_ASSERT_EQ(format_tile_time(3'850'000), std::string("3.8"));
 }
 
 TEST_CASE(OverlayVisibility, AurasFollowTheirPluginAndTheirOwnConditions) {
