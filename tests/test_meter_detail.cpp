@@ -1,6 +1,7 @@
 #include "test_framework.hpp"
 #include "meter_test_support.hpp"
 
+#include "game/skill_names.hpp"
 #include "meter/encounter_engine.hpp"
 #include "meter/fight_detail.hpp"
 
@@ -512,4 +513,139 @@ TEST_CASE(Engine, AnUnnamedAllyIsUpAgainByTheirHp) {
     e.on_event(ev(at_s(6), hp(300, 20'000)));
     e.on_event(ev(at_s(7), hp(kMe, 0)));
     TEST_ASSERT(e.in_fight());
+}
+
+// ---- Casts ----------------------------------------------------------------------
+
+namespace {
+
+/// Pummel, and a variant of it (other specialties).
+constexpr uint32_t kPummel = 12'040'230;
+constexpr uint32_t kPummelVariant = 12'040'237;
+/// A Templar passive going off, as the dungeon capture had it.
+constexpr uint32_t kPassive = 12'730'001;
+
+const SkillCasts* casts_of(const CombatantTotals& c, uint32_t code) {
+    for (const SkillCasts& s : c.cast_skills) {
+        if (s.code == game::skill_key(code)) return &s;
+    }
+    return nullptr;
+}
+
+} // namespace
+
+TEST_CASE(Engine, PressesCountPerSkillAndProcsDoNot) {
+    EncounterEngine e = setup();
+    e.on_event(ev(at_s(1), hit(kMe, kBoss, 100)));
+    for (const double t : {2.0, 4.0, 6.0}) e.on_event(ev(at_s(t), press(kMe, kPummel, kBoss)));
+    e.on_event(ev(at_s(8), press(kMe, kPummelVariant, kBoss)));
+    e.on_event(ev(at_s(5), proc(kMe, kPassive)));
+    // An NPC's skill (7 digits) is not a player's cast.
+    e.on_event(ev(at_s(6), press(kBoss, 2'900'100, kMe)));
+    e.on_event(ev(at_s(9), hit(kMe, kBoss, 100)));
+    const FightSummary s = e.current();
+    TEST_ASSERT(s.has_casts);
+    const CombatantTotals& me = row_of(s, kMe);
+    TEST_ASSERT_EQ(me.casts, uint64_t{4});
+    TEST_ASSERT_EQ(me.cast_skills.size(), size_t{1});
+    const SkillCasts* pummel = casts_of(me, kPummel);
+    TEST_ASSERT(pummel != nullptr);
+    TEST_ASSERT_EQ(pummel->casts, uint64_t{4});
+    TEST_ASSERT_NEAR(pummel->first_s, 1.0, 1e-9);
+    TEST_ASSERT_NEAR(pummel->last_s, 7.0, 1e-9);
+    TEST_ASSERT_NEAR(pummel->mean_gap_s(), 2.0, 1e-9);
+    TEST_ASSERT_NEAR(me.casts_per_minute(s.duration_s), 30.0, 1e-9);
+}
+
+TEST_CASE(Engine, OnlyTheOpeningPressLeadsIntoAFight) {
+    EncounterEngine e = setup();
+    e.on_event(ev(at_s(0.5), press(kMe, kPummel, kBoss)));
+    e.on_event(ev(at_s(3.2), press(kMe, kPummel, kBoss)));
+    // A press never starts a fight.
+    TEST_ASSERT_FALSE(e.in_fight());
+    e.on_event(ev(at_s(3.5), hit(kMe, kBoss, 100)));
+    const FightSummary s = e.current();
+    const CombatantTotals& me = row_of(s, kMe);
+    // The one 0.3 s before the first hit counts; the one 3 s before does not.
+    TEST_ASSERT_EQ(me.casts, uint64_t{1});
+    TEST_ASSERT_NEAR(me.cast_skills.at(0).first_s, -0.3, 1e-9);
+}
+
+TEST_CASE(Engine, APressNeverExtendsAFight) {
+    // A mob, not the boss: 10 s with no party hit ends the fight.
+    constexpr EntityId kMob = 0x4200;
+    EncounterEngine e = setup();
+    e.on_event(ev(at_s(0), npc(kMob, 100'000)));
+    e.on_event(ev(at_s(1), hit(kMe, kMob, 100)));
+    e.on_event(ev(at_s(5), press(kMe, kPummel, kMob)));
+    e.on_event(ev(at_s(9), press(kMe, kPummel, kMob)));
+    e.tick(at_s(11.5));
+    TEST_ASSERT_FALSE(e.in_fight());
+    const FightSummary s = e.take_finished().at(0);
+    TEST_ASSERT(s.end_reason == EndReason::Idle);
+    TEST_ASSERT_EQ(row_of(s, kMe).casts, uint64_t{2});
+    TEST_ASSERT_NEAR(s.duration_s, 1.0, 1e-9);
+}
+
+TEST_CASE(Engine, ASummonsSkillsAreNotItsOwnersCasts) {
+    EncounterEngine e = setup();
+    e.on_event(ev(at_s(0), summon(kSpirit, kMe)));
+    e.on_event(ev(at_s(1), hit(kMe, kBoss, 100)));
+    e.on_event(ev(at_s(2), press(kSpirit, 16'990'010, kBoss)));
+    e.on_event(ev(at_s(3), press(kMe, kPummel, kBoss)));
+    TEST_ASSERT_EQ(row_of(e.current(), kMe).casts, uint64_t{1});
+}
+
+TEST_CASE(Engine, AnAllysPressesCountOnceTheyHit) {
+    // No roster: an ally counts once they hit, and their presses since the fight
+    // began (and the one leading into their first hit) go in with them.
+    EncounterEngine e = setup();
+    e.on_event(ev(at_s(1), hit(kMe, kBoss, 100)));
+    e.on_event(ev(at_s(2), press(kAlly, kPummel, kBoss)));
+    TEST_ASSERT_EQ(e.current().combatants.size(), size_t{1});
+    e.on_event(ev(at_s(2.3), hit(kAlly, kBoss, 100)));
+    e.on_event(ev(at_s(4), press(kAlly, kPummel, kBoss)));
+    TEST_ASSERT_EQ(row_of(e.current(), kAlly).casts, uint64_t{2});
+}
+
+TEST_CASE(Engine, AStrangerOutsideTheRosterCastsNothing) {
+    EncounterEngine e = setup();
+    e.on_event(ev(at_s(0), player(300, "Zikel")));
+    e.on_event(ev(at_s(0), roster({"Ariel", "Lumiel"})));
+    e.on_event(ev(at_s(1), hit(kMe, kBoss, 100)));
+    e.on_event(ev(at_s(2), press(300, kPummel, kBoss)));
+    e.on_event(ev(at_s(2.2), hit(300, kBoss, 100)));
+    // With a roster, a member's presses count before any hit of theirs.
+    e.on_event(ev(at_s(3), press(kAlly, kPummel, kBoss)));
+    e.on_event(ev(at_s(3.4), hit(kAlly, kBoss, 100)));
+    const FightSummary s = e.current();
+    for (const CombatantTotals& c : s.combatants) TEST_ASSERT(c.id != EntityId{300});
+    TEST_ASSERT_EQ(row_of(s, kAlly).casts, uint64_t{1});
+}
+
+TEST_CASE(Engine, APressAddsNoOneToAFight) {
+    // A member who only pressed (a buff, say) did not take part: no row of theirs.
+    EncounterEngine e = setup();
+    e.on_event(ev(at_s(0), roster({"Ariel", "Lumiel"})));
+    e.on_event(ev(at_s(1), hit(kMe, kBoss, 100)));
+    e.on_event(ev(at_s(2), press(kAlly, kPummel, kAlly)));
+    const FightSummary s = e.current();
+    TEST_ASSERT_EQ(s.combatants.size(), size_t{1});
+    TEST_ASSERT_EQ(s.combatants[0].id, kMe);
+}
+
+TEST_CASE(Engine, ACharactersRowsJoinTheirCasts) {
+    EncounterEngine e = setup();
+    e.on_event(ev(at_s(1), hit(300, kBoss, 1'000)));
+    e.on_event(ev(at_s(1.5), press(300, kPummel, kBoss)));
+    e.on_event(ev(at_s(2), player(300, "Lumiel")));
+    e.on_event(ev(at_s(3), hit(kAlly, kBoss, 500)));
+    e.on_event(ev(at_s(4.5), press(kAlly, kPummelVariant, kBoss)));
+    const FightSummary s = e.current();
+    TEST_ASSERT_EQ(s.combatants.size(), size_t{1});
+    const SkillCasts* pummel = casts_of(s.combatants[0], kPummel);
+    TEST_ASSERT(pummel != nullptr);
+    TEST_ASSERT_EQ(pummel->casts, uint64_t{2});
+    TEST_ASSERT_NEAR(pummel->first_s, 0.5, 1e-9);
+    TEST_ASSERT_NEAR(pummel->last_s, 3.5, 1e-9);
 }

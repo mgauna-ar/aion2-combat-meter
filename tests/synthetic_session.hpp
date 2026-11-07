@@ -49,6 +49,8 @@ struct DeathTruth {
 /// What the capture holds, to check the meter against.
 struct Truth {
     std::map<uint64_t, uint64_t> damage;  // by player, summon folded into its owner
+    /// Presses (02 38 mode 2) by player in the fight: their own, not the spirit's.
+    std::map<uint64_t, uint64_t> casts;
     double first_hit_s{0};
     double last_hit_s{0};
     double death_s{0};
@@ -108,6 +110,8 @@ private:
 /// then goes back to town. Heartbeats every 50 ms throughout; some hits arrive in
 /// LZ4 bundles, as the server sends them. Ariel bursts for five seconds, Zikel
 /// stops hitting for five, and Lumiel dies to a crit and is up again 4 s later.
+/// Each player presses a skill before most of their hits (every fifth hit is the
+/// same press striking again), and a passive of Ariel's goes off now and then.
 inline Session boss_session() {
     using proto::opcode::Damage;
     SessionWriter w;
@@ -172,6 +176,18 @@ inline Session boss_session() {
     script.emplace_back(22.0, opcode_frame(proto::opcode::SkillUse, skill_use_body(15'230'010)));   // Arctic Armor, 90 s
     script.emplace_back(25.0, opcode_frame(proto::opcode::CooldownSet, cooldown_body(15'060'000, 22'000)));
     script.emplace_back(28.8, opcode_frame(proto::opcode::SkillUse, skill_use_body(15'040'030)));   // Firestorm, 5 s
+    // Presses that land no hit: Ariel's Arctic Armor (as its 01 38 above) and her
+    // Dodges. And Fire Mark, a passive, going off: no press.
+    const auto cast = [&](double t, uint64_t caster, uint32_t skill, uint64_t target, bool pressed) {
+        script.emplace_back(t, opcode_frame(proto::opcode::Cast, cast_body(caster, skill, target, pressed)));
+    };
+    cast(22.0, kMe, 15'230'010, kMe, true);
+    truth.casts[kMe] += 1;
+    for (const double t : {18.2, 33.2, 47.2}) {
+        cast(t, kMe, 15'000'100, kMe, true);
+        truth.casts[kMe] += 1;
+    }
+    for (int i = 0; i < 12; ++i) cast(6.3 + 4.0 * i, kMe, 15'710'001, kMe, false);
 
     // Lumiel's death: two hits, a heal, and a crit that kills; her HP back 4 s later.
     // She does not hit while down.
@@ -202,11 +218,17 @@ inline Session boss_session() {
     const uint32_t gladiator[] = {11010000, 11020000, 11040000, 11050000};
     const uint32_t elementalist[] = {16020030, 16030030, 16040020, 16060010};
     const auto land = [&](double t, uint64_t actor, uint64_t credit_to, uint64_t amount, bool crit, bool back,
-                          bool bundled, uint32_t skill, uint8_t modifiers) {
+                          bool bundled, uint32_t skill, uint8_t modifiers, bool pressed) {
         if (dead) return;
         if (actor == kAlly && t > lumiel.at_s && t < lumiel.up_s) return;
         // Zikel steps out for five seconds; the spirit goes on.
         if (actor == kAlly2 && t >= 36.0 && t < 41.0) return;
+        // The press comes about 80 ms ahead of its hit, the first one before the
+        // fight's first hit.
+        if (pressed) {
+            cast(t - 0.08, actor, skill, boss, true);
+            truth.casts[credit_to] += 1;
+        }
         DamageSpec d;
         d.target = boss;
         d.actor = actor;
@@ -241,13 +263,15 @@ inline Session boss_session() {
                                                   (i % 9 == 0 ? proto::hit_modifier::Double : 0));
         // Ariel's burst: more than twice her usual for five seconds.
         const uint64_t ariel = 9'000 + static_cast<uint64_t>(i * 37 % 2000);
+        const bool pressed = i % 5 != 4;
         land(t, kMe, kMe, t >= 15.0 && t < 20.0 ? ariel * 22 / 10 : ariel, i % 4 == 0, i % 3 == 0, i % 10 == 5,
-             pick(sorcerer), mods);
+             pick(sorcerer), mods, pressed);
         land(t + 0.1, kAlly, kAlly, 11'000 + static_cast<uint64_t>(i * 53 % 3000), i % 5 == 0, false, false,
-             pick(gladiator), 0);
+             pick(gladiator), 0, pressed);
         land(t + 0.2, kAlly2, kAlly2, 7'000 + static_cast<uint64_t>(i * 29 % 1500), false, i % 2 == 0, false,
-             pick(elementalist), mods);
-        if (i % 2 == 0) land(t + 0.3, spirit, kAlly2, 3'000, false, false, false, 16120002, 0);
+             pick(elementalist), mods, pressed);
+        // A spirit's skills are its own: no press of its owner's.
+        if (i % 2 == 0) land(t + 0.3, spirit, kAlly2, 3'000, false, false, false, 16120002, 0, false);
         if (i % 6 == 0) {
             // The boss hits back: damage taken, which starts nothing.
             DamageSpec back;

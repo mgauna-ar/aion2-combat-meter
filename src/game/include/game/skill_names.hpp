@@ -9,7 +9,9 @@
 namespace aion2::game {
 
 /// The skill a code is a variant of: a class skill's code less its low four digits
-/// (12240347 → 12240000). Other codes are their own skill.
+/// (12240347 → 12240000), or less its low two in the class's common block, where
+/// the weapon and Dodge are a hundred apart (12000101 → 12000100, Dodge). Other
+/// codes are their own skill.
 [[nodiscard]] uint32_t skill_base(uint32_t code) noexcept;
 
 /// The code a breakdown files a hit under: the code itself when the table names it,

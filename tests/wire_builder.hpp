@@ -453,6 +453,28 @@ inline Bytes cooldown_body(uint32_t skill, uint32_t remaining_ms) {
     return b;
 }
 
+/// 02 38: `caster`'s `skill` going off at `target`. A press (mode 2) carries a
+/// position; anything else (mode 0) one f32. The tails are the capture's shapes.
+inline Bytes cast_body(uint64_t caster, uint32_t skill, uint64_t target, bool pressed, uint8_t sequence = 1) {
+    Bytes b;
+    put_varint(b, caster);
+    b.push_back(0x00);
+    put_le32(b, skill);
+    b.push_back(sequence);
+    b.push_back(pressed ? 0x02 : 0x00);
+    put_varint(b, target);
+    if (pressed) {
+        put_f32(b, -83.0f);
+        put_f32(b, 12.1f);
+        put_f32(b, -99.3f);
+        put_f32(b, 0.0f);
+    } else {
+        put_f32(b, 188.4f);
+    }
+    put_bytes(b, {0x90, 0x4e, 0x01, 0x00});
+    return b;
+}
+
 inline Bytes death_body(uint64_t id) {
     Bytes b;
     put_varint(b, id);

@@ -50,6 +50,10 @@ constexpr uint8_t kBuffHasSkill = 0x02;
 constexpr uint64_t kBuffPermanent = ~uint64_t{0};
 /// Most entries one 47 38 is believed to carry: every one seen had one.
 constexpr uint8_t kMaxCooldownEntries = 16;
+/// 02 38's mode byte: a press carries a position (2); a passive going off, a chain's
+/// follow-up or a mantra's pulse does not (0). No other was seen in 28,550 records.
+constexpr uint8_t kCastPressed = 2;
+constexpr uint8_t kCastUnpressed = 0;
 
 enum class Record : uint8_t { Damage, CastMarker, Failed };
 
@@ -85,6 +89,23 @@ Record read_damage_record(ByteReader& r, Damage& d) {
         (void)r.varint();  // tail
     }
     return r.ok() ? Record::Damage : Record::Failed;
+}
+
+/// 02 38: caster varint, a byte (0 in nearly all), skill u32, a sequence u8 (counting
+/// up per caster), the mode u8, target varint, then a position (mode 2) or a shorter
+/// tail (mode 0), neither read. An unknown mode fails, so a patch that moves it shows.
+std::optional<SkillCast> read_cast(ByteReader& r) {
+    SkillCast c;
+    c.caster = normalize_entity_id(r.varint());
+    (void)r.u8();  // meaning unknown: 0, or 8, 12, 32 on a few
+    c.skill = r.u32le();
+    (void)r.u8();  // sequence
+    const uint8_t mode = r.u8();
+    c.target = normalize_entity_id(r.varint());
+    if (!r.ok() || c.caster == 0 || c.skill == 0) return std::nullopt;
+    if (mode != kCastPressed && mode != kCastUnpressed) return std::nullopt;
+    c.pressed = mode == kCastPressed;
+    return c;
 }
 
 /// 05 38 into `out`, left empty for a record with nothing to count. False when the
@@ -338,6 +359,7 @@ void PacketParser::parse(const Frame& frame, std::vector<ParsedEvent>& out) {
         case opcode::BuffAdd:
         case opcode::BuffRenew:
         case opcode::BuffRemove:
+        case opcode::Cast:
             if (parse_known(frame, out)) {
                 ++m_stats.decoded;
             } else {
@@ -346,8 +368,7 @@ void PacketParser::parse(const Frame& frame, std::vector<ParsedEvent>& out) {
             }
             return;
         case opcode::Pong:
-        case opcode::Cast:
-            return;  // read by nothing in v1, and never carry identities
+            return;  // read by nothing, and never carries identities
         default:
             break;
     }
@@ -424,6 +445,12 @@ bool PacketParser::parse_known(const Frame& frame, std::vector<ParsedEvent>& out
             const auto values = read_entity_values(r);
             if (!values) return false;
             emit(*values);
+            return true;
+        }
+        case opcode::Cast: {
+            const auto cast = read_cast(r);
+            if (!cast) return false;
+            emit(*cast);
             return true;
         }
         case opcode::SkillUse: {

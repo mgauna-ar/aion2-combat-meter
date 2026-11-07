@@ -136,6 +136,10 @@ void Report::on_event(const proto::ParsedEvent& pe, const meter::CombatantRegist
             } else if constexpr (std::is_same_v<T, proto::CooldownSet>) {
                 std::printf("%+.3f  cooldown  %s (%u) %.2f s left\n", t, game::skill_label(e.skill).c_str(), e.skill,
                             static_cast<double>(e.remaining_ms) / 1000.0);
+            } else if constexpr (std::is_same_v<T, proto::SkillCast>) {
+                std::printf("%+.3f  cast      %s -> %s  %s (%u) %s\n", t, who(e.caster, reg).c_str(),
+                            who(e.target, reg).c_str(), game::skill_label(e.skill).c_str(), e.skill,
+                            e.pressed ? "pressed" : "proc");
             } else if constexpr (std::is_same_v<T, proto::Heartbeat>) {
                 // Twenty a second: the flow summary counts them.
             } else if constexpr (std::is_same_v<T, proto::Identity>) {
@@ -210,6 +214,7 @@ void Report::on_fight(const meter::FightSummary& f) {
         for (const auto& c : f.combatants) print_breakdown(c);
     }
     print_detail(f);
+    print_casts(f);
     const auto& q = f.quality;
     std::printf("  capture %s: %" PRIu64 " gap bytes, %" PRIu64 " resyncs, %" PRIu64 " bundle errors%s\n",
                 q.clean() ? "clean" : "lossy", q.gap_bytes, q.resyncs, q.bundle_errors,
@@ -304,6 +309,26 @@ void Report::print_detail(const meter::FightSummary& f) const {
                         std::string(meter::effect_side_name(r.side)).c_str(),
                         game::effect_label(r.buff_id, r.source_skill).c_str(), target.c_str(), caster.c_str(),
                         r.applications, r.active_s, 100.0 * r.uptime(f.duration_s));
+        }
+    }
+}
+
+void Report::print_casts(const meter::FightSummary& f) const {
+    if (!m_opt.casts) return;
+    if (!f.has_casts) {
+        std::printf("  no casts\n");
+        return;
+    }
+    const double minutes = f.duration_s / 60.0;
+    for (const auto& c : f.combatants) {
+        std::printf("  casts  %-16s %5" PRIu64 "  %5.1f a minute\n",
+                    name(c.name.starts_with('#') ? std::string() : c.name, c.id).c_str(), c.casts,
+                    minutes > 0.0 ? static_cast<double>(c.casts) / minutes : 0.0);
+        for (const meter::SkillCasts& s : c.cast_skills) {
+            std::printf("    %-26.26s %5" PRIu64 "  %5.1f a minute", game::skill_label(s.code).c_str(), s.casts,
+                        minutes > 0.0 ? static_cast<double>(s.casts) / minutes : 0.0);
+            if (s.casts >= 2) std::printf("  every %.2f s", s.mean_gap_s());
+            std::printf("  first %+.2f s\n", s.first_s);
         }
     }
 }

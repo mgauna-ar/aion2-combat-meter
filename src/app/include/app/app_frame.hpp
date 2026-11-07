@@ -24,7 +24,7 @@ namespace aion2::app {
 enum class AppPage : uint8_t { Dashboard, Meter, Auras, Settings };
 
 /// The Combat Meter page's tabs, in their order.
-enum class MeterTab : int { Damage, Healing, Taken, Buffs, Timeline, Deaths, Settings };
+enum class MeterTab : int { Damage, Healing, Taken, Buffs, Casts, Timeline, Deaths, Settings };
 
 /// What the window remembers between frames.
 struct AppViewState {
@@ -36,6 +36,7 @@ struct AppViewState {
     meter::EntityId damage_player{0};
     meter::EntityId heal_player{0};
     meter::EntityId taken_player{0};
+    meter::EntityId casts_player{0};
     /// A Combat Meter tab to open on the next frame.
     std::optional<MeterTab> open_meter_tab;
     /// The Buffs & Debuffs tab's view.

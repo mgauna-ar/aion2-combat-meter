@@ -29,6 +29,9 @@ const char* find(uint32_t code) noexcept {
 
 uint32_t skill_base(uint32_t code) noexcept {
     if (code < kClassCodeMin || code > kClassCodeMax) return code;
+    // A class's common block holds skills a hundred apart: its weapon (XX0000xx) and
+    // Dodge (XX0001xx). By the ten thousands, a Dodge variant read as the weapon.
+    if (code / 10'000 % 100 == 0) return code - code % 100;
     return code - code % 10'000;
 }
 

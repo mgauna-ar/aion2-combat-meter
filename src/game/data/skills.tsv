@@ -1,8 +1,9 @@
 # AION 2 skill names by skill code, as damage (04 38) and tick (05 38) records
 # carry them. A code is 8 digits: the first two are the class (11 Gladiator to
 # 18 Chanter, 19 Brawler), code / 10000 is the skill, and the low four digits a
-# variant. A variant without a row of its own takes its skill's name. The
-# third column, when there is one, names the skill's icon, which
+# variant. In each class's common block (XX00xxxx), its weapon and Dodge, the
+# skill is code / 100. A variant without a row of its own takes its skill's
+# name. The third column, when there is one, names the skill's icon, which
 # tools/gen_icon_sheet.py packs for the app.
 #
 # Source: aion2.app's skill database (aion2.app/db/skills), retrieved 2026-11-06;

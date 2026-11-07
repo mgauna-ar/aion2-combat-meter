@@ -9,7 +9,8 @@ It shows what the game's own Combat Analysis window (Ctrl+X) shows, but for ever
 member: damage, hit counts, crit, perfect, double, back and front rates for each player
 and each of their skills; healing; damage taken; and every saved fight, grouped by visit
 to a map, one entry per dungeon run. Beyond the game's window, each fight is kept second
-by second, with its deaths and how long every buff and debuff was up.
+by second, with its deaths, how long every buff and debuff was up, and what each player
+pressed.
 
 ![The overlay during a boss fight: three players ranked by DPS, the boss's HP bar and the fight timer](../../docs/images/overlay-live.png)
 
@@ -72,6 +73,13 @@ The Combat Meter page shows the fight on view, live or saved, in tabs:
   who had it. *Debuffs on party* lists what enemies put on you, the most frequent
   first; *On enemies* the party's own effects on them, where uptime is the best one
   player kept up (a DoT's uptime on the boss). Passives are left out.
+- **Casts**: what each player pressed, ranked by casts a minute. Select a player for
+  their skills: how often each was pressed, the average time between presses, and its
+  direct hits per press (above 1 for a skill that strikes twice, or several targets).
+  A player's own presses only: passives going off, mantra pulses and summons' skills
+  don't count. The cast that opens a fight comes just before its first hit, so it can
+  read as 0:00. On a recorded dungeon run it matched the local player's own presses
+  for 97%.
 - **Timeline**: each player's DPS, HPS or damage taken second by second, smoothed over
   5, 15 or 30 s; the boss's HP on its own scale (right); a skull for each death, with a
   bar until the player was up again; and bands where one player's buff was on two or
@@ -88,6 +96,8 @@ A fight saved by a version before these has none of them, and each tab says so.
 ![The Deaths tab: one death with its killing blow, and the hits and heals in the 12 seconds before it](../../docs/images/app-deaths.png)
 
 ![The Buffs & Debuffs tab: each buff on the party with who put it on, how often, for how long, and its uptime](../../docs/images/app-buffs.png)
+
+![The Casts tab: three players ranked by casts a minute, and one player's skills with their casts, share, casts a minute, average gap and hits per cast](../../docs/images/app-casts.png)
 
 ![The Combat Meter page's Settings tab: the overlay, its visibility, fight tracking and saved fights](../../docs/images/app-settings.png)
 

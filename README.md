@@ -16,8 +16,9 @@ each with its own page in the app window and its own switch:
   has the live fight: the party ranked by DPS, the boss's HP and the fight timer. The
   app window has the details: damage, hit counts, crit, perfect, double, back and front
   rates for each player and each of their skills; healing; damage taken; each fight
-  second by second, its deaths and how long every buff and debuff was up; and every
-  saved fight, grouped by visit to a map, one entry per dungeon run.
+  second by second, its deaths, how long every buff and debuff was up, and what each
+  player pressed and how often; and every saved fight, grouped by visit to a map, one
+  entry per dungeon run.
 - **[Auras](plugins/auras/README.md)** (off until you switch it on): your buffs and
   debuffs and yours on the enemy you fight, each as a bar with the time it has left,
   your cooldowns, and a warning when a buff you watch for (a Chanter's mantra, say) is

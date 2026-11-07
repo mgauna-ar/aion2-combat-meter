@@ -144,7 +144,8 @@ src/app/         aion2::app
     src/ui/      the app window's pages (a page per plugin, opened by plugin_page's
                  header and master switch), theme, widgets, table (the meter's tables)
                  and Lucide icons (ported from ffxiv-hub; ImGui, behind HAVE_IMGUI);
-                 the Combat Meter page's view_timeline, view_deaths and view_effects
+                 the Combat Meter page's view_timeline, view_deaths, view_effects and
+                 view_casts
     src/win32/   main.cpp, app_window, overlay_window: Windows only
 tools/replay/    aion2meter-replay (every platform)
 tools/synth/     aion2meter-synth: writes the tests' made-up boss fight as a pcapng
@@ -266,12 +267,16 @@ BACK, FRNT, MULT and BLOC share matched it exactly.
     the damage (4.5 for one player in the first capture, about 10.6 for two others),
     and the last boss took 18.59M damage against 9.86M max HP. Never compare damage
     with HP: compare HP with HP.
-- **Skill codes** (in 04 38 and 05 38):
+- **Skill codes** (in 04 38, 05 38 and 02 38):
   - 8 digits. The first two are the class: 11 Gladiator, 12 Templar, 13 Assassin,
     14 Ranger, 15 Sorcerer, 16 Elementalist (the enum's Spiritmaster), 17 Cleric,
     18 Chanter, 19 Brawler.
   - `code / 10000` is the skill; the low four digits are a variant (12240340 and
     12240347 are both Judgment).
+  - Except in each class's common block, `XX00xxxx`, whose skills are a hundred
+    apart: its weapon (`XX0000xx`, "Equip Sorcerer Weapon") and Dodge (`XX0001xx`).
+    There `code / 100` is the skill (`game::skill_base`): read by the ten thousands,
+    the dungeon capture's Dodge 15000101 named the Sorcerer's weapon.
   - A spirit's attacks (1699xxxx) carry its summoner's class digits and have no name.
   - Names come from `src/game/data/skills.tsv`, taken from aion2.app's skill
     database. Checked against the first capture: every Templar and Elementalist code
@@ -288,6 +293,25 @@ BACK, FRNT, MULT and BLOC share matched it exactly.
     figure, with it to 97%.
   - Effects 02 to self (100,000, a spirit spawning), 08 and 38 (a boss skill on a
     trap, naming a player) are rare, and 08 and 38 fail to parse until understood.
+- **Cast `02 38`:** a skill going off, anyone's: caster varint, a byte, skill u32, a
+  sequence u8 (counting up per caster), a mode u8, target varint (the caster's own
+  for a self-cast), then a tail not read.
+  - **Mode 2 is a press,** and its tail a position (20–22 bytes). Mode 0 is a skill
+    going off unpressed, with a tail of 8–12 bytes. No other mode was seen in the
+    second capture's 28,550 records; the byte before the skill was 0 in all but 33
+    (8, 12 or 32).
+  - **Checked against the local player's own 01 38:** 1,154 of their 1,176 presses came
+    back as a 02 38 of the same skill from them, 11 ms later on average, 1,143 of
+    them in mode 2. Of their 1,137 other 02 38 records, 1,129 were mode 0: passives
+    going off (Punishing Benediction, 257 times), chain follow-ups (variant xx47 of
+    Vicious, Decisive and Desperate Strike), and every Chanter's mantras pulsing,
+    once a second (2,244 records, all mode 0).
+  - **Not quite every press:** two self-buffs (Defiance, Shield of Protection) came
+    back in mode 0, and a follow-up of Punishment's in mode 2 with no press. Over the
+    capture's five fights, the meter's casts matched the local player's 01 38, skill
+    by skill, for 97.2% of them.
+  - **NPCs' too:** 11,868 records carried 7-digit codes, 10,355 in mode 2. Nothing
+    reads them yet.
 - **Identity `33 36` (own) / `45 36` (other):** id varint, mask u32, flags u8 (bit 0:
   has a name), name length u8, name, server u16, a u32 read as the class.
   - 33 36 has a u16 of unknown meaning between the name and the server: 1406 in
@@ -423,6 +447,8 @@ capture, where all 17,182 records parse):
 - where the class is in 33 36 / 45 36, and what their "class" u32 and 33 36's extra
   u16 hold (`game/class_codes.cpp` is empty; skill codes give the class instead);
 - tick effects 08 and 38;
+- in `02 38`, the byte before the skill (8, 12 or 32 on a few records), and why two
+  self-buffs come back in mode 0;
 - what `0e 92` (an id and a byte, as often as 1a 92) means, and the byte before 2a 38's
   kind;
 - **the cooldown reduction.** The game shortens cooldowns by the Illusion [Kaisinel]
