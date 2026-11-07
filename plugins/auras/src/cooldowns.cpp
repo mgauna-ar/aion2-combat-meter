@@ -85,17 +85,23 @@ void CooldownTracker::on_set(uint32_t skill, uint32_t remaining_ms, Micros ts) {
     if (s.duration_ms < remaining_ms) s.duration_ms = remaining_ms;
 }
 
-std::vector<CooldownEntry> CooldownTracker::snapshot(Micros now) const {
+std::vector<CooldownEntry> CooldownTracker::snapshot(Micros) const {
     std::vector<CooldownEntry> out;
     for (const auto& [skill, s] : m_skills) {
         if (s.ready_at.empty()) continue;
         const Micros ready = *std::min_element(s.ready_at.begin(), s.ready_at.end());
-        if (ready <= now) continue;
         out.push_back(CooldownEntry{skill, game::skill_label(skill), ready, s.duration_ms, s.exact});
     }
-    std::sort(out.begin(), out.end(), [](const CooldownEntry& a, const CooldownEntry& b) {
+    const auto soonest = [](const CooldownEntry& a, const CooldownEntry& b) {
         return a.ready_at != b.ready_at ? a.ready_at < b.ready_at : a.skill < b.skill;
-    });
+    };
+    // Past the cap, the skills ready the longest go: they are the least use to show.
+    if (out.size() > kMaxListed) {
+        std::nth_element(out.begin(), out.begin() + kMaxListed, out.end(),
+                         [&](const CooldownEntry& a, const CooldownEntry& b) { return soonest(b, a); });
+        out.resize(kMaxListed);
+    }
+    std::sort(out.begin(), out.end(), soonest);
     return out;
 }
 

@@ -13,7 +13,7 @@ skill, for how much), and two plugins turn that into overlays and pages of the a
 | Plugin | Shows | At first |
 |---|---|---|
 | [⚔️ Combat Meter](plugins/combat_meter/README.md) | The game's Combat Analysis (Ctrl+X) for the whole party: damage, healing and damage taken, per skill; each fight's timeline, deaths, buff uptime and casts; every saved fight. | On |
-| [✨ Auras](plugins/auras/README.md) | Your buffs, debuffs and cooldowns, and yours on your target, as bars; a warning when a buff you watch for is missing. | Off |
+| [✨ Auras](plugins/auras/README.md) | Your buffs, debuffs and cooldowns, and yours on your target, as bars or icons; alerts when a chain skill is on offer, a cooldown is back, your HP runs low, or a buff you watch for is missing. | Off |
 
 ![The overlay during a boss fight: three players ranked by DPS, the boss's HP bar and the fight timer](docs/images/overlay-live.png)
 

@@ -2,6 +2,7 @@
 
 #include "game/npc_names.hpp"
 
+#include <algorithm>
 #include <tuple>
 
 namespace aion2::auras {
@@ -48,10 +49,27 @@ void Entities::on_values(const proto::RemainingHp& values) {
     const auto s = m_spawns.find(values.id);
     // An NPC or a summon is never the local player.
     if (values.self && s == m_spawns.end()) m_local = values.id;
+    if (values.id == m_local) {
+        if (m_health_id != m_local) {
+            m_health_id = m_local;
+            m_hp = m_max_hp = m_most_hp = 0;
+        }
+        if (values.has_hp) {
+            m_hp = values.hp;
+            m_most_hp = std::max(m_most_hp, values.hp);
+        }
+        if (values.has_max_hp) m_max_hp = values.max_hp;
+    }
     if (!values.has_hp || s == m_spawns.end()) return;
     // A mob in view before its spawn was seen: the most HP seen stands in for its max.
     if (values.hp > s->second.max_hp) s->second.max_hp = values.hp;
     if (values.hp > 0) s->second.dead = false;
+}
+
+Health Entities::local_health() const noexcept {
+    if (m_local == 0 || m_health_id != m_local) return {};
+    // HP above the stated max would be a max not sent again after it rose.
+    return Health{m_hp, m_max_hp != 0 ? std::max(m_max_hp, m_hp) : m_most_hp};
 }
 
 void Entities::on_damage(const proto::Damage& damage, Micros ts) {

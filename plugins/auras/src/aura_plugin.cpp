@@ -23,6 +23,10 @@ void AuraPlugin::on_event(const proto::ParsedEvent& event) {
             } else if constexpr (std::is_same_v<T, proto::CooldownSet>) {
                 on_own_cooldown();
                 m_cooldowns.on_set(e.skill, e.remaining_ms, ts);
+            } else if constexpr (std::is_same_v<T, proto::ChainOffered>) {
+                m_chains.on_offered(e, ts);
+            } else if constexpr (std::is_same_v<T, proto::ChainWithdrawn>) {
+                m_chains.on_withdrawn(e);
             } else if constexpr (std::is_same_v<T, proto::Identity>) {
                 m_entities.on_identity(e);
             } else if constexpr (std::is_same_v<T, proto::Spawn>) {
@@ -55,9 +59,13 @@ void AuraPlugin::on_map(const proto::MapLoad& m, uint32_t connection, Micros ts)
     // Ids may change on a reload too; the server sends each effect again.
     m_tracker.on_map_load(ts);
     m_entities.on_map_load(reload);
+    m_chains.clear();
 }
 
-void AuraPlugin::tick(Micros now) { m_tracker.prune(now, m_entities); }
+void AuraPlugin::tick(Micros now) {
+    m_tracker.prune(now, m_entities);
+    m_chains.prune(now);
+}
 
 void AuraPlugin::clear() { *this = AuraPlugin{}; }
 
@@ -72,6 +80,10 @@ AuraSnapshot AuraPlugin::snapshot(Micros now) const {
     const EntityId target = m_entities.target(now);
     AuraSnapshot s = m_tracker.snapshot(now, m_entities, target, target != 0 ? m_entities.label(target) : std::string{});
     s.cooldowns = m_cooldowns.snapshot(now);
+    s.chains = m_chains.snapshot(now);
+    const Health health = m_entities.local_health();
+    s.hp = health.hp;
+    s.max_hp = health.max_hp;
     return s;
 }
 

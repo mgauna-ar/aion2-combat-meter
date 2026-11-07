@@ -26,6 +26,10 @@ inline constexpr uint16_t Tick = 0x0538;
 inline constexpr uint16_t SkillUse = 0x0138;
 /// What is left of one of the local player's cooldowns, after a cut or a reset.
 inline constexpr uint16_t CooldownSet = 0x4738;
+/// A chain skill of the local player's on offer after the skill that sets it off,
+/// and the offer withdrawn: used, or let run out (about 3 s).
+inline constexpr uint16_t ChainOffered = 0x1838;
+inline constexpr uint16_t ChainWithdrawn = 0x1938;
 /// An effect put on an entity (a buff, a debuff, a mantra's pulse), and an
 /// instance of one renewed.
 inline constexpr uint16_t BuffAdd = 0x2A38;
@@ -54,6 +58,8 @@ inline constexpr uint16_t Bundle = 0xFFFF;
         case opcode::Tick: return "tick";
         case opcode::SkillUse: return "skill_use";
         case opcode::CooldownSet: return "cooldown";
+        case opcode::ChainOffered: return "chain_offered";
+        case opcode::ChainWithdrawn: return "chain_withdrawn";
         case opcode::BuffAdd: return "buff_add";
         case opcode::BuffRenew: return "buff_renew";
         case opcode::BuffRemove: return "buff_remove";

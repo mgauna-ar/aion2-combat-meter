@@ -72,6 +72,9 @@ struct CooldownEntry {
  */
 class CooldownTracker {
 public:
+    /// Most skills a snapshot lists; a session uses a few dozen.
+    static constexpr size_t kMaxListed = 64;
+
     /// A gap shorter than this share of the table's figure is a trigger or a reset,
     /// not the cooldown. The Illusion stat's reduction is capped at 60%; the second
     /// capture's character's cooldowns ran 8 to 12% under the table's.
@@ -82,7 +85,8 @@ public:
     /// Another character: what was learned was theirs.
     void clear() noexcept { m_skills.clear(); }
 
-    /// The skills cooling at `now`, the soonest ready first.
+    /// Every skill used this session, cooling at `now` or ready again (ready_at
+    /// <= now), the soonest ready first: the overlay lights up the ready ones.
     [[nodiscard]] std::vector<CooldownEntry> snapshot(Micros now) const;
     /// The cooldown the next use of `code` would start, for tests.
     [[nodiscard]] uint64_t estimate_ms(uint32_t code) const;

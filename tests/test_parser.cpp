@@ -423,6 +423,31 @@ TEST_CASE(Parser, EntityValuesHpAndSelf) {
     TEST_ASSERT_EQ(p.stats().failed, uint64_t{2});
 }
 
+TEST_CASE(Parser, EntityValuesMaxHp) {
+    // The capture's login: the local player's kind 3, one u32 value (stat 8) and one
+    // u64 value, stat 7, their max HP once their gear's figures had added up.
+    PacketParser p;
+    const Bytes login = {0xc3, 0x12, 0x03, 0x01, 0x08, 0x85, 0x0a, 0x00, 0x00, 0x01,
+                         0x07, 0x1d, 0x63, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+    const auto& max = only<RemainingHp>(parse_one(p, opcode::RemainingHp, login));
+    TEST_ASSERT_EQ(max.id, EntityId{2371});
+    TEST_ASSERT(max.self);
+    TEST_ASSERT_FALSE(max.has_hp);
+    TEST_ASSERT(max.has_max_hp);
+    TEST_ASSERT_EQ(max.max_hp, uint64_t{25'373});
+
+    // Both in one record, as kind 2 and kind 3 may carry them.
+    const auto& other = only<RemainingHp>(parse_one(p, opcode::RemainingHp, hp_body(2371, 21'729, 25'373)));
+    TEST_ASSERT(other.has_hp && other.has_max_hp);
+    TEST_ASSERT_EQ(other.hp, uint64_t{21'729});
+    TEST_ASSERT_EQ(other.max_hp, uint64_t{25'373});
+    const auto& both = only<RemainingHp>(parse_one(p, opcode::RemainingHp, both_values_body(2371, 6'000, 25'373)));
+    TEST_ASSERT(both.self && both.has_hp && both.has_max_hp);
+    TEST_ASSERT_EQ(both.max_hp, uint64_t{25'373});
+    TEST_ASSERT_FALSE(only<RemainingHp>(parse_one(p, opcode::RemainingHp, hp_body(2371, 5))).has_max_hp);
+    TEST_ASSERT_EQ(p.stats().failed, uint64_t{0});
+}
+
 TEST_CASE(Parser, PartyRosterNames) {
     PacketParser p;
     const auto& roster = only<PartyRoster>(parse_one(p, opcode::PartyRoster, party_body({"Ariel", "Lumiel", "Zikel"})));
@@ -488,6 +513,39 @@ TEST_CASE(Parser, CastBuilderRoundTripsAndFoldsLargeIds) {
     TEST_ASSERT_EQ(c.skill, uint32_t{12'240'340});
     TEST_ASSERT(c.pressed);
     TEST_ASSERT(!only<SkillCast>(parse_one(p, opcode::Cast, cast_body(70, 12'730'001, 70, false))).pressed);
+}
+
+// --- Chain skills (18 38, 19 38) ---
+
+TEST_CASE(Parser, ChainOfferAndItsEndAsTheCaptureHasThem) {
+    // Vicious Strike offers Decisive Strike; the offer is withdrawn as it is used.
+    PacketParser p;
+    const Bytes offer = {0x64, 0x43, 0xb7, 0x00, 0x01, 0x74, 0x6a, 0xb7, 0x00};
+    const auto o = only<ChainOffered>(parse_one(p, opcode::ChainOffered, offer));
+    TEST_ASSERT_EQ(o.trigger, uint32_t{12'010'340});
+    TEST_ASSERT_EQ(o.skill, uint32_t{12'020'340});
+    const Bytes end = {0x01, 0x74, 0x6a, 0xb7, 0x00};
+    TEST_ASSERT_EQ(only<ChainWithdrawn>(parse_one(p, opcode::ChainWithdrawn, end)).skill, uint32_t{12'020'340});
+    // The builders make the same shapes.
+    TEST_ASSERT(chain_offer_body(12'010'340, 12'020'340) == offer);
+    TEST_ASSERT(chain_end_body(12'020'340) == end);
+    TEST_ASSERT_EQ(p.stats().failed, uint64_t{0});
+    TEST_ASSERT_EQ(p.stats().unknown, uint64_t{0});
+}
+
+TEST_CASE(Parser, ChainWithNoSkillOrBytesLeftFails) {
+    PacketParser p;
+    TEST_ASSERT(parse_one(p, opcode::ChainWithdrawn, Bytes{0x00}).empty());  // a count of 0
+    Bytes many = chain_end_body(12'020'340);
+    many[0] = 5;  // more than kMaxChainSkills
+    TEST_ASSERT(parse_one(p, opcode::ChainWithdrawn, many).empty());
+    Bytes trailing = chain_offer_body(12'010'340, 12'020'340);
+    trailing.push_back(0x00);
+    TEST_ASSERT(parse_one(p, opcode::ChainOffered, trailing).empty());
+    TEST_ASSERT(parse_one(p, opcode::ChainOffered, chain_offer_body(0, 12'020'340)).empty());
+    TEST_ASSERT(parse_one(p, opcode::ChainOffered, chain_offer_body(12'010'340, 0)).empty());
+    TEST_ASSERT(parse_one(p, opcode::ChainWithdrawn, Bytes{0x01, 0x74, 0x6a}).empty());  // cut short
+    TEST_ASSERT_EQ(p.stats().failed, uint64_t{6});
 }
 
 TEST_CASE(Parser, CastOfAnUnseenModeOrCutShortFails) {

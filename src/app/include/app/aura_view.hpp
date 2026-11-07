@@ -6,7 +6,9 @@
 #include "common/micros.hpp"
 #include "pipeline/pipeline.hpp"
 
+#include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -21,7 +23,7 @@ struct AuraFrameInput {
     /// The capture time the bars count down to (aura_display_time). For drawing only:
     /// the engine's clock is the snapshot's.
     Micros now{0};
-    /// Seconds on any steady clock: what a missing watched effect pulses by.
+    /// Seconds on any steady clock: what the alerts pulse by.
     double pulse_s{0.0};
 };
 
@@ -39,10 +41,39 @@ inline constexpr Micros kAuraDisplayLead = 250 * kMicrosPerMilli;
 [[nodiscard]] std::vector<const auras::AuraEntry*> shown_auras(const std::vector<auras::AuraEntry>& entries,
                                                                const AuraSettings& settings, Micros now, bool self);
 
-/// The cooldowns the overlay lists at `now`: running, at least min_cooldown_s long,
-/// and none with show_cooldowns off.
+/// How long a cooldown that came back shows as ready: a "Ready" bar, a glowing icon.
+inline constexpr Micros kReadyFlash = 1500 * kMicrosPerMilli;
+
+/// A cooldown that came back within kReadyFlash of `now`.
+[[nodiscard]] bool just_ready(const auras::CooldownEntry& cooldown, Micros now) noexcept;
+
+/// The cooldowns the overlay lists at `now`: at least min_cooldown_s long, none with
+/// show_cooldowns off.
+/// - Bars: those cooling, and with show_ready those just_ready, the soonest ready first.
+/// - Icons: those cooling, and with show_ready every one ready again too, by skill
+///   code, so each keeps its place as on an action bar.
 [[nodiscard]] std::vector<const auras::CooldownEntry*> shown_cooldowns(const std::vector<auras::CooldownEntry>& entries,
                                                                        const AuraSettings& settings, Micros now);
+
+/// The local player's HP, in whole percent of their max, while low_hp_alert is on
+/// and it is under low_hp_percent; nothing when their max is not known yet, or at HP
+/// 0 (dead: nothing left to warn of).
+[[nodiscard]] std::optional<int> low_hp_percent(const auras::AuraSnapshot& auras, const AuraSettings& settings);
+
+/// Square tiles in rows across a width: how many a row holds (at least one), and
+/// how many rows `count` of them take.
+struct TileLayout {
+    int columns{1};
+    int rows{0};
+
+    bool operator==(const TileLayout&) const = default;
+};
+
+[[nodiscard]] TileLayout tile_layout(float width, float size, float gap, size_t count) noexcept;
+
+/// What a tile shows for an effect with no icon (a monster's): its label's first two
+/// letters or digits, "?" for none.
+[[nodiscard]] std::string tile_initials(const std::string& label);
 
 /// A watched effect the local player lacks.
 struct MissingEffect {
@@ -60,9 +91,13 @@ struct MissingEffect {
 /// "2m05", "12", "4.5": the time left on a bar.
 [[nodiscard]] std::string format_time_left(Micros left);
 
+/// "2m", "12", "4.5": the time left on an icon, which has room for less.
+[[nodiscard]] std::string format_tile_time(Micros left);
+
 /// Draws the aura overlay as one ImGui window filling the display, into the frame
-/// the caller has begun: missing watched effects, the effects on the local player,
-/// theirs on their target, and their cooldowns. A no-op where ImGui is not built
+/// the caller has begun, as bars or icons: the alerts (low HP, missing watched
+/// effects, chain skills on offer), the effects on the local player, their
+/// cooldowns, and theirs on their target. A no-op where ImGui is not built
 /// (HAVE_IMGUI unset).
 OverlayActions draw_auras(const AuraFrameInput& input);
 

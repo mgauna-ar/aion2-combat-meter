@@ -162,6 +162,10 @@ struct RemainingHp {
     /// Anyone else's, and the local player's own in a kind 3 record.
     bool has_hp{false};
     uint64_t hp{0};
+    /// Max HP (stat 7), sent at login and on each map as the gear's figures add up,
+    /// and when an effect changes it. Seen for the local player; for others, rarely.
+    bool has_max_hp{false};
+    uint64_t max_hp{0};
 };
 
 /// 2a 38 (a new instance) or 2b 38 (one renewed): an effect on an entity. A buff
@@ -226,8 +230,24 @@ struct CooldownSet {
     uint32_t remaining_ms{0};
 };
 
+/// 18 38: a chain skill on offer to the local player, after the skill that sets it
+/// off (Vicious Strike offers Decisive Strike). It names no one: only the local
+/// player's are sent. A 19 38 withdraws it.
+struct ChainOffered {
+    /// The skill that set it off, as cast.
+    uint32_t trigger{0};
+    /// The skill on offer, as it would be cast.
+    uint32_t skill{0};
+};
+
+/// 19 38: a chain skill no longer on offer: used, or let run out (3.0 to 3.1 s after
+/// the offer, in the second capture).
+struct ChainWithdrawn {
+    uint32_t skill{0};
+};
+
 using Event = std::variant<Heartbeat, Identity, Spawn, Death, MapLoad, Damage, Tick, PartyRoster, RemainingHp,
-                           BuffApplied, BuffRemoved, SkillUsed, CooldownSet, SkillCast>;
+                           BuffApplied, BuffRemoved, SkillUsed, CooldownSet, SkillCast, ChainOffered, ChainWithdrawn>;
 
 struct ParsedEvent {
     Micros ts{0};

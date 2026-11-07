@@ -89,20 +89,28 @@ std::unique_ptr<shots::Texture> atlas_texture() {
     return tex;
 }
 
-bool setup_imgui(const std::string& font) {
-    ImGui::CreateContext();
+/// The overlay's fonts and icons, as overlay_window.cpp's rebuild_fonts builds them:
+/// icons at `icon_px` before the scale (the aura overlay's icon size), else a text line.
+bool build_overlay_fonts(const std::string& font, float icon_px = 0.0f) {
     ImGuiIO& io = ImGui::GetIO();
-    io.IniFilename = nullptr;
-    io.LogFilename = nullptr;
+    io.Fonts->Clear();
     ImFontConfig cfg;
     cfg.OversampleH = 2;
     if (io.Fonts->AddFontFromFileTTF(font.c_str(), std::round(kBaseFontSize * kScale), &cfg) == nullptr) {
         std::fprintf(stderr, "cannot load font %s\n", font.c_str());
         return false;
     }
-    // As overlay_window.cpp's rebuild_fonts does.
-    app::build_atlas_with_icons(*io.Fonts, std::round(kBaseFontSize * kScale));
+    app::build_atlas_with_icons(*io.Fonts, std::round((icon_px > 0.0f ? icon_px : kBaseFontSize) * kScale));
     g_font_texture = atlas_texture();
+    return true;
+}
+
+bool setup_imgui(const std::string& font) {
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO();
+    io.IniFilename = nullptr;
+    io.LogFilename = nullptr;
+    if (!build_overlay_fonts(font)) return false;
     // The style overlay_window.cpp sets up.
     ImGuiStyle style;
     ImGui::StyleColorsDark(&style);
@@ -332,13 +340,20 @@ int main(int argc, char** argv) {
 
     bool ok = render(live, settings, out_dir);
     ok = render(done, settings, out_dir) && ok;
-    // Ariel's buffs, cooldowns and curse on the boss mid-fight, and a buff she
-    // watches for missing (Wish of Concentration).
+    // Ariel's buffs, cooldowns and curse on the boss mid-fight, a buff she watches for
+    // missing (Wish of Concentration), a chain skill on offer, and her HP low.
     app::AuraSettings aura_settings;
     aura_settings.locked = true;
     aura_settings.watch = {15'310'000};
-    Scene auras{"overlay-auras.png", 280.0f, 230.0f, live.snapshot};
+    Scene auras{"overlay-auras.png", 280.0f, 268.0f, live.snapshot};
     ok = render_auras(auras, aura_settings, out_dir) && ok;
+    // The same as icons, the atlas holding them at that size as the overlay's does.
+    app::AuraSettings icon_settings = aura_settings;
+    icon_settings.icons = true;
+    ok = build_overlay_fonts(font, static_cast<float>(icon_settings.icon_size)) && ok;
+    Scene aura_icons{"overlay-auras-icons.png", 280.0f, 226.0f, live.snapshot};
+    ok = render_auras(aura_icons, icon_settings, out_dir) && ok;
+    ok = build_overlay_fonts(font) && ok;
     ImGuiContext* overlay_ctx = ImGui::GetCurrentContext();
 
     setup_app_imgui(font, bold);

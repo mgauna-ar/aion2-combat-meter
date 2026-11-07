@@ -3,7 +3,9 @@
 
 #include "auras/aura_plugin.hpp"
 
+#include <algorithm>
 #include <string>
+#include <vector>
 
 using namespace aion2;
 using namespace aion2::auras;
@@ -23,6 +25,23 @@ constexpr uint32_t kDodge = 3015;
 constexpr uint32_t kDodgeSkill = 12'000'100;
 /// A monster's effect: no name.
 constexpr uint32_t kBossDebuff = 20'111'011;
+
+/// 00 8D with someone's HP and their max HP (stat 7).
+proto::RemainingHp hp_with_max(EntityId id, uint64_t value, uint64_t max) {
+    proto::RemainingHp v = hp(id, value);
+    v.has_max_hp = true;
+    v.max_hp = max;
+    return v;
+}
+
+/// 00 8D with only someone's max HP, as the local player's login sends it.
+proto::RemainingHp max_hp_only(EntityId id, uint64_t max) {
+    proto::RemainingHp v;
+    v.id = id;
+    v.has_max_hp = true;
+    v.max_hp = max;
+    return v;
+}
 
 /// The server's clock at capture time `ts` when it runs `ahead_ms` ahead.
 uint64_t server_ms(Micros ts, int64_t ahead_ms = 0) {
@@ -183,6 +202,12 @@ namespace {
 
 constexpr Micros kSec = kMicrosPerSecond;
 
+/// The skills still cooling at `now`: a snapshot keeps the ready ones too.
+size_t cooling(const std::vector<CooldownEntry>& shown, Micros now) {
+    return static_cast<size_t>(
+        std::count_if(shown.begin(), shown.end(), [&](const CooldownEntry& e) { return e.ready_at > now; }));
+}
+
 } // namespace
 
 TEST_CASE(Cooldowns, TheTableLessThePickedSpecialties) {
@@ -218,9 +243,12 @@ TEST_CASE(Cooldowns, AUseStartsTheEstimateAndTheServerCorrectsIt) {
     shown = c.snapshot(t + 700'000);
     TEST_ASSERT_EQ(shown[0].ready_at, t + 21'100'000);
     TEST_ASSERT(shown[0].exact);
-    // A reset: ready now.
+    // A reset: ready now, and still listed, so the overlay can light it up.
     c.on_set(12'350'000, 0, t + 2 * kSec);
-    TEST_ASSERT(c.snapshot(t + 2 * kSec).empty());
+    shown = c.snapshot(t + 2 * kSec);
+    TEST_ASSERT_EQ(shown.size(), size_t{1});
+    TEST_ASSERT_EQ(cooling(shown, t + 2 * kSec), size_t{0});
+    TEST_ASSERT_EQ(shown[0].ready_at, t + 2 * kSec);
     // The gap across that cut and reset teaches nothing.
     c.on_used(12'350'130, t + 3 * kSec);
     TEST_ASSERT_EQ(c.estimate_ms(12'350'130), uint64_t{25'000});
@@ -266,7 +294,7 @@ TEST_CASE(Cooldowns, ASecondUseShowsOnlyOnceBothAreSpent) {
     TEST_ASSERT_EQ(skill_charges(12'350'130), uint32_t{1});
     CooldownTracker c;
     c.on_used(12'110'010, at_s(0));
-    TEST_ASSERT(c.snapshot(at_s(0)).empty());  // one use left
+    TEST_ASSERT_EQ(cooling(c.snapshot(at_s(0)), at_s(0)), size_t{0});  // one use left
     c.on_used(12'110'010, at_s(3.35));
     auto shown = c.snapshot(at_s(3.35));
     TEST_ASSERT_EQ(shown.size(), size_t{1});
@@ -353,10 +381,88 @@ TEST_CASE(AuraPluginState, ClearForgetsEverything) {
     AuraPlugin p = setup();
     p.on_event(ev(at_s(1), buff(kMe, kChanter, 1, kMantra, 2400, 0, kMantraSkill)));
     p.on_event(ev(at_s(1), proto::SkillUsed{12'100'030}));
+    p.on_event(ev(at_s(1), proto::ChainOffered{12'010'340, 12'020'340}));
+    p.on_event(ev(at_s(1), hp_with_max(kMe, 5'000, 25'373)));
     TEST_ASSERT(!p.snapshot(at_s(1)).on_self.empty());
+    TEST_ASSERT(!p.snapshot(at_s(1)).chains.empty());
     p.clear();
     const AuraSnapshot a = p.snapshot(at_s(1));
     TEST_ASSERT(a.on_self.empty());
     TEST_ASSERT(a.cooldowns.empty());
+    TEST_ASSERT(a.chains.empty());
+    TEST_ASSERT_EQ(a.max_hp, uint64_t{0});
     TEST_ASSERT_EQ(p.entities().local(), EntityId{0});
+}
+
+// --- Chain skills on offer (18 38, 19 38) ---
+
+TEST_CASE(Chains, AnOfferStandsUntilTheServerWithdrawsIt) {
+    AuraPlugin e = setup();
+    // Vicious Strike offers Decisive Strike, which offers Desperate Strike.
+    e.on_event(ev(at_s(1), proto::ChainOffered{12'010'340, 12'020'340}));
+    AuraSnapshot a = e.snapshot(at_s(1.2));
+    TEST_ASSERT_EQ(a.chains.size(), size_t{1});
+    TEST_ASSERT_EQ(a.chains[0].label, std::string("Decisive Strike"));
+    TEST_ASSERT_EQ(a.chains[0].trigger, uint32_t{12'010'340});
+    TEST_ASSERT_EQ(a.chains[0].offered_at, at_s(1));
+    e.on_event(ev(at_s(1.6), proto::ChainOffered{12'020'340, 12'030'340}));
+    e.on_event(ev(at_s(1.6), proto::ChainWithdrawn{12'020'340}));
+    a = e.snapshot(at_s(1.6));
+    TEST_ASSERT_EQ(a.chains.size(), size_t{1});
+    TEST_ASSERT_EQ(a.chains[0].label, std::string("Desperate Strike"));
+    // A withdrawal matches by skill: another variant's code takes it off too.
+    e.on_event(ev(at_s(2), proto::ChainWithdrawn{12'030'000}));
+    TEST_ASSERT(e.snapshot(at_s(2)).chains.empty());
+}
+
+TEST_CASE(Chains, ALostWithdrawalOrAMapLoadEndsAnOffer) {
+    AuraPlugin e = setup();
+    e.on_event(ev(at_s(1), proto::ChainOffered{12'040'230, 12'060'230}));
+    // The server lets it run out after about 3 s; its 19 38 never came.
+    e.tick(at_s(4));
+    TEST_ASSERT_EQ(e.snapshot(at_s(4)).chains.size(), size_t{1});
+    TEST_ASSERT(e.snapshot(at_s(1) + ChainTracker::kMaxOffer).chains.empty());
+    e.tick(at_s(1) + ChainTracker::kMaxOffer);
+    TEST_ASSERT(e.chains().snapshot(at_s(1)).empty());
+
+    // Offered again before its end: one entry, from the new offer.
+    e.on_event(ev(at_s(10), proto::ChainOffered{12'040'230, 12'060'230}));
+    e.on_event(ev(at_s(11), proto::ChainOffered{12'040'230, 12'060'230}));
+    TEST_ASSERT_EQ(e.snapshot(at_s(11)).chains.size(), size_t{1});
+    TEST_ASSERT_EQ(e.snapshot(at_s(11)).chains[0].offered_at, at_s(11));
+    e.on_event(ev(at_s(12), proto::MapLoad{2, kDungeon + 1}));
+    TEST_ASSERT(e.snapshot(at_s(12)).chains.empty());
+}
+
+// --- The local player's HP (00 8D stats 0 and 7) ---
+
+TEST_CASE(AuraHealth, TheLocalPlayersHpAndTheirStatedMax) {
+    AuraPlugin e = setup();
+    TEST_ASSERT_EQ(e.snapshot(at_s(1)).max_hp, uint64_t{0});
+    // Before the max comes, the most HP seen stands in for it.
+    e.on_event(ev(at_s(1), hp(kMe, 21'000)));
+    e.on_event(ev(at_s(2), hp(kMe, 18'000)));
+    AuraSnapshot a = e.snapshot(at_s(2));
+    TEST_ASSERT_EQ(a.hp, uint64_t{18'000});
+    TEST_ASSERT_EQ(a.max_hp, uint64_t{21'000});
+    // The stated max, on a record of its own.
+    e.on_event(ev(at_s(3), max_hp_only(kMe, 25'373)));
+    a = e.snapshot(at_s(3));
+    TEST_ASSERT_EQ(a.hp, uint64_t{18'000});
+    TEST_ASSERT_EQ(a.max_hp, uint64_t{25'373});
+    // Others' HP is not the local player's.
+    e.on_event(ev(at_s(4), hp(kChanter, 900)));
+    e.on_event(ev(at_s(4), hp(kBoss, 4'000'000)));
+    TEST_ASSERT_EQ(e.snapshot(at_s(4)).hp, uint64_t{18'000});
+
+    // A new map, a new id: nothing known until it is sent again.
+    e.on_event(ev(at_s(10), proto::MapLoad{2, kDungeon}));
+    e.on_event(ev(at_s(10), player(kMe + 5, "Ariel", true)));
+    a = e.snapshot(at_s(10));
+    TEST_ASSERT_EQ(a.hp, uint64_t{0});
+    TEST_ASSERT_EQ(a.max_hp, uint64_t{0});
+    e.on_event(ev(at_s(11), hp_with_max(kMe + 5, 24'000, 25'373)));
+    a = e.snapshot(at_s(11));
+    TEST_ASSERT_EQ(a.hp, uint64_t{24'000});
+    TEST_ASSERT_EQ(a.max_hp, uint64_t{25'373});
 }

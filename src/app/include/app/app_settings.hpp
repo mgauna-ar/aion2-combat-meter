@@ -87,6 +87,17 @@ struct AuraSettings {
     bool show_cooldowns{true};
     /// Cooldowns shorter than this are left out: Dodge's, a combo's.
     float min_cooldown_s{3.0f};
+    /// Icons in a grid instead of bars, as the game draws its own effects.
+    bool icons{false};
+    /// An icon's side in icons mode, in pixels before the scale: 20 to 64.
+    int icon_size{36};
+    /// Light up the local player's chain skills while the server offers them (18 38).
+    bool show_chains{true};
+    /// Show a cooldown coming back: a "Ready" bar for a moment, or a lit icon.
+    bool show_ready{true};
+    /// Flag the local player's HP below low_hp_percent of their max.
+    bool low_hp_alert{true};
+    int low_hp_percent{30};
     /// Effects (game::effect_key) to flag while they are not on the local player.
     /// Not in the key table: a list. Read and written by hand in app_settings.cpp.
     std::vector<uint32_t> watch;
@@ -169,7 +180,7 @@ inline constexpr std::array<config::ConfigKey<OverlaySettings>, 25> kOverlayKeys
     config::field<OverlaySettings, &OverlaySettings::show_in_dungeons_only>("show_in_dungeons_only"),
 }};
 
-inline constexpr std::array<config::ConfigKey<AuraSettings>, 15> kAuraKeys{{
+inline constexpr std::array<config::ConfigKey<AuraSettings>, 21> kAuraKeys{{
     config::field<AuraSettings, &AuraSettings::locked>("locked"),
     config::field<AuraSettings, &AuraSettings::opacity>("opacity"),
     config::field<AuraSettings, &AuraSettings::scale>("scale"),
@@ -183,12 +194,22 @@ inline constexpr std::array<config::ConfigKey<AuraSettings>, 15> kAuraKeys{{
     config::field<AuraSettings, &AuraSettings::min_duration_s>("min_duration_s"),
     config::field<AuraSettings, &AuraSettings::show_cooldowns>("show_cooldowns"),
     config::field<AuraSettings, &AuraSettings::min_cooldown_s>("min_cooldown_s"),
+    config::field<AuraSettings, &AuraSettings::icons>("icons"),
+    config::field<AuraSettings, &AuraSettings::icon_size>("icon_size"),
+    config::field<AuraSettings, &AuraSettings::show_chains>("show_chains"),
+    config::field<AuraSettings, &AuraSettings::show_ready>("show_ready"),
+    config::field<AuraSettings, &AuraSettings::low_hp_alert>("low_hp_alert"),
+    config::field<AuraSettings, &AuraSettings::low_hp_percent>("low_hp_percent"),
     config::field<AuraSettings, &AuraSettings::show_in_dungeons_only>("show_in_dungeons_only"),
     config::field<AuraSettings, &AuraSettings::hide_when_game_unfocused>("hide_when_game_unfocused"),
 }};
 
 /// Most effects a watch list holds.
 inline constexpr size_t kMaxWatchedEffects = 64;
+/// An aura icon's side, in pixels before the scale. The sheet's icons are 40 px, so
+/// a larger one is drawn stretched.
+inline constexpr int kMinAuraIcon = 20;
+inline constexpr int kMaxAuraIcon = 64;
 
 inline constexpr std::array<config::ConfigKey<HistorySettings>, 1> kHistoryKeys{{
     config::field<HistorySettings, &HistorySettings::max_fights>("max_fights"),

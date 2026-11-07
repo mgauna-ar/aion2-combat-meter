@@ -112,7 +112,9 @@ void Report::on_event(const proto::ParsedEvent& pe, const meter::CombatantRegist
     const bool aura = std::holds_alternative<proto::BuffApplied>(pe.event) ||
                       std::holds_alternative<proto::BuffRemoved>(pe.event) ||
                       std::holds_alternative<proto::SkillUsed>(pe.event) ||
-                      std::holds_alternative<proto::CooldownSet>(pe.event);
+                      std::holds_alternative<proto::CooldownSet>(pe.event) ||
+                      std::holds_alternative<proto::ChainOffered>(pe.event) ||
+                      std::holds_alternative<proto::ChainWithdrawn>(pe.event);
     if (aura ? !m_opt.auras : !m_opt.events) return;
     std::visit(
         [&](const auto& e) {
@@ -136,6 +138,11 @@ void Report::on_event(const proto::ParsedEvent& pe, const meter::CombatantRegist
             } else if constexpr (std::is_same_v<T, proto::CooldownSet>) {
                 std::printf("%+.3f  cooldown  %s (%u) %.2f s left\n", t, game::skill_label(e.skill).c_str(), e.skill,
                             static_cast<double>(e.remaining_ms) / 1000.0);
+            } else if constexpr (std::is_same_v<T, proto::ChainOffered>) {
+                std::printf("%+.3f  chain     %s (%u) after %s (%u)\n", t, game::skill_label(e.skill).c_str(), e.skill,
+                            game::skill_label(e.trigger).c_str(), e.trigger);
+            } else if constexpr (std::is_same_v<T, proto::ChainWithdrawn>) {
+                std::printf("%+.3f  chain end %s (%u)\n", t, game::skill_label(e.skill).c_str(), e.skill);
             } else if constexpr (std::is_same_v<T, proto::SkillCast>) {
                 std::printf("%+.3f  cast      %s -> %s  %s (%u) %s\n", t, who(e.caster, reg).c_str(),
                             who(e.target, reg).c_str(), game::skill_label(e.skill).c_str(), e.skill,
@@ -178,10 +185,13 @@ void Report::on_event(const proto::ParsedEvent& pe, const meter::CombatantRegist
                 }
                 std::printf("\n");
             } else if constexpr (std::is_same_v<T, proto::RemainingHp>) {
+                const std::string max = e.has_max_hp ? " max " + std::to_string(e.max_hp) : std::string{};
                 if (e.self) {
-                    std::printf("%+.3f  self      %s\n", t, who(e.id, reg).c_str());
-                } else if (e.has_hp) {
-                    std::printf("%+.3f  hp        %s %" PRIu64 "\n", t, who(e.id, reg).c_str(), e.hp);
+                    std::printf("%+.3f  self      %s%s%s\n", t, who(e.id, reg).c_str(),
+                                e.has_hp ? (" hp " + std::to_string(e.hp)).c_str() : "", max.c_str());
+                } else if (e.has_hp || e.has_max_hp) {
+                    std::printf("%+.3f  hp        %s %s%s\n", t, who(e.id, reg).c_str(),
+                                e.has_hp ? std::to_string(e.hp).c_str() : "-", max.c_str());
                 }
             }
         },

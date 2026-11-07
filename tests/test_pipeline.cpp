@@ -184,3 +184,24 @@ TEST_CASE(Pipeline, SwitchingTheMeterOffEndsItsFightAndTheAurasForget) {
     TEST_ASSERT(fights[0].end_reason == meter::EndReason::Manual);
     TEST_ASSERT(fights[0].total_damage < session.truth.boss_damage);
 }
+
+TEST_CASE(Pipeline, TheAurasSeeTheLocalPlayersHpAndChainSkills) {
+    const Session session = boss_session();
+    const Micros scene = kStartMs * kMicrosPerMilli + 30 * kMicrosPerSecond;
+    const Micros later = kStartMs * kMicrosPerMilli + 45 * kMicrosPerSecond;
+    Pipeline p;
+    auras::AuraSnapshot at_scene;
+    auras::AuraSnapshot after;
+    (void)replay(session.pcapng, p, [&](Micros ts) {
+        if (ts >= scene && at_scene.max_hp == 0) at_scene = p.snapshot(ts).auras;
+        if (ts >= later && after.max_hp == 0) after = p.snapshot(ts).auras;
+    });
+    // At 30 s: her max from her login, her HP after the hit, and the chain on offer.
+    TEST_ASSERT_EQ(at_scene.max_hp, kMeMaxHp);
+    TEST_ASSERT_EQ(at_scene.hp, uint64_t{6'100});
+    TEST_ASSERT_EQ(at_scene.chains.size(), size_t{1});
+    TEST_ASSERT_EQ(at_scene.chains[0].label, std::string("Burst"));
+    // By 45 s both offers were withdrawn, and her HP is full again.
+    TEST_ASSERT(after.chains.empty());
+    TEST_ASSERT_EQ(after.hp, kMeMaxHp);
+}

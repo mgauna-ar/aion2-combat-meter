@@ -6,12 +6,13 @@ only, the engineering principles, the layering, the threads, the protocol (the e
 skill-use and cooldown opcodes are under "Effects, skill uses and cooldowns") and the
 self-update. What a user sees and sets is in this plugin's [`README.md`](README.md).
 
-**What it is:** `AuraPlugin` (a `game::Plugin`) owns three parts, fed the same events
+**What it is:** `AuraPlugin` (a `game::Plugin`) owns four parts, fed the same events
 as the combat meter on the same thread and the same capture clock:
-- `Entities`: who is who, as far as the auras need it;
+- `Entities`: who is who, as far as the auras need it, and the local player's HP;
 - `AuraTracker`: the effects on every entity in view;
 - `CooldownTracker`: the local player's cooldowns, from `data/cooldowns.tsv`
-  (`tools/gen_cooldown_table.py` makes `src/cooldown_table.inc` from it).
+  (`tools/gen_cooldown_table.py` makes `src/cooldown_table.inc` from it);
+- `ChainTracker`: the local player's chain skills on offer.
 
 The app draws it: the aura overlay (`src/app/src/aura_view.cpp`) and the Auras page
 (`src/app/src/ui/view_auras.cpp`).
@@ -44,6 +45,10 @@ hits, no party.
   map before. A reload within a run (the same map over the same connection: the combat
   meter's test, repeated here) keeps the spawns.
 - **HP 0** (00 8D) marks an enemy dead; its 42 36 (the corpse going) forgets it.
+- **The local player's HP** (`local_health`) is the 00 8D HP and max HP (stat 7) sent
+  for their id. Until a max comes (the plugin switched on mid-map), the most HP seen
+  stands in. A new local id knows nothing until 00 8D says it again, which it does on
+  each map, so nothing carries over from the old id.
 
 ## 🎯 The target
 
@@ -100,6 +105,18 @@ watch list and what the overlay shows are the tracker's own.
 - Checked on the second capture: over 274 uses of 12 skills, 13 came while the
   estimate still ran, by at most 0.65 s (0.2 s on average). Each was a reuse
   quicker than any before it, which the estimate then took.
+- The snapshot lists every skill used this session, ready ones too (`ready_at` past),
+  at most 64: the overlay decides what to show, a "Ready" bar or a lit icon.
+
+## 🔗 Chain skills (`ChainTracker`, the local player's only)
+
+- 18 38 puts an offer up, 19 38 takes it down. They match by `game::skill_key`, so a
+  withdrawal's variant digits need not repeat the offer's. The same skill offered again
+  before its end replaces the offer.
+- The server withdraws every offer, used or run out (all 437 in the second capture).
+  `kMaxOffer` (5 s, the longest seen 3.08 s) drops one whose 19 38 the capture lost;
+  it is no window: the server sends none, so the overlay shows no timer.
+- A map load drops every offer, as does switching the plugin off.
 
 ## 🖥️ The overlay and its settings
 
@@ -111,3 +128,14 @@ watch list and what the overlay shows are the tracker's own.
   `show_in_dungeons_only` (`auras_shown`), never by the meter overlay's. It has no
   "only in combat": buffs matter between fights too.
 - Ctrl+Alt+L locks every overlay at once; that is the app's, not a plugin's.
+- **Alerts first,** in both styles: low HP (`low_hp_percent`: under the threshold of a
+  known max, never at HP 0, which is a death), the watch list's missing effects, the
+  chain skills on offer. Then the effects on the local player, their cooldowns, and
+  theirs on the target.
+- **Bars or icons** (`auras.icons`). The pure parts are in `aura_view` and tested
+  without ImGui: `shown_cooldowns` (bars: cooling, and `just_ready` for `kReadyFlash`,
+  soonest first; icons: ready ones too, by skill code, so a tile keeps its place),
+  `tile_layout`, `tile_initials` for an effect with no icon, `format_tile_time`.
+- **The atlas holds the icons at the size they are drawn:** a text line for bars,
+  `icon_size` for icons (`OverlayWindow::set_icon_px`, rebuilt on a change). The sheet
+  is 40 px; a larger tile stretches it.

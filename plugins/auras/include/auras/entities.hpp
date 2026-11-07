@@ -12,6 +12,15 @@ namespace aion2::auras {
 
 using EntityId = proto::EntityId;
 
+/// The local player's HP, as 00 8D sends it; 0 for what is not known yet.
+struct Health {
+    uint64_t hp{0};
+    /// Stat 7, sent at login and on each map; until it comes, the most HP seen.
+    uint64_t max_hp{0};
+
+    bool operator==(const Health&) const = default;
+};
+
 /**
  * @brief Who is who, as far as the auras need it: the local player, whose summons
  * are whose, which ids are enemies, and which enemy the local player is fighting.
@@ -38,7 +47,7 @@ public:
 
     void on_identity(const proto::Identity& identity);
     void on_spawn(const proto::Spawn& spawn);
-    /// 00 8D: the local player's own values, and anyone's HP.
+    /// 00 8D: the local player's own values and HP, and anyone's HP.
     void on_values(const proto::RemainingHp& values);
     /// A direct hit: the local player's or their summons' on an enemy makes it a
     /// candidate for target().
@@ -54,6 +63,9 @@ public:
     [[nodiscard]] EntityId local() const noexcept { return m_local; }
     /// The local character, "name@server", from the last own identity; empty before.
     [[nodiscard]] const std::string& local_character() const noexcept { return m_character; }
+    /// The local player's HP on their current id; nothing known after they change id
+    /// until 00 8D says it again (it does on each map).
+    [[nodiscard]] Health local_health() const noexcept;
     /// A summon's owner, a summon's summon's too; any other id is itself.
     [[nodiscard]] EntityId resolve(EntityId id) const;
     /// A spawned monster, or something it owns.
@@ -90,6 +102,12 @@ private:
     std::unordered_set<EntityId> m_players;
     EntityId m_local{0};
     std::string m_character;
+    /// The local player's HP, for the id it was sent for.
+    EntityId m_health_id{0};
+    uint64_t m_hp{0};
+    /// Stat 7, the stated max; and the most HP seen, which stands in until it comes.
+    uint64_t m_max_hp{0};
+    uint64_t m_most_hp{0};
 };
 
 } // namespace aion2::auras

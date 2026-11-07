@@ -23,6 +23,8 @@ using namespace aion2::test::wire;
 
 inline constexpr uint64_t kStartMs = 1'792'152'000'000ULL;  // 2026-10-16 12:00:00 UTC
 inline constexpr uint64_t kMe = 1001;
+/// Ariel's max HP, as her login's 00 8D states it (stat 7).
+inline constexpr uint64_t kMeMaxHp = 25'373;
 inline constexpr uint64_t kAlly = 1002;
 inline constexpr uint64_t kAlly2 = 1003;
 inline constexpr uint64_t kBossRaw = 2'000'123;
@@ -176,6 +178,18 @@ inline Session boss_session() {
     script.emplace_back(22.0, opcode_frame(proto::opcode::SkillUse, skill_use_body(15'230'010)));   // Arctic Armor, 90 s
     script.emplace_back(25.0, opcode_frame(proto::opcode::CooldownSet, cooldown_body(15'060'000, 22'000)));
     script.emplace_back(28.8, opcode_frame(proto::opcode::SkillUse, skill_use_body(15'040'030)));   // Firestorm, 5 s
+    // Ariel's HP: her max with her login, then a hit taking her to 24% just before
+    // the overlay's scene at 30 s, back to full at 32 s.
+    script.emplace_back(0.008, opcode_frame(proto::opcode::RemainingHp, both_values_body(kMe, kMeMaxHp, kMeMaxHp)));
+    script.emplace_back(29.0, opcode_frame(proto::opcode::RemainingHp, hp_body(kMe, 9'100)));
+    script.emplace_back(29.5, opcode_frame(proto::opcode::RemainingHp, hp_body(kMe, 6'100)));
+    script.emplace_back(32.0, opcode_frame(proto::opcode::RemainingHp, hp_body(kMe, kMeMaxHp)));
+    // Two chain skills offered to Ariel: one withdrawn 0.8 s later, as a use would,
+    // and one let run out, withdrawn 3 s after.
+    script.emplace_back(29.6, opcode_frame(proto::opcode::ChainOffered, chain_offer_body(15'010'230, 15'030'230)));
+    script.emplace_back(30.4, opcode_frame(proto::opcode::ChainWithdrawn, chain_end_body(15'030'230)));
+    script.emplace_back(41.0, opcode_frame(proto::opcode::ChainOffered, chain_offer_body(15'080'230, 15'090'230)));
+    script.emplace_back(44.0, opcode_frame(proto::opcode::ChainWithdrawn, chain_end_body(15'090'230)));
     // Presses that land no hit: Ariel's Arctic Armor (as its 01 38 above) and her
     // Dodges. And Fire Mark, a passive, going off: no press.
     const auto cast = [&](double t, uint64_t caster, uint32_t skill, uint64_t target, bool pressed) {

@@ -35,13 +35,16 @@ constexpr uint8_t kTickHealOnHit = 0x30;
 /// Positions are world coordinates: anything beyond this is not a position.
 constexpr float kMaxCoordinate = 1.0e7f;
 constexpr size_t kPartyMemberPrefix = 10;  // mask, slot, account u64
-/// 00 8D kinds, and the stat that is current HP.
+/// 00 8D kinds, and the stats that are current and max HP.
 constexpr uint8_t kValuesSelf = 1;
 constexpr uint8_t kValuesOther = 2;
 /// The local player's, both lists in one: kind 1's u32 values, then a count and
 /// kind 2's u64 values, which carry their own HP.
 constexpr uint8_t kValuesBoth = 3;
 constexpr uint8_t kStatHp = 0;
+/// Max HP: at login and on each map, the local player's climbed 11,988, 17,421,
+/// 21,320 and 25,373 as their gear's figures added up, and current HP never passed it.
+constexpr uint8_t kStatMaxHp = 7;
 /// 2a 38 / 2b 38's kind byte: 0x11, or 0x13 with the applying skill (a u32) after
 /// the level. No other was seen in 13,887 records.
 constexpr uint8_t kBuffKind = 0x11;
@@ -50,6 +53,8 @@ constexpr uint8_t kBuffHasSkill = 0x02;
 constexpr uint64_t kBuffPermanent = ~uint64_t{0};
 /// Most entries one 47 38 is believed to carry: every one seen had one.
 constexpr uint8_t kMaxCooldownEntries = 16;
+/// Most skills one 18 38 or 19 38 is believed to carry: all 874 seen had one.
+constexpr uint8_t kMaxChainSkills = 4;
 /// 02 38's mode byte: a press carries a position (2); a passive going off, a chain's
 /// follow-up or a mantra's pulse does not (0). No other was seen in 28,550 records.
 constexpr uint8_t kCastPressed = 2;
@@ -246,6 +251,9 @@ std::optional<RemainingHp> read_entity_values(ByteReader& r) {
         if (stat == kStatHp) {
             v.has_hp = true;
             v.hp = value;
+        } else if (stat == kStatMaxHp) {
+            v.has_max_hp = true;
+            v.max_hp = value;
         }
     }
     if (!r.ok() || !r.at_end()) return std::nullopt;
@@ -356,6 +364,8 @@ void PacketParser::parse(const Frame& frame, std::vector<ParsedEvent>& out) {
         case opcode::RemainingHp:
         case opcode::SkillUse:
         case opcode::CooldownSet:
+        case opcode::ChainOffered:
+        case opcode::ChainWithdrawn:
         case opcode::BuffAdd:
         case opcode::BuffRenew:
         case opcode::BuffRemove:
@@ -475,6 +485,27 @@ bool PacketParser::parse_known(const Frame& frame, std::vector<ParsedEvent>& out
             }
             if (!r.at_end()) return false;
             for (const CooldownSet& c : entries) emit(c);
+            return true;
+        }
+        case opcode::ChainOffered:
+        case opcode::ChainWithdrawn: {
+            // 18 38: the skill that set it off, then a count and the skills on offer.
+            // 19 38: a count and the skills withdrawn.
+            const bool offered = frame.opcode == opcode::ChainOffered;
+            const uint32_t trigger = offered ? r.u32le() : 0;
+            const uint8_t count = r.u8();
+            if (!r.ok() || (offered && trigger == 0) || count == 0 || count > kMaxChainSkills) return false;
+            std::vector<uint32_t> skills;
+            for (uint8_t i = 0; i < count; ++i) skills.push_back(r.u32le());
+            if (!r.ok() || !r.at_end()) return false;
+            if (std::find(skills.begin(), skills.end(), 0u) != skills.end()) return false;
+            for (const uint32_t skill : skills) {
+                if (offered) {
+                    emit(ChainOffered{trigger, skill});
+                } else {
+                    emit(ChainWithdrawn{skill});
+                }
+            }
             return true;
         }
         case opcode::BuffAdd:

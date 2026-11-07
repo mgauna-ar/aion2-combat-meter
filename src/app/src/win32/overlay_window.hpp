@@ -90,6 +90,9 @@ public:
     [[nodiscard]] RECT screen_rect() const;
     /// The monitor's DPI over 96.
     [[nodiscard]] float dpi_scale() const;
+    /// The size the window draws its game icons at, in pixels before the scale; 0
+    /// for a text line. The font atlas holds them at that size, rebuilt on a change.
+    void set_icon_px(float px) noexcept { m_icon_px = px; }
 
     /// Draws one frame with `draw` (draw_overlay or draw_auras), which gets the
     /// settings' `scale` times the monitor's DPI scale.
@@ -119,6 +122,9 @@ private:
     bool m_hotkeys{false};
     POINT m_default{40, 160};
     float m_font_scale{0.0f};
+    float m_icon_px{0.0f};
+    /// m_icon_px when the atlas was last built.
+    float m_built_icon_px{0.0f};
     UINT m_resize_width{0};
     UINT m_resize_height{0};
     ClientRect m_drag_area;

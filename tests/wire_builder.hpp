@@ -322,13 +322,17 @@ inline Bytes damage_body(std::initializer_list<DamageSpec> records) {
     return b;
 }
 
-/// 00 8D for anyone but the local player: id, kind 2, one value, stat 0 (HP) as u64.
-inline Bytes hp_body(uint64_t id, uint64_t hp) {
+/// 00 8D kind 2: id, a count, then (stat, u64): stat 0 (HP), and stat 7 (max HP)
+/// when `max_hp` is not 0. Anyone's, the local player's too.
+inline Bytes hp_body(uint64_t id, uint64_t hp, uint64_t max_hp = 0) {
     Bytes b;
     put_varint(b, id);
-    put_bytes(b, {0x02, 0x01, 0x00});
-    put_le32(b, static_cast<uint32_t>(hp));
-    put_le32(b, static_cast<uint32_t>(hp >> 32));
+    put_bytes(b, {0x02, static_cast<uint8_t>(max_hp != 0 ? 2 : 1), 0x00});
+    put_le64(b, hp);
+    if (max_hp != 0) {
+        b.push_back(0x07);
+        put_le64(b, max_hp);
+    }
     return b;
 }
 
@@ -345,8 +349,9 @@ inline Bytes self_values_body(uint64_t id) {
 }
 
 /// 00 8D kind 3, the local player's: kind 1's (stat, u32) list, then a count and
-/// kind 2's (stat, u64) list, here with their HP.
-inline Bytes both_values_body(uint64_t id, uint64_t hp) {
+/// kind 2's (stat, u64) list, here with their HP, and their max HP (stat 7) when
+/// `max_hp` is not 0.
+inline Bytes both_values_body(uint64_t id, uint64_t hp, uint64_t max_hp = 0) {
     Bytes b;
     put_varint(b, id);
     put_bytes(b, {0x03, 0x02});
@@ -354,9 +359,13 @@ inline Bytes both_values_body(uint64_t id, uint64_t hp) {
     put_le32(b, 2096);
     b.push_back(0x03);
     put_le32(b, 92133);
-    b.push_back(0x01);
+    b.push_back(static_cast<uint8_t>(max_hp != 0 ? 2 : 1));
     b.push_back(0x00);
     put_le64(b, hp);
+    if (max_hp != 0) {
+        b.push_back(0x07);
+        put_le64(b, max_hp);
+    }
     return b;
 }
 
@@ -441,6 +450,22 @@ inline Bytes buff_remove_body(uint64_t target, uint32_t buff_id) {
 /// 01 38: the local player started `skill`.
 inline Bytes skill_use_body(uint32_t skill) {
     Bytes b = {0x00, 0x00, 0x00};
+    put_le32(b, skill);
+    return b;
+}
+
+/// 18 38: `skill` on offer to the local player after `trigger`.
+inline Bytes chain_offer_body(uint32_t trigger, uint32_t skill) {
+    Bytes b;
+    put_le32(b, trigger);
+    b.push_back(0x01);
+    put_le32(b, skill);
+    return b;
+}
+
+/// 19 38: `skill` no longer on offer.
+inline Bytes chain_end_body(uint32_t skill) {
+    Bytes b = {0x01};
     put_le32(b, skill);
     return b;
 }

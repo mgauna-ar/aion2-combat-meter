@@ -1,5 +1,6 @@
 #pragma once
 
+#include "auras/chains.hpp"
 #include "auras/cooldowns.hpp"
 #include "auras/entities.hpp"
 #include "common/micros.hpp"
@@ -58,8 +59,14 @@ struct AuraSnapshot {
     std::vector<AuraEntry> on_target;
     /// Every helpful effect seen on the local player since the plugin started, by label.
     std::vector<SeenEffect> seen;
-    /// The local player's skills cooling down, the soonest ready first.
+    /// The local player's skills used this session that have a cooldown, cooling or
+    /// ready again, the soonest ready first.
     std::vector<CooldownEntry> cooldowns;
+    /// The local player's chain skills on offer, the oldest first.
+    std::vector<ChainEntry> chains;
+    /// The local player's HP and max HP (Entities::local_health); 0 for unknown.
+    uint64_t hp{0};
+    uint64_t max_hp{0};
 
     bool operator==(const AuraSnapshot&) const = default;
 };
@@ -93,7 +100,8 @@ public:
     void prune(Micros now, const Entities& entities);
 
     /// What the overlay draws at `now`: the local player's effects, and the local
-    /// player's on `target` (0 for none). Cooldowns are the plugin's to add.
+    /// player's on `target` (0 for none). Cooldowns, chains and HP are the plugin's
+    /// to add.
     [[nodiscard]] AuraSnapshot snapshot(Micros now, const Entities& entities, EntityId target,
                                         std::string target_label) const;
 
