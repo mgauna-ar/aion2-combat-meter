@@ -2,8 +2,11 @@
 #include "synthetic_session.hpp"
 
 #include "capture/capture_file.hpp"
+#include "game/skill_names.hpp"
+#include "meter/fight_detail.hpp"
 #include "pipeline/pipeline.hpp"
 
+#include <algorithm>
 #include <functional>
 
 using namespace aion2;
@@ -66,6 +69,40 @@ TEST_CASE(Pipeline, SyntheticBossFightEndToEnd) {
     }
     TEST_ASSERT_EQ(f.total_damage, total);
     TEST_ASSERT_EQ(total, session.truth.boss_damage);
+
+    // Its detail: every second of every row, the death, the boss's line, the effects.
+    TEST_ASSERT(f.detail != nullptr);
+    const meter::FightDetail& d = *f.detail;
+    for (const auto& c : f.combatants) {
+        const meter::TimelineRow* row = d.timeline.row(c.id);
+        TEST_ASSERT(row != nullptr);
+        uint64_t binned = 0;
+        for (const auto& bin : row->bins) binned += bin.damage;
+        TEST_ASSERT_EQ(binned, c.damage);
+    }
+    TEST_ASSERT_EQ(d.deaths.size(), session.truth.deaths.size());
+    const DeathTruth& died = session.truth.deaths[0];
+    TEST_ASSERT_EQ(d.deaths[0].player, died.player);
+    TEST_ASSERT_EQ(d.deaths[0].name, std::string("Lumiel"));
+    TEST_ASSERT_NEAR(d.deaths[0].time_s, died.at_s - session.truth.first_hit_s, 1e-3);
+    TEST_ASSERT_NEAR(d.deaths[0].up_after_s, died.up_s - died.at_s, 1e-3);
+    TEST_ASSERT(d.deaths[0].killing_blow() != nullptr);
+    TEST_ASSERT_EQ(d.deaths[0].killing_blow()->amount, died.amount);
+    TEST_ASSERT_EQ(d.deaths[0].killing_blow()->skill, game::skill_key(died.skill));
+    TEST_ASSERT(d.deaths[0].killing_blow()->crit);
+    // Its first figure comes with the first hit, in second 0.
+    TEST_ASSERT(d.timeline.boss_hp.at(0) > 950);
+    TEST_ASSERT_EQ(d.timeline.boss_hp.permille.back(), uint16_t{0});
+    TEST_ASSERT_EQ(d.timeline.buffs.size(), size_t{2});
+    const auto row_named = [&f](const char* name) {
+        return *std::find_if(f.combatants.begin(), f.combatants.end(), [&](const auto& c) { return c.name == name; });
+    };
+    TEST_ASSERT(row_named("Lumiel").active_s < row_named("Ariel").active_s);
+    TEST_ASSERT(row_named("Zikel").active_s < row_named("Ariel").active_s);
+    const bool curse = std::any_of(d.effects.begin(), d.effects.end(), [](const meter::EffectUptimeRow& r) {
+        return r.side == meter::EffectSide::OnEnemy && r.caster == "Ariel" && r.uptime(47.0) > 0.8;
+    });
+    TEST_ASSERT(curse);
 
     const auto names = [&f] {
         std::vector<std::string> out;

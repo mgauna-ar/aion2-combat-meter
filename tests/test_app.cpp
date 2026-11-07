@@ -340,6 +340,10 @@ TEST_CASE(AppRuntime, ReplaysAFightIntoHistory) {
     const auto fight = runtime.load_fight(history[0].file);
     TEST_ASSERT(fight.has_value());
     TEST_ASSERT_EQ(fight->combatants.size(), size_t{3});
+    // Saved with its detail, and read back with it.
+    TEST_ASSERT(fight->detail != nullptr);
+    TEST_ASSERT_EQ(fight->detail->deaths.size(), session.truth.deaths.size());
+    TEST_ASSERT_FALSE(fight->detail->timeline.rows.empty());
 
     TEST_ASSERT(snap != nullptr);
     TEST_ASSERT_EQ(snap->local_name, std::string("Ariel"));

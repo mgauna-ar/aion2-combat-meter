@@ -35,6 +35,17 @@ inline constexpr uint64_t kBossHp = 3'000'000;
 inline constexpr uint32_t kDungeon = 600001;
 inline constexpr uint32_t kTown = 200100;
 
+/// A party member's death in the capture.
+struct DeathTruth {
+    uint64_t player{0};
+    double at_s{0};
+    /// When their HP came back.
+    double up_s{0};
+    /// The killing blow.
+    uint32_t skill{0};
+    uint64_t amount{0};
+};
+
 /// What the capture holds, to check the meter against.
 struct Truth {
     std::map<uint64_t, uint64_t> damage;  // by player, summon folded into its owner
@@ -42,6 +53,7 @@ struct Truth {
     double last_hit_s{0};
     double death_s{0};
     uint64_t boss_damage{0};
+    std::vector<DeathTruth> deaths;
 };
 
 struct Session {
@@ -94,7 +106,8 @@ private:
 
 /// The party (Ariel, Lumiel, Zikel and Zikel's spirit) kills a boss in a dungeon,
 /// then goes back to town. Heartbeats every 50 ms throughout; some hits arrive in
-/// LZ4 bundles, as the server sends them.
+/// LZ4 bundles, as the server sends them. Ariel bursts for five seconds, Zikel
+/// stops hitting for five, and Lumiel dies to a crit and is up again 4 s later.
 inline Session boss_session() {
     using proto::opcode::Damage;
     SessionWriter w;
@@ -144,7 +157,13 @@ inline Session boss_session() {
     };
     effect(4.0, kMe, kMe, 1, 15'180'001, 60'000, false);      // Vaizel's Wisdom
     effect(22.0, kMe, kMe, 2, 15'230'001, 15'000, false);     // Arctic Armor
-    effect(26.0, kMe, kAlly2, 3, 16'770'001, 8'000, false);   // Spirit Communion
+    // Spirit Communion, twice on the whole party: a party-wide buff.
+    effect(26.0, kMe, kAlly2, 3, 16'770'001, 8'000, false);
+    effect(26.0, kAlly, kAlly2, 1, 16'770'001, 8'000, false);
+    effect(26.0, kAlly2, kAlly2, 1, 16'770'001, 8'000, false);
+    effect(40.0, kMe, kAlly2, 4, 16'770'001, 8'000, false);
+    effect(40.0, kAlly, kAlly2, 2, 16'770'001, 8'000, false);
+    effect(40.0, kAlly2, kAlly2, 2, 16'770'001, 8'000, false);
     effect(5.0, boss, kMe, 1, 15'320'001, 10'000, false);     // Delayed Explosion
     for (int i = 1; i < 6; ++i) effect(5.0 + 10.0 * i, boss, kMe, 1, 15'320'001, 10'000, true);
     // Ariel's skill uses, whose cooldowns the aura overlay estimates, and one the
@@ -153,6 +172,27 @@ inline Session boss_session() {
     script.emplace_back(22.0, opcode_frame(proto::opcode::SkillUse, skill_use_body(15'230'010)));   // Arctic Armor, 90 s
     script.emplace_back(25.0, opcode_frame(proto::opcode::CooldownSet, cooldown_body(15'060'000, 22'000)));
     script.emplace_back(28.8, opcode_frame(proto::opcode::SkillUse, skill_use_body(15'040'030)));   // Firestorm, 5 s
+
+    // Lumiel's death: two hits, a heal, and a crit that kills; her HP back 4 s later.
+    // She does not hit while down.
+    DeathTruth lumiel{kAlly, 30.15, 34.15, 900'102, 60'000};
+    truth.deaths.push_back(lumiel);
+    const auto boss_hits = [&](double t, uint64_t target, uint32_t skill, uint64_t amount, bool crit) {
+        DamageSpec h;
+        h.target = target;
+        h.actor = boss;
+        h.skill = skill;
+        h.amount = amount;
+        h.crit = crit;
+        if (crit) h.layout = 5;
+        script.emplace_back(t, opcode_frame(Damage, damage_body({h})));
+    };
+    boss_hits(27.4, kAlly, 900'101, 4'000, false);
+    boss_hits(28.9, kAlly, 900'101, 4'000, false);
+    script.emplace_back(29.45, opcode_frame(proto::opcode::Tick, tick_body(kAlly, 0x09, kAlly2, 16770000, 1'800)));
+    boss_hits(lumiel.at_s, kAlly, lumiel.skill, lumiel.amount, true);
+    script.emplace_back(lumiel.at_s + 0.0005, opcode_frame(proto::opcode::RemainingHp, hp_body(kAlly, 0)));
+    script.emplace_back(lumiel.up_s, opcode_frame(proto::opcode::RemainingHp, hp_body(kAlly, 52'000)));
 
     uint64_t boss_taken = 0;
     bool dead = false;
@@ -164,6 +204,9 @@ inline Session boss_session() {
     const auto land = [&](double t, uint64_t actor, uint64_t credit_to, uint64_t amount, bool crit, bool back,
                           bool bundled, uint32_t skill, uint8_t modifiers) {
         if (dead) return;
+        if (actor == kAlly && t > lumiel.at_s && t < lumiel.up_s) return;
+        // Zikel steps out for five seconds; the spirit goes on.
+        if (actor == kAlly2 && t >= 36.0 && t < 41.0) return;
         DamageSpec d;
         d.target = boss;
         d.actor = actor;
@@ -196,7 +239,9 @@ inline Session boss_session() {
         const auto pick = [i](const uint32_t (&skills)[4]) { return skills[(i * 7 + i / 3) % 4]; };
         const uint8_t mods = static_cast<uint8_t>((i % 7 == 0 ? proto::hit_modifier::Perfect : 0) |
                                                   (i % 9 == 0 ? proto::hit_modifier::Double : 0));
-        land(t, kMe, kMe, 9'000 + static_cast<uint64_t>(i * 37 % 2000), i % 4 == 0, i % 3 == 0, i % 10 == 5,
+        // Ariel's burst: more than twice her usual for five seconds.
+        const uint64_t ariel = 9'000 + static_cast<uint64_t>(i * 37 % 2000);
+        land(t, kMe, kMe, t >= 15.0 && t < 20.0 ? ariel * 22 / 10 : ariel, i % 4 == 0, i % 3 == 0, i % 10 == 5,
              pick(sorcerer), mods);
         land(t + 0.1, kAlly, kAlly, 11'000 + static_cast<uint64_t>(i * 53 % 3000), i % 5 == 0, false, false,
              pick(gladiator), 0);
