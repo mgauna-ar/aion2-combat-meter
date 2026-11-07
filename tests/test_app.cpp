@@ -7,6 +7,7 @@
 #include "app/aura_view.hpp"
 #include "app/overlay_visibility.hpp"
 #include "app/display_format.hpp"
+#include "app/timeline_chart.hpp"
 #include "capture/capture_file.hpp"
 #include "capture/file_source.hpp"
 #include "capture/os/npcap_source.hpp"
@@ -419,6 +420,103 @@ TEST_CASE(DisplayFormat, UnitsFollowRounding) {
     TEST_ASSERT_EQ(format_rate(999.96), std::string("1.0k"));
     TEST_ASSERT_EQ(format_rate(std::nan("")), std::string("0.0"));
     TEST_ASSERT_EQ(format_percent(std::nan("")), std::string("0.0%"));
+}
+
+TEST_CASE(DisplayFormat, SecondsUnderAMinuteThenAClock) {
+    TEST_ASSERT_EQ(format_seconds(3.24), std::string("3.2 s"));
+    TEST_ASSERT_EQ(format_seconds(-1.0), std::string("0.0 s"));
+    TEST_ASSERT_EQ(format_seconds(65.0), std::string("1:05"));
+}
+
+namespace {
+
+/// A fight of 10 seconds: Ariel hits for 100 a second, Lumiel heals for 50 in the
+/// first half, and the boss goes from full to a quarter.
+meter::FightSummary chart_fight() {
+    meter::FightSummary f;
+    f.duration_s = 10.0;
+    meter::CombatantTotals ariel;
+    ariel.id = 100;
+    ariel.name = "Ariel";
+    ariel.cls = game::AionClass::Sorcerer;
+    meter::CombatantTotals lumiel;
+    lumiel.id = 200;
+    lumiel.name = "Lumiel";
+    f.combatants = {ariel, lumiel};
+    auto d = std::make_shared<meter::FightDetail>();
+    d->timeline.seconds = 10;
+    meter::TimelineRow a{100, std::vector<meter::TimelineBin>(10)};
+    for (auto& bin : a.bins) bin.damage = 100;
+    meter::TimelineRow l{200, std::vector<meter::TimelineBin>(5)};
+    for (auto& bin : l.bins) bin.healing = 50;
+    d->timeline.rows = {a, l};
+    d->timeline.boss_hp.first_s = 2;
+    d->timeline.boss_hp.permille = {1000, 750, 500, 250};
+    f.detail = d;
+    return f;
+}
+
+} // namespace
+
+TEST_CASE(TimelineChart, LinesFollowTheMetricAndOrder) {
+    const meter::FightSummary f = chart_fight();
+    TimelineChart chart;
+    TimelineView view;
+    view.smoothing_s = 1;
+    TEST_ASSERT(update_timeline_chart(chart, f, view, 100));
+    // Lumiel dealt no damage: no line.
+    TEST_ASSERT_EQ(chart.lines.size(), size_t{1});
+    TEST_ASSERT_EQ(chart.lines[0].name, std::string("Ariel"));
+    TEST_ASSERT_EQ(chart.lines[0].values.size(), size_t{10});
+    TEST_ASSERT_NEAR(chart.lines[0].peak, 100.0, 1e-4);
+    view.metric = meter::TimelineMetric::Healing;
+    TEST_ASSERT(update_timeline_chart(chart, f, view, 100));
+    TEST_ASSERT_EQ(chart.lines.size(), size_t{1});
+    TEST_ASSERT_EQ(chart.lines[0].name, std::string("Lumiel"));
+    TEST_ASSERT_NEAR(chart.lines[0].total, 250.0, 1e-9);
+}
+
+TEST_CASE(TimelineChart, RebuildsOnlyWhenSomethingChanged) {
+    meter::FightSummary f = chart_fight();
+    TimelineChart chart;
+    TimelineView view;
+    TEST_ASSERT(update_timeline_chart(chart, f, view, 100));
+    TEST_ASSERT_FALSE(update_timeline_chart(chart, f, view, 100));
+    // A line hidden in the legend is a drawing matter, not a rebuild.
+    view.hidden.insert("Ariel");
+    TEST_ASSERT_FALSE(update_timeline_chart(chart, f, view, 100));
+    TEST_ASSERT(update_timeline_chart(chart, f, view, 50));
+    view.smoothing_s = 5;
+    TEST_ASSERT(update_timeline_chart(chart, f, view, 50));
+    // The live fight's next snapshot: another detail.
+    f.detail = std::make_shared<meter::FightDetail>(*f.detail);
+    TEST_ASSERT(update_timeline_chart(chart, f, view, 50));
+}
+
+TEST_CASE(TimelineChart, BossLineIsAFraction) {
+    const meter::FightSummary f = chart_fight();
+    TimelineChart chart;
+    TEST_ASSERT(update_timeline_chart(chart, f, TimelineView{}, 100));
+    TEST_ASSERT_EQ(chart.boss_hp.size(), size_t{10});
+    TEST_ASSERT(chart.boss_hp[1] < 0.0f);  // before its first figure
+    TEST_ASSERT_NEAR(chart.boss_hp[2], 1.0, 1e-6);
+    TEST_ASSERT_NEAR(chart.boss_hp[4], 0.5, 1e-6);
+    TEST_ASSERT_NEAR(chart.boss_hp[9], 0.25, 1e-6);
+    // Fewer points than seconds: each the figure at its span's end.
+    TEST_ASSERT(update_timeline_chart(chart, f, TimelineView{}, 5));
+    TEST_ASSERT_EQ(chart.boss_hp.size(), size_t{5});
+    TEST_ASSERT_NEAR(chart.boss_hp[1], 0.75, 1e-6);
+}
+
+TEST_CASE(TimelineChart, NoDetailGivesNoLines) {
+    meter::FightSummary f = chart_fight();
+    f.detail.reset();
+    TimelineChart chart;
+    TEST_ASSERT(update_timeline_chart(chart, f, TimelineView{}, 100));
+    TEST_ASSERT(chart.lines.empty());
+    TEST_ASSERT(chart.boss_hp.empty());
+    TEST_ASSERT_NEAR(chart_top(83'000.0), 100'000.0, 1e-6);
+    TEST_ASSERT_NEAR(time_step(300.0, 600.0f, 70.0f), 60.0, 1e-9);
 }
 
 TEST_CASE(DisplayFormat, TheLocalPlayerAlwaysShows) {

@@ -44,6 +44,8 @@ inline constexpr Rgb Local{0.30f, 0.58f, 1.00f};
 [[nodiscard]] std::string format_rate(double value);
 /// "62.3%".
 [[nodiscard]] std::string format_percent(double fraction);
+/// "3.2 s" under a minute, "1:05" from one: how long something lasted.
+[[nodiscard]] std::string format_seconds(double seconds);
 
 /// A row the overlay draws: its place in the fight's combatants, and its rank.
 struct ShownRow {
