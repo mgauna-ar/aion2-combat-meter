@@ -140,7 +140,8 @@ Changes are saved as you make them. Closing the window hides it to the tray (or 
 with *Close to tray* off); starting the meter again while it runs opens it.
 
 The tray icon's menu opens the window, does all of the above, and also opens the
-history and recordings folders, `config.json` and the log.
+history and recordings folders, `config.json` and the log. The window's title bar and
+the tray menu are dark, like the app, whatever the Windows theme.
 
 ## ⚙️ Configuration
 
@@ -342,5 +343,6 @@ monster and NPC names come from aion2.app's database (see `src/game/data/skills.
 `maps.tsv` and `npcs.tsv`), and so do skill cooldowns (`plugins/auras/data/cooldowns.tsv`).
 The class emblems and skill icons are NCSOFT's own art, as aion2.app serves it, packed
 into `src/app/src/game_icon_sheet.inc` by `tools/gen_icon_sheet.py`. The MIT licence
-does not cover them. AION 2 is a trademark of NCSOFT. This project is not affiliated
+does not cover them. The app's own icon, wings around a crystal, is this project's
+drawing (`tools/gen_app_icon.py`), under the MIT licence like the rest. AION 2 is a trademark of NCSOFT. This project is not affiliated
 with NCSOFT.

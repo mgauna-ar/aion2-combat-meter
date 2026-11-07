@@ -132,8 +132,9 @@ void setup_fonts_and_theme(const std::string& regular_ttf, const std::string& bo
     ImFont* bold = bold_ttf.empty() ? nullptr : io.Fonts->AddFontFromFileTTF(bold_ttf.c_str(), size, &cfg);
     if (bold != nullptr) load_icon_font(size);
     set_bold_font(bold != nullptr ? bold : io.Fonts->Fonts[0]);
-    // Class emblems and skill icons, a text line tall, in the same texture as the text.
-    build_atlas_with_icons(*io.Fonts, size);
+    // Class emblems and skill icons, a text line tall, in the same texture as the text;
+    // the app's mark too, the size of the sidebar's chip it stands in for.
+    build_atlas_with_icons(*io.Fonts, size, std::round(metrics::ChipSizeLg * dpi_scale));
 
     set_ui_scale(dpi_scale);
     apply_slate_theme();

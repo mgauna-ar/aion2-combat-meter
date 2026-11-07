@@ -1,6 +1,7 @@
 #include "app/app_frame.hpp"
 
 #include "aion2/version.hpp"
+#include "app/game_icons.hpp"
 #include "app/imgui_guard.hpp"
 #include "app/ui/icons.hpp"
 #include "app/ui/theme.hpp"
@@ -125,7 +126,14 @@ void render_sidebar(const AppFrameInput& in, AppViewState& state) {
     ImGui::Dummy(ImVec2(0.0f, m(10.0f)));
     ImGui::Indent(m(6.0f));
     const float brand_y = ImGui::GetCursorPosY();
-    icon_chip(ICON_GAUGE, colors::Accent, metrics::ChipSizeLg);
+    // The app's own mark, as its icon draws it; a gauge chip on an atlas without it.
+    const float mark = m(metrics::ChipSizeLg);
+    const ImVec2 mark_at = ImGui::GetCursorScreenPos();
+    if (draw_app_mark(ImGui::GetWindowDrawList(), mark_at.x, mark_at.y, mark)) {
+        ImGui::Dummy(ImVec2(mark, mark));
+    } else {
+        icon_chip(ICON_GAUGE, colors::Accent, metrics::ChipSizeLg);
+    }
     ImGui::SameLine(0.0f, m(10.0f));
     ImGui::BeginGroup();
     ImGui::SetCursorPosY(brand_y + m(1.0f));

@@ -57,6 +57,38 @@ void copy_wide(wchar_t* dst, size_t capacity, const std::string& utf8) {
     wcsncpy_s(dst, capacity, w.c_str(), _TRUNCATE);
 }
 
+/// The build number Windows really is: GetVersionEx is deprecated and can lie.
+DWORD windows_build() {
+    using RtlGetVersionFn = LONG(WINAPI*)(OSVERSIONINFOW*);
+    const HMODULE ntdll = GetModuleHandleW(L"ntdll.dll");
+    if (ntdll == nullptr) return 0;
+    const auto get_version = reinterpret_cast<RtlGetVersionFn>(GetProcAddress(ntdll, "RtlGetVersion"));
+    OSVERSIONINFOW info{};
+    info.dwOSVersionInfoSize = sizeof(info);
+    return get_version != nullptr && get_version(&info) == 0 ? info.dwBuildNumber : 0;
+}
+
+/// Popup menus are light unless the app asks for dark ones, as the app is dark
+/// whatever the system's theme (its title bar too). The only way to ask is uxtheme's
+/// SetPreferredAppMode, which Windows exports by ordinal alone: 135, with
+/// FlushMenuThemes at 136, since Windows 10 1903 (build 18362). Widely used, and
+/// stable since. Before that build 135 was something else, so it is not called.
+/// The setting is the process's: the app window's system menu turns dark as well.
+void prefer_dark_menus() {
+    if (windows_build() < 18362) return;
+    // Kept loaded: the preference lives in it.
+    const HMODULE uxtheme = LoadLibraryExW(L"uxtheme.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32);
+    if (uxtheme == nullptr) return;
+    using SetPreferredAppModeFn = int(WINAPI*)(int);
+    using FlushMenuThemesFn = void(WINAPI*)();
+    const auto set_mode = reinterpret_cast<SetPreferredAppModeFn>(GetProcAddress(uxtheme, MAKEINTRESOURCEA(135)));
+    const auto flush = reinterpret_cast<FlushMenuThemesFn>(GetProcAddress(uxtheme, MAKEINTRESOURCEA(136)));
+    if (set_mode == nullptr) return;
+    constexpr int kForceDark = 2;  // 0 default, 1 follow the system, 2 dark, 3 light
+    set_mode(kForceDark);
+    if (flush != nullptr) flush();
+}
+
 } // namespace
 
 TrayIcon::~TrayIcon() { destroy(); }
@@ -64,6 +96,7 @@ TrayIcon::~TrayIcon() { destroy(); }
 bool TrayIcon::create(uint32_t icon_resource, uint32_t activation_message) {
     if (m_created) return true;
     m_activation_message = activation_message;
+    prefer_dark_menus();
     HINSTANCE inst = GetModuleHandleW(nullptr);
 
     WNDCLASSEXW wc{};

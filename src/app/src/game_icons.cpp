@@ -19,18 +19,27 @@ struct SkillIconRow {
 };
 
 #include "game_icon_sheet.inc"
+#include "app_mark.inc"
 
 constexpr size_t kSlotBytes = static_cast<size_t>(kIconPx) * kIconPx * 4;
 static_assert(kIconPixelsSize == kSlotBytes * kIconSlots, "the sheet's size is its slots'");
+static_assert(kAppMarkSize == static_cast<size_t>(kAppMarkPx) * kAppMarkPx * 4, "the mark is one square");
 
-/// The sheet, inflated on first use. Empty when the stream does not decode to
-/// exactly the size the index gives: then no icon draws, and nothing else changes.
+/// A deflated image, inflated on first use. Empty when the stream does not decode to
+/// exactly the size given: then it does not draw, and nothing else changes.
+std::vector<uint8_t> inflate_exactly(std::span<const uint8_t> deflated, size_t size) {
+    archive::InflateResult r = archive::inflate(deflated, size);
+    if (!r.ok() || r.data.size() != size) return {};
+    return std::move(r.data);
+}
+
 const std::vector<uint8_t>& sheet() {
-    static const std::vector<uint8_t> pixels = [] {
-        archive::InflateResult r = archive::inflate(kIconPixelsDeflated, kIconPixelsSize);
-        if (!r.ok() || r.data.size() != kIconPixelsSize) return std::vector<uint8_t>{};
-        return std::move(r.data);
-    }();
+    static const std::vector<uint8_t> pixels = inflate_exactly(kIconPixelsDeflated, kIconPixelsSize);
+    return pixels;
+}
+
+const std::vector<uint8_t>& mark() {
+    static const std::vector<uint8_t> pixels = inflate_exactly(kAppMarkDeflated, kAppMarkSize);
     return pixels;
 }
 
@@ -62,6 +71,10 @@ std::span<const uint8_t> icon_pixels(int slot) {
     if (slot < 0 || slot >= kIconSlots || pixels.empty()) return {};
     return std::span<const uint8_t>(pixels).subspan(static_cast<size_t>(slot) * kSlotBytes, kSlotBytes);
 }
+
+int app_mark_px() noexcept { return kAppMarkPx; }
+
+std::span<const uint8_t> app_mark_pixels() { return mark(); }
 
 void resample_icon(std::span<const uint8_t> src, int src_px, uint8_t* dst, int dst_px, size_t dst_stride) {
     if (src_px <= 0 || dst_px <= 0 || dst == nullptr) return;
@@ -106,12 +119,14 @@ void resample_icon(std::span<const uint8_t> src, int src_px, uint8_t* dst, int d
 
 namespace {
 
-/// Where an atlas keeps the icons: its first custom rect and their size. Each
-/// window has its own context and atlas, all drawn from the UI thread.
+/// Where an atlas keeps the icons and the mark: their custom rects (-1 for none) and
+/// sizes. Each window has its own context and atlas, all drawn from the UI thread.
 struct AtlasIcons {
     const ImFontAtlas* atlas;
     int first_rect;
     int px;
+    int mark_rect;
+    int mark_px;
 };
 std::vector<AtlasIcons> g_atlases;
 
@@ -122,14 +137,30 @@ const AtlasIcons* icons_of(const ImFontAtlas* atlas) {
     return nullptr;
 }
 
+/// Draws custom rect `index`, painted at `px`, `size` square at (x, y).
+void draw_rect(ImDrawList* dl, const ImFontAtlas* atlas, int index, int px, float x, float y, float size,
+               float alpha) {
+    const ImFontAtlasCustomRect* rect = &atlas->CustomRects[index];
+    ImVec2 uv0;
+    ImVec2 uv1;
+    atlas->CalcCustomRectUV(rect, &uv0, &uv1);
+    // Whole pixels, and the atlas's own size when it is close: one texel to a pixel
+    // keeps the image sharp, where the renderer's linear filter would blur it.
+    const float side = std::fabs(size - static_cast<float>(px)) < 1.5f ? static_cast<float>(px) : size;
+    const ImVec2 p0(std::round(x + (size - side) * 0.5f), std::round(y + (size - side) * 0.5f));
+    dl->AddImage(atlas->TexID, p0, ImVec2(p0.x + side, p0.y + side), uv0, uv1,
+                 ImGui::GetColorU32(ImVec4(1.0f, 1.0f, 1.0f, alpha)));
+}
+
 } // namespace
 
-void build_atlas_with_icons(ImFontAtlas& atlas, float icon_px) {
+void build_atlas_with_icons(ImFontAtlas& atlas, float icon_px, float mark_px) {
     std::erase_if(g_atlases, [&](const AtlasIcons& a) { return a.atlas == &atlas; });
     const int px = std::clamp(static_cast<int>(std::lround(icon_px)), 8, kIconPx);
-    const bool have = !sheet().empty();
+    const int mpx = std::clamp(static_cast<int>(std::lround(mark_px)), 0, kAppMarkPx);
+    bool icons = !sheet().empty();
     const int first = atlas.CustomRects.Size;
-    if (have) {
+    if (icons) {
         for (int i = 0; i < kIconSlots; ++i) atlas.AddCustomRectRegular(px, px);
         // Wide enough that the icons do not stretch the atlas into a tall strip.
         const int pad = px + atlas.TexGlyphPadding;
@@ -137,44 +168,49 @@ void build_atlas_with_icons(ImFontAtlas& atlas, float icon_px) {
             atlas.TexDesiredWidth = std::max(atlas.TexDesiredWidth, 1024);
         }
     }
+    const int mark_rect = mpx >= 8 && !mark().empty() ? atlas.AddCustomRectRegular(mpx, mpx) : -1;
     atlas.Build();
     unsigned char* pixels = nullptr;
     int width = 0;
     int height = 0;
     atlas.GetTexDataAsRGBA32(&pixels, &width, &height);
-    if (!have || pixels == nullptr) return;
+    if (pixels == nullptr) return;
     const size_t stride = static_cast<size_t>(width) * 4;
-    for (int i = 0; i < kIconSlots; ++i) {
-        const ImFontAtlasCustomRect* rect = atlas.GetCustomRectByIndex(first + i);
-        if (!rect->IsPacked()) return;
-        resample_icon(icon_pixels(i), kIconPx, pixels + rect->Y * stride + static_cast<size_t>(rect->X) * 4, px,
-                      stride);
-    }
-    g_atlases.push_back({&atlas, first, px});
+    const auto paint = [&](int index, std::span<const uint8_t> src, int src_px, int dst_px) {
+        const ImFontAtlasCustomRect* rect = atlas.GetCustomRectByIndex(index);
+        if (!rect->IsPacked()) return false;
+        resample_icon(src, src_px, pixels + rect->Y * stride + static_cast<size_t>(rect->X) * 4, dst_px, stride);
+        return true;
+    };
+    for (int i = 0; icons && i < kIconSlots; ++i) icons = paint(first + i, icon_pixels(i), kIconPx, px);
+    const bool marked = mark_rect >= 0 && paint(mark_rect, mark(), kAppMarkPx, mpx);
+    if (icons || marked) g_atlases.push_back({&atlas, icons ? first : -1, px, marked ? mark_rect : -1, mpx});
 }
 
 void draw_icon(ImDrawList* dl, int slot, float x, float y, float size, float alpha) {
     if (dl == nullptr || slot < 0 || slot >= kIconSlots) return;
     const ImFontAtlas* atlas = ImGui::GetIO().Fonts;
     const AtlasIcons* icons = icons_of(atlas);
-    if (icons == nullptr || icons->first_rect + slot >= atlas->CustomRects.Size) return;
-    const ImFontAtlasCustomRect* rect = &atlas->CustomRects[icons->first_rect + slot];
-    ImVec2 uv0;
-    ImVec2 uv1;
-    atlas->CalcCustomRectUV(rect, &uv0, &uv1);
-    // Whole pixels, and the atlas's own size when it is close: one texel to a pixel
-    // keeps the icon sharp, where the renderer's linear filter would blur it.
-    const float side = std::fabs(size - static_cast<float>(icons->px)) < 1.5f ? static_cast<float>(icons->px) : size;
-    const ImVec2 p0(std::round(x + (size - side) * 0.5f), std::round(y + (size - side) * 0.5f));
-    dl->AddImage(atlas->TexID, p0, ImVec2(p0.x + side, p0.y + side), uv0, uv1,
-                 ImGui::GetColorU32(ImVec4(1.0f, 1.0f, 1.0f, alpha)));
+    if (icons == nullptr || icons->first_rect < 0 || icons->first_rect + slot >= atlas->CustomRects.Size) return;
+    draw_rect(dl, atlas, icons->first_rect + slot, icons->px, x, y, size, alpha);
+}
+
+bool draw_app_mark(ImDrawList* dl, float x, float y, float size) {
+    if (dl == nullptr) return false;
+    const ImFontAtlas* atlas = ImGui::GetIO().Fonts;
+    const AtlasIcons* icons = icons_of(atlas);
+    if (icons == nullptr || icons->mark_rect < 0 || icons->mark_rect >= atlas->CustomRects.Size) return false;
+    draw_rect(dl, atlas, icons->mark_rect, icons->mark_px, x, y, size, 1.0f);
+    return true;
 }
 
 #else // !HAVE_IMGUI
 
-void build_atlas_with_icons(ImFontAtlas&, float) {}
+void build_atlas_with_icons(ImFontAtlas&, float, float) {}
 
 void draw_icon(ImDrawList*, int, float, float, float, float) {}
+
+bool draw_app_mark(ImDrawList*, float, float, float) { return false; }
 
 #endif
 

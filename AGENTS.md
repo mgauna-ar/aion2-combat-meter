@@ -81,7 +81,9 @@ License).
    - So are the updater's SHA-256 and zip reader (`sha256`, `archive/`, ported from
      ffxiv-hub). HTTPS is Windows' own WinHTTP.
    - The icon sheet is raw DEFLATE, decoded once by that same `archive::inflate`, and
-     painted into each window's font atlas: no image library, no second texture.
+     painted into each window's font atlas: no image library, no second texture. The
+     app's own mark (`app_mark.inc`, the sidebar's) is too, kept apart from the sheet,
+     since the sheet is NCSOFT's art and the mark is ours.
 5. **Privacy.**
    - Captures and fight records hold character names.
    - `*.pcap*` and `tests/fixtures/local/` are gitignored.
@@ -139,7 +141,8 @@ src/app/         aion2::app
     update_check (release parsing, versions, the update balloon) and updater (check,
     download, stage, swap), both ported from ffxiv-hub,
     game_icons (class emblems and skill icons from game_icon_sheet.inc, painted into
-    each window's font atlas at its text size), timeline_chart (the Timeline tab's
+    each window's font atlas at its text size, and the app's mark from app_mark.inc
+    at the sidebar chip's), timeline_chart (the Timeline tab's
     lines as numbers, no ImGui)
     src/ui/      the app window's pages (a page per plugin, opened by plugin_page's
                  header and master switch), theme, widgets, table (the meter's tables)
@@ -151,7 +154,9 @@ tools/replay/    aion2meter-replay (every platform)
 tools/synth/     aion2meter-synth: writes the tests' made-up boss fight as a pcapng
 tools/screenshots/  renders docs/images from overlay_view and app_frame (software rasterizer from
                  ffxiv-hub), in UTC; --all also draws the pages the README does not show
-tools/check_forbidden_apis.sh, tools/gen_app_icon.py, tools/embed_icon_font.py
+tools/check_forbidden_apis.sh, tools/embed_icon_font.py
+tools/gen_app_icon.py            the app's mark (wings around a crystal, our own drawing)
+                                 → app.ico and app_mark.inc
 tools/gen_skill_table.py         skills.tsv → skill_table.inc (`make test` checks they agree);
                                  the TSV's third column names each skill's icon
 tools/gen_icon_sheet.py          aion2.app's class emblems and skill icons → game_icon_sheet.inc
