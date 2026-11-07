@@ -40,6 +40,11 @@ void usage() {
                  "  --fights          a table per fight: damage, DPS, crits, boss, end reason\n"
                  "  --skills          --fights, and each player's skills, healing and damage\n"
                  "                    taken\n"
+                 "  --deaths          --fights, and each fight's deaths: killing blow, time until\n"
+                 "                    up, and the last hits and heals before it\n"
+                 "  --active          --fights, and each player's time spent hitting\n"
+                 "  --effects         --fights, and each fight's effect uptime: party buffs,\n"
+                 "                    debuffs on the party, the party's effects on enemies\n"
                  "  --events          every decoded event but heartbeats and --auras', one per line\n"
                  "  --auras           effects put on and taken off, and the local player's skill\n"
                  "                    uses and cooldown changes\n"
@@ -86,6 +91,15 @@ bool parse_args(int argc, char** argv, Options& opt) {
         } else if (arg == "--skills") {
             opt.report.fights = true;
             opt.report.skills = true;
+        } else if (arg == "--deaths") {
+            opt.report.fights = true;
+            opt.report.deaths = true;
+        } else if (arg == "--active") {
+            opt.report.fights = true;
+            opt.report.active = true;
+        } else if (arg == "--effects") {
+            opt.report.fights = true;
+            opt.report.effects = true;
         } else if (arg == "--events") {
             opt.report.events = true;
         } else if (arg == "--auras") {

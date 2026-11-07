@@ -1,6 +1,11 @@
 #include "meter/fight_json.hpp"
 
+#include "meter/fight_detail.hpp"
+
+#include <algorithm>
+#include <cmath>
 #include <cstdint>
+#include <memory>
 #include <string>
 
 namespace aion2::meter {
@@ -104,6 +109,187 @@ std::vector<T> vector_of(const JsonValue& j, F from_json) {
     return out;
 }
 
+
+/// Most of each list a record's detail reads: a misread or hand-edited file stops
+/// here, never runs away with memory.
+constexpr size_t kMaxTimelineRows = 256;
+constexpr size_t kMaxEffectRows = 4096;
+constexpr size_t kMaxBuffWindows = 4096;
+
+/// Milliseconds as written: seconds kept to the millisecond.
+[[nodiscard]] uint64_t to_ms(double seconds) {
+    return seconds > 0.0 ? static_cast<uint64_t>(std::llround(seconds * 1000.0)) : 0;
+}
+[[nodiscard]] double from_ms(const JsonValue& v) { return static_cast<double>(u64(v)) / 1000.0; }
+
+template <typename T, typename F>
+std::vector<T> bounded_vector_of(const JsonValue& j, size_t most, F from_json) {
+    std::vector<T> out;
+    for (const JsonValue& item : j.as_array()) {
+        if (out.size() >= most) break;
+        out.push_back(from_json(item));
+    }
+    return out;
+}
+
+/// One field of every bin, its trailing zeros cut: a number each second.
+JsonValue series_to_json(const std::vector<TimelineBin>& bins, uint32_t TimelineBin::*field) {
+    size_t n = bins.size();
+    while (n > 0 && bins[n - 1].*field == 0) --n;
+    JsonValue::ArrayType out;
+    out.reserve(n);
+    for (size_t i = 0; i < n; ++i) out.emplace_back(bins[i].*field);
+    return JsonValue(std::move(out));
+}
+
+void series_from_json(const JsonValue& j, std::vector<TimelineBin>& bins, uint32_t TimelineBin::*field) {
+    const auto& values = j.as_array();
+    const size_t n = std::min(values.size(), kTimelineMaxSeconds);
+    if (bins.size() < n) bins.resize(n);
+    for (size_t i = 0; i < n; ++i) bins[i].*field = u32(values[i]);
+}
+
+JsonValue timeline_to_json(const FightTimeline& tl) {
+    JsonValue j;
+    j["seconds"] = tl.seconds;
+    JsonValue::ArrayType rows;
+    for (const TimelineRow& r : tl.rows) {
+        JsonValue row;
+        row["id"] = r.id;
+        row["damage"] = series_to_json(r.bins, &TimelineBin::damage);
+        row["healing"] = series_to_json(r.bins, &TimelineBin::healing);
+        row["taken"] = series_to_json(r.bins, &TimelineBin::taken);
+        rows.push_back(std::move(row));
+    }
+    j["rows"] = JsonValue(std::move(rows));
+    if (!tl.boss_hp.empty()) {
+        JsonValue boss;
+        boss["first_s"] = tl.boss_hp.first_s;
+        JsonValue::ArrayType permille;
+        permille.reserve(tl.boss_hp.permille.size());
+        for (const uint16_t p : tl.boss_hp.permille) permille.emplace_back(p);
+        boss["permille"] = JsonValue(std::move(permille));
+        j["boss_hp"] = std::move(boss);
+    }
+    j["buffs"] = array_of(tl.buffs, [](const BuffWindow& w) {
+        JsonValue b;
+        b["key"] = w.key;
+        b["buff"] = w.buff_id;
+        if (w.source_skill != 0) b["skill"] = w.source_skill;
+        b["caster"] = w.caster;
+        b["class"] = std::string(game::class_name(w.caster_cls));
+        b["begin_ms"] = to_ms(w.begin_s);
+        b["end_ms"] = to_ms(w.end_s);
+        return b;
+    });
+    return j;
+}
+
+FightTimeline timeline_from_json(const JsonValue& j) {
+    FightTimeline tl;
+    tl.seconds = std::min(u32(j["seconds"]), static_cast<uint32_t>(kTimelineMaxSeconds));
+    tl.rows = bounded_vector_of<TimelineRow>(j["rows"], kMaxTimelineRows, [](const JsonValue& r) {
+        TimelineRow row;
+        row.id = u32(r["id"]);
+        series_from_json(r["damage"], row.bins, &TimelineBin::damage);
+        series_from_json(r["healing"], row.bins, &TimelineBin::healing);
+        series_from_json(r["taken"], row.bins, &TimelineBin::taken);
+        return row;
+    });
+    const JsonValue& boss = j["boss_hp"];
+    tl.boss_hp.first_s = std::min(u32(boss["first_s"]), static_cast<uint32_t>(kTimelineMaxSeconds));
+    for (const JsonValue& p : boss["permille"].as_array()) {
+        if (tl.boss_hp.first_s + tl.boss_hp.permille.size() >= kTimelineMaxSeconds) break;
+        tl.boss_hp.permille.push_back(static_cast<uint16_t>(std::min<uint64_t>(u64(p), 1000)));
+    }
+    tl.buffs = bounded_vector_of<BuffWindow>(j["buffs"], kMaxBuffWindows, [](const JsonValue& b) {
+        BuffWindow w;
+        w.key = u32(b["key"]);
+        w.buff_id = u32(b["buff"]);
+        w.source_skill = u32(b["skill"]);
+        w.caster = b["caster"].as_string();
+        w.caster_cls = game::class_from_name(b["class"].as_string());
+        w.begin_s = from_ms(b["begin_ms"]);
+        w.end_s = std::max(w.begin_s, from_ms(b["end_ms"]));
+        return w;
+    });
+    return tl;
+}
+
+JsonValue death_to_json(const DeathRecord& d) {
+    JsonValue j;
+    j["player"] = d.player;
+    j["name"] = d.name;
+    j["class"] = std::string(game::class_name(d.cls));
+    j["at_ms"] = to_ms(d.time_s);
+    if (d.up()) j["up_after_ms"] = to_ms(d.up_after_s);
+    j["recap"] = array_of(d.recap, [](const RecapEvent& e) {
+        JsonValue r;
+        r["before_ms"] = to_ms(e.before_s);
+        r["kind"] = std::string(recap_kind_name(e.kind));
+        r["skill"] = e.skill;
+        if (e.source_npc != 0) r["npc"] = e.source_npc;
+        if (!e.healer.empty()) r["from"] = e.healer;
+        r["amount"] = e.amount;
+        r["crit"] = e.crit;
+        return r;
+    });
+    return j;
+}
+
+DeathRecord death_from_json(const JsonValue& j) {
+    DeathRecord d;
+    d.player = u32(j["player"]);
+    d.name = j["name"].as_string();
+    d.cls = game::class_from_name(j["class"].as_string());
+    d.time_s = from_ms(j["at_ms"]);
+    d.up_after_s = j.contains("up_after_ms") ? from_ms(j["up_after_ms"]) : -1.0;
+    d.recap = bounded_vector_of<RecapEvent>(j["recap"], kRecapShown, [](const JsonValue& r) {
+        RecapEvent e;
+        e.before_s = from_ms(r["before_ms"]);
+        e.kind = recap_kind_from_name(r["kind"].as_string());
+        e.skill = u32(r["skill"]);
+        e.source_npc = u32(r["npc"]);
+        e.healer = r["from"].as_string();
+        e.amount = u64(r["amount"]);
+        e.crit = r["crit"].as_bool();
+        return e;
+    });
+    return d;
+}
+
+JsonValue effect_to_json(const EffectUptimeRow& r) {
+    JsonValue j;
+    j["key"] = r.key;
+    j["buff"] = r.buff_id;
+    if (r.source_skill != 0) j["skill"] = r.source_skill;
+    j["side"] = std::string(effect_side_name(r.side));
+    j["target"] = r.target;
+    j["target_name"] = r.target_name;
+    if (r.target_cls != AionClass::Unknown) j["target_class"] = std::string(game::class_name(r.target_cls));
+    j["caster"] = r.caster;
+    if (r.caster_cls != AionClass::Unknown) j["caster_class"] = std::string(game::class_name(r.caster_cls));
+    j["applications"] = r.applications;
+    j["active_ms"] = to_ms(r.active_s);
+    return j;
+}
+
+EffectUptimeRow effect_from_json(const JsonValue& j) {
+    EffectUptimeRow r;
+    r.key = u32(j["key"]);
+    r.buff_id = u32(j["buff"]);
+    r.source_skill = u32(j["skill"]);
+    r.side = effect_side_from_name(j["side"].as_string());
+    r.target = u32(j["target"]);
+    r.target_name = j["target_name"].as_string();
+    r.target_cls = game::class_from_name(j["target_class"].as_string());
+    r.caster = j["caster"].as_string();
+    r.caster_cls = game::class_from_name(j["caster_class"].as_string());
+    r.applications = u32(j["applications"]);
+    r.active_s = from_ms(j["active_ms"]);
+    return r;
+}
+
 } // namespace
 
 uint64_t json_u64(const JsonValue& v) {
@@ -177,9 +363,15 @@ JsonValue fight_to_json(const FightSummary& f) {
         r["damage_taken"] = c.damage_taken;
         r["taken"] = hits_to_json(c.taken);
         r["taken_by"] = array_of(c.taken_by, amount_to_json);
+        if (f.detail != nullptr) r["active_s"] = c.active_s;
         rows.push_back(std::move(r));
     }
     j["combatants"] = std::move(rows);
+    if (f.detail != nullptr) {
+        j["timeline"] = timeline_to_json(f.detail->timeline);
+        j["deaths"] = array_of(f.detail->deaths, death_to_json);
+        j["effects"] = array_of(f.detail->effects, effect_to_json);
+    }
     return j;
 }
 
@@ -239,7 +431,17 @@ std::optional<FightSummary> fight_from_json(const JsonValue& j) {
         c.damage_taken = u64(r["damage_taken"]);
         c.taken = hits_from_json(r["taken"]);
         c.taken_by = vector_of<SkillAmount>(r["taken_by"], amount_from_json);
+        const double active = r["active_s"].as_double(0.0);
+        c.active_s = std::isfinite(active) && active > 0.0 ? active : 0.0;
         f.combatants.push_back(std::move(c));
+    }
+    // Saved before the meter kept them: no detail at all, rather than an empty one.
+    if (j.contains("timeline") || j.contains("deaths") || j.contains("effects")) {
+        auto detail = std::make_shared<FightDetail>();
+        detail->timeline = timeline_from_json(j["timeline"]);
+        detail->deaths = bounded_vector_of<DeathRecord>(j["deaths"], kMaxDeathsPerFight, death_from_json);
+        detail->effects = bounded_vector_of<EffectUptimeRow>(j["effects"], kMaxEffectRows, effect_from_json);
+        f.detail = std::move(detail);
     }
     return f;
 }

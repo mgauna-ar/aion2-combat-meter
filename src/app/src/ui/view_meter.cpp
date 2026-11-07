@@ -3,12 +3,15 @@
 #include "app/display_format.hpp"
 #include "app/game_icons.hpp"
 #include "app/ui/icons.hpp"
+#include "app/ui/meter_tabs.hpp"
 #include "app/ui/page.hpp"
+#include "app/ui/table.hpp"
 #include "app/ui/widgets.hpp"
 #include "common/time_format.hpp"
 #include "game/map_names.hpp"
 #include "game/npc_names.hpp"
 #include "game/skill_names.hpp"
+#include "meter/fight_detail.hpp"
 #include "meter/pull_grouping.hpp"
 
 #ifdef HAVE_IMGUI
@@ -26,11 +29,6 @@ namespace aion2::app::ui {
 
 namespace {
 
-/// Every table on the page: a table that does not fit scrolls rather than crushing
-/// its columns (table_sizing). PadOuterX keeps the edge columns off the sides.
-constexpr ImGuiTableFlags kTableFlags =
-    ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY | ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_PadOuterX;
-
 struct Badge {
     const char* label;
     uint32_t color;
@@ -43,11 +41,6 @@ struct Shown {
     const meter::HistoryEntry* entry{nullptr};
     int number{0};
 };
-
-uint32_t row_color_u32(const meter::CombatantTotals& c) {
-    if (c.cls != game::AionClass::Unknown) return class_color_u32(c.cls);
-    return c.is_local ? colors::Accent : colors::TextMuted;
-}
 
 Badge outcome(bool live, bool killed, meter::EndReason reason) {
     if (live) return {"In combat", colors::SuccessLight};
@@ -78,86 +71,7 @@ std::string share(uint64_t part, uint64_t whole) {
     return whole == 0 ? std::string("-") : format_percent(static_cast<double>(part) / static_cast<double>(whole));
 }
 
-std::string number(uint64_t n) {
-    char buf[32];
-    std::snprintf(buf, sizeof(buf), "%" PRIu64, n);
-    return buf;
-}
-
 // ------------------------------------------------------------------ tables ---
-
-struct Column {
-    const char* name;
-    /// Unscaled pixels; 0 stretches.
-    float width;
-    const char* tip;
-    /// 0 is shown first; the highest go when the table is narrow.
-    int priority;
-};
-
-/// A ranking or breakdown table: columns, the header row with each column's
-/// tooltip, scrolling with the header frozen. A table narrower than its columns
-/// drops the least important ones (by priority) rather than scroll sideways; only
-/// one too narrow even for those scrolls. False when nothing is to be drawn.
-bool begin_table(const char* id, const Column* cols, int count, float height) {
-    // What a column costs beyond its content: its cell padding and its border.
-    const float chrome = ImGui::GetStyle().CellPadding.x * 2.0f + 1.0f;
-    const float avail = ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ScrollbarSize;
-    std::vector<int> order(static_cast<size_t>(count));
-    for (int i = 0; i < count; ++i) order[static_cast<size_t>(i)] = i;
-    std::stable_sort(order.begin(), order.end(), [&](int a, int b) { return cols[a].priority < cols[b].priority; });
-    std::vector<bool> shown(static_cast<size_t>(count), false);
-    float used = 0.0f;
-    float natural = 0.0f;
-    int shown_count = 0;
-    for (const int i : order) {
-        const float w = m(cols[i].width > 0.0f ? cols[i].width : 110.0f) + chrome;
-        if (used > 0.0f && used + w > avail) continue;
-        used += w;
-        natural += cols[i].width > 0.0f ? cols[i].width : 110.0f;
-        shown[static_cast<size_t>(i)] = true;
-        ++shown_count;
-    }
-    // The chrome of the columns shown only: counting the dropped ones made a table
-    // that fits look cramped, and its stretching column shrank to its minimum.
-    const auto sizing = table_sizing(natural, shown_count, kTableFlags);
-    if (!ImGui::BeginTable(id, count, sizing.flags, ImVec2(0.0f, height))) return false;
-    for (int i = 0; i < count; ++i) {
-        const ImGuiTableColumnFlags hide = shown[static_cast<size_t>(i)] ? 0 : ImGuiTableColumnFlags_Disabled;
-        if (cols[i].width > 0.0f) {
-            ImGui::TableSetupColumn(cols[i].name, ImGuiTableColumnFlags_WidthFixed | hide, m(cols[i].width));
-        } else {
-            ImGui::TableSetupColumn(cols[i].name, sizing.flex_flags() | hide, sizing.flex_width(110.0f, 1.0f));
-        }
-    }
-    ImGui::TableSetupScrollFreeze(0, 1);
-    ImGui::TableNextRow(ImGuiTableRowFlags_Headers);
-    ImGui::PushStyleColor(ImGuiCol_Text, v4(colors::TextDim));
-    for (int i = 0; i < count; ++i) {
-        if (!ImGui::TableSetColumnIndex(i)) continue;
-        ImGui::TableHeader(cols[i].name);
-        if (cols[i].tip != nullptr && ImGui::IsItemHovered()) ImGui::SetTooltip("%s", cols[i].tip);
-    }
-    ImGui::PopStyleColor();
-    return true;
-}
-
-/// A cell's text; nothing for a column dropped for width.
-void cell(int column, uint32_t color, const std::string& text) {
-    if (!ImGui::TableSetColumnIndex(column)) return;
-    text_colored_u32(color, "%s", text.c_str());
-}
-
-/// A skill's icon, then its name; nothing for a column dropped for width. A skill
-/// without an icon keeps the space, so the names line up.
-void skill_cell(int column, uint32_t code) {
-    if (!ImGui::TableSetColumnIndex(column)) return;
-    const float side = ImGui::GetTextLineHeight();
-    const ImVec2 p = ImGui::GetCursorScreenPos();
-    draw_icon(ImGui::GetWindowDrawList(), skill_icon(code), p.x, p.y, side);
-    ImGui::SetCursorScreenPos(ImVec2(p.x + side + m(6.0f), p.y));
-    text_colored_u32(colors::TextBody, "%s", game::skill_label(code).c_str());
-}
 
 /// The row's player: a selectable across the row, which opens their breakdown.
 void name_cell(int column, const meter::CombatantTotals& c, meter::EntityId& selected, const char* tab) {
@@ -275,21 +189,25 @@ void damage_tab(const meter::FightSummary& f, AppViewState& state) {
     }
     const meter::CombatantTotals* open = find_row(f, state.damage_player);
     const Column cols[] = {
-        {"#", 24.0f, nullptr, 12},
-        {"Class", 64.0f, "From the skills the player used.", 7},
+        {"#", 24.0f, nullptr, 13},
+        {"Class", 64.0f, "From the skills the player used.", 8},
         {"Player", 0.0f, "Select a player for their skills.", 0},
         {"DPS", 60.0f, "Damage per second, from the fight's first hit to its last.", 1},
         {"Damage", 64.0f, "Direct hits and DoT ticks.", 2},
         {"Share", 52.0f, "Of the party's damage.", 3},
-        {"HIT", 40.0f, kTipHits, 6},
+        {"Active", 54.0f,
+         "Time spent hitting: the gaps of 3 s or less between the player's own direct hits, of the fight. "
+         "Summons and DoTs do not count, so healers and summoners read lower.",
+         6},
+        {"HIT", 40.0f, kTipHits, 7},
         {"CRI", 50.0f, kTipCrit, 4},
-        {"PERF", 50.0f, kTipPerfect, 8},
-        {"DOUB", 50.0f, kTipDouble, 9},
+        {"PERF", 50.0f, kTipPerfect, 9},
+        {"DOUB", 50.0f, kTipDouble, 10},
         {"BACK", 50.0f, kTipBack, 5},
-        {"FRNT", 50.0f, kTipFront, 10},
-        {"MULT", 50.0f, kTipMulti, 13},
-        {"BLOC", 50.0f, kTipBlock, 14},
-        {"Max", 58.0f, "The player's biggest hit.", 11},
+        {"FRNT", 50.0f, kTipFront, 11},
+        {"MULT", 50.0f, kTipMulti, 14},
+        {"BLOC", 50.0f, kTipBlock, 15},
+        {"Max", 58.0f, "The player's biggest hit.", 12},
     };
     if (begin_table("##DamageTable", cols, static_cast<int>(std::size(cols)), table_height(open != nullptr))) {
         const double top = std::max(rows.front()->dps, 1.0);
@@ -310,15 +228,21 @@ void damage_tab(const meter::FightSummary& f, AppViewState& state) {
                 ImGui::SetTooltip("%" PRIu64 " damage, %" PRIu64 " of it from DoTs", c->damage, c->dot_damage);
             }
             cell(5, colors::TextMuted, format_percent(c->share));
-            cell(6, colors::TextMuted, number(c->hits.hits));
-            cell(7, colors::TextMuted, rate(c->hits, &meter::HitCounts::crits));
-            cell(8, colors::TextMuted, rate(c->hits, &meter::HitCounts::perfect));
-            cell(9, colors::TextMuted, rate(c->hits, &meter::HitCounts::doubles));
-            cell(10, colors::TextMuted, rate(c->hits, &meter::HitCounts::back));
-            cell(11, colors::TextMuted, rate(c->hits, &meter::HitCounts::front));
-            cell(12, colors::TextMuted, rate(c->hits, &meter::HitCounts::multi));
-            cell(13, colors::TextMuted, rate(c->hits, &meter::HitCounts::blocks));
-            cell(14, colors::TextMuted, format_amount(c->max_hit));
+            // A record saved before the meter kept active time has none to show.
+            cell(6, colors::TextMuted, f.detail != nullptr ? format_percent(c->active_share(f.duration_s)) : "-");
+            if (f.detail != nullptr && ImGui::IsItemHovered()) {
+                ImGui::SetTooltip("%s of %s spent hitting", common::clock_duration(c->active_s).c_str(),
+                                  common::clock_duration(f.duration_s).c_str());
+            }
+            cell(7, colors::TextMuted, number(c->hits.hits));
+            cell(8, colors::TextMuted, rate(c->hits, &meter::HitCounts::crits));
+            cell(9, colors::TextMuted, rate(c->hits, &meter::HitCounts::perfect));
+            cell(10, colors::TextMuted, rate(c->hits, &meter::HitCounts::doubles));
+            cell(11, colors::TextMuted, rate(c->hits, &meter::HitCounts::back));
+            cell(12, colors::TextMuted, rate(c->hits, &meter::HitCounts::front));
+            cell(13, colors::TextMuted, rate(c->hits, &meter::HitCounts::multi));
+            cell(14, colors::TextMuted, rate(c->hits, &meter::HitCounts::blocks));
+            cell(15, colors::TextMuted, format_amount(c->max_hit));
         }
         ImGui::EndTable();
     }
@@ -709,6 +633,11 @@ void top_bar(const Shown& shown, AppActions& out) {
     stat("DAMAGE", format_amount(f.total_damage), colors::TextPrimary, nullptr);
     if (f.total_healing > 0) stat("HEALING", format_amount(f.total_healing), colors::Heal, nullptr);
     stat("PLAYERS", std::to_string(f.combatants.size()), colors::TextPrimary, nullptr);
+    if (f.detail != nullptr) {
+        const size_t deaths = f.detail->deaths.size();
+        stat("DEATHS", std::to_string(deaths), deaths > 0 ? colors::DangerLight : colors::TextPrimary,
+             "Party members whose HP reached 0 during the fight. The Deaths tab has what hit them.");
+    }
     if (f.boss.present() && f.boss.killed) {
         stat("BOSS HP", "Killed", colors::Gold, nullptr);
     } else if (f.boss.present() && f.boss.hp_known) {
@@ -840,7 +769,9 @@ void tracking_card(const AppFrameInput& in, AppActions& out) {
 
     setting_slider("Partial data under", "A killed boss that lost less than this share of its HP with hits seen.",
                    &s.partial_damage_ratio, 0.0, 1.0, "%.2f", out, Applies::Engine);
-    setting_switch("Wipe ends the fight", "When every party member is dead. Off until captures show revives.",
+    setting_switch("Wipe ends the fight",
+                   "When every party member in it is dead at once. Off: a party can all go down and get "
+                   "back up mid-fight.",
                    &s.wipe_detection, out, Applies::Engine);
     end_settings_card();
 }
@@ -931,10 +862,19 @@ void render_meter_page(const AppFrameInput& in, AppViewState& state, AppActions&
          [&] { pull_view(in, state, out, groups, shown, "##HealPane", [&](const auto& f) { healing_tab(f, state); }); }},
         {ICON_SHIELD, "Damage Taken",
          [&] { pull_view(in, state, out, groups, shown, "##TakenPane", [&](const auto& f) { taken_tab(f, state); }); }},
+        {ICON_SPARKLE, "Buffs & Debuffs",
+         [&] { pull_view(in, state, out, groups, shown, "##EffectsPane", [&](const auto& f) { effects_tab(f, state); }); }},
+        {ICON_TRENDING, "Timeline",
+         [&] {
+             pull_view(in, state, out, groups, shown, "##TimelinePane", [&](const auto& f) { timeline_tab(f, state); });
+         }},
+        {ICON_SKULL, "Deaths",
+         [&] { pull_view(in, state, out, groups, shown, "##DeathsPane", [&](const auto& f) { deaths_tab(f, state); }); }},
         {ICON_SLIDERS, "Settings", [&] { settings_tab(in, out); }},
     };
-    render_tabs("##MeterTabs", tabs, std::size(tabs), state.open_meter_tab);
-    state.open_meter_tab = -1;
+    static_assert(std::size(tabs) == static_cast<size_t>(MeterTab::Settings) + 1, "a tab for every MeterTab");
+    render_tabs("##MeterTabs", tabs, std::size(tabs), state.open_meter_tab ? static_cast<int>(*state.open_meter_tab) : -1);
+    state.open_meter_tab.reset();
 }
 
 #endif // HAVE_IMGUI

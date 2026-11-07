@@ -20,6 +20,7 @@
 #include "app/overlay_view.hpp"
 #include "app/ui/theme.hpp"
 #include "capture/capture_file.hpp"
+#include "meter/fight_detail.hpp"
 #include "meter/history_store.hpp"
 #include "pipeline/pipeline.hpp"
 
@@ -349,12 +350,37 @@ int main(int argc, char** argv) {
     damage.view.damage_player = static_cast<meter::EntityId>(test::synthetic::kMe);
     ok = render_app(damage, app_settings, out_dir) && ok;
     AppScene settings_page{"app-settings.png", done.snapshot, damage.history, {}};
-    settings_page.view.open_meter_tab = 3;
+    settings_page.view.open_meter_tab = app::MeterTab::Settings;
     // Locked, so the visibility conditions read as live rather than greyed out.
     app::AppSettings shown_settings = app_settings;
     shown_settings.overlay.locked = true;
     shown_settings.overlay.show_in_combat_only = true;
     ok = render_app(settings_page, shown_settings, out_dir) && ok;
+    // The fight second by second, read at the moment Lumiel dies, under Spirit
+    // Communion's band.
+    AppScene timeline = damage;
+    timeline.file = "app-timeline.png";
+    timeline.view.damage_player = 0;
+    timeline.view.open_meter_tab = app::MeterTab::Timeline;
+    timeline.view.timeline_hover_at = 0.52f;
+    ok = render_app(timeline, app_settings, out_dir) && ok;
+    // Lumiel's death, with the hits and heals before it.
+    AppScene deaths = damage;
+    deaths.file = "app-deaths.png";
+    deaths.view.damage_player = 0;
+    deaths.view.open_meter_tab = app::MeterTab::Deaths;
+    if (kill.detail != nullptr && !kill.detail->deaths.empty()) {
+        deaths.view.death_player = kill.detail->deaths.front().player;
+        deaths.view.death_time_s = kill.detail->deaths.front().time_s;
+    }
+    ok = render_app(deaths, app_settings, out_dir) && ok;
+    // The party's effects on the boss.
+    AppScene buffs = damage;
+    buffs.file = "app-buffs.png";
+    buffs.view.damage_player = 0;
+    buffs.view.open_meter_tab = app::MeterTab::Buffs;
+    buffs.view.effect_view = meter::EffectSide::PartyBuff;
+    ok = render_app(buffs, app_settings, out_dir) && ok;
     // The Auras plugin's page, switched on, with the overlay's settings above.
     AppScene auras_page{"app-auras.png", done.snapshot, damage.history, {}};
     auras_page.view.page = app::AppPage::Auras;
@@ -365,12 +391,12 @@ int main(int argc, char** argv) {
     if (all) {
         AppScene healing = damage;
         healing.file = "app-healing.png";
-        healing.view.open_meter_tab = 1;
+        healing.view.open_meter_tab = app::MeterTab::Healing;
         healing.view.heal_player = static_cast<meter::EntityId>(test::synthetic::kAlly2);
         ok = render_app(healing, app_settings, out_dir) && ok;
         AppScene taken = damage;
         taken.file = "app-taken.png";
-        taken.view.open_meter_tab = 2;
+        taken.view.open_meter_tab = app::MeterTab::Taken;
         taken.view.taken_player = static_cast<meter::EntityId>(test::synthetic::kMe);
         ok = render_app(taken, app_settings, out_dir) && ok;
         AppScene dashboard{"app-dashboard.png", done.snapshot, damage.history, {}};

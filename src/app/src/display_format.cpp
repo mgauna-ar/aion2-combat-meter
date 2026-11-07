@@ -1,5 +1,7 @@
 #include "app/display_format.hpp"
 
+#include "common/time_format.hpp"
+
 #include <cmath>
 #include <cstdio>
 
@@ -69,6 +71,14 @@ std::string format_percent(double fraction) {
     if (!std::isfinite(fraction)) fraction = 0.0;
     char buf[16];
     std::snprintf(buf, sizeof(buf), "%.1f%%", 100.0 * fraction);
+    return buf;
+}
+
+std::string format_seconds(double seconds) {
+    if (!(seconds > 0.0)) seconds = 0.0;
+    if (seconds >= 60.0) return common::clock_duration(seconds);
+    char buf[32];
+    std::snprintf(buf, sizeof(buf), "%.1f s", seconds);
     return buf;
 }
 

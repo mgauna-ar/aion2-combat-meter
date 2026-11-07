@@ -2,6 +2,7 @@
 #include "file_test_support.hpp"
 #include "meter_test_support.hpp"
 
+#include "meter/fight_detail.hpp"
 #include "meter/fight_json.hpp"
 #include "meter/history_store.hpp"
 #include "meter/pull_grouping.hpp"
@@ -57,6 +58,67 @@ FightSummary sample_fight(uint64_t id, double start_s) {
     return f;
 }
 
+/// A fight's detail with something of each kind in it.
+std::shared_ptr<const FightDetail> sample_detail() {
+    auto d = std::make_shared<FightDetail>();
+    d->timeline.seconds = 95;
+    TimelineRow me;
+    me.id = 100;
+    me.bins.resize(4);
+    me.bins[0].damage = 53'214;
+    me.bins[2].damage = 61'200;
+    me.bins[1].taken = 4'000;
+    me.bins[3].healing = 0;  // trailing zeros are cut and read back as nothing
+    TimelineRow ally;
+    ally.id = 200;
+    ally.bins.resize(2);
+    ally.bins[1].healing = 1'800;
+    d->timeline.rows = {me, ally};
+    d->timeline.boss_hp.first_s = 0;
+    d->timeline.boss_hp.permille = {1000, 998, 991, 0};
+    d->timeline.buffs.push_back(BuffWindow{18'190'000, 181'900'211, 18'190'021, "Lumiel", AionClass::Chanter, 1.0, 11.5});
+
+    DeathRecord up;
+    up.player = 200;
+    up.name = "Lumiel";
+    up.cls = AionClass::Chanter;
+    up.time_s = 25.004;
+    up.up_after_s = 4.0;
+    up.recap.push_back(RecapEvent{2.7, RecapKind::Hit, 900'101, 777, {}, 4'000, false});
+    up.recap.push_back(RecapEvent{0.7, RecapKind::HealTick, 16'770'000, 0, "Zikel", 1'800, false});
+    up.recap.push_back(RecapEvent{0.0, RecapKind::Hit, 900'102, 777, {}, 60'000, true});
+    DeathRecord down = up;
+    down.time_s = 80.5;
+    down.up_after_s = -1.0;
+    down.recap.clear();
+    d->deaths = {up, down};
+
+    EffectUptimeRow buff;
+    buff.key = 18'190'000;
+    buff.buff_id = 181'900'211;
+    buff.source_skill = 18'190'021;
+    buff.side = EffectSide::PartyBuff;
+    buff.target = 100;
+    buff.target_name = "Ariel";
+    buff.target_cls = AionClass::Sorcerer;
+    buff.caster = "Lumiel";
+    buff.caster_cls = AionClass::Chanter;
+    buff.applications = 7;
+    buff.active_s = 81.25;
+    EffectUptimeRow curse;
+    curse.key = 153'200'011;
+    curse.buff_id = 153'200'011;
+    curse.side = EffectSide::OnEnemy;
+    curse.target = 0x4100;
+    curse.target_name = "NPC #777";
+    curse.caster = "Ariel";
+    curse.caster_cls = AionClass::Sorcerer;
+    curse.applications = 9;
+    curse.active_s = 60.5;
+    d->effects = {buff, curse};
+    return d;
+}
+
 } // namespace
 
 TEST_CASE(FightJson, RoundTrip) {
@@ -89,6 +151,81 @@ TEST_CASE(FightJson, OtherVersionIsRefused) {
     auto j = fight_to_json(sample_fight(1, 0));
     j["v"] = 99;
     TEST_ASSERT_FALSE(fight_from_json(j).has_value());
+}
+
+TEST_CASE(FightJson, DetailRoundTrips) {
+    FightSummary f = sample_fight(3, 0);
+    f.combatants[0].active_s = 70.125;
+    f.detail = sample_detail();
+    const auto back = fight_from_json(fight_to_json(f));
+    TEST_ASSERT(back.has_value());
+    TEST_ASSERT(back->detail != nullptr);
+    TEST_ASSERT_NEAR(back->combatants[0].active_s, 70.125, 1e-9);
+    // The trailing zero second is cut, and nothing else differs.
+    FightDetail expected = *f.detail;
+    expected.timeline.rows[0].bins.resize(3);
+    TEST_ASSERT(back->detail->timeline == expected.timeline);
+    TEST_ASSERT(back->detail->deaths == expected.deaths);
+    TEST_ASSERT(back->detail->effects == expected.effects);
+    TEST_ASSERT_FALSE(back->detail->deaths[1].up());
+    TEST_ASSERT(back->detail->deaths[0].killing_blow()->crit);
+}
+
+TEST_CASE(FightJson, SeriesAreOneLineEach) {
+    FightSummary f = sample_fight(3, 0);
+    f.detail = sample_detail();
+    const std::string text = fight_to_json(f).stringify();
+    TEST_ASSERT(text.find("[53214,0,61200]") != std::string::npos);
+}
+
+TEST_CASE(FightJson, ARecordWithoutDetailReadsWithNone) {
+    const auto back = fight_from_json(fight_to_json(sample_fight(1, 0)));
+    TEST_ASSERT(back.has_value());
+    TEST_ASSERT(back->detail == nullptr);
+    TEST_ASSERT_NEAR(back->combatants[0].active_s, 0.0, 1e-9);
+}
+
+TEST_CASE(FightJson, DetailNumbersAreBounded) {
+    FightSummary f = sample_fight(3, 0);
+    f.detail = sample_detail();
+    auto j = fight_to_json(f);
+    config::JsonValue::ArrayType long_series(5000, config::JsonValue(1));
+    j["timeline"]["rows"].as_array()[0]["damage"] = config::JsonValue(long_series);
+    j["timeline"]["boss_hp"]["permille"] = config::JsonValue::ArrayType{config::JsonValue(5000), config::JsonValue(-3)};
+    j["timeline"]["seconds"] = 1e12;
+    j["combatants"].as_array()[0]["active_s"] = std::nan("");
+    config::JsonValue::ArrayType deaths(300, j["deaths"].as_array()[0]);
+    j["deaths"] = config::JsonValue(deaths);
+    config::JsonValue::ArrayType recap(20, j["deaths"].as_array()[0]["recap"].as_array()[0]);
+    j["deaths"].as_array()[0]["recap"] = config::JsonValue(recap);
+    j["deaths"].as_array()[0]["at_ms"] = -50;
+
+    const auto back = fight_from_json(j);
+    TEST_ASSERT(back.has_value());
+    const FightDetail& d = *back->detail;
+    TEST_ASSERT_EQ(d.timeline.rows[0].bins.size(), kTimelineMaxSeconds);
+    TEST_ASSERT_EQ(d.timeline.seconds, static_cast<uint32_t>(kTimelineMaxSeconds));
+    TEST_ASSERT_EQ(d.timeline.boss_hp.permille[0], uint16_t{1000});
+    TEST_ASSERT_EQ(d.timeline.boss_hp.permille[1], uint16_t{0});
+    TEST_ASSERT_EQ(d.deaths.size(), kMaxDeathsPerFight);
+    TEST_ASSERT_EQ(d.deaths[0].recap.size(), kRecapShown);
+    TEST_ASSERT_NEAR(d.deaths[0].time_s, 0.0, 1e-9);
+    TEST_ASSERT_NEAR(back->combatants[0].active_s, 0.0, 1e-9);
+}
+
+TEST_CASE(History, SaveLoadKeepsTheDetail) {
+    ScratchDir dir("aion2_test_history_detail");
+    HistoryStore store(dir.path / "history");
+    FightSummary f = sample_fight(5, 0);
+    f.detail = sample_detail();
+    TEST_ASSERT_EQ(store.save(f), std::string());
+    const auto index = store.load_index();
+    TEST_ASSERT_EQ(index.size(), size_t{1});
+    const auto back = store.load(index[0].file);
+    TEST_ASSERT(back.has_value());
+    TEST_ASSERT(back->detail != nullptr);
+    TEST_ASSERT(back->detail->effects == f.detail->effects);
+    TEST_ASSERT_EQ(back->detail->deaths.size(), size_t{2});
 }
 
 TEST_CASE(History, FileNameIsUtcStartAndId) {

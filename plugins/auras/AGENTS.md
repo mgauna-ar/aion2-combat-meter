@@ -62,6 +62,9 @@ latest hit on a tie. In a boss fight with adds, the boss. A mechanic aimed at a 
 
 ## ✨ Effects (`AuraTracker`)
 
+The rules below that are the protocol's (instances, ends, removals, deaths, map loads)
+live in `game::EffectBook` (`src/game`), which the combat meter keeps one of too; the
+watch list and what the overlay shows are the tracker's own.
 - Every entity's effects are kept, by instance, from 2a 38, 2b 38 and 1a 92. A 1a 92
   takes the instance of that effect that ends soonest.
 - An instance ends at its record's stated end, brought onto the capture clock by the

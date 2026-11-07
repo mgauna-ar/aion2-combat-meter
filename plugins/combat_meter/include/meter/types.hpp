@@ -4,7 +4,9 @@
 #include "game/classes.hpp"
 #include "protocol/events.hpp"
 
+#include <algorithm>
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -14,6 +16,9 @@ namespace aion2::meter {
 using EntityId = proto::EntityId;
 
 using game::AionClass;
+
+/// A fight's seconds, deaths and effects (meter/fight_detail.hpp).
+struct FightDetail;
 
 /// Which side of a PvE fight an entity is on. Damage only crosses sides, so one
 /// side known for either end of a hit gives the other.
@@ -122,8 +127,17 @@ struct CombatantTotals {
     /// By attacking skill and NPC, most damage first.
     std::vector<SkillAmount> taken_by;
 
+    /// Time spent hitting: the gaps of kActiveGap or less between this player's own
+    /// direct hits (not their summons', not their ticks). 0 in a record saved before
+    /// the meter kept it.
+    double active_s{0.0};
+
     [[nodiscard]] double crit_rate() const noexcept { return hits.rate(&HitCounts::crits); }
     [[nodiscard]] double back_rate() const noexcept { return hits.rate(&HitCounts::back); }
+    /// Of the fight's duration, 0..1.
+    [[nodiscard]] double active_share(double duration_s) const noexcept {
+        return duration_s <= 0.0 ? 0.0 : std::clamp(active_s / duration_s, 0.0, 1.0);
+    }
 };
 
 /// The enemy a fight is fought against: the damaged one with the most max HP.
@@ -185,6 +199,9 @@ struct FightSummary {
     double total_dps{0.0};
     uint64_t total_healing{0};
     CaptureQuality quality;
+    /// Its seconds, deaths and effects, shared by every copy; null for a record saved
+    /// before the meter kept them.
+    std::shared_ptr<const FightDetail> detail;
 };
 
 } // namespace aion2::meter

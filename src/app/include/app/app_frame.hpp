@@ -7,7 +7,9 @@
 // small and the screenshot tool can draw it on the Mac.
 
 #include "app/app_settings.hpp"
+#include "app/timeline_chart.hpp"
 #include "app/updater.hpp"
+#include "meter/fight_detail.hpp"
 #include "meter/history_store.hpp"
 #include "meter/types.hpp"
 #include "pipeline/pipeline.hpp"
@@ -21,6 +23,9 @@ namespace aion2::app {
 
 enum class AppPage : uint8_t { Dashboard, Meter, Auras, Settings };
 
+/// The Combat Meter page's tabs, in their order.
+enum class MeterTab : int { Damage, Healing, Taken, Buffs, Timeline, Deaths, Settings };
+
 /// What the window remembers between frames.
 struct AppViewState {
     AppPage page{AppPage::Meter};
@@ -31,8 +36,20 @@ struct AppViewState {
     meter::EntityId damage_player{0};
     meter::EntityId heal_player{0};
     meter::EntityId taken_player{0};
-    /// A Combat Meter tab to open on the next frame (0 Damage .. 3 Settings); -1 for none.
-    int open_meter_tab{-1};
+    /// A Combat Meter tab to open on the next frame.
+    std::optional<MeterTab> open_meter_tab;
+    /// The Buffs & Debuffs tab's view.
+    meter::EffectSide effect_view{meter::EffectSide::PartyBuff};
+    /// The Timeline tab's controls, and its chart, rebuilt only when they change.
+    TimelineView timeline;
+    TimelineChart timeline_chart;
+    /// The death whose recap is open on the Deaths tab: its player and its time;
+    /// a negative time for none.
+    meter::EntityId death_player{0};
+    double death_time_s{-1.0};
+    /// Draw the Timeline tab as if the mouse were this far across its plot, 0..1;
+    /// below 0 for the real mouse. The screenshots show the hover readout with it.
+    float timeline_hover_at{-1.0f};
 };
 
 /// One frame's inputs. Pointers may be null before the first snapshot.

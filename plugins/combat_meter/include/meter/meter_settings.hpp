@@ -28,8 +28,10 @@ struct MeterSettings {
     /// A killed boss that lost less than this share of its HP (by the server's HP
     /// figures) with hits we saw makes the fight's data partial.
     double partial_damage_ratio{0.7};
-    /// End the fight when every party member has died. Off until captures show
-    /// how revives look on the wire.
+    /// End the fight when every party member in it is dead at once. Off: in the
+    /// second capture's last boss fight the whole party was at HP 0 together for
+    /// about a second, got up again and killed the boss, so everyone dead is no wipe
+    /// in AION 2 until a capture shows what one looks like.
     bool wipe_detection{false};
     /// Finished fights kept in memory for the overlay's history.
     int memory_history{10};

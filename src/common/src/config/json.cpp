@@ -1,4 +1,5 @@
 #include "common/config/json.hpp"
+#include <algorithm>
 #include <sstream>
 #include <iomanip>
 #include <cctype>
@@ -433,8 +434,20 @@ void stringify_internal(const JsonValue& val, std::ostringstream& ss, int indent
             break;
         case JsonValue::Type::Array: {
             const auto& arr = val.as_array();
+            const bool numbers = std::all_of(arr.begin(), arr.end(), [](const JsonValue& v) {
+                return v.type() == JsonValue::Type::Number;
+            });
             if (arr.empty()) {
                 ss << "[]";
+            } else if (numbers) {
+                // A series (a fight's seconds) on one line: one value a line would
+                // make an hour of them a megabyte.
+                ss << '[';
+                for (size_t i = 0; i < arr.size(); ++i) {
+                    if (i != 0) ss << ',';
+                    stringify_internal(arr[i], ss, 0, 0);
+                }
+                ss << ']';
             } else {
                 ss << "[\n";
                 for (size_t i = 0; i < arr.size(); ++i) {

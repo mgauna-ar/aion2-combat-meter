@@ -3,7 +3,11 @@
 #include "common/micros.hpp"
 #include "game/plugin.hpp"
 #include "meter/combatant_registry.hpp"
+#include "meter/death_log.hpp"
+#include "meter/effect_uptime.hpp"
+#include "meter/fight_detail.hpp"
 #include "meter/meter_settings.hpp"
+#include "meter/timeline.hpp"
 #include "meter/types.hpp"
 #include "protocol/events.hpp"
 
@@ -11,6 +15,7 @@
 #include <cstddef>
 #include <deque>
 #include <functional>
+#include <memory>
 #include <optional>
 #include <unordered_map>
 #include <vector>
@@ -32,6 +37,19 @@ namespace aion2::meter {
  */
 class EncounterEngine final : public game::Plugin {
 public:
+    /// The longest gap between a player's own direct hits that still counts as time
+    /// spent hitting (CombatantTotals::active_s). In the second capture's last boss
+    /// fight, 99% of every player's gaps were 2.7 s or less.
+    static constexpr Micros kActiveGap = 3 * kMicrosPerSecond;
+    /// Most enemies whose HP one fight follows, for the boss's line.
+    static constexpr size_t kMaxHpSeries = 256;
+    /// Most players one fight keeps a recap ring for.
+    static constexpr size_t kMaxRecapRings = 256;
+    /// A player's own hit this soon after their HP 0 was in flight as they died: it
+    /// says nothing of their being up. In the second capture one landed 55 ms after,
+    /// and HP above 0 came 3.9 s later.
+    static constexpr Micros kInFlight = kMicrosPerSecond;
+
     explicit EncounterEngine(MeterSettings settings = {});
 
     void set_settings(const MeterSettings& settings) noexcept { m_settings = settings; }
@@ -45,6 +63,9 @@ public:
     void tick(Micros now) override;
     /// Ends the live fight now, if there is one.
     void end_fight(EndReason reason, Micros now);
+    /// Forgets every effect it knew of: switched off, it will miss what happens
+    /// meanwhile.
+    void forget_effects() noexcept { m_effects.clear(); }
 
     [[nodiscard]] bool in_fight() const noexcept { return m_fight.has_value(); }
     /// The live fight, or else the newest finished one; id 0 before any.
@@ -76,6 +97,10 @@ private:
         HitCounts taken_hits;
         /// By game::skill_key() << 32 | the attacker's NPC code.
         std::unordered_map<uint64_t, SkillAmount> taken_by;
+        /// Second by second, from the fight's start.
+        std::vector<TimelineBin> bins;
+        /// The gaps of kActiveGap or less between their own direct hits.
+        Micros active_us{0};
 
         void merge(const Accum& other);
     };
@@ -107,9 +132,27 @@ private:
         CaptureQuality counters_at_start;
         bool boss_killed{false};
         Micros kill_ts{0};
+        /// Each player's last own direct hit, by id: active time bridges the gap.
+        std::unordered_map<EntityId, Micros> last_direct;
+        /// The server's HP figures for each enemy, the last one of each second.
+        struct HpSample {
+            uint32_t second{0};
+            uint64_t hp{0};
+        };
+        std::unordered_map<EntityId, std::vector<HpSample>> enemy_hp;
+        /// What landed on each party member, for the recap of a death.
+        std::unordered_map<EntityId, RecapRing> recaps;
+        struct Death {
+            RowKey key;
+            Micros ts{0};
+            /// When HP above 0, or their own hit, said they were up; 0 while down.
+            Micros up_ts{0};
+            std::vector<RecapEvent> recap;
+        };
+        std::vector<Death> deaths;
     };
 
-    void on_spawn(const proto::Spawn& s);
+    void on_spawn(const proto::Spawn& s, Micros ts);
     void on_damage(const proto::Damage& d, Micros ts);
     void on_tick(const proto::Tick& t, Micros ts);
     /// 00 8D: the local player's id, and HP, whose 0 is a death.
@@ -121,9 +164,37 @@ private:
                 Micros ts);
     /// A heal tick, or a 04 38 `record` from a player to the player side, during a
     /// fight: healing for the resolved healer. Never starts a fight.
-    void book_heal(EntityId actor, EntityId target, uint64_t amount, uint32_t skill, bool record);
+    void book_heal(EntityId actor, EntityId target, uint64_t amount, uint32_t skill, bool record, Micros ts);
     /// An enemy's hit or tick on a player during a fight: damage that player took.
-    void book_taken(EntityId actor, EntityId target, uint64_t amount, uint32_t skill, const proto::Damage* direct);
+    void book_taken(EntityId actor, EntityId target, uint64_t amount, uint32_t skill, const proto::Damage* direct,
+                    Micros ts);
+    /// An enemy's HP figure `hp` at `ts`, `before` the one the meter had: the boss's
+    /// line. The first in a fight also stands at its start.
+    void sample_hp(EntityId id, uint64_t hp, std::optional<uint64_t> before, Micros ts);
+    /// The exact HP figure the meter has for `id`: its last 00 8D, else its spawn's.
+    [[nodiscard]] std::optional<uint64_t> exact_hp(EntityId id) const;
+    /// A party member's HP reached 0 during a fight: a death, with its recap.
+    void record_death(EntityId id, Micros ts);
+    /// HP above 0, or their own hit (`by_hit`) more than kInFlight after it: a death
+    /// still open for `id` is over.
+    void note_alive(EntityId id, Micros ts, bool by_hit = false);
+    /// `id` died less than kInFlight before `ts`, and is not up since: a hit of theirs
+    /// now was in flight as they died.
+    [[nodiscard]] bool just_died(EntityId id, Micros ts) const;
+    void push_recap(EntityId target, const RecapSample& sample);
+    /// What an effect on `target` from `caster` is to the fight, or nothing for one
+    /// it does not track: on a party member (not a summon), or a party member's on an
+    /// enemy.
+    [[nodiscard]] std::optional<EffectTag> effect_tag(EntityId target, EntityId caster) const;
+    /// The fight's detail (timeline, deaths, effects) for its summary `s`, whose rows
+    /// are `row_ids` (by group_key) with their seconds in `rows`.
+    [[nodiscard]] std::shared_ptr<const FightDetail> build_detail(const Fight& fight, const FightSummary& s,
+                                                                  const std::unordered_map<uint64_t, EntityId>& row_ids,
+                                                                  std::vector<TimelineRow> rows) const;
+    /// A player's name and class as a summary shows them.
+    [[nodiscard]] std::pair<std::string, AionClass> player_label(EntityId id, CharacterId who) const;
+    /// The key summarize groups a player's rows by: their character, else the id.
+    [[nodiscard]] uint64_t group_key(EntityId id, CharacterId who) const;
     /// A player whose healing and damage taken a live fight books: a party member by
     /// the roster, the local player, or with no roster one already in the fight,
     /// so strangers healing each other nearby stay out.
@@ -176,6 +247,8 @@ private:
     std::unordered_map<EntityId, HpLoss> m_hp_loss;
     /// A hit (or heal) on `target` was seen: the next HP change is accounted for.
     void note_hit_on(EntityId target);
+    /// Every effect in view, and the live fight's spans of them.
+    EffectUptime m_effects;
     std::vector<FightSummary> m_finished;
     std::deque<FightSummary> m_recent;
     uint64_t m_recent_revision{0};

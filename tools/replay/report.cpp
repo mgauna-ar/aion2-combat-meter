@@ -1,6 +1,7 @@
 #include "report.hpp"
 
 #include "hex_dump.hpp"
+#include "meter/fight_detail.hpp"
 
 #include "game/map_names.hpp"
 #include "game/npc_names.hpp"
@@ -208,6 +209,7 @@ void Report::on_fight(const meter::FightSummary& f) {
     if (m_opt.skills) {
         for (const auto& c : f.combatants) print_breakdown(c);
     }
+    print_detail(f);
     const auto& q = f.quality;
     std::printf("  capture %s: %" PRIu64 " gap bytes, %" PRIu64 " resyncs, %" PRIu64 " bundle errors%s\n",
                 q.clean() ? "clean" : "lossy", q.gap_bytes, q.resyncs, q.bundle_errors,
@@ -245,6 +247,63 @@ void Report::print_breakdown(const meter::CombatantTotals& c) const {
             const std::string from = s.source_npc != 0 ? game::npc_label(s.source_npc) : std::string("?");
             std::printf("      %-26.26s %-24s %9" PRIu64 " %5" PRIu64 " hits\n", game::skill_label(s.code).c_str(),
                         from.c_str(), s.amount, s.hits);
+        }
+    }
+}
+
+void Report::print_detail(const meter::FightSummary& f) const {
+    if (!m_opt.deaths && !m_opt.active && !m_opt.effects) return;
+    if (f.detail == nullptr) {
+        std::printf("  no detail\n");
+        return;
+    }
+    const meter::FightDetail& d = *f.detail;
+    if (m_opt.active) {
+        for (const auto& c : f.combatants) {
+            std::printf("  active  %-16s %7.1f s  %5.1f%%\n",
+                        name(c.name.starts_with('#') ? std::string() : c.name, c.id).c_str(), c.active_s,
+                        100.0 * c.active_share(f.duration_s));
+        }
+    }
+    if (m_opt.deaths) {
+        std::printf("  deaths %zu\n", d.deaths.size());
+        for (const meter::DeathRecord& death : d.deaths) {
+            const meter::RecapEvent* blow = death.killing_blow();
+            std::printf("    %7.2f s  %-16s", death.time_s, name(death.name, death.player).c_str());
+            if (blow != nullptr) {
+                std::printf("  by %s%s %" PRIu64 "%s", game::skill_label(blow->skill).c_str(),
+                            blow->source_npc != 0 ? (" (" + game::npc_label(blow->source_npc) + ")").c_str() : "",
+                            blow->amount, blow->crit ? " crit" : "");
+            } else {
+                std::printf("  no hit seen");
+            }
+            if (death.up()) {
+                std::printf("  up after %.2f s\n", death.up_after_s);
+            } else {
+                std::printf("  still down\n");
+            }
+            for (const meter::RecapEvent& e : death.recap) {
+                const std::string from = !e.damage()      ? (m_opt.anonymize ? std::string("a healer") : e.healer)
+                                         : e.source_npc != 0 ? game::npc_label(e.source_npc)
+                                                             : std::string("?");
+                std::printf("      -%5.2f s  %-4s %-26.26s %-20.20s %c%" PRIu64 "%s\n", e.before_s,
+                            std::string(meter::recap_kind_name(e.kind)).c_str(), game::skill_label(e.skill).c_str(),
+                            from.c_str(), e.damage() ? '-' : '+', e.amount, e.crit ? " crit" : "");
+            }
+        }
+    }
+    if (m_opt.effects) {
+        std::printf("  effects %zu rows, %zu party-wide buff windows\n", d.effects.size(), d.timeline.buffs.size());
+        for (const meter::EffectUptimeRow& r : d.effects) {
+            const std::string target =
+                r.side == meter::EffectSide::OnEnemy ? r.target_name : name(r.target_name, r.target);
+            const std::string caster = r.side == meter::EffectSide::PartyDebuff || r.caster.empty()
+                                           ? (r.caster.empty() ? std::string("?") : r.caster)
+                                           : (m_opt.anonymize ? std::string("a player") : r.caster);
+            std::printf("    %-6s %-28.28s on %-20.20s from %-20.20s %4u x %7.1f s %5.1f%%\n",
+                        std::string(meter::effect_side_name(r.side)).c_str(),
+                        game::effect_label(r.buff_id, r.source_skill).c_str(), target.c_str(), caster.c_str(),
+                        r.applications, r.active_s, 100.0 * r.uptime(f.duration_s));
         }
     }
 }

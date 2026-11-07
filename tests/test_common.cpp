@@ -52,6 +52,19 @@ TEST_CASE(Json, TimestampsPrintAsIntegers) {
     TEST_ASSERT_EQ(doc.stringify_compact(), std::string(R"({"ts":1792152000123456})"));
 }
 
+TEST_CASE(Json, NumberArraysStayOnOneLine) {
+    JsonValue doc;
+    doc["series"] = JsonValue::ArrayType{JsonValue(1), JsonValue(0), JsonValue(2.5)};
+    doc["mixed"] = JsonValue::ArrayType{JsonValue(1), JsonValue("two")};
+    const std::string text = doc.stringify();
+    TEST_ASSERT(text.find(R"("series": [1,0,2.5000])") != std::string::npos);
+    // Anything else keeps one item a line.
+    TEST_ASSERT(text.find("\"mixed\": [\n") != std::string::npos);
+    const auto parsed = JsonValue::parse(text);
+    TEST_ASSERT(parsed.has_value());
+    TEST_ASSERT(*parsed == doc);
+}
+
 TEST_CASE(Json, RejectsTruncatedInput) {
     TEST_ASSERT_FALSE(JsonValue::parse(R"({"a":1,"b":[1,2)").has_value());
 }

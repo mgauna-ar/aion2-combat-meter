@@ -15,7 +15,8 @@ each with its own page in the app window and its own switch:
   Analysis window (Ctrl+X) shows, but for every party member. An overlay over the game
   has the live fight: the party ranked by DPS, the boss's HP and the fight timer. The
   app window has the details: damage, hit counts, crit, perfect, double, back and front
-  rates for each player and each of their skills; healing; damage taken; and every
+  rates for each player and each of their skills; healing; damage taken; each fight
+  second by second, its deaths and how long every buff and debuff was up; and every
   saved fight, grouped by visit to a map, one entry per dungeon run.
 - **[Auras](plugins/auras/README.md)** (off until you switch it on): your buffs and
   debuffs and yours on the enemy you fight, each as a bar with the time it has left,
@@ -302,6 +303,9 @@ aion2-combat-meter.exe --replay fight.pcapng --speed 1
 |---|---|
 | `--fights` | A table per fight. |
 | `--skills` | The fight tables, and each player's skills, healing and damage taken. |
+| `--deaths` | The fight tables, and each fight's deaths: killing blow, time until up, the hits and heals before. |
+| `--active` | The fight tables, and each player's time spent hitting. |
+| `--effects` | The fight tables, and how long each buff and debuff was up. |
 | `--events` | Every decoded event but effects, skill uses and cooldowns. |
 | `--auras` | Effects put on and taken off, and your skill uses and cooldown changes. |
 | `--opcodes` | Counts and sizes per opcode. |
