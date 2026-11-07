@@ -2,6 +2,7 @@
 
 #include "app/ui/theme.hpp"
 
+#include <dwmapi.h>
 #include <dxgi.h>
 
 #include <algorithm>
@@ -57,6 +58,24 @@ RECT start_rect(const WindowSettings& s) {
     return RECT{x, y, x + w, y + h};
 }
 
+/// The app is dark whatever the system's theme, so its frame is too: Windows gives
+/// every window a light title bar unless it asks otherwise. Windows 11 also paints the
+/// caption and the border in the app's own colours, so the title bar runs into the
+/// page; Windows 10 refuses those two and keeps its dark grey. The attributes are
+/// spelled as numbers, which an older SDK still builds.
+void use_dark_frame(HWND hwnd) {
+    const BOOL dark = TRUE;
+    // DWMWA_USE_IMMERSIVE_DARK_MODE: 20 since Windows 10 2004, 19 before it.
+    if (FAILED(DwmSetWindowAttribute(hwnd, 20, &dark, sizeof(dark)))) {
+        DwmSetWindowAttribute(hwnd, 19, &dark, sizeof(dark));
+    }
+    // A theme colour keeps R in its low byte, as COLORREF does.
+    const COLORREF caption = ui::colors::Canvas & 0x00FFFFFFu;
+    const COLORREF border = ui::colors::Border & 0x00FFFFFFu;
+    DwmSetWindowAttribute(hwnd, 35, &caption, sizeof(caption));  // DWMWA_CAPTION_COLOR
+    DwmSetWindowAttribute(hwnd, 34, &border, sizeof(border));    // DWMWA_BORDER_COLOR
+}
+
 } // namespace
 
 AppWindow::~AppWindow() { destroy(); }
@@ -81,6 +100,7 @@ bool AppWindow::create(const WindowSettings& settings, int icon_resource, std::s
         error = "cannot create the app window";
         return false;
     }
+    use_dark_frame(m_hwnd);  // before it is first shown, so it never flashes light
     if (!create_device()) {
         error = "cannot create a Direct3D 11 device for the app window";
         destroy();

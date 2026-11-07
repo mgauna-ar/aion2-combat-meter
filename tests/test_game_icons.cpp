@@ -78,6 +78,18 @@ TEST_CASE(GameIcons, TheSheetDecodes) {
     TEST_ASSERT(clear > 0);
 }
 
+TEST_CASE(GameIcons, TheAppMarkDecodes) {
+    const int px = app_mark_px();
+    TEST_ASSERT(px >= 72);  // the sidebar's 36 px chip at 200% without blowing it up
+    const auto pixels = app_mark_pixels();
+    TEST_ASSERT_EQ(pixels.size(), static_cast<size_t>(px) * static_cast<size_t>(px) * 4);
+    // A rounded plate: its corners clear, its middle (the crystal) opaque.
+    const auto alpha = [&](int x, int y) { return pixels[(static_cast<size_t>(y) * px + x) * 4 + 3]; };
+    TEST_ASSERT_EQ(alpha(0, 0), 0);
+    TEST_ASSERT_EQ(alpha(px - 1, px - 1), 0);
+    TEST_ASSERT_EQ(alpha(px / 2, px / 2), 255);
+}
+
 TEST_CASE(GameIcons, ResamplingAveragesByArea) {
     // A 2x2 icon: red, green, blue and a transparent pixel, halved to one pixel. The
     // transparent one lends no colour, only its share of the alpha.
