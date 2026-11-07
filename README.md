@@ -26,7 +26,7 @@ skill, for how much), and two plugins turn that into overlays and pages of the a
 
 ## 🚧 Status
 
-Version 0.5, checked against two real captures: open-world mobs, and a dungeon run with
+Version 0.6, checked against two real captures: open-world mobs, and a dungeon run with
 three bosses. On the last boss, your damage, hits and every per-skill CRI, PERF, DOUB,
 BACK, FRNT, MULT and BLOC share matched the game's Combat Analysis exactly; healing came
 to 97% of its Total Heal. Aura bars are exact; cooldowns are estimates, marked "~"
