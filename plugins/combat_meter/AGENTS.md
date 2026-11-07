@@ -105,12 +105,58 @@ is switched off the pipeline feeds it nothing; switching it off ends its live fi
     00 8D) with a hit seen since the HP figure before marks the fight partial. It is
     HP against HP: damage and HP are not in the same units. A boss that leaves view
     and spawns again keeps the loss counted so far; its spawn HP is one more figure.
+- **Timeline** (`FightDetail`, beside the totals: `FightSummary::detail` is a
+  `shared_ptr`, so the snapshot and the recent fights copy a pointer):
+  - each row's damage (direct, ticks and its summons'), healing (to the healer) and
+    damage taken (to the victim) per second of the fight, kept per row like the
+    totals and joined by character with them. Up to an hour (`kTimelineMaxSeconds`);
+    the totals count past it;
+  - `seconds` can run past the fight's duration, which ends at the party's last hit:
+    hits taken, deaths and the boss's HP 0 can come after it;
+  - the boss's line is the server's own HP figures (00 8D, and its spawn's) for the
+    summary's boss, in permille of its max HP, carried forward. The figure the meter
+    had before the fight's first stands at second 0. Never damage: other units.
+- **Active time:** the gaps of `kActiveGap` (3 s) or less between a player's own direct
+  hits, by id, so an id named late still bridges its gap. Summons and ticks never
+  count. In the second capture's last boss fight 99% of every player's gaps were 2.7 s
+  or less, and it came to 55–85%.
+- **Deaths:**
+  - a party member's HP 0 (00 8D) during a fight: players get no 42 36. Not a summon's,
+    and not a stranger's (`counts_in_fight`). Repeated zeros while down are one death;
+  - up again at HP above 0, or at their own direct hit more than `kInFlight` (1 s)
+    after: one landed 55 ms after, already in flight, 3.9 s before their HP came back;
+  - the recap: the newest 10 of the last 16 hits taken and heals received, within 12 s,
+    booked under the same filters as Damage Taken and Healing. The killing blow is the
+    last damage in it;
+  - a death adds no row: it keeps its own name and class;
+  - checked on the second capture: 19 deaths in the last boss fight, every one up again
+    by its HP, 3 to 17 s later. The local player's killing record carried 0 damage, which
+    books nothing, so that death shows no killing blow.
+- **Effect uptime** (`EffectUptime`, with its own `game::EffectBook`, fed every effect
+  record, fight or not, so a fight knows what is already running as it starts):
+  - a span per instance on a party member (by the roster or the map, not a summon) or,
+    from a party member or their summon, on an enemy. A renewal while it runs goes on
+    with the span; a 1a 92, a death or a map load (a reload too) ends it. Permanent
+    effects (passives) are left out;
+  - rows per side (on the party from anyone else, on the party from an enemy, on an
+    enemy), target (character, or enemy id), `effect_key` and caster; stacks count
+    once, clamped to the fight. Only enemies the party damaged keep rows;
+  - a party-wide buff is one caster's effect on two or more party members: merged over
+    all of them, bridging gaps under 1 s, it is a band on the timeline;
+  - at most 16,384 spans a fight. Switching the meter off forgets every effect;
+  - checked on the second capture's last boss fight: 151 rows and 42 bands, the party's
+    best-kept debuff on the boss up 87.5%.
 - **History:**
   - What is saved: boss fights, and fights of at least `min_saved_duration_s`. With
     `save_only_dungeons`, only in a dungeon (`is_dungeon`: a row above maps.tsv's
     `# By hand` line, so not map 0, an open-world zone, or a map added by hand).
   - Each fight is one JSON file (`"v":2`; version 1 files still load, without the
     breakdowns), written atomically, plus a line appended to `index.jsonl`.
+  - The detail (`timeline`, `deaths`, `effects`) and `active_s` are optional fields of
+    version 2: an older build ignores them, where a new version would make it skip the
+    record, and a record without them reads with no detail. A series is one line
+    (`[1,0,2]`, the JSON printer's rule for an array of numbers), its trailing zeros
+    cut; reading bounds every list.
   - Fights are grouped by map visit (`visit_ts`): every map load starts one but a
     reload within a run (the same map over the same connection), so each run of a
     dungeon is its own. So does the first fight after the meter starts.

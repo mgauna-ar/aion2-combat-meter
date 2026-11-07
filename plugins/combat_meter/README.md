@@ -8,7 +8,8 @@ page.
 It shows what the game's own Combat Analysis window (Ctrl+X) shows, but for every party
 member: damage, hit counts, crit, perfect, double, back and front rates for each player
 and each of their skills; healing; damage taken; and every saved fight, grouped by visit
-to a map, one entry per dungeon run.
+to a map, one entry per dungeon run. Beyond the game's window, each fight is kept second
+by second, with its deaths and how long every buff and debuff was up.
 
 ![The overlay during a boss fight: three players ranked by DPS, the boss's HP bar and the fight timer](../../docs/images/overlay-live.png)
 
@@ -59,6 +60,34 @@ always be found and dragged back. Switching the plugin off hides it too.
   looks the same.
 
 ![The app window's Combat Meter page: saved fights by map visit on the left, the selected fight's ranking with the in-game window's hit columns, and one player's skills below](../../docs/images/app-damage.png)
+
+## The fight in detail
+
+The Combat Meter page shows the fight on view, live or saved, in tabs:
+- **Damage**, **Healing** and **Damage Taken**: each player's totals, and their skills
+  when you select them. **Active** is the share of the fight a player spent hitting:
+  the gaps of 3 s or less between their own direct hits. Their summons and DoTs don't
+  count, so healers and summoners read lower. **DEATHS** above counts the party's.
+- **Buffs & Debuffs**: how long each effect was up, on average over the party members
+  who had it. *Debuffs on party* lists what enemies put on you, the most frequent
+  first; *On enemies* the party's own effects on them, where uptime is the best one
+  player kept up (a DoT's uptime on the boss). Passives are left out.
+- **Timeline**: each player's DPS, HPS or damage taken second by second, smoothed over
+  5, 15 or 30 s; the boss's HP on its own scale (right); a skull for each death, with a
+  bar until the player was up again; and bands where one player's buff was on two or
+  more party members. Hover it to read every line at that moment; click a name below
+  to hide its line.
+- **Deaths**: who died when, the hit that killed them, and how long until they were up.
+  Select one for the last hits and heals on them before it. The game says a player died
+  only by their HP reaching 0, and that they are up by it rising again.
+
+A fight saved by a version before these has none of them, and each tab says so.
+
+![The Timeline tab: three players' DPS over a boss fight, the boss's HP falling, a death marked at 0:25, two bands of a party-wide buff, and the readout at the moment of the death](../../docs/images/app-timeline.png)
+
+![The Deaths tab: one death with its killing blow, and the hits and heals in the 12 seconds before it](../../docs/images/app-deaths.png)
+
+![The Buffs & Debuffs tab: each buff on the party with who put it on, how often, for how long, and its uptime](../../docs/images/app-buffs.png)
 
 ![The Combat Meter page's Settings tab: the overlay, its visibility, fight tracking and saved fights](../../docs/images/app-settings.png)
 

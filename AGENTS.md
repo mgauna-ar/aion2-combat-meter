@@ -124,7 +124,8 @@ src/game/        aion2::game   what the game is, for every plugin
     effect_book (the protocol's rules for effects: each plugin that reads them keeps one)
 plugins/combat_meter/  aion2::meter (include prefix meter/; its AGENTS.md and README.md)
     types, combatant_registry, encounter_engine, meter_settings, fight_json,
-    history_store, pull_grouping
+    history_store, pull_grouping, fight_detail (what a fight keeps beyond its totals),
+    timeline, death_log, effect_uptime
 plugins/auras/   aion2::auras (include prefix auras/; its AGENTS.md and README.md)
     aura_plugin, entities (who is who), aura_tracker (effects on everyone in view),
     cooldowns (data/cooldowns.tsv → cooldown_table.inc, and the local player's tracker)
@@ -138,10 +139,12 @@ src/app/         aion2::app
     update_check (release parsing, versions, the update balloon) and updater (check,
     download, stage, swap), both ported from ffxiv-hub,
     game_icons (class emblems and skill icons from game_icon_sheet.inc, painted into
-    each window's font atlas at its text size)
+    each window's font atlas at its text size), timeline_chart (the Timeline tab's
+    lines as numbers, no ImGui)
     src/ui/      the app window's pages (a page per plugin, opened by plugin_page's
-                 header and master switch), theme, widgets and Lucide icons (ported from
-                 ffxiv-hub; ImGui, behind HAVE_IMGUI)
+                 header and master switch), theme, widgets, table (the meter's tables)
+                 and Lucide icons (ported from ffxiv-hub; ImGui, behind HAVE_IMGUI);
+                 the Combat Meter page's view_timeline, view_deaths and view_effects
     src/win32/   main.cpp, app_window, overlay_window: Windows only
 tools/replay/    aion2meter-replay (every platform)
 tools/synth/     aion2meter-synth: writes the tests' made-up boss fight as a pcapng
@@ -173,7 +176,7 @@ plugin; capture + the plugins ← pipeline ← app. Neither plugin depends on th
 |---|---|---|
 | Capture (one per Npcap adapter, or the FileSource thread) | its pcap handle | `BoundedQueue<OwnedPacket>` (8192), `try_push` only. A full queue drops and counts, and the drop shows up as a TCP gap. |
 | Npcap watcher | the loopback filter text | a mutex plus an atomic generation counter. Each capture thread applies a new filter itself between `pcap_next_ex` calls, because a pcap handle is not shared. |
-| Engine (`AppRuntime::run`) | `Pipeline`, `HistoryStore` writes, the recorder | publishes `LiveSnapshot` into a `SnapshotSlot` every 200 ms of capture time, and whenever the queue runs dry. |
+| Engine (`AppRuntime::run`) | `Pipeline`, `HistoryStore` writes, the recorder | publishes `LiveSnapshot` into a `SnapshotSlot` every 200 ms of capture time, and whenever the queue runs dry. A fight's `FightDetail` is shared, never copied: a snapshot holds a pointer to it. |
 | UI (`wWinMain`) | the three windows (the app window, the meter overlay and the aura overlay, each with its own ImGui context), the tray, `AppSettings`, the `Updater` | reads snapshots and the history index (copied under a mutex). Requests go to the engine as atomics: end fight, recording on/off, clear history. New meter and history settings and the plugin switches go through `AppRuntime::update_settings`, under the mutex; the engine applies them on its next pass. |
 | Updater worker (one at a time) | the check or the download | `Updater::status()`, copied under its mutex, which the UI reads each frame. Staged files are moved into place on the UI thread (`apply_staged`). `stop()` cancels a download and joins, before the engine stops. |
 
@@ -335,6 +338,11 @@ BACK, FRNT, MULT and BLOC share matched it exactly.
 - **Other opcodes:**
   - Death `42 36`: id varint. For a mob it comes about 4 s after 00 8D says HP 0: the
     corpse going. HP 0 is the death.
+    - A player gets none: their death is 00 8D HP 0 (kind 2, or kind 3 for the local
+      player), and HP above 0 that they are up again. In the second capture's last boss
+      fight 19 deaths came that way, each back up 3 to 17 s later, at full HP.
+    - A killing hit can carry 0: the local player's did there (a heavy hit by the boss),
+      though the same skill hit others for 77,635 and more.
   - Map load `21 36`: load count u32, map id u32. Ids 600000–700000 are instances.
     - Names come from `src/game/data/maps.tsv`. It holds aion2.app's dungeon tier
       ids: one row per difficulty, such as Krao Cave 600002 (Exploration) and 600001
@@ -561,6 +569,7 @@ public: GitHub's API shows a private repository's releases to no anonymous calle
 | `make tsan`, `make asan` | macOS / Linux | The same tests under the sanitizers. |
 | `make screenshots` | macOS (zlib) | Re-renders `docs/images`. |
 | `make fixtures` | anywhere | Your own captures against their `.expected.txt`. |
+| `aion2meter-replay --deaths --active --effects` | anywhere | A capture's fight detail, to check against what happened in game. |
 | CI `build-windows` | GitHub | The only MSVC build: the app, ctest, the replay smoke test, the zip and its SHA-256. |
 
 **Conventions:**
