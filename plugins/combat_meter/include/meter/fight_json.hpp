@@ -10,6 +10,11 @@ namespace aion2::meter {
 /// The version written in every fight record ("v"). A reader skips records of a
 /// version it does not know rather than misreading them. 2 added the skill,
 /// healing and damage-taken breakdowns and the map visit; a 1 reads without them.
+///
+/// Fields a reader can do without come with no new version: a missing field reads
+/// as empty, and older builds ignore what they do not know, where a new version
+/// would make them skip the whole record. The timeline, the deaths, the effects and
+/// active time came that way, and a record without them reads with no FightDetail.
 inline constexpr int kFightRecordVersion = 2;
 inline constexpr int kOldestFightRecordVersion = 1;
 
