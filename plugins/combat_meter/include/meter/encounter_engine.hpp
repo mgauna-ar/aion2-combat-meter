@@ -45,6 +45,10 @@ public:
     static constexpr size_t kMaxHpSeries = 256;
     /// Most players one fight keeps a recap ring for.
     static constexpr size_t kMaxRecapRings = 256;
+    /// A player's own hit this soon after their HP 0 was in flight as they died: it
+    /// says nothing of their being up. In the second capture one landed 55 ms after,
+    /// and HP above 0 came 3.9 s later.
+    static constexpr Micros kInFlight = kMicrosPerSecond;
 
     explicit EncounterEngine(MeterSettings settings = {});
 
@@ -171,8 +175,9 @@ private:
     [[nodiscard]] std::optional<uint64_t> exact_hp(EntityId id) const;
     /// A party member's HP reached 0 during a fight: a death, with its recap.
     void record_death(EntityId id, Micros ts);
-    /// HP above 0 or their own hit: a death still open for `id` is over.
-    void note_alive(EntityId id, Micros ts);
+    /// HP above 0, or their own hit (`by_hit`) more than kInFlight after it: a death
+    /// still open for `id` is over.
+    void note_alive(EntityId id, Micros ts, bool by_hit = false);
     void push_recap(EntityId target, const RecapSample& sample);
     /// What an effect on `target` from `caster` is to the fight, or nothing for one
     /// it does not track: on a party member (not a summon), or a party member's on an

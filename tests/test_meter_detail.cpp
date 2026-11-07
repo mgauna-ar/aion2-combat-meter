@@ -263,7 +263,9 @@ TEST_CASE(Engine, HpAboveZeroOrTheirOwnHitGetsThemUp) {
     e.on_event(ev(at_s(4), hp(kAlly, 0)));
     e.on_event(ev(at_s(7), hp(kAlly, 5000)));
     e.on_event(ev(at_s(10), hp(kAlly, 0)));
-    // Their DoT goes on ticking: no proof they are up.
+    // A hit already in flight as they died, and their DoT ticking on: no proof
+    // they are up.
+    e.on_event(ev(at_s(10.05), hit(kAlly, kBoss, 100)));
     e.on_event(ev(at_s(11), dot(kAlly, kBoss, 30)));
     e.on_event(ev(at_s(12), hit(kAlly, kBoss, 100)));
     const FightSummary s = e.current();

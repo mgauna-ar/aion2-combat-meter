@@ -26,6 +26,13 @@ struct ReportOptions {
     bool fights{false};
     /// Each player's skills, healing and damage taken under their fight's table.
     bool skills{false};
+    /// Each fight's deaths with their recaps, under its table.
+    bool deaths{false};
+    /// Each player's active time, under their fight's table.
+    bool active{false};
+    /// Each fight's effect uptime: party buffs, debuffs on the party, and the
+    /// party's effects on enemies.
+    bool effects{false};
     bool unknown{false};
     bool anonymize{false};
     bool dump_all{false};
@@ -45,6 +52,8 @@ public:
     void on_fight(const meter::FightSummary& fight);
     /// One player's skills, healing and damage taken (--skills).
     void print_breakdown(const meter::CombatantTotals& c) const;
+    /// The fight's deaths (--deaths), active times (--active) and effects (--effects).
+    void print_detail(const meter::FightSummary& f) const;
 
     void print_flows(const pipeline::StreamDemux& demux) const;
     void print_parse(const proto::ParseStats& stats) const;

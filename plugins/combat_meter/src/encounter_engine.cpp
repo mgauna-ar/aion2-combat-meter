@@ -317,7 +317,7 @@ void EncounterEngine::credit(EntityId actor, EntityId target, uint64_t amount, u
         if (last != 0 && ts >= last && ts - last <= kActiveGap) acc.active_us += ts - last;
         last = std::max(last, ts);
         m_registry.on_revive(player);
-        note_alive(player, ts);
+        note_alive(player, ts, true);
     }
 }
 
@@ -638,12 +638,13 @@ void EncounterEngine::record_death(EntityId id, Micros ts) {
     m_fight->deaths.push_back(std::move(d));
 }
 
-void EncounterEngine::note_alive(EntityId id, Micros ts) {
+void EncounterEngine::note_alive(EntityId id, Micros ts, bool by_hit) {
     if (!m_fight) return;
     const CharacterId who = m_registry.character_of(id);
     for (auto it = m_fight->deaths.rbegin(); it != m_fight->deaths.rend(); ++it) {
         if (it->up_ts != 0) continue;
         if (it->key.id == id || (who != 0 && it->key.who == who)) {
+            if (by_hit && ts < it->ts + kInFlight) return;
             it->up_ts = std::max(ts, it->ts);
             return;
         }
