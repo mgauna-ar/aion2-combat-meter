@@ -126,6 +126,26 @@ is switched off the pipeline feeds it nothing; switching it off ends its live fi
   hits, by id, so an id named late still bridges its gap. Summons and ticks never
   count. In the second capture's last boss fight 99% of every player's gaps were 2.7 s
   or less, and it came to 55–85%.
+- **Casts** (02 38, Protocol in the root AGENTS.md): a player's presses, per skill
+  (`skill_key`, so variants share a row, as on the Damage tab).
+  - Only mode 2 (a press) of a class skill: no passive going off, chain follow-up or
+    mantra pulse, and no NPC's skill.
+  - Only the player's own: a summon's skills are its AI's, not a press of its owner's.
+  - Booked like healing (`counts_in_fight`): a roster member's and the local player's
+    at once; with no roster, a player's once they hit, their presses since the fight
+    began going in with that first hit (`Fight::pending_casts`). Strangers' never.
+  - A press adds no one to a fight: presses are kept apart from the rows
+    (`Fight::casts`) and join only those a hit, a heal or damage taken made. A member
+    who only pressed a buff during a short pull has no row, as before casts.
+  - A press never starts or extends a fight. The opening cast comes 0.1–0.5 s before
+    the hit that starts one, so presses of the last `kCastLead` (2 s) are held while
+    no fight runs, and those still within it when one starts count in it; its first
+    cast can read below 0 s.
+  - Each skill keeps its count and its first and last press: casts a minute run over
+    the fight's duration, and the average gap between presses over first to last.
+  - Checked on the second capture: over its five fights, the local player's casts
+    matched their own 01 38 skill by skill for 97.2%. The rest the server sends in
+    another mode (Protocol).
 - **Deaths:**
   - a party member's HP 0 (00 8D) during a fight: players get no 42 36. Not a summon's,
     and not a stranger's (`counts_in_fight`). Repeated zeros while down are one death;
@@ -158,9 +178,11 @@ is switched off the pipeline feeds it nothing; switching it off ends its live fi
     `# By hand` line, so not map 0, an open-world zone, or a map added by hand).
   - Each fight is one JSON file (`"v":2`; version 1 files still load, without the
     breakdowns), written atomically, plus a line appended to `index.jsonl`.
-  - The detail (`timeline`, `deaths`, `effects`) and `active_s` are optional fields of
+  - The detail (`timeline`, `deaths`, `effects`), `active_s` and each row's `casts`
+    (`[code, casts, first ms, last ms]`, one line each) are optional fields of
     version 2: an older build ignores them, where a new version would make it skip the
-    record, and a record without them reads with no detail. A series is one line
+    record. A record without the detail reads with none, and one without `casts` with
+    `has_casts` false, so its Casts tab says it was saved before. A series is one line
     (`[1,0,2]`, the JSON printer's rule for an array of numbers), its trailing zeros
     cut; reading bounds every list.
   - Fights are grouped by map visit (`visit_ts`): every map load starts one but a

@@ -45,6 +45,8 @@ void usage() {
                  "  --active          --fights, and each player's time spent hitting\n"
                  "  --effects         --fights, and each fight's effect uptime: party buffs,\n"
                  "                    debuffs on the party, the party's effects on enemies\n"
+                 "  --casts           --fights, and each player's casts per skill: how many, a\n"
+                 "                    minute, and the average time between them\n"
                  "  --events          every decoded event but heartbeats and --auras', one per line\n"
                  "  --auras           effects put on and taken off, and the local player's skill\n"
                  "                    uses and cooldown changes\n"
@@ -100,6 +102,9 @@ bool parse_args(int argc, char** argv, Options& opt) {
         } else if (arg == "--effects") {
             opt.report.fights = true;
             opt.report.effects = true;
+        } else if (arg == "--casts") {
+            opt.report.fights = true;
+            opt.report.casts = true;
         } else if (arg == "--events") {
             opt.report.events = true;
         } else if (arg == "--auras") {

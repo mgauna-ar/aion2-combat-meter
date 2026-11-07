@@ -71,9 +71,12 @@ std::string share(uint64_t part, uint64_t whole) {
     return whole == 0 ? std::string("-") : format_percent(static_cast<double>(part) / static_cast<double>(whole));
 }
 
-// ------------------------------------------------------------------ tables ---
+} // namespace
 
-/// The row's player: a selectable across the row, which opens their breakdown.
+// ------------------------------------------------------------------ tables ---
+// The row and breakdown helpers below are shared with the tabs in files of their
+// own (meter_tabs.hpp).
+
 void name_cell(int column, const meter::CombatantTotals& c, meter::EntityId& selected, const char* tab) {
     ImGui::TableSetColumnIndex(column);
     const std::string label = c.name + "##" + tab + std::to_string(c.id);
@@ -85,6 +88,8 @@ void name_cell(int column, const meter::CombatantTotals& c, meter::EntityId& sel
     ImGui::PopStyleColor();
 }
 
+namespace {
+
 const char* const kTipHits = "HIT: direct hits. DoT ticks are counted apart and carry no crit or direction.";
 const char* const kTipCrit = "CRI: critical hits, of the direct hits.";
 const char* const kTipPerfect = "PERF: perfect hits, of the direct hits.";
@@ -94,7 +99,8 @@ const char* const kTipFront = "FRNT: hits from the target's front, of the direct
 const char* const kTipMulti = "MULT: multi-hits, of the direct hits.";
 const char* const kTipBlock = "BLOC: hits the target blocked, of the direct hits.";
 
-/// The table's height when a breakdown shares the space under it.
+} // namespace
+
 float table_height(bool breakdown_open) { return breakdown_open ? fill_h(0.0f) * 0.5f : fill_h(0.0f); }
 
 const meter::CombatantTotals* find_row(const meter::FightSummary& f, meter::EntityId id) {
@@ -122,6 +128,8 @@ bool begin_breakdown(const char* id, const char* title, const meter::CombatantTo
     }
     return true;
 }
+
+namespace {
 
 // ------------------------------------------------------------------ damage ---
 
@@ -864,6 +872,8 @@ void render_meter_page(const AppFrameInput& in, AppViewState& state, AppActions&
          [&] { pull_view(in, state, out, groups, shown, "##TakenPane", [&](const auto& f) { taken_tab(f, state); }); }},
         {ICON_SPARKLE, "Buffs & Debuffs",
          [&] { pull_view(in, state, out, groups, shown, "##EffectsPane", [&](const auto& f) { effects_tab(f, state); }); }},
+        {ICON_BOLT, "Casts",
+         [&] { pull_view(in, state, out, groups, shown, "##CastsPane", [&](const auto& f) { casts_tab(f, state); }); }},
         {ICON_TRENDING, "Timeline",
          [&] {
              pull_view(in, state, out, groups, shown, "##TimelinePane", [&](const auto& f) { timeline_tab(f, state); });

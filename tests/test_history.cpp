@@ -178,6 +178,48 @@ TEST_CASE(FightJson, SeriesAreOneLineEach) {
     TEST_ASSERT(text.find("[53214,0,61200]") != std::string::npos);
 }
 
+TEST_CASE(FightJson, CastsRoundTrip) {
+    FightSummary f = sample_fight(3, 0);
+    f.has_casts = true;
+    f.combatants[0].casts = 7;
+    f.combatants[0].cast_skills = {SkillCasts{12'040'000, 5, -0.25, 40.5}, SkillCasts{12'000'100, 2, 3.0, 9.125}};
+    const auto back = fight_from_json(fight_to_json(f));
+    TEST_ASSERT(back.has_value());
+    TEST_ASSERT(back->has_casts);
+    TEST_ASSERT_EQ(back->combatants[0].casts, uint64_t{7});
+    TEST_ASSERT(back->combatants[0].cast_skills == f.combatants[0].cast_skills);
+    TEST_ASSERT(back->combatants[1].cast_skills.empty());
+    // [code, casts, first ms, last ms], one line.
+    TEST_ASSERT(fight_to_json(f).stringify().find("[12040000,5,-250,40500]") != std::string::npos);
+}
+
+TEST_CASE(FightJson, ARecordWithoutCastsSaysSo) {
+    const auto back = fight_from_json(fight_to_json(sample_fight(1, 0)));
+    TEST_ASSERT(back.has_value());
+    TEST_ASSERT_FALSE(back->has_casts);
+    TEST_ASSERT_EQ(back->combatants[0].casts, uint64_t{0});
+}
+
+TEST_CASE(FightJson, CastListsAreBounded) {
+    FightSummary f = sample_fight(3, 0);
+    f.has_casts = true;
+    f.combatants[0].cast_skills = {SkillCasts{12'040'000, 5, 1.0, 2.0}};
+    auto j = fight_to_json(f);
+    config::JsonValue::ArrayType many(2000, j["combatants"].as_array()[0]["casts"].as_array()[0]);
+    j["combatants"].as_array()[0]["casts"] = config::JsonValue(many);
+    // A short entry and a last before the first read safely.
+    j["combatants"].as_array()[1]["casts"] =
+        config::JsonValue(config::JsonValue::ArrayType{config::JsonValue(config::JsonValue::ArrayType{
+            config::JsonValue(12'000'100u), config::JsonValue(3), config::JsonValue(5000)})});
+    const auto back = fight_from_json(j);
+    TEST_ASSERT(back.has_value());
+    TEST_ASSERT_EQ(back->combatants[0].cast_skills.size(), size_t{512});
+    const SkillCasts& odd = back->combatants[1].cast_skills.at(0);
+    TEST_ASSERT_EQ(odd.casts, uint64_t{3});
+    TEST_ASSERT_NEAR(odd.first_s, 5.0, 1e-9);
+    TEST_ASSERT_NEAR(odd.last_s, 5.0, 1e-9);
+}
+
 TEST_CASE(FightJson, ARecordWithoutDetailReadsWithNone) {
     const auto back = fight_from_json(fight_to_json(sample_fight(1, 0)));
     TEST_ASSERT(back.has_value());

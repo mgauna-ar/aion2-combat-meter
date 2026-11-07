@@ -381,6 +381,13 @@ int main(int argc, char** argv) {
     buffs.view.open_meter_tab = app::MeterTab::Buffs;
     buffs.view.effect_view = meter::EffectSide::PartyBuff;
     ok = render_app(buffs, app_settings, out_dir) && ok;
+    // What the party pressed, and Ariel's skills.
+    AppScene casts = damage;
+    casts.file = "app-casts.png";
+    casts.view.damage_player = 0;
+    casts.view.open_meter_tab = app::MeterTab::Casts;
+    casts.view.casts_player = static_cast<meter::EntityId>(test::synthetic::kMe);
+    ok = render_app(casts, app_settings, out_dir) && ok;
     // The Auras plugin's page, switched on, with the overlay's settings above.
     AppScene auras_page{"app-auras.png", done.snapshot, damage.history, {}};
     auras_page.view.page = app::AppPage::Auras;

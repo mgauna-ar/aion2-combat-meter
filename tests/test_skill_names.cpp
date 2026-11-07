@@ -17,6 +17,16 @@ TEST_CASE(SkillNames, VariantsTakeTheirSkillsName) {
     TEST_ASSERT_EQ(std::string(skill_name(16330000)), std::string("Dimensional Control"));
 }
 
+TEST_CASE(SkillNames, DodgeIsNotItsClassWeapon) {
+    // A class's common block holds its weapon (XX0000xx) and Dodge (XX0001xx): a
+    // Dodge variant from the dungeon capture once read as the Sorcerer's weapon.
+    TEST_ASSERT_EQ(skill_base(12000101), uint32_t{12000100});
+    TEST_ASSERT_EQ(skill_key(15000101), uint32_t{15000100});
+    TEST_ASSERT_EQ(std::string(skill_name(15000101)), std::string("Dodge"));
+    TEST_ASSERT_EQ(std::string(skill_name(15000003)), std::string("Equip Sorcerer Weapon"));
+    TEST_ASSERT_EQ(skill_base(16009999), uint32_t{16009900});
+}
+
 TEST_CASE(SkillNames, AVariantWithItsOwnRowKeepsIt) {
     // 16290000 is Dismiss: Fire Spirit; 16290002, its own row, is the earth spirit.
     TEST_ASSERT_EQ(std::string(skill_name(16290002)), std::string("Dismiss: Earth Spirit"));

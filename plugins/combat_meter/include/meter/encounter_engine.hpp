@@ -49,6 +49,13 @@ public:
     /// says nothing of their being up. In the second capture one landed 55 ms after,
     /// and HP above 0 came 3.9 s later.
     static constexpr Micros kInFlight = kMicrosPerSecond;
+    /// A press this long before the hit that starts a fight still counts in it: the
+    /// opening cast comes 0.1 to 0.5 s ahead of its hit.
+    static constexpr Micros kCastLead = 2 * kMicrosPerSecond;
+    /// Most presses held while no fight runs, and per fight for players not counted
+    /// yet (with no roster, until their first hit).
+    static constexpr size_t kMaxHeldCasts = 256;
+    static constexpr size_t kMaxPendingCasts = 4096;
 
     explicit EncounterEngine(MeterSettings settings = {});
 
@@ -101,8 +108,22 @@ private:
         std::vector<TimelineBin> bins;
         /// The gaps of kActiveGap or less between their own direct hits.
         Micros active_us{0};
+        /// Their own presses, by game::skill_key().
+        struct Casts {
+            uint64_t count{0};
+            Micros first{0};
+            Micros last{0};
+        };
+        std::unordered_map<uint32_t, Casts> casts;
 
         void merge(const Accum& other);
+    };
+
+    /// A press (02 38 mode 2) not booked yet.
+    struct HeldCast {
+        EntityId caster{0};
+        uint32_t skill{0};
+        Micros ts{0};
     };
 
     /// A row: an id, and the character it was when it hit. The server gives a
@@ -150,6 +171,12 @@ private:
             std::vector<RecapEvent> recap;
         };
         std::vector<Death> deaths;
+        /// Presses by players who do not count yet: booked once they do (a first
+        /// hit, with no roster), else never.
+        std::vector<HeldCast> pending_casts;
+        /// Presses by row, apart from `players`: a press adds no one to a fight, so
+        /// the summary keeps only the rows something else made.
+        std::unordered_map<RowKey, std::unordered_map<uint32_t, Accum::Casts>, RowKeyHash> casts;
     };
 
     void on_spawn(const proto::Spawn& s, Micros ts);
@@ -159,6 +186,12 @@ private:
     void on_values(const proto::RemainingHp& v, Micros ts);
     void on_death(EntityId id, Micros ts);
     void on_map(const proto::MapLoad& m, uint32_t connection, Micros ts);
+    /// 02 38: a player's own press counts in the fight, by skill. Procs, pulses and
+    /// summons' skills do not, and a press never starts or extends a fight.
+    void on_cast(const proto::SkillCast& c, Micros ts);
+    void book_cast(EntityId player, uint32_t skill, Micros ts);
+    /// Books the live fight's pending presses of players who count by now.
+    void book_pending_casts();
     /// A hit from the player side on an enemy, credited to its resolved player.
     void credit(EntityId actor, EntityId target, uint64_t amount, uint32_t skill, const proto::Damage* direct,
                 Micros ts);
@@ -245,6 +278,8 @@ private:
         }
     };
     std::unordered_map<EntityId, HpLoss> m_hp_loss;
+    /// Presses of the last kCastLead while no fight runs, oldest first.
+    std::deque<HeldCast> m_held_casts;
     /// A hit (or heal) on `target` was seen: the next HP change is accounted for.
     void note_hit_on(EntityId target);
     /// Every effect in view, and the live fight's spans of them.

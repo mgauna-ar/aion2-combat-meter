@@ -115,6 +115,8 @@ std::vector<T> vector_of(const JsonValue& j, F from_json) {
 constexpr size_t kMaxTimelineRows = 256;
 constexpr size_t kMaxEffectRows = 4096;
 constexpr size_t kMaxBuffWindows = 4096;
+/// Most skills one player's casts list: a class has fewer than 60.
+constexpr size_t kMaxCastSkills = 512;
 
 /// Milliseconds as written: seconds kept to the millisecond.
 [[nodiscard]] uint64_t to_ms(double seconds) {
@@ -147,6 +149,35 @@ void series_from_json(const JsonValue& j, std::vector<TimelineBin>& bins, uint32
     const size_t n = std::min(values.size(), kTimelineMaxSeconds);
     if (bins.size() < n) bins.resize(n);
     for (size_t i = 0; i < n; ++i) bins[i].*field = u32(values[i]);
+}
+
+/// [code, casts, first ms, last ms]: one line, by the printer's rule for an array of
+/// numbers. The first can be below 0 (the opening cast, before the first hit).
+JsonValue cast_to_json(const SkillCasts& c) {
+    JsonValue::ArrayType a;
+    a.emplace_back(c.code);
+    a.emplace_back(c.casts);
+    a.emplace_back(static_cast<int64_t>(std::llround(c.first_s * 1000.0)));
+    a.emplace_back(static_cast<int64_t>(std::llround(c.last_s * 1000.0)));
+    return JsonValue(std::move(a));
+}
+
+SkillCasts cast_from_json(const JsonValue& j) {
+    const auto& a = j.as_array();
+    const auto at = [&](size_t i) -> const JsonValue& {
+        static const JsonValue kNone;
+        return i < a.size() ? a[i] : kNone;
+    };
+    const auto ms = [](const JsonValue& v) {
+        const double d = v.as_double(0.0);
+        return std::isfinite(d) ? d / 1000.0 : 0.0;
+    };
+    SkillCasts c;
+    c.code = u32(at(0));
+    c.casts = u64(at(1));
+    c.first_s = ms(at(2));
+    c.last_s = std::max(ms(at(3)), c.first_s);
+    return c;
 }
 
 JsonValue timeline_to_json(const FightTimeline& tl) {
@@ -364,6 +395,7 @@ JsonValue fight_to_json(const FightSummary& f) {
         r["taken"] = hits_to_json(c.taken);
         r["taken_by"] = array_of(c.taken_by, amount_to_json);
         if (f.detail != nullptr) r["active_s"] = c.active_s;
+        if (f.has_casts) r["casts"] = array_of(c.cast_skills, cast_to_json);
         rows.push_back(std::move(r));
     }
     j["combatants"] = std::move(rows);
@@ -433,6 +465,12 @@ std::optional<FightSummary> fight_from_json(const JsonValue& j) {
         c.taken_by = vector_of<SkillAmount>(r["taken_by"], amount_from_json);
         const double active = r["active_s"].as_double(0.0);
         c.active_s = std::isfinite(active) && active > 0.0 ? active : 0.0;
+        // Saved before the meter counted casts: none, and the fight says so.
+        if (r.contains("casts")) {
+            f.has_casts = true;
+            c.cast_skills = bounded_vector_of<SkillCasts>(r["casts"], kMaxCastSkills, cast_from_json);
+            for (const SkillCasts& s : c.cast_skills) c.casts += s.casts;
+        }
         f.combatants.push_back(std::move(c));
     }
     // Saved before the meter kept them: no detail at all, rather than an empty one.

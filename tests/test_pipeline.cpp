@@ -69,6 +69,9 @@ TEST_CASE(Pipeline, SyntheticBossFightEndToEnd) {
     }
     TEST_ASSERT_EQ(f.total_damage, total);
     TEST_ASSERT_EQ(total, session.truth.boss_damage);
+    // Every press, the opening one before the first hit included; no proc.
+    TEST_ASSERT(f.has_casts);
+    for (const auto& c : f.combatants) TEST_ASSERT_EQ(c.casts, session.truth.casts.at(c.id));
 
     // Its detail: every second of every row, the death, the boss's line, the effects.
     TEST_ASSERT(f.detail != nullptr);

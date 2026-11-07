@@ -8,6 +8,7 @@
 #include <map>
 #include <tuple>
 #include <type_traits>
+#include <utility>
 #include <variant>
 
 namespace aion2::meter {
@@ -18,6 +19,11 @@ namespace {
 constexpr double kMinDurationSeconds = 1.0;
 
 [[nodiscard]] uint64_t grew(uint64_t now, uint64_t then) noexcept { return now >= then ? now - then : 0; }
+
+/// `ts` in seconds after `start`, negative before it (the opening cast).
+[[nodiscard]] double seconds_from(Micros start, Micros ts) noexcept {
+    return ts >= start ? to_seconds(ts - start) : -to_seconds(start - ts);
+}
 
 void add(HitCounts& into, const HitCounts& h) noexcept {
     into.hits += h.hits;
@@ -121,6 +127,12 @@ void EncounterEngine::Accum::merge(const Accum& o) {
         add_capped(bins[i].taken, o.bins[i].taken);
     }
     active_us += o.active_us;
+    for (const auto& [key, c] : o.casts) {
+        Casts& into = casts[key];
+        into.first = into.count == 0 ? c.first : std::min(into.first, c.first);
+        into.last = std::max(into.last, c.last);
+        into.count += c.count;
+    }
 }
 
 void EncounterEngine::on_event(const proto::ParsedEvent& event) {
@@ -154,6 +166,8 @@ void EncounterEngine::on_event(const proto::ParsedEvent& event) {
                 m_effects.on_applied(e, ts, effect_tag(e.target, e.caster));
             } else if constexpr (std::is_same_v<T, proto::BuffRemoved>) {
                 m_effects.on_removed(e, ts);
+            } else if constexpr (std::is_same_v<T, proto::SkillCast>) {
+                on_cast(e, ts);
             }
         },
         event.event);
@@ -287,10 +301,18 @@ void EncounterEngine::credit(EntityId actor, EntityId target, uint64_t amount, u
         m_fight = std::move(f);
         // What is already on the party and the enemies counts from here.
         m_effects.begin_fight(ts, [this](EntityId on, EntityId from) { return effect_tag(on, from); });
+        // The presses that led into it: the opening cast comes ahead of its hit.
+        for (const HeldCast& c : m_held_casts) {
+            if (c.ts + kCastLead >= ts) m_fight->pending_casts.push_back(c);
+        }
+        m_held_casts.clear();
     }
 
     Fight& fight = *m_fight;
-    Accum& acc = fight.players[row_key(player)];
+    const auto [row, added] = fight.players.try_emplace(row_key(player));
+    Accum& acc = row->second;
+    // A first hit can make a player count: their presses so far go in with it.
+    if (added) book_pending_casts();
     acc.damage += amount;
     acc.max_hit = std::max(acc.max_hit, amount);
     const uint32_t key = game::skill_key(skill);
@@ -321,6 +343,47 @@ void EncounterEngine::credit(EntityId actor, EntityId target, uint64_t amount, u
         if (!just_died(player, ts)) m_registry.on_revive(player);
         note_alive(player, ts, true);
     }
+}
+
+void EncounterEngine::on_cast(const proto::SkillCast& c, Micros ts) {
+    // A press, of a class skill: procs, chain follow-ups, mantra pulses and NPCs'
+    // skills are not a player's casts.
+    if (!c.pressed || c.caster == 0 || game::class_of_skill(c.skill) == AionClass::Unknown) return;
+    // A summon's skills are its AI's.
+    if (m_registry.resolve(c.caster) != c.caster) return;
+    if (!m_fight) {
+        while (!m_held_casts.empty() && m_held_casts.front().ts + kCastLead < ts) m_held_casts.pop_front();
+        if (m_held_casts.size() >= kMaxHeldCasts) m_held_casts.pop_front();
+        m_held_casts.push_back(HeldCast{c.caster, c.skill, ts});
+        return;
+    }
+    if (counts_in_fight(c.caster)) {
+        book_cast(c.caster, c.skill, ts);
+    } else if (m_registry.in_party(c.caster) && m_fight->pending_casts.size() < kMaxPendingCasts) {
+        m_fight->pending_casts.push_back(HeldCast{c.caster, c.skill, ts});
+    }
+}
+
+void EncounterEngine::book_cast(EntityId player, uint32_t skill, Micros ts) {
+    if (!m_fight) return;
+    Accum::Casts& c = m_fight->casts[row_key(player)][game::skill_key(skill)];
+    c.first = c.count == 0 ? ts : std::min(c.first, ts);
+    c.last = std::max(c.last, ts);
+    ++c.count;
+}
+
+void EncounterEngine::book_pending_casts() {
+    if (!m_fight) return;
+    std::vector<HeldCast> later;
+    for (const HeldCast& c : std::exchange(m_fight->pending_casts, {})) {
+        if (m_registry.resolve(c.caster) != c.caster || m_registry.side(c.caster) != Side::Player) continue;
+        if (counts_in_fight(c.caster)) {
+            book_cast(c.caster, c.skill, c.ts);
+        } else if (m_registry.in_party(c.caster)) {
+            later.push_back(c);
+        }
+    }
+    m_fight->pending_casts = std::move(later);
 }
 
 void EncounterEngine::on_values(const proto::RemainingHp& v, Micros ts) {
@@ -376,6 +439,7 @@ void EncounterEngine::on_map(const proto::MapLoad& m, uint32_t connection, Micro
     m_registry.on_map_change(m.is_instance());
     m_damage_since_spawn.clear();
     m_hp_loss.clear();
+    m_held_casts.clear();
 }
 
 bool EncounterEngine::party_wiped(const Fight& fight) const {
@@ -488,6 +552,7 @@ FightSummary EncounterEngine::summarize(const Fight& fight, bool live, EndReason
     const double span = to_seconds(fight.last_hit_ts > fight.start_ts ? fight.last_hit_ts - fight.start_ts : 0);
     s.duration_s = std::max(span, kMinDurationSeconds);
     s.boss = boss_of(fight);
+    s.has_casts = true;
 
     // One row per character, whatever ids it had; an id named after it hit joins
     // its character. Unnamed ids stay apart.
@@ -505,6 +570,14 @@ FightSummary EncounterEngine::summarize(const Fight& fight, bool live, EndReason
         g.id = std::min(g.id, key.id);
         g.local = g.local || key.id == m_registry.local_player();
         g.acc.merge(acc);
+    }
+    // Presses join the rows their players have; a player who only pressed has none.
+    for (const auto& [key, by_skill] : fight.casts) {
+        const auto g = groups.find(group_key(key.id, key.who));
+        if (g == groups.end()) continue;
+        Accum pressed;
+        pressed.casts = by_skill;
+        g->second.acc.merge(pressed);
     }
     std::unordered_map<uint64_t, EntityId> row_ids;
     std::vector<TimelineRow> timeline_rows;
@@ -542,6 +615,15 @@ FightSummary EncounterEngine::summarize(const Fight& fight, bool live, EndReason
         row.taken = acc.taken_hits;
         row.taken_by = sorted_values(acc.taken_by, [](const SkillAmount& k) { return k.amount; });
         row.active_s = to_seconds(acc.active_us);
+        for (const auto& [code, c] : acc.casts) {
+            row.casts += c.count;
+            row.cast_skills.push_back(SkillCasts{code, c.count, seconds_from(fight.start_ts, c.first),
+                                                 seconds_from(fight.start_ts, c.last)});
+        }
+        std::sort(row.cast_skills.begin(), row.cast_skills.end(), [](const SkillCasts& a, const SkillCasts& b) {
+            if (a.casts != b.casts) return a.casts > b.casts;
+            return a.code < b.code;
+        });
         s.total_damage += acc.damage;
         s.total_healing += acc.healing;
         s.combatants.push_back(std::move(row));

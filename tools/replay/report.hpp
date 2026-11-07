@@ -33,6 +33,8 @@ struct ReportOptions {
     /// Each fight's effect uptime: party buffs, debuffs on the party, and the
     /// party's effects on enemies.
     bool effects{false};
+    /// Each player's casts per skill, under their fight's table.
+    bool casts{false};
     bool unknown{false};
     bool anonymize{false};
     bool dump_all{false};
@@ -54,6 +56,8 @@ public:
     void print_breakdown(const meter::CombatantTotals& c) const;
     /// The fight's deaths (--deaths), active times (--active) and effects (--effects).
     void print_detail(const meter::FightSummary& f) const;
+    /// Each player's casts per skill (--casts).
+    void print_casts(const meter::FightSummary& f) const;
 
     void print_flows(const pipeline::StreamDemux& demux) const;
     void print_parse(const proto::ParseStats& stats) const;

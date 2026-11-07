@@ -139,6 +139,16 @@ inline constexpr Micros kT0 = 1'792'152'000'000'000ULL;
     return b;
 }
 
+/// 02 38: `caster` pressing `skill` at `target`.
+[[nodiscard]] inline proto::SkillCast press(EntityId caster, uint32_t skill, EntityId target = 0) {
+    return proto::SkillCast{caster, skill, target != 0 ? target : caster, true};
+}
+
+/// 02 38 with no press behind it: a passive going off, a mantra's pulse.
+[[nodiscard]] inline proto::SkillCast proc(EntityId caster, uint32_t skill) {
+    return proto::SkillCast{caster, skill, caster, false};
+}
+
 [[nodiscard]] inline proto::PartyRoster roster(std::initializer_list<const char*> names) {
     proto::PartyRoster r;
     for (const char* n : names) r.members.push_back(proto::PartyMember{n});

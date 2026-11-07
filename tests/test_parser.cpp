@@ -449,11 +449,57 @@ TEST_CASE(Parser, PartyScanSkipsOneLetterLookAlikes) {
 TEST_CASE(Parser, IgnoredOpcodesAreNeitherDecodedNorUnknown) {
     PacketParser p;
     const Bytes body = {1, 2, 3, 4};
-    (void)parse_one(p, opcode::Cast, body);
     (void)parse_one(p, opcode::Pong, body);
     TEST_ASSERT_EQ(p.stats().decoded, uint64_t{0});
     TEST_ASSERT_EQ(p.stats().unknown, uint64_t{0});
-    TEST_ASSERT_EQ(p.stats().frames, uint64_t{2});
+    TEST_ASSERT_EQ(p.stats().frames, uint64_t{1});
+}
+
+// --- Casts (02 38) ---
+
+TEST_CASE(Parser, PressedCastAsTheCaptureHasIt) {
+    // The local player's Dodge, at themself: mode 02 and a position.
+    PacketParser p;
+    const Bytes body = {0xa0, 0x50, 0x00, 0x65, 0x1b, 0xb7, 0x00, 0x0a, 0x02, 0xa0, 0x50, 0xb4, 0x0c, 0xa6, 0xc2, 0xa2,
+                        0x4d, 0x42, 0x41, 0x0f, 0x85, 0xc6, 0xc2, 0x00, 0x00, 0x00, 0x00, 0x90, 0x4e, 0x01, 0xf4, 0x03};
+    const auto c = only<SkillCast>(parse_one(p, opcode::Cast, body));
+    TEST_ASSERT_EQ(c.caster, EntityId{10'272});
+    TEST_ASSERT_EQ(c.skill, uint32_t{12'000'101});
+    TEST_ASSERT_EQ(c.target, EntityId{10'272});
+    TEST_ASSERT(c.pressed);
+}
+
+TEST_CASE(Parser, MantraPulseIsNotAPress) {
+    // A Chanter's Undefeated Mantra pulsing, once a second: mode 00, no position.
+    PacketParser p;
+    const Bytes body = {0xd9, 0x3c, 0x00, 0xd9, 0x8e, 0x15, 0x01, 0x7e, 0x00, 0xd9,
+                        0x3c, 0xb1, 0x65, 0x3c, 0x43, 0x9e, 0x55, 0x01, 0x00};
+    const auto c = only<SkillCast>(parse_one(p, opcode::Cast, body));
+    TEST_ASSERT_EQ(c.caster, EntityId{7769});
+    TEST_ASSERT_EQ(c.skill, uint32_t{18'190'041});
+    TEST_ASSERT(!c.pressed);
+}
+
+TEST_CASE(Parser, CastBuilderRoundTripsAndFoldsLargeIds) {
+    PacketParser p;
+    const auto c = only<SkillCast>(parse_one(p, opcode::Cast, cast_body(1'234'567, 12'240'340, 2'000'001, true)));
+    TEST_ASSERT_EQ(c.caster, normalize_entity_id(1'234'567));
+    TEST_ASSERT_EQ(c.target, normalize_entity_id(2'000'001));
+    TEST_ASSERT_EQ(c.skill, uint32_t{12'240'340});
+    TEST_ASSERT(c.pressed);
+    TEST_ASSERT(!only<SkillCast>(parse_one(p, opcode::Cast, cast_body(70, 12'730'001, 70, false))).pressed);
+}
+
+TEST_CASE(Parser, CastOfAnUnseenModeOrCutShortFails) {
+    PacketParser p;
+    Bytes odd_mode = cast_body(70, 12'240'340, 9000, true);
+    odd_mode[7] = 0x01;  // caster (1 byte), the byte, skill (4), sequence: the mode
+    TEST_ASSERT(parse_one(p, opcode::Cast, odd_mode).empty());
+    const Bytes cut = {0xa0, 0x50, 0x00, 0x65, 0x1b, 0xb7};
+    TEST_ASSERT(parse_one(p, opcode::Cast, cut).empty());
+    TEST_ASSERT(parse_one(p, opcode::Cast, cast_body(70, 0, 9000, true)).empty());
+    TEST_ASSERT_EQ(p.stats().failed, uint64_t{3});
+    TEST_ASSERT_EQ(p.stats().failures_by_opcode.at(opcode::Cast), uint64_t{3});
 }
 
 // --- Effects, skill uses and cooldowns (2a 38, 2b 38, 1a 92, 01 38, 47 38) ---

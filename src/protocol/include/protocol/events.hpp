@@ -205,6 +205,20 @@ struct SkillUsed {
     uint32_t skill{0};
 };
 
+/// 02 38: a skill going off, anyone's: players', summons', NPCs'. The local player's
+/// press (01 38) comes back as one about 10 ms later, with the same skill.
+struct SkillCast {
+    EntityId caster{0};
+    /// The code as cast, specialties in its variant digits; 7 digits for an NPC's.
+    uint32_t skill{0};
+    /// Whom it was aimed at; the caster for a self-cast.
+    EntityId target{0};
+    /// A press (mode 2, with a position). Otherwise (mode 0) something the player
+    /// did not press: a passive going off, a chain's follow-up, a mantra's pulse
+    /// every second.
+    bool pressed{false};
+};
+
 /// 47 38: what is left of one of the local player's cooldowns, sent when something
 /// cut it (Warding Strike, 2 s a time) or reset it (0). Not sent as a cooldown starts.
 struct CooldownSet {
@@ -213,7 +227,7 @@ struct CooldownSet {
 };
 
 using Event = std::variant<Heartbeat, Identity, Spawn, Death, MapLoad, Damage, Tick, PartyRoster, RemainingHp,
-                           BuffApplied, BuffRemoved, SkillUsed, CooldownSet>;
+                           BuffApplied, BuffRemoved, SkillUsed, CooldownSet, SkillCast>;
 
 struct ParsedEvent {
     Micros ts{0};

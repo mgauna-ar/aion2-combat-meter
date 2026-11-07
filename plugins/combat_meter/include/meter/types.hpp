@@ -92,6 +92,23 @@ struct SkillAmount {
     [[nodiscard]] bool operator==(const SkillAmount&) const = default;
 };
 
+/// How often a player pressed one skill in a fight.
+struct SkillCasts {
+    /// game::skill_key(), as SkillTotals'.
+    uint32_t code{0};
+    uint64_t casts{0};
+    /// The first and the last press, in seconds from the fight's start. The opening
+    /// cast comes before its first hit, so the first can be below 0.
+    double first_s{0.0};
+    double last_s{0.0};
+
+    /// The average time between two presses; 0 for one.
+    [[nodiscard]] double mean_gap_s() const noexcept {
+        return casts < 2 ? 0.0 : std::max(last_s - first_s, 0.0) / static_cast<double>(casts - 1);
+    }
+    [[nodiscard]] bool operator==(const SkillCasts&) const = default;
+};
+
 /// One player's line in a fight: their damage and their summons'.
 struct CombatantTotals {
     EntityId id{0};
@@ -132,11 +149,22 @@ struct CombatantTotals {
     /// the meter kept it.
     double active_s{0.0};
 
+    /// Skills they pressed (02 38 mode 2): their own, not their summons', and no
+    /// passive going off or mantra pulse. 0 in a record saved before the meter
+    /// counted them (FightSummary::has_casts).
+    uint64_t casts{0};
+    /// Most casts first.
+    std::vector<SkillCasts> cast_skills;
+
     [[nodiscard]] double crit_rate() const noexcept { return hits.rate(&HitCounts::crits); }
     [[nodiscard]] double back_rate() const noexcept { return hits.rate(&HitCounts::back); }
     /// Of the fight's duration, 0..1.
     [[nodiscard]] double active_share(double duration_s) const noexcept {
         return duration_s <= 0.0 ? 0.0 : std::clamp(active_s / duration_s, 0.0, 1.0);
+    }
+    /// Casts a minute of the fight's duration.
+    [[nodiscard]] double casts_per_minute(double duration_s) const noexcept {
+        return duration_s <= 0.0 ? 0.0 : 60.0 * static_cast<double>(casts) / duration_s;
     }
 };
 
@@ -199,6 +227,9 @@ struct FightSummary {
     double total_dps{0.0};
     uint64_t total_healing{0};
     CaptureQuality quality;
+    /// Its rows carry their casts: false for a record saved before the meter counted
+    /// them.
+    bool has_casts{false};
     /// Its seconds, deaths and effects, shared by every copy; null for a record saved
     /// before the meter kept them.
     std::shared_ptr<const FightDetail> detail;
