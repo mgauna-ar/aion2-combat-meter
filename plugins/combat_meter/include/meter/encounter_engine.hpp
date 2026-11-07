@@ -178,6 +178,9 @@ private:
     /// HP above 0, or their own hit (`by_hit`) more than kInFlight after it: a death
     /// still open for `id` is over.
     void note_alive(EntityId id, Micros ts, bool by_hit = false);
+    /// `id` died less than kInFlight before `ts`, and is not up since: a hit of theirs
+    /// now was in flight as they died.
+    [[nodiscard]] bool just_died(EntityId id, Micros ts) const;
     void push_recap(EntityId target, const RecapSample& sample);
     /// What an effect on `target` from `caster` is to the fight, or nothing for one
     /// it does not track: on a party member (not a summon), or a party member's on an

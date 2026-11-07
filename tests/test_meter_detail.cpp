@@ -259,6 +259,8 @@ TEST_CASE(Engine, RepeatedZerosAreOneDeath) {
 
 TEST_CASE(Engine, HpAboveZeroOrTheirOwnHitGetsThemUp) {
     EncounterEngine e = setup();
+    // The local player stands throughout: no wipe.
+    e.on_event(ev(at_s(1), hit(kMe, kBoss, 100)));
     e.on_event(ev(at_s(1), hit(kAlly, kBoss, 100)));
     e.on_event(ev(at_s(4), hp(kAlly, 0)));
     e.on_event(ev(at_s(7), hp(kAlly, 5000)));
@@ -450,4 +452,64 @@ TEST_CASE(Engine, AFightKeepsAtMostTheSpanCap) {
     e.on_event(ev(at_s(20), hit(kMe, kBoss, 100)));
     const auto buffs = effects(e.current(), EffectSide::PartyBuff);
     TEST_ASSERT_EQ(buffs.at(0).applications, static_cast<uint32_t>(EffectUptime::kMaxSpans));
+}
+
+// ---- Wipes -------------------------------------------------------------------
+
+namespace {
+
+EncounterEngine wipes_on() {
+    MeterSettings settings;
+    settings.wipe_detection = true;
+    return setup(settings);
+}
+
+} // namespace
+
+TEST_CASE(Engine, WipeDetectionIsOffByDefault) {
+    // The whole party went down and got back up in the second capture's last fight.
+    TEST_ASSERT_FALSE(MeterSettings{}.wipe_detection);
+    EncounterEngine e = setup();
+    e.on_event(ev(at_s(1), hit(kMe, kBoss, 100)));
+    e.on_event(ev(at_s(1), hit(kAlly, kBoss, 100)));
+    e.on_event(ev(at_s(5), hp(kMe, 0)));
+    e.on_event(ev(at_s(5), hp(kAlly, 0)));
+    TEST_ASSERT(e.in_fight());
+}
+
+TEST_CASE(Engine, ARevivedPlayerStandsInTheWayOfAWipe) {
+    EncounterEngine e = wipes_on();
+    e.on_event(ev(at_s(0), roster({"Ariel", "Lumiel"})));
+    e.on_event(ev(at_s(1), hit(kMe, kBoss, 100)));
+    e.on_event(ev(at_s(1), hit(kAlly, kBoss, 100)));
+    e.on_event(ev(at_s(5), hp(kMe, 0)));
+    e.on_event(ev(at_s(8), hp(kMe, 30'000)));
+    e.on_event(ev(at_s(9), hp(kAlly, 0)));
+    TEST_ASSERT(e.in_fight());
+    e.on_event(ev(at_s(10), hp(kMe, 0)));
+    TEST_ASSERT_FALSE(e.in_fight());
+    TEST_ASSERT(e.take_finished().at(0).end_reason == EndReason::Wipe);
+}
+
+TEST_CASE(Engine, AHitInFlightAsTheyDieDoesNotStopAWipe) {
+    EncounterEngine e = wipes_on();
+    e.on_event(ev(at_s(0), roster({"Ariel", "Lumiel"})));
+    e.on_event(ev(at_s(1), hit(kMe, kBoss, 100)));
+    e.on_event(ev(at_s(1), hit(kAlly, kBoss, 100)));
+    e.on_event(ev(at_s(5), hp(kMe, 0)));
+    e.on_event(ev(at_s(5.05), hit(kMe, kBoss, 100)));  // cast before they fell
+    e.on_event(ev(at_s(6), hp(kAlly, 0)));
+    TEST_ASSERT_FALSE(e.in_fight());
+    TEST_ASSERT(e.take_finished().at(0).end_reason == EndReason::Wipe);
+}
+
+TEST_CASE(Engine, AnUnnamedAllyIsUpAgainByTheirHp) {
+    // Known only from the hits they trade: HP above 0 still says they are up.
+    EncounterEngine e = wipes_on();
+    e.on_event(ev(at_s(1), hit(kMe, kBoss, 100)));
+    e.on_event(ev(at_s(1), hit(300, kBoss, 100)));
+    e.on_event(ev(at_s(4), hp(300, 0)));
+    e.on_event(ev(at_s(6), hp(300, 20'000)));
+    e.on_event(ev(at_s(7), hp(kMe, 0)));
+    TEST_ASSERT(e.in_fight());
 }

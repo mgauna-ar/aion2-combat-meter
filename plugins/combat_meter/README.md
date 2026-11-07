@@ -110,7 +110,7 @@ and saves as you go.
 | `min_saved_duration_s` | 20 | A fight with no boss is saved if it lasts at least this long. |
 | `save_only_dungeons` | false | Save only fights in a dungeon, as `overlay.show_in_dungeons_only` tells them. A dungeon the meter cannot name (its fights read "Map <number>") counts as not one. |
 | `partial_damage_ratio` | 0.7 | A boss that dies having lost less than this share of its HP with hits the meter saw (by the game's own HP updates) marks the fight "partial data". |
-| `wipe_detection` | false | End the fight when every party member is dead. Off until real captures show how revives look on the wire. |
+| `wipe_detection` | false | End the fight when every party member in it is dead at once, and mark it a wipe. Off: in a recorded dungeon run the whole party went down together, got back up seconds later and killed the boss. |
 | `memory_history` | 10 | Finished fights kept in memory. |
 
 **overlay**

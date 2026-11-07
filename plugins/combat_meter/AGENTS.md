@@ -85,9 +85,15 @@ is switched off the pipeline feeds it nothing; switching it off ends its live fi
   comes over a new connection: running a dungeon again, straight back in; not over the
   same one, a teleport or a revive within the run), idle time with no party hit (`idle_timeout_s`, or
   `boss_idle_timeout_s` while a boss stands), no traffic (`capture_lost_s`), a wipe
-  (when enabled) or by hand.
-  - A dead player stays dead for the wipe check while their DoTs and summons keep
-    hitting; their own direct hit, or 00 8D HP above 0, revives them.
+  (`wipe_detection`, off: see below) or by hand.
+  - A wipe is every party member in the fight dead at once. A player is dead from
+    00 8D HP 0 until HP above 0, or their own direct hit more than `kInFlight` (1 s)
+    after (one in flight as they died proves nothing), and stays dead while their DoTs
+    and summons keep hitting.
+  - So it stays off: in the second capture's last boss fight the whole party was at HP
+    0 at once for 1.2 s (four died together, the fifth already down), got up 1 to 9 s
+    later and killed the boss. By this rule that was a wipe, cutting the fight in two
+    at 2:41; in game it was not.
   - Duration runs from the first hit to the last, floored at 1 s for DPS.
 - **Boss:** the damaged enemy with the most max HP. It is a boss if that max HP is at
   least `boss_min_max_hp`.

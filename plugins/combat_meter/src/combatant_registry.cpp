@@ -163,7 +163,8 @@ void CombatantRegistry::on_hp(EntityId id, uint64_t hp) {
     // Without a spawn (it came into view before the meter started), the most HP
     // seen is the best lower bound on its max.
     if (hp > a.max_hp) a.max_hp = hp;
-    if (hp > 0 && a.is_player) a.dead = false;
+    // A player is up again: one named, or one known only from the hits they trade.
+    if (hp > 0 && (a.is_player || a.inferred_side == Side::Player)) a.dead = false;
 }
 
 void CombatantRegistry::on_spawn(const proto::Spawn& spawn) {

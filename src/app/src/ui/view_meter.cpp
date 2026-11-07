@@ -769,7 +769,9 @@ void tracking_card(const AppFrameInput& in, AppActions& out) {
 
     setting_slider("Partial data under", "A killed boss that lost less than this share of its HP with hits seen.",
                    &s.partial_damage_ratio, 0.0, 1.0, "%.2f", out, Applies::Engine);
-    setting_switch("Wipe ends the fight", "When every party member is dead. Off until captures show revives.",
+    setting_switch("Wipe ends the fight",
+                   "When every party member in it is dead at once. Off: a party can all go down and get "
+                   "back up mid-fight.",
                    &s.wipe_detection, out, Applies::Engine);
     end_settings_card();
 }

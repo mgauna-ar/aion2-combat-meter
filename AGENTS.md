@@ -434,6 +434,9 @@ capture, where all 17,182 records parse):
   instead (plugins/auras/AGENTS.md, Cooldowns);
 - whether a skill with a second use ("+1 consecutive use") recharges each use on its
   own, as the Auras plugin assumes, or both at once;
+- what a wipe looks like on the wire. The whole party at HP 0 is not one: in the second
+  capture's last boss fight they all were, for 1.2 s, and got up again and won
+  (plugins/combat_meter/AGENTS.md, Fight end). `wipe_detection` stays off until then;
 - whether the game's Total Heal counts heals before a fight's first hit: the meter's
   healing came to 97% of it;
 - what the 5-HP object (2,920,366, kind 14, no name) the party broke in the second
