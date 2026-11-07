@@ -61,7 +61,11 @@ TEST_CASE(Timeline, BinsStopAtAnHourAndSaturate) {
     TimelineBin* first = timeline_bin(bins, at_s(10), at_s(9));  // before the start: second 0
     TEST_ASSERT(first != nullptr);
     TEST_ASSERT_EQ(bins.size(), size_t{1});
-    TEST_ASSERT(timeline_bin(bins, at_s(10), at_s(12.9)) == &bins[2]);
+    // The call grows `bins`, so it goes first: the order of `==`'s sides is the
+    // compiler's, and MSVC took `&bins[2]` before the resize.
+    const TimelineBin* third = timeline_bin(bins, at_s(10), at_s(12.9));
+    TEST_ASSERT_EQ(bins.size(), size_t{3});
+    TEST_ASSERT(third == &bins[2]);
     TEST_ASSERT(timeline_bin(bins, at_s(0), at_s(3599.5)) != nullptr);
     TEST_ASSERT(timeline_bin(bins, at_s(0), at_s(3600)) == nullptr);
     TEST_ASSERT_EQ(bins.size(), kTimelineMaxSeconds);
