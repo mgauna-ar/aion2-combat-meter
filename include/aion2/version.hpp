@@ -5,10 +5,10 @@
 // numbers below for project(VERSION), and app.rc includes this file for the
 // executable's version resource, so everything above the RC_INVOKED guard must stay
 // plain preprocessor that rc.exe understands: no #pragma once, no C++.
-#define AION2_VERSION_MAJOR 0
-#define AION2_VERSION_MINOR 7
+#define AION2_VERSION_MAJOR 1
+#define AION2_VERSION_MINOR 0
 #define AION2_VERSION_PATCH 0
-#define AION2_VERSION_STRING "0.7.0"
+#define AION2_VERSION_STRING "1.0.0"
 
 #ifndef RC_INVOKED
 
