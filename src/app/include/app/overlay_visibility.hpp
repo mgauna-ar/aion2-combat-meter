@@ -15,7 +15,8 @@ struct OverlayConditions {
     /// that cannot be told (no game process found), so a condition never hides the
     /// overlay on a guess.
     bool game_in_front{true};
-    /// The map is a dungeon (game::is_dungeon). False before any map load.
+    /// The map is a dungeon (game::is_dungeon: by its id, named or not). False before
+    /// any map load.
     bool in_dungeon{false};
 };
 

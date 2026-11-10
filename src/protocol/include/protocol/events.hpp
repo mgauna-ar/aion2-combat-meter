@@ -84,10 +84,8 @@ struct Death {
 
 struct MapLoad {
     uint32_t load_count{0};
+    /// Whether it is a dungeon is game::is_dungeon's to say.
     uint32_t map_id{0};
-
-    /// Instanced dungeons and arenas.
-    [[nodiscard]] bool is_instance() const noexcept { return map_id >= 600000 && map_id < 700000; }
 };
 
 /// Where a long-layout hit (5..7) landed relative to its target.

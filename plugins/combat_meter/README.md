@@ -118,7 +118,7 @@ and saves as you go.
 | `kill_grace_s` | 2 | Hits after the boss dies still count for this long. |
 | `boss_min_max_hp` | 1000000 | Max HP that makes an enemy a boss. One dungeon's bosses had 5.2M–9.9M, its trash under 450,000. |
 | `min_saved_duration_s` | 20 | A fight with no boss is saved if it lasts at least this long. |
-| `save_only_dungeons` | false | Save only fights in a dungeon, as `overlay.show_in_dungeons_only` tells them. A dungeon the meter cannot name (its fights read "Map <number>") counts as not one. |
+| `save_only_dungeons` | false | Save only fights in a dungeon, as `overlay.show_in_dungeons_only` tells them. A new dungeon the meter cannot name yet (its fights read "Dungeon <number>") counts as one. |
 | `partial_damage_ratio` | 0.7 | A boss that dies having lost less than this share of its HP with hits the meter saw (by the game's own HP updates) marks the fight "partial data". |
 | `wipe_detection` | false | End the fight when every party member in it is dead at once, and mark it a wipe. Off: in a recorded dungeon run the whole party went down together, got back up seconds later and killed the boss. |
 | `memory_history` | 10 | Finished fights kept in memory. |
@@ -139,7 +139,7 @@ and saves as you go.
 | `show_in_combat_only` | false | Show the overlay only during a fight, and for `hide_after_combat_s` after it. Applies only while locked. |
 | `hide_after_combat_s` | 5 | Seconds it stays up after a fight, to read the result. |
 | `hide_when_game_unfocused` | false | Hide it while neither the game nor the meter's window is in front. Applies only while locked. |
-| `show_in_dungeons_only` | false | Show the overlay only in a dungeon: one of `src/game/data/maps.tsv`'s dungeon tiers. Hidden in the open world, the Abyss, battlefields, and before the first loading screen. Applies only while locked. |
+| `show_in_dungeons_only` | false | Show the overlay only in a dungeon, told by the map's id, so a new dungeon counts before the meter can name it. Hidden in the open world and before the first loading screen. Applies only while locked. |
 
 **history**
 

@@ -64,7 +64,10 @@ A patch can add or rename skills. Rows the meter cannot name read "Skill 1234567
 
 ## 4. Refresh the map names
 
-A patch can add dungeons or tiers. Maps the meter cannot name read "Map 600001".
+A patch can add dungeons or tiers. One the meter cannot name reads "Dungeon 600001".
+It counts as a dungeon all the same (`game::is_dungeon` goes by the id, 600000 and
+up), so the overlays and the history work in it before this step: only the name is
+missing.
 
 1. **Download the pages.** The list pages give each dungeon's page, and each dungeon's
    page gives its tier ids:

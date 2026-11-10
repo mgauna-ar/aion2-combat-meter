@@ -373,10 +373,18 @@ BACK, FRNT, MULT and BLOC share matched it exactly.
       fight 19 deaths came that way, each back up 3 to 17 s later, at full HP.
     - A killing hit can carry 0: the local player's did there (a heavy hit by the boss),
       though the same skill hit others for 77,635 and more.
-  - Map load `21 36`: load count u32, map id u32. Ids 600000–700000 are instances.
+  - Map load `21 36`: load count u32, map id u32.
+    - **An id of 600000 or more is a dungeon** (`game::is_dungeon`, the one place
+      that says so). It goes by the id alone, never by the table of names, so a
+      dungeon a patch adds counts before the meter can name it: the overlays'
+      `show_in_dungeons_only`, `save_only_dungeons` and the party with no roster all
+      ask it. Every tier known sits there (600001 to 690046, and the Awakening tiers
+      at 910011 to 910064), and the one open-world id seen is the town's, 1010. The
+      community's notes gave 600000–700000 as the instances, which left the
+      Awakening tiers out.
     - Names come from `src/game/data/maps.tsv`. It holds aion2.app's dungeon tier
       ids: one row per difficulty, such as Krao Cave 600002 (Exploration) and 600001
-      (Conquest), with Awakening tiers at 910000 and up, outside the instance range.
+      (Conquest), with Awakening tiers at 910000 and up.
       The second capture's dungeon came as 600072, which the table names Vakron Sky
       Island (Conquest), the dungeon that was run: the tier ids are the map ids.
     - A tier added later gets an id of its own, with no pattern to guess it by:
@@ -385,7 +393,8 @@ BACK, FRNT, MULT and BLOC share matched it exactly.
     - aion2.app lists dungeons whose pages give no tier ids (2026-11): the Lv.99
       Awakening tiers (Insane, Hell, Doom), Ascension, Abyss Corridor, Growth, Daily,
       the Legion airships, the battlefields, Chaotic Reshanta and the arenas. They
-      show as "Map <id>"; the import lists them.
+      show as "Dungeon <id>" (an unnamed id below 600000 as "Map <id>"); the import
+      lists them.
     - Open-world zones have no public numeric ids. Their rows go by hand under the
       TSV's `# By hand` line, which `--import-pages` keeps. metabot.gg gives 333 zone
       ids (Reshanta's Root is 622), but they look like zones within a map, not maps,
@@ -493,8 +502,11 @@ capture, where all 17,182 records parse):
   ignores case), but no one has checked the name of the running process;
 - the open-world zones' map ids (the second capture's town was 1010);
 - the map ids of the dungeons aion2.app lists without tier ids (above). A capture can
-  give them, but a row added by hand counts as no dungeon (`is_dungeon`), so
-  `save_only_dungeons` and `show_in_dungeons_only` would treat it as the open world;
+  give them, and a row added by hand names them;
+- whether every dungeon's id is 600000 or more, and whether anything that is not a
+  dungeon is (the arenas, the battlefields, the Abyss). `is_dungeon` assumes the
+  first and lets the second through: an overlay showing in an arena costs less than
+  one hidden in a dungeon. An id that should stay out needs a rule of its own then;
 - whether the server hands a player's old id to someone else. Ids belong to a map
   instance and are handed out on entering it: in the second capture the local
   player's id was new on each of its three maps, while players who stayed in town

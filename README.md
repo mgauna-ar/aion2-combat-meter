@@ -35,7 +35,8 @@ to 97% of its Total Heal. Aura bars are exact; cooldowns are estimates, marked "
 Not there yet (a [capture](#-recording-a-capture) helps):
 - **Misses and defences** (ACC, endurance, regeneration, invincibility) are not decoded.
 - **Open-world zones**, and dungeons with no public id yet (the Lv.99 Awakening tiers,
-  Ascension), show by number: `Map 1010`.
+  Ascension), show by number: `Map 1010`, `Dungeon 600123`. A dungeon shown by number
+  still counts as one.
 - **Bosses** are enemies with 1,000,000 max HP or more (`meter.boss_min_max_hp`),
   checked on one dungeon only.
 - **PvP:** the other faction looks like your party, so PvP damage is not counted.
@@ -138,8 +139,8 @@ that option unticked, or run the meter as administrator.
 **No overlay in game:** use Borderless Windowed, check the plugin is on, and press
 Ctrl+Alt+H if the meter overlay is hidden. An overlay set to show only in combat, only
 in dungeons or only with the game in front stays out of sight until then; unlock it
-(Ctrl+Alt+L) to see it at once. A dungeon shown by number (`Map 600123`) counts as the
-open world.
+(Ctrl+Alt+L) to see it at once. "Only in dungeons" needs one loading screen after the
+meter starts, to learn which map you are on.
 
 **Players show as #12345:** the game sends names on loading screens. Start the meter
 before you log in or teleport; until then your own row is **You**.

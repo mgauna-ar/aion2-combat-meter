@@ -123,7 +123,7 @@ void visibility_card(const AppFrameInput& in, AppActions& out) {
     if (!a.locked) ImGui::BeginDisabled();
     setting_switch("Hide when the game is not in front", "Hidden while another program has the focus.",
                    &a.hide_when_game_unfocused, out);
-    setting_switch("Only in dungeons", "Hidden in the open world, and on maps the meter can't name.",
+    setting_switch("Only in dungeons", "Hidden in the open world. A new dungeon counts before the meter can name it.",
                    &a.show_in_dungeons_only, out);
     if (!a.locked) ImGui::EndDisabled();
     ImGui::Dummy(ImVec2(0.0f, m(2.0f)));

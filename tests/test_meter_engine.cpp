@@ -590,6 +590,19 @@ TEST_CASE(Engine, OutOfAPartyTheOpenWorldCountsOnlyYou) {
     e.on_event(ev(at_s(31), npc(kAdd, 50'000, 778)));
     e.on_event(ev(at_s(32), hit(kStranger, kAdd, 900)));
     TEST_ASSERT_FALSE(e.in_fight());
+
+    // An Awakening tier (910000 and up) is a dungeon too, and so is one the map
+    // table cannot name yet.
+    double t = 40;
+    uint32_t load = 4;
+    for (const uint32_t map : {910064u, 910099u}) {
+        e.on_event(ev(at_s(t), proto::MapLoad{load++, map}));
+        e.on_event(ev(at_s(t + 1), npc(kBoss, kBossHp, 777)));
+        e.on_event(ev(at_s(t + 2), hit(kMe, kBoss, 100)));
+        e.on_event(ev(at_s(t + 3), hit(kStranger, kBoss, 900)));
+        TEST_ASSERT_EQ(e.current().combatants.size(), size_t{2});
+        t += 10;
+    }
 }
 
 TEST_CASE(Engine, APlayerToPlayerRecordOffThePartyIsNoHeal) {

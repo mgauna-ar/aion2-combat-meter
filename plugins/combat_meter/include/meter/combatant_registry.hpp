@@ -109,8 +109,8 @@ public:
     void on_skill_class(EntityId player, AionClass cls);
     /// A map load, the same map again included when it is a new run of a dungeon:
     /// NPCs, summons and inferred sides go; players stay, stale, since a new
-    /// instance has ids of its own. `instance` (proto::MapLoad::is_instance) says
-    /// who counts with no roster.
+    /// instance has ids of its own. `instance` (game::is_dungeon) says who counts
+    /// with no roster.
     void on_map_change(bool instance);
     /// The map loaded again within one run (a teleport, a revive): NPCs stay, and
     /// players go stale, in case they have new ids.
