@@ -112,13 +112,28 @@ Both come from the heartbeat alone, so they need no counter and work in a replay
   `show_in_dungeons_only` (`ping_shown`), never by another overlay's. It has no "only
   in combat": lag matters between fights too.
 - Ctrl+Alt+L locks every overlay at once; that is the app's, not a plugin's.
+- **Locking moves and resizes nothing.** The figures' panel starts
+  `chrome::header_height` down the window whether the header is drawn or not.
+  Unlocked, one ImGui window fills the display, header first. Locked, only the panel
+  is drawn (`chrome::begin` over part of the display), and the header's strip stays
+  see-through: an overlay window is transparent where nothing is drawn, and
+  click-through all over while locked. So `ping.height` includes the header.
+  - The graph's height must not depend on `interactive`: the resize grip is drawn
+    over the corner, with no room left for it.
+- **Without the graph the panel fits its line** (`ping_row_layout`): the ping, and the
+  jitter beside it, or under it when the window is too narrow for both. The window
+  keeps its size, unseen while locked. Unlocked, the window shows around the panel
+  with the panel marked out, since that is what the user moves and what bounds the
+  line's width.
 - **The pure parts are in `ping_view` and tested without ImGui:** `ping_level` (the two
   thresholds; `bad_ms` is never under `warn_ms`, which `sanitize` and the page's
-  sliders both hold), `shown_ping`, `ping_status`, `format_ms`, and the graph as
+  sliders both hold), `shown_ping`, `ping_status`, `format_ms`, `ping_row_layout`, and the graph as
   numbers (`ping_graph`: 120 columns, the newest last, and `ping_graph_top`, a round
   figure so the scale does not twitch).
 - **The graph draws two things apart:** the ping as a line, each second's lateness as
   bars from the bottom, on one scale. Lateness under 1 ms is not drawn.
 - **Text is ASCII:** the overlay's font has no dash beyond "-".
 - The README's pictures come from a `PingSnapshot` made up in `tools/screenshots`: the
-  synthetic session has no pongs, and a replay has no counter.
+  synthetic session has no pongs, and a replay has no counter. The tool crops each
+  to what was drawn, so a locked overlay shows as its panel; `--all` adds the unlocked
+  and narrow states.

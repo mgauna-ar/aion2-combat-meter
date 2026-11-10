@@ -50,6 +50,13 @@ std::string format_ms(float ms) {
     return buf;
 }
 
+PingRowLayout ping_row_layout(float ping_w, float jitter_w, float gap, float max_w) noexcept {
+    if (jitter_w <= 0.0f) return PingRowLayout{1, ping_w};
+    const float both = ping_w + gap + jitter_w;
+    if (both <= max_w) return PingRowLayout{1, both};
+    return PingRowLayout{2, std::max(ping_w, jitter_w)};
+}
+
 float ping_graph_top(float highest) noexcept {
     constexpr float kSteps[] = {50.0f, 100.0f, 150.0f, 200.0f, 300.0f, 500.0f, 750.0f, 1000.0f, 1500.0f, 2000.0f, 3000.0f};
     for (const float step : kSteps) {
@@ -187,9 +194,41 @@ OverlayActions draw_ping(const PingFrameInput& in) {
     const float scale = in.scale;
     const bool interactive = !s.locked;
 
-    if (chrome::begin("##aion2ping", s.opacity, scale, interactive)) {
-        // Header, while it can be moved: a title and the buttons. Locked, the window
-        // is only its figures.
+    const ping::PingSnapshot none{};
+    const ping::PingSnapshot& p = in.snapshot != nullptr ? in.snapshot->ping : none;
+    const Micros now = in.snapshot != nullptr ? in.snapshot->now : 0;
+    const std::optional<float> ping = shown_ping(p, now);
+    const Rgb level = ping ? level_color(ping_level(*ping, s)) : colors::TextDim;
+    const std::string ping_text = ping ? format_ms(*ping) : std::string("-");
+    const std::string jitter_text = p.has_jitter ? format_ms(p.jitter_ms) : std::string("-");
+
+    // The line of figures, measured first: without the graph the panel is as large
+    // as that line.
+    const ImVec2 display = ImGui::GetIO().DisplaySize;
+    const ImVec2 pad = chrome::window_padding(scale);
+    const ImVec2 spacing = chrome::item_spacing(scale);
+    const float dot_gap = 6.0f * scale;
+    const float ping_w = chrome::dot_width(scale) + dot_gap + ImGui::CalcTextSize("Ping").x + spacing.x +
+                         (ping ? chrome::bold_text_width(ping_text) : ImGui::CalcTextSize(ping_text.c_str()).x);
+    const float jitter_w =
+        s.show_jitter ? ImGui::CalcTextSize("Jitter").x + spacing.x + ImGui::CalcTextSize(jitter_text.c_str()).x : 0.0f;
+    const float inner_max = std::max(0.0f, display.x - 2.0f * pad.x);
+    const PingRowLayout row = ping_row_layout(ping_w, jitter_w, 14.0f * scale, inner_max);
+    const float line = ImGui::GetTextLineHeight();
+
+    // The figures' panel: under where the header is while unlocked, so locking moves
+    // and resizes nothing. With the graph it takes the rest of the window.
+    const float header_h = chrome::header_height(scale);
+    const ImVec2 body_pos(0.0f, header_h);
+    const ImVec2 body_size =
+        s.show_graph ? ImVec2(display.x, std::max(0.0f, display.y - header_h))
+                     : ImVec2(std::min(display.x, row.width + 2.0f * pad.x),
+                              static_cast<float>(row.rows) * line + static_cast<float>(row.rows - 1) * spacing.y + 2.0f * pad.y);
+    const float inner_w = std::max(0.0f, body_size.x - 2.0f * pad.x);
+
+    const bool open = interactive ? chrome::begin("##aion2ping", s.opacity, scale, true)
+                                  : chrome::begin("##aion2ping", s.opacity, scale, false, body_pos, body_size);
+    if (open) {
         if (interactive) {
             ImGui::TextColored(rgba(colors::TextDim), "PING");
             chrome::HeaderButtons buttons;
@@ -197,44 +236,43 @@ OverlayActions draw_ping(const PingFrameInput& in) {
             buttons.app_tooltip = "Open the app: the ping's settings are on its page.";
             buttons.lock_tooltip = "Click-through and fixed in place. Unlock it in the app.";
             chrome::finish_header(buttons, out);
+            if (!s.show_graph) {
+                // What stays once locked, marked out in the window it is moved by.
+                ImDrawList* dl = ImGui::GetWindowDrawList();
+                const ImVec2 p1(body_pos.x + body_size.x, body_pos.y + body_size.y);
+                dl->AddRectFilled(body_pos, p1, u32(colors::Text, 0.08f), 8.0f * scale);
+            }
+            // Exactly where the locked panel's content starts, however tall the
+            // header came out.
+            ImGui::SetCursorPos(ImVec2(pad.x, header_h + pad.y));
         }
+        const float left = ImGui::GetCursorPosX();
 
-        const ping::PingSnapshot none{};
-        const ping::PingSnapshot& p = in.snapshot != nullptr ? in.snapshot->ping : none;
-        const Micros now = in.snapshot != nullptr ? in.snapshot->now : 0;
-        const float spacing = ImGui::GetStyle().ItemSpacing.x;
-
-        // A light in the ping's colour, the ping, and the jitter at the right edge
-        // while there is room beside it.
-        const std::optional<float> ping = shown_ping(p, now);
-        const Rgb level = ping ? level_color(ping_level(*ping, s)) : colors::TextDim;
+        // A light in the ping's colour, the ping, and the jitter at the panel's right
+        // edge, or under the ping where there is no room beside it.
         chrome::dot(level, scale, ping ? 1.0f : 0.6f);
-        ImGui::SameLine(0.0f, 6.0f * scale);
+        ImGui::SameLine(0.0f, dot_gap);
         ImGui::TextColored(rgba(colors::TextDim), "Ping");
         ImGui::SameLine();
         if (ping) {
             const chrome::BoldScope bold;
-            ImGui::TextColored(rgba(level), "%s", format_ms(*ping).c_str());
+            ImGui::TextColored(rgba(level), "%s", ping_text.c_str());
         } else {
-            ImGui::TextColored(rgba(colors::TextDim), "-");
+            ImGui::TextColored(rgba(colors::TextDim), "%s", ping_text.c_str());
             if (interactive && ImGui::IsItemHovered()) ImGui::SetTooltip("%s.", ping_status(p, now));
         }
         if (s.show_jitter) {
-            const std::string jitter = p.has_jitter ? format_ms(p.jitter_ms) : std::string("-");
-            const float label_w = ImGui::CalcTextSize("Jitter").x;
-            const float width = label_w + spacing + ImGui::CalcTextSize(jitter.c_str()).x;
-            const float x = ImGui::GetWindowContentRegionMax().x - width;
-            if (x > ImGui::GetItemRectMax().x - ImGui::GetWindowPos().x + spacing) ImGui::SameLine(x);
+            if (row.rows == 1) ImGui::SameLine(left + inner_w - jitter_w);
             ImGui::TextColored(rgba(colors::TextDim), "Jitter");
             ImGui::SameLine();
-            ImGui::TextUnformatted(jitter.c_str());
+            ImGui::TextUnformatted(jitter_text.c_str());
         }
 
         if (s.show_graph) {
-            // The graph takes what is left above the line of figures under it.
-            const float line = ImGui::GetTextLineHeightWithSpacing();
+            // The graph takes what is left above the line of figures under it: the
+            // same locked or not, the grip drawn over the corner.
             const ImVec2 avail = ImGui::GetContentRegionAvail();
-            const float graph_h = avail.y - line - (interactive ? 10.0f * scale : 0.0f);
+            const float graph_h = avail.y - ImGui::GetTextLineHeightWithSpacing();
             if (graph_h >= 14.0f * scale && avail.x > 0.0f) {
                 const ImVec2 p0 = ImGui::GetCursorScreenPos();
                 ImGui::Dummy(ImVec2(avail.x, graph_h));
@@ -249,6 +287,19 @@ OverlayActions draw_ping(const PingFrameInput& in) {
             } else {
                 ImGui::TextColored(rgba(colors::TextDim), "%s", ping_status(p, now));
             }
+        }
+
+        if (interactive && !s.show_graph) {
+            // The rest of the window is only there to move it by: say so, where
+            // there is room under the panel.
+            ImGui::SetCursorPos(ImVec2(pad.x, body_pos.y + body_size.y + spacing.y + 2.0f * scale));
+            const char* hint = "Locked, only this stays.";
+            ImGui::PushTextWrapPos(display.x - pad.x);
+            const float hint_h = ImGui::CalcTextSize(hint, nullptr, false, inner_max).y;
+            if (ImGui::GetCursorPosY() + hint_h <= display.y - pad.y) {
+                ImGui::TextColored(rgba(colors::TextDim, 0.8f), "%s", hint);
+            }
+            ImGui::PopTextWrapPos();
         }
 
         if (interactive) out.resize_grip = chrome::resize_grip(scale);

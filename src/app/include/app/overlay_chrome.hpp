@@ -39,6 +39,9 @@ public:
     BoldScope& operator=(const BoldScope&) = delete;
 };
 
+/// How wide `s` is in the bold font, for laying a line out before it is drawn.
+[[nodiscard]] float bold_text_width(const std::string& s);
+
 /// Text ending at `x_right`, in the current font.
 void text_right(ImDrawList* dl, float x_right, float y, ImU32 col, const std::string& s);
 /// Text with a dark shadow, readable over any icon.
@@ -50,7 +53,21 @@ void shadowed_text(ImDrawList* dl, ImVec2 at, const std::string& text, float sca
 /// background at `opacity`. The border is full while the overlay can be moved
 /// (`interactive`), so an empty one can still be found. Always pair with end().
 bool begin(const char* id, float opacity, float scale, bool interactive);
+/// The same over part of the display, from `pos`, `size` large. What it leaves
+/// uncovered stays see-through: an overlay window is transparent where nothing is
+/// drawn, and click-through all over while locked.
+bool begin(const char* id, float opacity, float scale, bool interactive, ImVec2 pos, ImVec2 size);
 void end();
+
+/// The window's padding and its items' spacing, as begin() sets them.
+[[nodiscard]] ImVec2 window_padding(float scale) noexcept;
+[[nodiscard]] ImVec2 item_spacing(float scale) noexcept;
+/// How far a header (a title line, finish_header) pushes the content under it down.
+/// An overlay that draws no header while locked can begin() that much lower, so its
+/// content sits where it sat unlocked, at the size it had.
+[[nodiscard]] float header_height(float scale);
+/// The width dot() takes.
+[[nodiscard]] float dot_width(float scale) noexcept;
 
 /// A filled circle a text line high, as an item: a status light before a label.
 void dot(Rgb color, float scale, float alpha = 1.0f);
