@@ -30,8 +30,10 @@ std::string NpcapSource::loopback_filter(uint16_t server_port, const std::vector
 #endif
 #include <windows.h>
 
+#include "capture/clock_offset.hpp"
 #include "capture/os/connection_finder.hpp"
 #include "common/os/logger.hpp"
+#include "common/os/performance_clock.hpp"
 
 #include <atomic>
 #include <chrono>
@@ -184,6 +186,8 @@ struct NpcapSource::Impl {
     std::string loopback_filter;
     std::atomic<uint64_t> filter_generation{1};
     std::string status;
+    /// The capture clock against the performance counter, for the Ping plugin.
+    ClockOffsetEstimator clock_offset;
 
     explicit Impl(NpcapOptions o) : options(std::move(o)) {}
 
@@ -225,9 +229,12 @@ struct NpcapSource::Impl {
             const unsigned char* data = nullptr;
             const int rc = api.next_ex(d.handle, &header, &data);
             if (rc == 1 && header != nullptr && data != nullptr) {
+                // Read first: every microsecond until then counts as delivery delay.
+                const Micros counter = os::performance_counter_now();
                 OwnedPacket pkt;
                 pkt.link_type = d.link;
                 pkt.ts = static_cast<Micros>(header->tv_sec) * kMicrosPerSecond + static_cast<Micros>(header->tv_usec);
+                clock_offset.sample(pkt.ts, counter);
                 pkt.data.assign(data, data + header->caplen);
                 push(std::move(pkt));
             } else if (rc < 0) {
@@ -382,6 +389,8 @@ uint64_t NpcapSource::dropped() const {
     return total;
 }
 
+std::optional<Micros> NpcapSource::counter_offset() const { return m_impl->clock_offset.offset(); }
+
 std::string NpcapSource::status() const {
     std::lock_guard<std::mutex> lock(m_impl->mutex);
     return m_impl->status;
@@ -409,6 +418,8 @@ bool NpcapSource::start(Push, std::string& error) {
 void NpcapSource::stop() {}
 
 uint64_t NpcapSource::dropped() const { return 0; }
+
+std::optional<Micros> NpcapSource::counter_offset() const { return std::nullopt; }
 
 std::string NpcapSource::status() const { return "live capture runs on Windows only"; }
 

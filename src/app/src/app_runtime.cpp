@@ -81,6 +81,7 @@ void AppRuntime::run() {
 
         if (now >= last_tick + pipeline::Pipeline::kTickEvery) {
             m_pipeline.set_dropped_packets(m_queue.dropped() + m_source->dropped());
+            m_pipeline.set_counter_offset(m_source->counter_offset());
             m_pipeline.tick(now);
             last_tick = now;
         }

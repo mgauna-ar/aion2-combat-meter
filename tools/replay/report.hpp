@@ -3,6 +3,7 @@
 #include "common/micros.hpp"
 #include "meter/combatant_registry.hpp"
 #include "meter/types.hpp"
+#include "ping/ping_tracker.hpp"
 #include "pipeline/pipeline.hpp"
 #include "pipeline/stream_demux.hpp"
 #include "protocol/events.hpp"
@@ -35,6 +36,8 @@ struct ReportOptions {
     bool effects{false};
     /// Each player's casts per skill, under their fight's table.
     bool casts{false};
+    /// Each pong, and per connection how its echo and the heartbeats spread.
+    bool ping{false};
     bool unknown{false};
     bool anonymize{false};
     bool dump_all{false};
@@ -62,6 +65,8 @@ public:
     void print_flows(const pipeline::StreamDemux& demux) const;
     void print_parse(const proto::ParseStats& stats) const;
     void print_opcodes() const;
+    /// Per connection: the pongs' spread and the heartbeats' jitter (--ping).
+    void print_ping() const;
 
     [[nodiscard]] uint64_t frames() const;
     [[nodiscard]] size_t distinct_opcodes() const { return m_stats.size(); }
@@ -79,6 +84,20 @@ private:
         uint64_t failed{0};
     };
 
+    /// What --ping gathers of one connection.
+    struct PingFlow {
+        /// Each pong's arrival less the clock it echoes, in ms. A capture has no
+        /// counter to make a ping of it, but its spread above its least is the
+        /// ping's own.
+        std::vector<double> echo_ms;
+        /// The client's clock at the first pong, as seconds of uptime.
+        double uptime_s{0.0};
+        uint64_t heartbeats{0};
+        double jitter_sum{0.0};
+        double jitter_max{0.0};
+    };
+
+    void note_ping(const proto::ParsedEvent& event);
     [[nodiscard]] double rel(Micros ts) const;
     [[nodiscard]] std::string who(uint32_t id, const meter::CombatantRegistry& registry) const;
     [[nodiscard]] std::string name(const std::string& real, uint32_t id) const;
@@ -90,6 +109,9 @@ private:
     Micros m_first_ts{0};
     Micros m_last_ts{0};
     size_t m_fights{0};
+    /// The plugin's own sums, for the jitter. It follows the newest connection.
+    ping::PingTracker m_ping;
+    std::map<uint32_t, PingFlow> m_ping_flows;
 };
 
 } // namespace aion2::replay

@@ -157,6 +157,17 @@ inline Bytes heartbeat(uint64_t server_ms) {
     return opcode_frame(0x0036, body);
 }
 
+/// The pong frame: 18 03 36, 00 00, the client's clock it echoes and the server's
+/// Unix milliseconds.
+inline Bytes pong_body(uint64_t client_ms, uint64_t server_ms) {
+    Bytes body = {0x00, 0x00};
+    put_le64(body, client_ms);
+    put_le64(body, server_ms);
+    return body;
+}
+
+inline Bytes pong(uint64_t client_ms, uint64_t server_ms) { return opcode_frame(0x0336, pong_body(client_ms, server_ms)); }
+
 /// An LZ4 bundle frame: FF FF, the raw size, and `inner` (whole frames) compressed.
 inline Bytes bundle_frame(std::span<const uint8_t> inner) {
     Bytes payload = {0xFF, 0xFF};

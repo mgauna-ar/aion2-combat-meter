@@ -12,6 +12,7 @@ constexpr const char* kWindow = "app";
 constexpr const char* kCapture = "capture";
 constexpr const char* kOverlay = "overlay";
 constexpr const char* kAuras = aion2::plugins::AURAS.config_section;
+constexpr const char* kPing = aion2::plugins::PING.config_section;
 constexpr const char* kMeter = aion2::plugins::COMBAT_METER.config_section;
 constexpr const char* kHistory = "history";
 
@@ -82,6 +83,12 @@ void sanitize(AppSettings& s) {
     s.auras.icon_size = std::clamp(s.auras.icon_size, kMinAuraIcon, kMaxAuraIcon);
     s.auras.low_hp_percent = std::clamp(s.auras.low_hp_percent, 5, 90);
     if (s.auras.watch.size() > kMaxWatchedEffects) s.auras.watch.resize(kMaxWatchedEffects);
+    s.ping.opacity = std::clamp(s.ping.opacity, 0.0f, 1.0f);
+    s.ping.scale = std::clamp(s.ping.scale, 0.6f, 2.5f);
+    s.ping.width = std::clamp(s.ping.width, 160, 4000);
+    s.ping.height = std::clamp(s.ping.height, 90, 4000);
+    s.ping.warn_ms = std::clamp(s.ping.warn_ms, kMinPingThreshold, kMaxPingThreshold);
+    s.ping.bad_ms = std::clamp(s.ping.bad_ms, s.ping.warn_ms, kMaxPingThreshold);
     s.meter.idle_timeout_s = std::clamp(s.meter.idle_timeout_s, 2.0, 600.0);
     s.meter.boss_idle_timeout_s = std::clamp(s.meter.boss_idle_timeout_s, s.meter.idle_timeout_s, 1800.0);
     s.meter.capture_lost_s = std::clamp(s.meter.capture_lost_s, 5.0, 600.0);
@@ -112,6 +119,9 @@ config::JsonValue settings_to_json(const AppSettings& s) {
     for (const uint32_t code : s.auras.watch) watch.emplace_back(static_cast<double>(code));
     auras["watch"] = config::JsonValue(std::move(watch));
     root[kAuras] = std::move(auras);
+    config::JsonValue ping;
+    config::write_keys<PingSettings>(kPingKeys, s.ping, ping);
+    root[kPing] = std::move(ping);
     config::JsonValue meter;
     config::write_keys<meter::MeterSettings>(meter::kMeterSettingKeys, s.meter, meter);
     root[kMeter] = std::move(meter);
@@ -131,6 +141,7 @@ AppSettings settings_from_json(const config::JsonValue& json) {
     config::read_keys<OverlaySettings>(kOverlayKeys, json[kOverlay], s.overlay);
     config::read_keys<AuraSettings>(kAuraKeys, json[kAuras], s.auras);
     s.auras.watch = read_watch(json[kAuras]["watch"]);
+    config::read_keys<PingSettings>(kPingKeys, json[kPing], s.ping);
     config::read_keys<meter::MeterSettings>(meter::kMeterSettingKeys, json[kMeter], s.meter);
     config::read_keys<HistorySettings>(kHistoryKeys, json[kHistory], s.history);
     sanitize(s);

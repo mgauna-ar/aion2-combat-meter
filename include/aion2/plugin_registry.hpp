@@ -11,6 +11,7 @@ namespace aion2::plugins {
 enum class PluginId : uint8_t {
     CombatMeter,
     Auras,
+    Ping,
 };
 
 struct PluginDescriptor {
@@ -40,28 +41,48 @@ inline constexpr PluginDescriptor AURAS{
     false,
 };
 
+inline constexpr PluginDescriptor PING{
+    PluginId::Ping,
+    "Ping",
+    "Your latency to the game server, its jitter and a graph of both, read off the game's own pings",
+    "ping",
+    false,
+};
+
 /// Key of every plugin's master switch in its config section.
 inline constexpr const char* MASTER_SWITCH_KEY = "plugin_enabled";
 
 /// Every plugin, in the order the app lists them.
-inline constexpr std::array ALL{COMBAT_METER, AURAS};
+inline constexpr std::array ALL{COMBAT_METER, AURAS, PING};
 
 /// Which plugins are switched on: the settings' master switches, and what the
 /// pipeline feeds.
 struct PluginSwitches {
     bool combat_meter{COMBAT_METER.enabled_by_default};
     bool auras{AURAS.enabled_by_default};
+    bool ping{PING.enabled_by_default};
 
     [[nodiscard]] constexpr bool enabled(PluginId id) const noexcept {
-        return id == PluginId::CombatMeter ? combat_meter : auras;
+        switch (id) {
+            case PluginId::CombatMeter: return combat_meter;
+            case PluginId::Auras: return auras;
+            case PluginId::Ping: return ping;
+        }
+        return false;
     }
-    constexpr void set(PluginId id, bool on) noexcept { (id == PluginId::CombatMeter ? combat_meter : auras) = on; }
+    constexpr void set(PluginId id, bool on) noexcept {
+        switch (id) {
+            case PluginId::CombatMeter: combat_meter = on; break;
+            case PluginId::Auras: auras = on; break;
+            case PluginId::Ping: ping = on; break;
+        }
+    }
 
     bool operator==(const PluginSwitches&) const = default;
 };
 
 /// Every plugin on: the replay tool's and the tests' pipeline.
-inline constexpr PluginSwitches ALL_ON{true, true};
+inline constexpr PluginSwitches ALL_ON{true, true, true};
 
 /// The descriptor for `id`.
 [[nodiscard]] constexpr const PluginDescriptor& find(PluginId id) noexcept {

@@ -10,6 +10,7 @@
 #include "app/app_settings.hpp"
 #include "app/aura_view.hpp"
 #include "app/overlay_visibility.hpp"
+#include "app/ping_view.hpp"
 #include "app/updater.hpp"
 #include "capture/file_source.hpp"
 #include "capture/os/connection_finder.hpp"
@@ -159,7 +160,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
         runtime.stop();
         return 1;
     }
-    // The Auras plugin's overlay is a second window like it, without the hotkeys; the
+    // The Auras plugin's overlay is another window like it, without the hotkeys; the
     // meter runs on without it. Each shows only while its plugin is switched on.
     app::win32::OverlayWindow aura_window;
     std::string aura_error;
@@ -167,6 +168,13 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
         aura_window.create(app::win32::placement_of(settings.auras, settings.plugins.auras), L"AION 2 Combat Meter Auras",
                            false, aura_error);
     if (!have_auras) os::Logger::error(aura_error);
+    // The Ping plugin's, a third one on the same terms.
+    app::win32::OverlayWindow ping_window;
+    std::string ping_error;
+    const bool have_ping =
+        ping_window.create(app::win32::placement_of(settings.ping, settings.plugins.ping), L"AION 2 Combat Meter Ping",
+                           false, ping_error);
+    if (!have_ping) os::Logger::error(ping_error);
     // The app window is a convenience: without it the overlay and the tray still work.
     app::win32::AppWindow app_window;
     std::string app_error;
@@ -188,6 +196,8 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
         window.set_locked(locked);
         settings.auras.locked = locked;
         if (have_auras) aura_window.set_locked(locked);
+        settings.ping.locked = locked;
+        if (have_ping) ping_window.set_locked(locked);
         settings_dirty = true;
     };
     // The window follows overlay_shown() each frame; this is the user's switch.
@@ -229,6 +239,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     const auto apply_overlay = [&] {
         if (window.locked() != settings.overlay.locked) window.set_locked(settings.overlay.locked);
         if (have_auras && aura_window.locked() != settings.auras.locked) aura_window.set_locked(settings.auras.locked);
+        if (have_ping && ping_window.locked() != settings.ping.locked) ping_window.set_locked(settings.ping.locked);
     };
 
     window.on_hotkey = [&](app::win32::Hotkey key) {
@@ -252,6 +263,14 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
         settings.auras.y = r.top;
         settings.auras.width = r.right - r.left;
         settings.auras.height = r.bottom - r.top;
+        settings_dirty = true;
+    };
+    ping_window.on_geometry_changed = [&] {
+        const RECT r = ping_window.screen_rect();
+        settings.ping.x = r.left;
+        settings.ping.y = r.top;
+        settings.ping.width = r.right - r.left;
+        settings.ping.height = r.bottom - r.top;
         settings_dirty = true;
     };
 
@@ -414,6 +433,12 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
                 settings.auras.y = -1;
                 save_now();
             }
+            if (actions.reset_ping_position && have_ping) {
+                ping_window.reset_position();
+                settings.ping.x = -1;
+                settings.ping.y = -1;
+                save_now();
+            }
             open_target(actions.open);
             if (actions.check_updates) updater.check_now();
             if (actions.install_update) updater.install();
@@ -488,11 +513,34 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
             }
         }
 
+        if (have_ping) {
+            if (const bool shown = app::ping_shown(settings, conditions); shown != ping_window.visible()) {
+                ping_window.set_visible(shown);
+            }
+            if (ping_window.visible()) {
+                app::PingFrameInput input;
+                input.snapshot = snapshot.get();
+                input.settings = &settings.ping;
+                const app::OverlayActions actions = ping_window.render(settings.ping.scale, [&](float scale) {
+                    input.scale = scale;
+                    return app::draw_ping(input);
+                });
+                if (actions.lock) {
+                    settings.ping.locked = true;
+                    ping_window.set_locked(true);
+                    settings_dirty = true;
+                }
+                if (actions.open_app) open_app();
+            }
+        }
+
         if (Clock::now() - last_housekeeping >= kHousekeeping) {
             last_housekeeping = Clock::now();
             window.keep_on_top();
             if (have_auras) aura_window.keep_on_top();
-            if (settings.overlay.hide_when_game_unfocused || settings.auras.hide_when_game_unfocused) {
+            if (have_ping) ping_window.keep_on_top();
+            if (settings.overlay.hide_when_game_unfocused || settings.auras.hide_when_game_unfocused ||
+                settings.ping.hide_when_game_unfocused) {
                 game_pids = capture::game_process_ids(settings.capture.game_process);
             }
             std::string tip = "AION 2 Combat Meter";
@@ -505,7 +553,8 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
             if (settings_dirty) save_now();
         }
 
-        const bool drawing = window.visible() || (have_auras && aura_window.visible()) || (have_app && app_window.visible());
+        const bool drawing = window.visible() || (have_auras && aura_window.visible()) ||
+                             (have_ping && ping_window.visible()) || (have_app && app_window.visible());
         const auto budget = drawing ? kVisibleFrame : kHiddenFrame;
         const auto spent = Clock::now() - frame_start;
         if (spent < budget) std::this_thread::sleep_for(budget - spent);
@@ -515,6 +564,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     updater.stop();
     runtime.stop();
     app_window.destroy();
+    ping_window.destroy();
     aura_window.destroy();
     window.destroy();
     tray.destroy();

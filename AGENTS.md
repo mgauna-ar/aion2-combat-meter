@@ -9,7 +9,9 @@ a plugin:
 - [`plugins/combat_meter/AGENTS.md`](plugins/combat_meter/AGENTS.md): fights, sides,
   the boss, the history;
 - [`plugins/auras/AGENTS.md`](plugins/auras/AGENTS.md): effects, the target, the
-  cooldown estimates.
+  cooldown estimates;
+- [`plugins/ping/AGENTS.md`](plugins/ping/AGENTS.md): the ping off the game's own
+  pong, the jitter, the counter offset.
 
 Occasional procedures are skills under `.claude/skills/`:
 - `decode-capture`: check and fix the decoder against a real capture. The decoder
@@ -39,8 +41,10 @@ It runs in `make test` and in CI, so a violation fails the build. Finding the ga
 connection uses a Toolhelp process snapshot and `GetExtendedTcpTable`. Neither opens a
 handle to another process; keep it that way. "Is the game in front" (the overlay's
 hide condition) compares `GetWindowThreadProcessId` of the foreground window with
-those snapshot ids: no handle either. AION 2 has anti-cheat, and the user cares
-about account safety: when in doubt, don't.
+those snapshot ids: no handle either. The Ping plugin sends no ping of its own: it
+times the game's, against the machine's performance counter
+(`QueryPerformanceCounter`), which is system-wide and read in our own process. AION 2
+has anti-cheat, and the user cares about account safety: when in doubt, don't.
 
 **Third-party code:** copy none: this repository is MIT, and its code is its own.
 Facts about the protocol from the community's published notes are fine. **Game art** is
@@ -63,6 +67,10 @@ License).
    - Everything after capture runs on the capture timestamp (`Micros`, Unix µs,
      `common/micros.hpp`).
    - The pipeline, the parser and the engine never read the system clock.
+   - One figure comes from outside the capture: how far its clock sits from the
+     machine's performance counter (`PacketSource::counter_offset`), measured by the
+     capture threads and handed to the pipeline as data, for the Ping plugin alone.
+     A capture file has none.
    - That is why `aion2meter-replay` reproduces the live meter's fights exactly.
      `AppRuntime` is the only place that turns wall time into ticks. While packets are
      queued, it uses their time, never the source's clock, which runs ahead of a
@@ -110,12 +118,14 @@ src/common/      aion2::config, aion2::os, aion2::common
     config/      json (ported), key_table (ported), json_file (atomic write)
     os/          logger, paths, single_instance, unique_handle, local_time (ported), tray_icon,
                  auto_start (the Run key), http_client (WinHTTP GET, the only network
-                 access), process_launch (the updater's relaunch)
+                 access), process_launch (the updater's relaunch), performance_clock
+                 (the machine's performance counter, for the Ping plugin)
     archive/     inflate (RFC 1951) and zip_reader, for the release zip (ported)
     bounded_queue.hpp, snapshot_slot.hpp, micros.hpp, time_format, sha256 (ported)
 src/capture/     aion2::capture
     capture_file (pcap + pcapng reader), pcapng_writer, packet_headers, tcp_reassembler,
-    packet_source + file_source, os/npcap_source, os/connection_finder
+    packet_source + file_source, os/npcap_source, os/connection_finder,
+    clock_offset (the capture's clock against the performance counter)
 src/protocol/    aion2::proto
     byte_reader, lz4_block, frame_decoder, opcodes.hpp, events.hpp, entity_id, identity,
     packet_parser
@@ -132,12 +142,15 @@ plugins/auras/   aion2::auras (include prefix auras/; its AGENTS.md and README.m
     aura_plugin, entities (who is who, and the local player's HP), aura_tracker (effects
     on everyone in view), cooldowns (data/cooldowns.tsv → cooldown_table.inc, and the
     local player's tracker), chains (their chain skills on offer)
+plugins/ping/    aion2::ping (include prefix ping/; its AGENTS.md and README.md)
+    ping_plugin, ping_tracker (the pong's round trip, the heartbeats' jitter and
+    lateness, the graph's seconds)
 src/pipeline/    aion2::pipeline   stream_demux (flows -> frames), pipeline (parser, then
                  each plugin switched on)
 src/app/         aion2::app
     app_settings, app_runtime (threads, history, recording), display_format,
-    overlay_view (the Combat Meter's overlay) and aura_view (the Auras'; ImGui, behind
-    HAVE_IMGUI),
+    overlay_view (the Combat Meter's overlay), aura_view (the Auras') and ping_view
+    (the Ping's; ImGui, behind HAVE_IMGUI),
     overlay_visibility, app_frame (the app window's contents),
     update_check (release parsing, versions, the update balloon) and updater (check,
     download, stage, swap), both ported from ffxiv-hub,
@@ -170,9 +183,9 @@ tests/           TEST_CASE framework (ported), one test_<concern>.cpp per area
 ```
 
 **Dependencies run one way:** common ← capture; common ← protocol ← game ← each
-plugin; capture + the plugins ← pipeline ← app. Neither plugin depends on the other.
+plugin; capture + the plugins ← pipeline ← app. No plugin depends on another.
 - The Makefile's `layer_inc` and CMake's per-target include roots enforce it: an
-  `#include` across it, one plugin's header in the other included, does not compile.
+  `#include` across it, one plugin's header in another included, does not compile.
 - `make check-headers` compiles every header alone, against its own layer's roots.
 
 ---
@@ -181,10 +194,10 @@ plugin; capture + the plugins ← pipeline ← app. Neither plugin depends on th
 
 | Thread | Owns | Talks through |
 |---|---|---|
-| Capture (one per Npcap adapter, or the FileSource thread) | its pcap handle | `BoundedQueue<OwnedPacket>` (8192), `try_push` only. A full queue drops and counts, and the drop shows up as a TCP gap. |
+| Capture (one per Npcap adapter, or the FileSource thread) | its pcap handle | `BoundedQueue<OwnedPacket>` (8192), `try_push` only. A full queue drops and counts, and the drop shows up as a TCP gap. Each Npcap thread also samples the capture clock against the performance counter (`ClockOffsetEstimator`, under its own mutex), which the engine reads each tick. |
 | Npcap watcher | the loopback filter text | a mutex plus an atomic generation counter. Each capture thread applies a new filter itself between `pcap_next_ex` calls, because a pcap handle is not shared. |
 | Engine (`AppRuntime::run`) | `Pipeline`, `HistoryStore` writes, the recorder | publishes `LiveSnapshot` into a `SnapshotSlot` every 200 ms of capture time, and whenever the queue runs dry. A fight's `FightDetail` is shared, never copied: a snapshot holds a pointer to it. |
-| UI (`wWinMain`) | the three windows (the app window, the meter overlay and the aura overlay, each with its own ImGui context), the tray, `AppSettings`, the `Updater` | reads snapshots and the history index (copied under a mutex). Requests go to the engine as atomics: end fight, recording on/off, clear history. New meter and history settings and the plugin switches go through `AppRuntime::update_settings`, under the mutex; the engine applies them on its next pass. |
+| UI (`wWinMain`) | the four windows (the app window and the meter, aura and ping overlays, each with its own ImGui context), the tray, `AppSettings`, the `Updater` | reads snapshots and the history index (copied under a mutex). Requests go to the engine as atomics: end fight, recording on/off, clear history. New meter and history settings and the plugin switches go through `AppRuntime::update_settings`, under the mutex; the engine applies them on its next pass. |
 | Updater worker (one at a time) | the check or the download | `Updater::status()`, copied under its mutex, which the UI reads each frame. Staged files are moved into place on the UI thread (`apply_staged`). `stop()` cancels a download and joins, before the engine stops. |
 
 `make tsan` runs the suite under ThreadSanitizer. The `AppRuntime` tests drive real
@@ -224,12 +237,27 @@ BACK, FRNT, MULT and BLOC share matched it exactly.
 - An opcode of `FF FF` means `u32 raw_size` and an LZ4 block follow, decompressing into
   more frames. Nesting is capped at 2.
 
-**Heartbeat**
-- The frame is `0E 00 36` plus a u64 LE of server Unix ms, about every 50 ms.
+**Heartbeat and pong**
+- The heartbeat frame is `0E 00 36` plus a u64 LE of server Unix ms, about every 50 ms.
 - The decoder resyncs on one whose time is within a day of the capture's. Only such a
   frame (no flag, an 8-byte body, a time that close) counts as a heartbeat.
 - 3 s with no heartbeat while bytes keep flowing means the decoder is misaligned, and it
   resyncs.
+- **Pong `03 36`:** the server's answer to the client's ping. 18 bytes: two bytes
+  (00 00), a u64 LE the client sent, a u64 LE of server Unix ms. All 95 in the two
+  captures parse.
+  - One every 10 s on each connection, the first as it opens. The echoed u64 steps
+    by exactly 10,000 a pong: the client's own clock, in ms.
+  - **That clock reads as Unreal's** `FPlatformTime::Seconds()`: the performance
+    counter since boot plus 16,777,216 s. The two captures' first pongs (16,784,277,100
+    and 16,803,843,895) are 1.96 h and 7.40 h of uptime that way, on two different
+    days. Inferred, not confirmed (below).
+  - The pong's arrival less that clock sat within 0 to 3 ms of its least, with spikes
+    of 20 to 45 ms: it moves as a round trip does. The Ping plugin makes the ping of
+    it (plugins/ping/AGENTS.md).
+  - The server's ms is the heartbeat's clock: a pong's fell between the two
+    heartbeats around it. A heartbeat's delay ran 7 to 10 ms longer than a pong's, so
+    the two are not stamped at the same point of the server's tick.
 
 **Body layouts** (`packet_parser.cpp`)
 - **Damage `04 38`:** target varint, switch varint, flag varint, actor varint, skill
@@ -458,6 +486,11 @@ capture, where all 17,182 records parse):
 
 **Unknown or guessed. Each needs a real capture (skill `decode-capture`):**
 - whether the "optional 00 pad" can be confused with a scalar of 0;
+- **the clock in the pong.** That `03 36` echoes Unreal's clock (base 16,777,216 s) is
+  read off two captures' figures, and has not been held against the game's own ping
+  display or a live run. The Ping plugin shows nothing rather than a ping outside 0 to
+  5 s, so a wrong base shows as no ping, with the figure it read on the plugin's page.
+  What the pong's first two bytes are (00 00 in all 95) is unknown too;
 - multi-record `04 38` packets;
 - misses, and the target's endurance, regeneration and invincibility (above);
 - where the class is in 33 36 / 45 36, and what their "class" u32 and 33 36's extra
@@ -533,6 +566,7 @@ capture, one tray and one updater, around them.
 |---|---|---|---|
 | Combat Meter | `plugins/combat_meter` | fights: damage, healing, damage taken, the boss, the history; the meter overlay | on |
 | Auras | `plugins/auras` | effects on the local player and theirs on their target, their cooldowns; the aura overlay | off |
+| Ping | `plugins/ping` | the latency to the game server off the game's own pong, the heartbeats' jitter, a graph; the ping overlay | off |
 
 - **One table names them.** `include/aion2/plugin_registry.hpp` holds each plugin's id,
   name, description, config section and default switch; the sidebar, the dashboard,
@@ -547,16 +581,18 @@ capture, one tray and one updater, around them.
   only the panel that turns it back on (`render_plugin_disabled_gate`). Off means the
   pipeline feeds it no events and no ticks, and its overlay hides. Switching it off
   takes effect on the engine thread through `AppRuntime::update_settings`
-  (`Pipeline::set_plugins`): the meter ends its live fight, the auras forget everything.
+  (`Pipeline::set_plugins`): the meter ends its live fight, the auras and the ping
+  forget everything.
 - **A plugin's page** opens with its header and switch, then its own settings, then its
   overlay's, as ffxiv-hub orders them. Overlays it draws are separate windows of the
   app (`win32/overlay_window`), each shown by its plugin's switch and its own hide
   conditions (`overlay_visibility`). Ctrl+Alt+L locks every overlay: that is the app's.
 - **The dashboard stays plugin-agnostic:** capture, the plugin list from the table,
   recording, files. A plugin's figures belong on its own page.
-- **A new plugin** gets a descriptor in the table, a directory under `plugins/` with its
-  `AGENTS.md` and `README.md`, its layer in the Makefile's `layer_inc` and in CMake,
-  its member in `Pipeline`, its page, and its keys in its own config section.
+- **A new plugin** gets a descriptor in the table and its switch in `PluginSwitches`, a
+  directory under `plugins/` with its `AGENTS.md` and `README.md`, its layer in the
+  Makefile's `layer_inc` and in CMake, its member in `Pipeline`, its page, and its keys
+  in its own config section.
 
 ---
 
@@ -615,6 +651,7 @@ public: GitHub's API shows a private repository's releases to no anonymous calle
 | `make screenshots` | macOS (zlib) | Re-renders `docs/images`. |
 | `make fixtures` | anywhere | Your own captures against their `.expected.txt`. |
 | `aion2meter-replay --deaths --active --effects` | anywhere | A capture's fight detail, to check against what happened in game. |
+| `aion2meter-replay --ping` | anywhere | A capture's pongs, and per connection how their echo and the heartbeats spread. |
 | CI `build-windows` | GitHub | The only MSVC build: the app, ctest, the replay smoke test, the zip and its SHA-256. |
 
 **Conventions:**

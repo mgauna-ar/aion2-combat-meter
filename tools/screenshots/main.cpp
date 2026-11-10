@@ -16,6 +16,7 @@
 #include "app/app_frame.hpp"
 #include "app/app_settings.hpp"
 #include "app/aura_view.hpp"
+#include "app/ping_view.hpp"
 #include "app/game_icons.hpp"
 #include "app/overlay_view.hpp"
 #include "app/ui/theme.hpp"
@@ -137,6 +138,73 @@ bool render(Scene& scene, const app::OverlaySettings& settings, const std::files
         const app::OverlayActions actions = app::draw_overlay(input);
         ImGui::Render();
         (void)actions;
+    }
+    shots::Canvas overlay(w, h, shots::Rgba{0, 0, 0, 0});
+    overlay.draw(*ImGui::GetDrawData());
+    shots::Canvas picture = shots::make_backdrop(w + 2 * kMargin, h + 2 * kMargin);
+    picture.paste(overlay, kMargin, kMargin);
+    const std::filesystem::path path = out_dir / scene.file;
+    if (!picture.write_png(path.string())) {
+        std::fprintf(stderr, "cannot write %s\n", path.string().c_str());
+        return false;
+    }
+    std::printf("wrote %s\n", path.string().c_str());
+    return true;
+}
+
+/// What the Ping plugin would hold two minutes into a calm evening with one lag
+/// spike: made up here, since the synthetic session has no pongs and a replay has
+/// no performance counter to make a ping of them.
+ping::PingSnapshot ping_demo(Micros now) {
+    ping::PingSnapshot p;
+    p.state = ping::PingState::Measured;
+    p.pongs = 30;
+    p.has_jitter = true;
+    p.jitter_ms = 2.4f;
+    p.heartbeat_at = now;
+    const Micros now_second = now - now % kMicrosPerSecond;
+    uint32_t seed = 12345;
+    const auto noise = [&] {
+        seed = seed * 1664525u + 1013904223u;
+        return static_cast<float>((seed >> 16) & 0xFF) / 255.0f;
+    };
+    float ping_ms = 68.0f;
+    float sum = 0.0f;
+    for (size_t age = app::kPingGraphColumns; age-- > 0;) {
+        // A pong every ten seconds; the one 40 s ago came back slowly.
+        if (age % 10 == 3) {
+            ping_ms = age == 43 ? 143.0f : 62.0f + 12.0f * noise();
+            p.min_ms = p.samples == 0 ? ping_ms : std::min(p.min_ms, ping_ms);
+            p.max_ms = std::max(p.max_ms, ping_ms);
+            sum += ping_ms;
+            ++p.samples;
+            p.ping_ms = ping_ms;
+            p.ping_at = now_second - age * kMicrosPerSecond;
+        }
+        float late_ms = 5.0f * noise();
+        if (age >= 44 && age <= 47) late_ms = 55.0f + 60.0f * noise();
+        p.seconds.push_back(ping::PingSecond{now_second - age * kMicrosPerSecond, ping_ms, late_ms});
+    }
+    p.avg_ms = sum / static_cast<float>(p.samples);
+    return p;
+}
+
+/// The ping overlay over the same backdrop.
+bool render_ping(Scene& scene, const app::PingSettings& settings, const std::filesystem::path& out_dir) {
+    ImGuiIO& io = ImGui::GetIO();
+    const int w = static_cast<int>(std::lround(scene.width * kScale));
+    const int h = static_cast<int>(std::lround(scene.height * kScale));
+    app::PingFrameInput input;
+    input.snapshot = &scene.snapshot;
+    input.settings = &settings;
+    input.scale = kScale;
+    for (int frame = 0; frame < 3; ++frame) {
+        io.DisplaySize = ImVec2(static_cast<float>(w), static_cast<float>(h));
+        io.DeltaTime = 1.0f / 60.0f;
+        io.AddMousePosEvent(-FLT_MAX, -FLT_MAX);
+        ImGui::NewFrame();
+        (void)app::draw_ping(input);
+        ImGui::Render();
     }
     shots::Canvas overlay(w, h, shots::Rgba{0, 0, 0, 0});
     overlay.draw(*ImGui::GetDrawData());
@@ -354,6 +422,14 @@ int main(int argc, char** argv) {
     Scene aura_icons{"overlay-auras-icons.png", 280.0f, 226.0f, live.snapshot};
     ok = render_auras(aura_icons, icon_settings, out_dir) && ok;
     ok = build_overlay_fonts(font) && ok;
+    // The ping overlay, locked: its figures, the graph and the range under it.
+    app::PingSettings ping_settings;
+    ping_settings.locked = true;
+    pipeline::LiveSnapshot ping_snapshot = live.snapshot;
+    ping_snapshot.ping = ping_demo(ping_snapshot.now);
+    Scene ping_scene{"overlay-ping.png", static_cast<float>(ping_settings.width),
+                     static_cast<float>(ping_settings.height), ping_snapshot};
+    ok = render_ping(ping_scene, ping_settings, out_dir) && ok;
     ImGuiContext* overlay_ctx = ImGui::GetCurrentContext();
 
     setup_app_imgui(font, bold);
@@ -410,6 +486,15 @@ int main(int argc, char** argv) {
     auras_settings.plugins.auras = true;
     auras_settings.auras = aura_settings;
     ok = render_app(auras_page, auras_settings, out_dir) && ok;
+    // The Ping plugin's page, switched on.
+    pipeline::LiveSnapshot ping_page_snapshot = done.snapshot;
+    ping_page_snapshot.ping = ping_demo(ping_page_snapshot.now);
+    AppScene ping_page{"app-ping.png", ping_page_snapshot, damage.history, {}};
+    ping_page.view.page = app::AppPage::Ping;
+    app::AppSettings ping_app_settings = app_settings;
+    ping_app_settings.plugins.ping = true;
+    ping_app_settings.ping = ping_settings;
+    ok = render_app(ping_page, ping_app_settings, out_dir) && ok;
     if (all) {
         AppScene healing = damage;
         healing.file = "app-healing.png";

@@ -471,13 +471,26 @@ TEST_CASE(Parser, PartyScanSkipsOneLetterLookAlikes) {
     TEST_ASSERT_EQ(roster.members[1].name, std::string("Lumiel"));
 }
 
-TEST_CASE(Parser, IgnoredOpcodesAreNeitherDecodedNorUnknown) {
+// --- Pong (03 36) ---
+
+TEST_CASE(Parser, PongAsTheCaptureHasIt) {
     PacketParser p;
-    const Bytes body = {1, 2, 3, 4};
-    (void)parse_one(p, opcode::Pong, body);
-    TEST_ASSERT_EQ(p.stats().decoded, uint64_t{0});
+    const Bytes body = {0x00, 0x00, 0x6c, 0xbe, 0x6b, 0xe8, 0x03, 0x00, 0x00, 0x00,
+                        0x22, 0xb3, 0x45, 0x4a, 0xa1, 0x01, 0x00, 0x00};
+    const auto& pong = only<Pong>(parse_one(p, opcode::Pong, body));
+    TEST_ASSERT_EQ(pong.client_ms, uint64_t{16'784'277'100});
+    TEST_ASSERT_EQ(pong.server_ms, uint64_t{1'792'247'444'258});
+    TEST_ASSERT_EQ(p.stats().decoded, uint64_t{1});
+}
+
+TEST_CASE(Parser, PongOfAnotherLengthFails) {
+    PacketParser p;
+    TEST_ASSERT(parse_one(p, opcode::Pong, Bytes{1, 2, 3, 4}).empty());
+    Bytes longer = pong_body(16'784'277'100, 1'792'247'444'258);
+    longer.push_back(0x00);
+    TEST_ASSERT(parse_one(p, opcode::Pong, longer).empty());
+    TEST_ASSERT_EQ(p.stats().failed, uint64_t{2});
     TEST_ASSERT_EQ(p.stats().unknown, uint64_t{0});
-    TEST_ASSERT_EQ(p.stats().frames, uint64_t{1});
 }
 
 // --- Casts (02 38) ---

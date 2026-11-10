@@ -8,12 +8,13 @@
 **A party DPS meter for AION 2 that draws on top of the game, without touching it.**
 
 It reads the game's network traffic as it reaches your PC (who hit what, with which
-skill, for how much), and two plugins turn that into overlays and pages of the app window:
+skill, for how much), and three plugins turn that into overlays and pages of the app window:
 
 | Plugin | Shows | At first |
 |---|---|---|
 | [⚔️ Combat Meter](plugins/combat_meter/README.md) | The game's Combat Analysis (Ctrl+X) for the whole party: damage, healing and damage taken, per skill; each fight's timeline, deaths, buff uptime and casts; every saved fight. | On |
 | [✨ Auras](plugins/auras/README.md) | Your buffs, debuffs and cooldowns, and yours on your target, as bars or icons; alerts when a chain skill is on offer, a cooldown is back, your HP runs low, or a buff you watch for is missing. | Off |
+| [📶 Ping](plugins/ping/README.md) | Your latency to the game server, its jitter and a graph of the last two minutes, read off the game's own pings: the meter sends none. | Off |
 
 ![The overlay during a boss fight: three players ranked by DPS, the boss's HP bar and the fight timer](docs/images/overlay-live.png)
 
@@ -30,7 +31,9 @@ Version 0.6, checked against two real captures: open-world mobs, and a dungeon r
 three bosses. On the last boss, your damage, hits and every per-skill CRI, PERF, DOUB,
 BACK, FRNT, MULT and BLOC share matched the game's Combat Analysis exactly; healing came
 to 97% of its Total Heal. Aura bars are exact; cooldowns are estimates, marked "~"
-([how exact](plugins/auras/README.md#how-exact-it-is)).
+([how exact](plugins/auras/README.md#how-exact-it-is)). The ping rests on a reading of
+the game's clock that the captures support but the game's own display has not confirmed
+([how it is measured](plugins/ping/README.md#how-it-is-measured-and-how-exact-it-is)).
 
 Not there yet (a [capture](#-recording-a-capture) helps):
 - **Misses and defences** (ACC, endurance, regeneration, invincibility) are not decoded.
@@ -115,8 +118,9 @@ meter is closed. Out-of-range values are clamped.
 
 **Each plugin's keys** are in its own section, documented in its README:
 [Combat Meter](plugins/combat_meter/README.md#configuration) (`meter`, `overlay`,
-`history`) and [Auras](plugins/auras/README.md#configuration) (`auras`). Each
-section's `plugin_enabled` is that plugin's switch.
+`history`), [Auras](plugins/auras/README.md#configuration) (`auras`) and
+[Ping](plugins/ping/README.md#configuration) (`ping`). Each section's `plugin_enabled`
+is that plugin's switch.
 
 **Files**, all in `%APPDATA%\aion2-combat-meter\`: saved fights in `history\` (a JSON
 file per fight, and `index.jsonl`), recordings in `captures\`, and the log in
@@ -214,7 +218,7 @@ aion2-combat-meter.exe --replay fight.pcapng --speed 1
 ```
 
 The replay tool prints it; `--help` lists its reports (skills, deaths, effects, casts,
-events, hex dumps) and `--anonymize`, for output you will share:
+ping, events, hex dumps) and `--anonymize`, for output you will share:
 
 ```bash
 ./aion2meter-replay capture.pcapng --fights
@@ -226,7 +230,8 @@ invented names, to try it all without the game.
 ## 📡 Protocol
 
 The meter decodes the server's side of TCP port 13328, which is not encrypted: framed
-opcodes, some bundled with LZ4, and a heartbeat carrying the server's clock. The opcodes
+opcodes, some bundled with LZ4, a heartbeat carrying the server's clock, and the
+answer to the game's own ping. The opcodes
 are in `src/protocol/include/protocol/opcodes.hpp`; the layouts, and what is still
 unknown, in [AGENTS.md](AGENTS.md). These facts come from the AION 2 community's
 published notes on the Global client; the code is written from scratch.

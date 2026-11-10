@@ -35,11 +35,21 @@ float header_action_width() { return ImGui::CalcTextSize("Disabled").x + m(8.0f)
 } // namespace
 
 const char* plugin_icon(plugins::PluginId id) noexcept {
-    return id == plugins::PluginId::CombatMeter ? ICON_SWORDS : ICON_SPARKLE;
+    switch (id) {
+        case plugins::PluginId::CombatMeter: return ICON_SWORDS;
+        case plugins::PluginId::Auras: return ICON_SPARKLE;
+        case plugins::PluginId::Ping: return ICON_ACTIVITY;
+    }
+    return ICON_PLUG;
 }
 
 AppPage plugin_page(plugins::PluginId id) noexcept {
-    return id == plugins::PluginId::CombatMeter ? AppPage::Meter : AppPage::Auras;
+    switch (id) {
+        case plugins::PluginId::CombatMeter: return AppPage::Meter;
+        case plugins::PluginId::Auras: return AppPage::Auras;
+        case plugins::PluginId::Ping: return AppPage::Ping;
+    }
+    return AppPage::Dashboard;
 }
 
 void render_plugin_header(const AppFrameInput& in, AppActions& out, plugins::PluginId id, const char* icon,

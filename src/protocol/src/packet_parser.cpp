@@ -353,6 +353,7 @@ void PacketParser::parse(const Frame& frame, std::vector<ParsedEvent>& out) {
     ++m_stats.frames;
     switch (frame.opcode) {
         case opcode::Heartbeat:
+        case opcode::Pong:
         case opcode::OwnCharacter:
         case opcode::OtherPlayer:
         case opcode::Spawn:
@@ -377,8 +378,6 @@ void PacketParser::parse(const Frame& frame, std::vector<ParsedEvent>& out) {
                 ++m_stats.failures_by_opcode[frame.opcode];
             }
             return;
-        case opcode::Pong:
-            return;  // read by nothing, and never carries identities
         default:
             break;
     }
@@ -401,6 +400,16 @@ bool PacketParser::parse_known(const Frame& frame, std::vector<ParsedEvent>& out
             const uint64_t ms = r.u64le();
             if (!r.ok()) return false;
             emit(Heartbeat{ms});
+            return true;
+        }
+        case opcode::Pong: {
+            // Two bytes (00 00 in all 95 of the two captures), then the two clocks.
+            r.skip(2);
+            Pong pong;
+            pong.client_ms = r.u64le();
+            pong.server_ms = r.u64le();
+            if (!r.ok() || !r.at_end()) return false;
+            emit(pong);
             return true;
         }
         case opcode::OwnCharacter:

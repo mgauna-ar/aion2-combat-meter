@@ -29,4 +29,9 @@ struct OverlayConditions {
 /// Its effects matter out of combat too, so it has no show_in_combat_only.
 [[nodiscard]] bool auras_shown(const AppSettings& settings, const OverlayConditions& now) noexcept;
 
+/// Whether the ping overlay shows now: the Ping plugin's master switch first, then,
+/// while it is locked, its own hide_when_game_unfocused and show_in_dungeons_only.
+/// Lag matters out of combat too, so it has no show_in_combat_only either.
+[[nodiscard]] bool ping_shown(const AppSettings& settings, const OverlayConditions& now) noexcept;
+
 } // namespace aion2::app
