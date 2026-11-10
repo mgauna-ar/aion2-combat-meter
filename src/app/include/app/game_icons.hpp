@@ -53,9 +53,9 @@ void resample_icon(std::span<const uint8_t> src, int src_px, uint8_t* dst, int d
 /// the renderer's font texture, from the thread that draws.
 void build_atlas_with_icons(ImFontAtlas& atlas, float icon_px, float mark_px = 0.0f);
 
-/// Draws an icon from the current context's font atlas, `size` square at (x, y).
-/// Nothing for kNoIcon, or on an atlas built without icons.
-void draw_icon(ImDrawList* dl, int slot, float x, float y, float size, float alpha = 1.0f);
+/// Draws an icon from the current context's font atlas, `size` square at (x, y), its
+/// corners cut to `rounding`. Nothing for kNoIcon, or on an atlas built without icons.
+void draw_icon(ImDrawList* dl, int slot, float x, float y, float size, float alpha = 1.0f, float rounding = 0.0f);
 
 /// Draws the app's mark from the current context's font atlas, `size` square at
 /// (x, y). False, having drawn nothing, on an atlas built without it.

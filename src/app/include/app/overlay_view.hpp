@@ -30,7 +30,6 @@ struct OverlayFrameInput {
 
 /// What the user did this frame, for the window to carry out.
 struct OverlayActions {
-    bool end_fight{false};
     bool lock{false};
     /// Open the app window: the history and every setting live there.
     bool open_app{false};
@@ -39,6 +38,10 @@ struct OverlayActions {
     ClientRect drag_area;
     ClientRect resize_grip;
 };
+
+/// The side of a class emblem in the meter's rows, in pixels before the scale: what
+/// the window's atlas holds the game's icons at (OverlayWindow::set_icon_px).
+inline constexpr float kMeterEmblemPx = 18.0f;
 
 /// Draws the meter's live fight as one ImGui window filling the display, into the
 /// frame the caller has begun: the party ranked, the boss's HP and the timer. Saved

@@ -150,13 +150,14 @@ src/pipeline/    aion2::pipeline   stream_demux (flows -> frames), pipeline (par
 src/app/         aion2::app
     app_settings, app_runtime (threads, history, recording), display_format,
     overlay_view (the Combat Meter's overlay), aura_view (the Auras') and ping_view
-    (the Ping's; ImGui, behind HAVE_IMGUI),
+    (the Ping's; ImGui, behind HAVE_IMGUI), overlay_chrome (what the three share, so
+    they stay one look: the fonts, the frame, the header's buttons, the grip, the bars),
     overlay_visibility, app_frame (the app window's contents),
     update_check (release parsing, versions, the update balloon) and updater (check,
     download, stage, swap), both ported from ffxiv-hub,
     game_icons (class emblems and skill icons from game_icon_sheet.inc, painted into
-    each window's font atlas at its text size, and the app's mark from app_mark.inc
-    at the sidebar chip's), timeline_chart (the Timeline tab's
+    each window's font atlas at the size it draws them, and the app's mark from
+    app_mark.inc at the sidebar chip's), timeline_chart (the Timeline tab's
     lines as numbers, no ImGui)
     src/ui/      the app window's pages (a page per plugin, opened by plugin_page's
                  header and master switch), theme, widgets, table (the meter's tables)
@@ -168,6 +169,7 @@ tools/replay/    aion2meter-replay (every platform)
 tools/synth/     aion2meter-synth: writes the tests' made-up boss fight as a pcapng
 tools/screenshots/  renders docs/images from overlay_view and app_frame (software rasterizer from
                  ffxiv-hub), in UTC; --all also draws the pages the README does not show
+                 and the overlays unlocked
 tools/check_forbidden_apis.sh, tools/embed_icon_font.py
 tools/gen_app_icon.py            the app's mark (wings around a crystal, our own drawing)
                                  → app.ico and app_mark.inc

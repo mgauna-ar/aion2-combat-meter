@@ -7,8 +7,8 @@
 // real pipeline, and draw_overlay and draw_app draw each scene into a software
 // rasterizer (canvas.cpp, from ffxiv-hub). Nothing here needs Windows or the game.
 // The fonts stand in for Segoe UI and Segoe UI Bold; `make screenshots` passes
-// Arial from macOS. --all also draws the app's other pages, for a look at them;
-// the README does not use those.
+// Arial from macOS. --all also draws the app's other pages and the overlays
+// unlocked, for a look at them; the README does not use those.
 
 #include "canvas.hpp"
 #include "synthetic_session.hpp"
@@ -18,6 +18,7 @@
 #include "app/aura_view.hpp"
 #include "app/ping_view.hpp"
 #include "app/game_icons.hpp"
+#include "app/overlay_chrome.hpp"
 #include "app/overlay_view.hpp"
 #include "app/ui/theme.hpp"
 #include "capture/capture_file.hpp"
@@ -91,27 +92,23 @@ std::unique_ptr<shots::Texture> atlas_texture() {
 }
 
 /// The overlay's fonts and icons, as overlay_window.cpp's rebuild_fonts builds them:
-/// icons at `icon_px` before the scale (the aura overlay's icon size), else a text line.
-bool build_overlay_fonts(const std::string& font, float icon_px = 0.0f) {
-    ImGuiIO& io = ImGui::GetIO();
-    io.Fonts->Clear();
-    ImFontConfig cfg;
-    cfg.OversampleH = 2;
-    if (io.Fonts->AddFontFromFileTTF(font.c_str(), std::round(kBaseFontSize * kScale), &cfg) == nullptr) {
+/// icons at `icon_px` before the scale (the meter's emblems, or the aura overlay's
+/// bar icons or tiles).
+bool build_overlay_fonts(const std::string& font, const std::string& bold, float icon_px) {
+    if (!app::chrome::build_overlay_fonts(font, bold, kBaseFontSize * kScale, std::round(icon_px * kScale))) {
         std::fprintf(stderr, "cannot load font %s\n", font.c_str());
         return false;
     }
-    app::build_atlas_with_icons(*io.Fonts, std::round((icon_px > 0.0f ? icon_px : kBaseFontSize) * kScale));
     g_font_texture = atlas_texture();
     return true;
 }
 
-bool setup_imgui(const std::string& font) {
+bool setup_imgui(const std::string& font, const std::string& bold) {
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
     io.IniFilename = nullptr;
     io.LogFilename = nullptr;
-    if (!build_overlay_fonts(font)) return false;
+    if (!build_overlay_fonts(font, bold, app::kMeterEmblemPx)) return false;
     // The style overlay_window.cpp sets up.
     ImGuiStyle style;
     ImGui::StyleColorsDark(&style);
@@ -393,7 +390,7 @@ int main(int argc, char** argv) {
     }
     std::error_code ec;
     std::filesystem::create_directories(out_dir, ec);
-    if (!setup_imgui(font)) return 1;
+    if (!setup_imgui(font, bold)) return 1;
 
     const auto session = test::synthetic::boss_session();
     // Locked, as it is in play: no header buttons and no resize grip, which only an
@@ -408,20 +405,35 @@ int main(int argc, char** argv) {
 
     bool ok = render(live, settings, out_dir);
     ok = render(done, settings, out_dir) && ok;
+    // Unlocked, as an overlay is while it is being placed: the header's buttons and
+    // the grip. Under --all, like the pages the README does not show.
+    if (all) {
+        app::OverlaySettings unlocked = settings;
+        unlocked.locked = false;
+        Scene scene{"overlay-live-unlocked.png", 430.0f, 215.0f, live.snapshot};
+        ok = render(scene, unlocked, out_dir) && ok;
+    }
     // Ariel's buffs, cooldowns and curse on the boss mid-fight, a buff she watches for
     // missing (Wish of Concentration), a chain skill on offer, and her HP low.
     app::AuraSettings aura_settings;
     aura_settings.locked = true;
     aura_settings.watch = {15'310'000};
-    Scene auras{"overlay-auras.png", 280.0f, 268.0f, live.snapshot};
+    ok = build_overlay_fonts(font, bold, app::kAuraBarIconPx) && ok;
+    Scene auras{"overlay-auras.png", 280.0f, 286.0f, live.snapshot};
     ok = render_auras(auras, aura_settings, out_dir) && ok;
+    if (all) {
+        app::AuraSettings unlocked = aura_settings;
+        unlocked.locked = false;
+        Scene scene{"overlay-auras-unlocked.png", 280.0f, 320.0f, live.snapshot};
+        ok = render_auras(scene, unlocked, out_dir) && ok;
+    }
     // The same as icons, the atlas holding them at that size as the overlay's does.
     app::AuraSettings icon_settings = aura_settings;
     icon_settings.icons = true;
-    ok = build_overlay_fonts(font, static_cast<float>(icon_settings.icon_size)) && ok;
-    Scene aura_icons{"overlay-auras-icons.png", 280.0f, 226.0f, live.snapshot};
+    ok = build_overlay_fonts(font, bold, static_cast<float>(icon_settings.icon_size)) && ok;
+    Scene aura_icons{"overlay-auras-icons.png", 280.0f, 236.0f, live.snapshot};
     ok = render_auras(aura_icons, icon_settings, out_dir) && ok;
-    ok = build_overlay_fonts(font) && ok;
+    ok = build_overlay_fonts(font, bold, kBaseFontSize) && ok;
     // The ping overlay, locked: its figures, the graph and the range under it.
     app::PingSettings ping_settings;
     ping_settings.locked = true;
@@ -430,6 +442,13 @@ int main(int argc, char** argv) {
     Scene ping_scene{"overlay-ping.png", static_cast<float>(ping_settings.width),
                      static_cast<float>(ping_settings.height), ping_snapshot};
     ok = render_ping(ping_scene, ping_settings, out_dir) && ok;
+    if (all) {
+        app::PingSettings unlocked = ping_settings;
+        unlocked.locked = false;
+        Scene scene{"overlay-ping-unlocked.png", static_cast<float>(ping_settings.width),
+                    static_cast<float>(ping_settings.height) + 26.0f, ping_snapshot};
+        ok = render_ping(scene, unlocked, out_dir) && ok;
+    }
     ImGuiContext* overlay_ctx = ImGui::GetCurrentContext();
 
     setup_app_imgui(font, bold);

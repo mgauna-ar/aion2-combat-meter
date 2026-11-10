@@ -146,30 +146,19 @@ std::string format_tile_time(Micros left) {
 
 #ifdef HAVE_IMGUI
 
+#include "app/overlay_chrome.hpp"
+#include "app/ui/icons.hpp"
+
 #include <string>
 
 namespace aion2::app {
 
+using chrome::fit;
+using chrome::rgba;
+using chrome::shadowed_text;
+using chrome::u32;
+
 namespace {
-
-ImVec4 rgba(Rgb c, float a = 1.0f) { return ImVec4(c.r, c.g, c.b, a); }
-
-ImU32 u32(Rgb c, float a = 1.0f) { return ImGui::GetColorU32(rgba(c, a)); }
-
-float button_width(const char* label) {
-    return ImGui::CalcTextSize(label).x + ImGui::GetStyle().FramePadding.x * 2.0f;
-}
-
-/// `s` cut with "..." to fit `width`, by whole UTF-8 code points.
-std::string fit(const std::string& s, float width) {
-    if (ImGui::CalcTextSize(s.c_str()).x <= width) return s;
-    std::string out = s;
-    while (!out.empty() && ImGui::CalcTextSize((out + "...").c_str()).x > width) {
-        while (!out.empty() && (static_cast<unsigned char>(out.back()) & 0xC0) == 0x80) out.pop_back();
-        if (!out.empty()) out.pop_back();
-    }
-    return out + "...";
-}
 
 /// A bar's colour: an enemy's effect red, the local player's own blue, an ally's green.
 Rgb aura_color(const auras::AuraEntry& e) {
@@ -186,124 +175,162 @@ std::string effect_tooltip(const auras::AuraEntry& e) {
     return out;
 }
 
-/// One bar per effect: its share of its duration left, its name and stacks, and the
-/// time left on the right.
-void draw_entries(const std::vector<const auras::AuraEntry*>& entries, Micros now, float scale, bool interactive) {
-    ImDrawList* dl = ImGui::GetWindowDrawList();
-    const float line = ImGui::GetTextLineHeight();
-    const float row_h = line + 5.0f * scale;
-    const float width = ImGui::GetContentRegionAvail().x;
-    const ImVec2 origin = ImGui::GetCursorScreenPos();
-    const float time_w = ImGui::CalcTextSize("00m00").x + 6.0f * scale;
-    float y = origin.y;
-    for (const auras::AuraEntry* e : entries) {
-        const ImVec2 row_min(origin.x, y);
-        const ImVec2 row_max(origin.x + width, y + row_h - 1.0f * scale);
-        dl->AddRectFilled(row_min, row_max, u32(colors::Text, 0.04f), 2.0f * scale);
-        float fraction = 1.0f;
-        std::string left = "-";
-        if (!e->permanent) {
-            const Micros remaining = e->expires_at > now ? e->expires_at - now : 0;
-            const double total = static_cast<double>(e->duration_ms) * static_cast<double>(kMicrosPerMilli);
-            fraction = total > 0.0 ? static_cast<float>(std::clamp(static_cast<double>(remaining) / total, 0.0, 1.0)) : 0.0f;
-            left = format_time_left(remaining);
-        }
-        dl->AddRectFilled(row_min, ImVec2(row_min.x + width * fraction, row_max.y), u32(aura_color(*e), 0.45f),
-                          2.0f * scale);
+/// One row of the overlay as bars: an icon in its own square, then a bar with a
+/// label in it, a dim note after the label, and a figure at its right end.
+struct BarRow {
+    int icon{kNoIcon};
+    std::string label;
+    /// After the label, dim: an effect's stacks.
+    std::string note;
+    /// At the right, bold: the time left, "Ready", "Chain".
+    std::string value;
+    Rgb color{colors::Accent};
+    float fraction{1.0f};
+    float fill_alpha{0.60f};
+    /// Above 0, a border in the bar's colour at this opacity: an alert.
+    float border_alpha{0.0f};
+    std::string tooltip;
+};
 
-        const float ty = y + (row_h - line) * 0.5f - 0.5f * scale;
-        // The skill's icon, then the name; an effect without one (a monster's) keeps
-        // the space, so the names line up.
-        draw_icon(dl, effect_icon(e->buff_id, e->source_skill), origin.x + 2.0f * scale,
-                  y + (row_h - 1.0f * scale - line) * 0.5f, line);
-        const float label_x = origin.x + line + 6.0f * scale;
-        std::string label = e->label;
-        if (e->stacks > 1) label += " x" + std::to_string(e->stacks);
-        dl->AddText(ImVec2(label_x, ty), u32(colors::Text),
-                    fit(label, row_max.x - time_w - label_x - 4.0f * scale).c_str());
-        const ImVec2 size = ImGui::CalcTextSize(left.c_str());
-        dl->AddText(ImVec2(row_max.x - 4.0f * scale - size.x, ty), u32(colors::Text), left.c_str());
+/// Where the rows start, and how far apart: an icon high, and the gap under it.
+struct BarMetrics {
+    float icon;
+    float gap;
+    float pitch;
+};
 
-        if (interactive && ImGui::IsMouseHoveringRect(row_min, row_max)) {
-            ImGui::SetTooltip("%s", effect_tooltip(*e).c_str());
-        }
-        y += row_h;
-    }
-    ImGui::Dummy(ImVec2(width, std::max(0.0f, y - origin.y)));
+BarMetrics bar_metrics(float scale) {
+    const float icon = std::round(kAuraBarIconPx * scale);
+    const float gap = 2.0f * scale;
+    return BarMetrics{icon, gap, icon + gap};
 }
 
-void section_title(const std::string& title) { ImGui::TextColored(rgba(colors::TextDim), "%s", title.c_str()); }
-
-/// One bar per cooldown: the share of it left, the skill, and the time to ready,
-/// "~" before an estimate. One that just came back is a full bar reading "Ready".
-void draw_cooldowns(const std::vector<const auras::CooldownEntry*>& entries, Micros now, float scale, bool interactive,
-                    float pulse) {
+void draw_bar_rows(const std::vector<BarRow>& rows, float scale, bool interactive) {
+    if (rows.empty()) return;
     ImDrawList* dl = ImGui::GetWindowDrawList();
+    const BarMetrics m = bar_metrics(scale);
     const float line = ImGui::GetTextLineHeight();
-    const float row_h = line + 5.0f * scale;
     const float width = ImGui::GetContentRegionAvail().x;
     const ImVec2 origin = ImGui::GetCursorScreenPos();
-    const float time_w = ImGui::CalcTextSize("~00m00").x + 6.0f * scale;
+    const float rounding = 3.0f * scale;
+    const float pad = 6.0f * scale;
     float y = origin.y;
-    for (const auras::CooldownEntry* c : entries) {
+    for (const BarRow& r : rows) {
         const ImVec2 row_min(origin.x, y);
-        const ImVec2 row_max(origin.x + width, y + row_h - 1.0f * scale);
-        dl->AddRectFilled(row_min, row_max, u32(colors::Text, 0.04f), 2.0f * scale);
-        const bool ready = c->ready_at <= now;
-        const Micros left = ready ? 0 : c->ready_at - now;
-        const double total = static_cast<double>(c->duration_ms) * static_cast<double>(kMicrosPerMilli);
-        const float fraction =
-            ready ? 1.0f
-                  : (total > 0.0 ? static_cast<float>(std::clamp(static_cast<double>(left) / total, 0.0, 1.0)) : 0.0f);
-        dl->AddRectFilled(row_min, ImVec2(row_min.x + width * fraction, row_max.y),
-                          ready ? u32(colors::Good, 0.30f + 0.30f * pulse) : u32(colors::Warn, 0.40f), 2.0f * scale);
-        const float ty = y + (row_h - line) * 0.5f - 0.5f * scale;
-        draw_icon(dl, skill_icon(c->skill), origin.x + 2.0f * scale, y + (row_h - 1.0f * scale - line) * 0.5f, line);
-        const float label_x = origin.x + line + 6.0f * scale;
-        dl->AddText(ImVec2(label_x, ty), u32(colors::Text),
-                    fit(c->label, row_max.x - time_w - label_x - 4.0f * scale).c_str());
-        const std::string time = ready ? "Ready" : (c->exact ? "" : "~") + format_time_left(left);
-        const ImVec2 size = ImGui::CalcTextSize(time.c_str());
-        dl->AddText(ImVec2(row_max.x - 4.0f * scale - size.x, ty), u32(colors::Text), time.c_str());
-        if (interactive && ImGui::IsMouseHoveringRect(row_min, row_max)) {
-            ImGui::SetTooltip("%s\n%s", c->label.c_str(),
-                              c->exact ? "what the server says is left"
-                                       : "~ an estimate: the listed cooldown less your specialties,\n"
-                                         "shortened to the quickest reuse seen this session");
+        const ImVec2 row_max(origin.x + width, y + m.icon);
+        // The icon's square: dark under an icon with see-through corners, tinted for
+        // an effect with none (a monster's), so the labels still line up.
+        const ImVec2 icon_max(row_min.x + m.icon, row_max.y);
+        dl->AddRectFilled(row_min, icon_max, u32(colors::Background, 0.85f), rounding);
+        if (r.icon != kNoIcon) {
+            draw_icon(dl, r.icon, row_min.x, row_min.y, m.icon, 1.0f, rounding);
+        } else {
+            dl->AddRectFilled(row_min, icon_max, u32(r.color, 0.30f), rounding);
         }
-        y += row_h;
+        const ImVec2 bar_min(icon_max.x + 3.0f * scale, y);
+        chrome::BarStyle style;
+        style.alpha = r.fill_alpha;
+        chrome::draw_bar(dl, bar_min, row_max, r.fraction, r.color, scale, style);
+        if (r.border_alpha > 0.0f) {
+            dl->AddRect(bar_min, row_max, u32(r.color, r.border_alpha), rounding, 0, 1.5f * scale);
+        }
+
+        const float ty = y + (m.icon - line) * 0.5f - 0.5f * scale;
+        float value_w = 0.0f;
+        if (!r.value.empty()) {
+            const chrome::BoldScope bold;
+            value_w = ImGui::CalcTextSize(r.value.c_str()).x;
+            dl->AddText(ImVec2(row_max.x - pad - value_w, ty), u32(colors::Text), r.value.c_str());
+        }
+        const float note_w = r.note.empty() ? 0.0f : ImGui::CalcTextSize(r.note.c_str()).x + 5.0f * scale;
+        const float label_x = bar_min.x + pad;
+        const std::string label = fit(r.label, row_max.x - pad - value_w - pad - note_w - label_x);
+        dl->AddText(ImVec2(label_x, ty), u32(colors::Text), label.c_str());
+        if (!r.note.empty()) {
+            dl->AddText(ImVec2(label_x + ImGui::CalcTextSize(label.c_str()).x + 5.0f * scale, ty),
+                        u32(colors::Text, 0.65f), r.note.c_str());
+        }
+        if (interactive && !r.tooltip.empty() && ImGui::IsMouseHoveringRect(row_min, row_max)) {
+            ImGui::SetTooltip("%s", r.tooltip.c_str());
+        }
+        y += m.pitch;
     }
-    ImGui::Dummy(ImVec2(width, std::max(0.0f, y - origin.y)));
+    ImGui::Dummy(ImVec2(width, y - origin.y - m.gap));
 }
 
-/// One bar per chain skill on offer, glowing: the skill and what set it off. No
-/// timer: the server does not send the window, only the offer and its end.
-void draw_chains(const std::vector<auras::ChainEntry>& chains, float scale, bool interactive, float pulse) {
+/// An effect: the share of its duration left, its name and stacks, the time left.
+BarRow effect_row(const auras::AuraEntry& e, Micros now) {
+    BarRow r;
+    r.icon = effect_icon(e.buff_id, e.source_skill);
+    r.label = e.label;
+    if (e.stacks > 1) r.note = "x" + std::to_string(e.stacks);
+    r.color = aura_color(e);
+    if (!e.permanent) {
+        const Micros remaining = e.expires_at > now ? e.expires_at - now : 0;
+        const double total = static_cast<double>(e.duration_ms) * static_cast<double>(kMicrosPerMilli);
+        r.fraction =
+            total > 0.0 ? static_cast<float>(std::clamp(static_cast<double>(remaining) / total, 0.0, 1.0)) : 0.0f;
+        r.value = format_time_left(remaining);
+    }
+    r.tooltip = effect_tooltip(e);
+    return r;
+}
+
+/// A cooldown: the share of it left, the skill, and the time to ready, "~" before an
+/// estimate. One that just came back is a full bar reading "Ready".
+BarRow cooldown_row(const auras::CooldownEntry& c, Micros now, float pulse) {
+    BarRow r;
+    r.icon = skill_icon(c.skill);
+    r.label = c.label;
+    const bool ready = c.ready_at <= now;
+    if (ready) {
+        r.color = colors::Good;
+        r.fill_alpha = 0.40f + 0.35f * pulse;
+        r.value = "Ready";
+    } else {
+        const Micros left = c.ready_at - now;
+        const double total = static_cast<double>(c.duration_ms) * static_cast<double>(kMicrosPerMilli);
+        r.color = colors::Warn;
+        r.fraction = total > 0.0 ? static_cast<float>(std::clamp(static_cast<double>(left) / total, 0.0, 1.0)) : 0.0f;
+        r.value = (c.exact ? "" : "~") + format_time_left(left);
+    }
+    r.tooltip = c.label + "\n" +
+                (c.exact ? "what the server says is left"
+                         : "~ an estimate: the listed cooldown less your specialties,\n"
+                           "shortened to the quickest reuse seen this session");
+    return r;
+}
+
+/// A chain skill on offer, glowing: the skill and what set it off. No timer: the
+/// server does not send the window, only the offer and its end.
+BarRow chain_row(const auras::ChainEntry& c, float pulse) {
+    BarRow r;
+    r.icon = skill_icon(c.skill);
+    r.label = c.label;
+    r.value = "Chain";
+    r.color = colors::Warn;
+    r.fill_alpha = 0.45f + 0.40f * pulse;
+    r.border_alpha = 0.6f + 0.4f * pulse;
+    r.tooltip = c.label + "\non offer after " + game::skill_label(c.trigger);
+    return r;
+}
+
+/// A warning across the window, in a red that pulses: low HP, a watched effect gone.
+void draw_alert(const std::string& text, float scale, float pulse) {
     ImDrawList* dl = ImGui::GetWindowDrawList();
     const float line = ImGui::GetTextLineHeight();
-    const float row_h = line + 5.0f * scale;
-    const float width = ImGui::GetContentRegionAvail().x;
-    const ImVec2 origin = ImGui::GetCursorScreenPos();
-    float y = origin.y;
-    for (const auras::ChainEntry& c : chains) {
-        const ImVec2 row_min(origin.x, y);
-        const ImVec2 row_max(origin.x + width, y + row_h - 1.0f * scale);
-        dl->AddRectFilled(row_min, row_max, u32(colors::Warn, 0.30f + 0.35f * pulse), 2.0f * scale);
-        dl->AddRect(row_min, row_max, u32(colors::Warn, 0.6f + 0.4f * pulse), 2.0f * scale, 0, 1.5f * scale);
-        draw_icon(dl, skill_icon(c.skill), origin.x + 2.0f * scale, y + (row_h - 1.0f * scale - line) * 0.5f, line);
-        const float label_x = origin.x + line + 6.0f * scale;
-        const float ty = y + (row_h - line) * 0.5f - 0.5f * scale;
-        const char* tag = "Chain";
-        const float tag_w = ImGui::CalcTextSize(tag).x;
-        dl->AddText(ImVec2(label_x, ty), u32(colors::Text),
-                    fit(c.label, row_max.x - tag_w - label_x - 10.0f * scale).c_str());
-        dl->AddText(ImVec2(row_max.x - 4.0f * scale - tag_w, ty), u32(colors::Text), tag);
-        if (interactive && ImGui::IsMouseHoveringRect(row_min, row_max)) {
-            ImGui::SetTooltip("%s\non offer after %s", c.label.c_str(), game::skill_label(c.trigger).c_str());
-        }
-        y += row_h;
-    }
-    ImGui::Dummy(ImVec2(width, std::max(0.0f, y - origin.y)));
+    const ImVec2 min = ImGui::GetCursorScreenPos();
+    const ImVec2 max(min.x + ImGui::GetContentRegionAvail().x, min.y + bar_metrics(scale).icon);
+    ImGui::Dummy(ImVec2(max.x - min.x, max.y - min.y));
+    const float rounding = 3.0f * scale;
+    dl->AddRectFilled(min, max, u32(colors::Live, 0.12f + 0.14f * pulse), rounding);
+    dl->AddRect(min, max, u32(colors::Live, 0.30f + 0.40f * pulse), rounding, 0, 1.0f);
+    const float ty = min.y + (max.y - min.y - line) * 0.5f - 0.5f * scale;
+    const float pad = 6.0f * scale;
+    dl->AddText(ImVec2(min.x + pad, ty), u32(colors::Live), ICON_WARNING);
+    const float text_x = min.x + pad + ImGui::CalcTextSize(ICON_WARNING).x + 5.0f * scale;
+    const chrome::BoldScope bold;
+    dl->AddText(ImVec2(text_x, ty), u32(colors::Text), fit(text, max.x - pad - text_x).c_str());
 }
 
 /// A square in icons mode: an icon (or a tinted square with initials), a shade over
@@ -323,12 +350,6 @@ struct Tile {
     std::string tooltip;
 };
 
-/// Text with a dark shadow, readable over any icon.
-void shadowed_text(ImDrawList* dl, ImVec2 at, const std::string& text, float scale) {
-    dl->AddText(ImVec2(at.x + 1.0f * scale, at.y + 1.0f * scale), u32(Rgb{0.0f, 0.0f, 0.0f}, 0.9f), text.c_str());
-    dl->AddText(at, u32(colors::Text), text.c_str());
-}
-
 /// Tiles of `size` in rows across the window, wrapping.
 void draw_tiles(const std::vector<Tile>& tiles, float size, float scale, bool interactive) {
     if (tiles.empty()) return;
@@ -337,7 +358,8 @@ void draw_tiles(const std::vector<Tile>& tiles, float size, float scale, bool in
     const float width = ImGui::GetContentRegionAvail().x;
     const ImVec2 origin = ImGui::GetCursorScreenPos();
     const TileLayout layout = tile_layout(width, size, gap, tiles.size());
-    const float rounding = 3.0f * scale;
+    const float rounding = 4.0f * scale;
+    const chrome::BoldScope bold;
     for (size_t i = 0; i < tiles.size(); ++i) {
         const Tile& t = tiles[i];
         const auto col = static_cast<float>(i % static_cast<size_t>(layout.columns));
@@ -346,15 +368,16 @@ void draw_tiles(const std::vector<Tile>& tiles, float size, float scale, bool in
         const ImVec2 max(min.x + size, min.y + size);
         dl->AddRectFilled(min, max, u32(colors::Background, 0.85f), rounding);
         if (t.icon != kNoIcon) {
-            draw_icon(dl, t.icon, min.x, min.y, size, t.icon_alpha);
+            draw_icon(dl, t.icon, min.x, min.y, size, t.icon_alpha, rounding);
         } else {
             dl->AddRectFilled(min, max, u32(t.tint, 0.35f * t.icon_alpha), rounding);
-            dl->AddText(ImVec2(min.x + 3.0f * scale, min.y + 2.0f * scale), u32(colors::Text, t.icon_alpha),
+            dl->AddText(ImVec2(min.x + 4.0f * scale, min.y + 3.0f * scale), u32(colors::Text, t.icon_alpha),
                         t.initials.c_str());
         }
         if (t.shade > 0.0f) {
-            dl->AddRectFilled(min, ImVec2(max.x, min.y + size * std::clamp(t.shade, 0.0f, 1.0f)),
-                              u32(colors::Background, 0.65f));
+            const float shade = std::clamp(t.shade, 0.0f, 1.0f);
+            dl->AddRectFilled(min, ImVec2(max.x, min.y + size * shade), u32(colors::Background, 0.65f), rounding,
+                              shade >= 1.0f ? ImDrawFlags_RoundCornersAll : ImDrawFlags_RoundCornersTop);
         }
         if (!t.center.empty()) {
             const ImVec2 ts = ImGui::CalcTextSize(t.center.c_str());
@@ -362,9 +385,13 @@ void draw_tiles(const std::vector<Tile>& tiles, float size, float scale, bool in
         }
         if (!t.corner.empty()) {
             const ImVec2 ts = ImGui::CalcTextSize(t.corner.c_str());
-            shadowed_text(dl, ImVec2(max.x - ts.x - 2.0f * scale, max.y - ts.y), t.corner, scale);
+            shadowed_text(dl, ImVec2(max.x - ts.x - 3.0f * scale, max.y - ts.y - 1.0f * scale), t.corner, scale);
         }
-        dl->AddRect(min, max, u32(t.tint, t.border_alpha), rounding, 0, t.border_px * scale);
+        // A dark line inside the coloured border, which keeps it apart from a bright icon.
+        const float border = t.border_px * scale;
+        dl->AddRect(ImVec2(min.x + border, min.y + border), ImVec2(max.x - border, max.y - border),
+                    u32(Rgb{0.0f, 0.0f, 0.0f}, 0.45f), std::max(0.0f, rounding - border), 0, 1.0f);
+        dl->AddRect(min, max, u32(t.tint, t.border_alpha), rounding, 0, border);
         if (interactive && !t.tooltip.empty() && ImGui::IsMouseHoveringRect(min, max)) {
             ImGui::SetTooltip("%s", t.tooltip.c_str());
         }
@@ -446,42 +473,17 @@ OverlayActions draw_auras(const AuraFrameInput& in) {
     const AuraSettings& s = in.settings != nullptr ? *in.settings : defaults;
     const float scale = in.scale;
     const bool interactive = !s.locked;
-    const ImGuiIO& io = ImGui::GetIO();
 
-    ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f));
-    ImGui::SetNextWindowSize(io.DisplaySize);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 6.0f * scale);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8.0f * scale, 6.0f * scale));
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1.0f);
-    ImGui::PushStyleColor(ImGuiCol_WindowBg, rgba(colors::Background, s.opacity));
-    ImGui::PushStyleColor(ImGuiCol_Border, rgba(colors::Border, interactive ? 1.0f : std::min(1.0f, s.opacity + 0.2f)));
-    ImGui::PushStyleColor(ImGuiCol_Text, rgba(colors::Text));
-
-    const ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
-                                   ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse |
-                                   ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar |
-                                   ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoBringToFrontOnFocus;
-    if (ImGui::Begin("##aion2auras", nullptr, flags)) {
+    if (chrome::begin("##aion2auras", s.opacity, scale, interactive)) {
         // Header, while it can be moved: a title and the buttons. Locked, the window
         // is only its bars.
         if (interactive) {
             ImGui::TextColored(rgba(colors::TextDim), "AURAS");
-            const float text_end_x = ImGui::GetItemRectMax().x;
-            const char* app_label = "App";
-            const char* lock_label = "Lock";
-            const float spacing = ImGui::GetStyle().ItemSpacing.x;
-            const float buttons_x =
-                ImGui::GetWindowContentRegionMax().x - (button_width(app_label) + button_width(lock_label) + spacing);
-            if (buttons_x > text_end_x + spacing) {
-                ImGui::SameLine(buttons_x);
-                if (ImGui::SmallButton(app_label)) out.open_app = true;
-                if (ImGui::IsItemHovered()) ImGui::SetTooltip("Open the app: the aura settings are under Settings.");
-                ImGui::SameLine();
-                if (ImGui::SmallButton(lock_label)) out.lock = true;
-                if (ImGui::IsItemHovered()) ImGui::SetTooltip("Click-through and fixed in place. Unlock it in the app.");
-            }
-            out.drag_area = ClientRect{0.0f, 0.0f, std::max(buttons_x, text_end_x), ImGui::GetCursorPosY()};
-            ImGui::Separator();
+            chrome::HeaderButtons buttons;
+            buttons.scale = scale;
+            buttons.app_tooltip = "Open the app: the aura settings are under Settings.";
+            buttons.lock_tooltip = "Click-through and fixed in place. Unlock it in the app.";
+            chrome::finish_header(buttons, out);
         }
 
         const auras::AuraSnapshot* auras = in.snapshot != nullptr ? &in.snapshot->auras : nullptr;
@@ -492,7 +494,7 @@ OverlayActions draw_auras(const AuraFrameInput& in) {
             const float glow = 0.5f + 0.5f * static_cast<float>(std::sin(in.pulse_s * 6.0));
             const float tile = static_cast<float>(s.icon_size) * scale;
             if (const auto low = low_hp_percent(*auras, s)) {
-                ImGui::TextColored(rgba(colors::Live, pulse), "Low HP %d%%", *low);
+                draw_alert("Low HP " + std::to_string(*low) + "%", scale, pulse);
                 drew = true;
             }
             // Missing watched effects: in icons, a tile for each that has an icon.
@@ -502,7 +504,7 @@ OverlayActions draw_auras(const AuraFrameInput& in) {
                 if (icon != kNoIcon) {
                     alert_tiles.push_back(missing_tile(m, icon, pulse));
                 } else {
-                    ImGui::TextColored(rgba(colors::Live, pulse), "Missing: %s", m.label.c_str());
+                    draw_alert("Missing: " + m.label, scale, pulse);
                 }
                 drew = true;
             }
@@ -510,46 +512,50 @@ OverlayActions draw_auras(const AuraFrameInput& in) {
                 if (s.icons) {
                     for (const auras::ChainEntry& c : auras->chains) alert_tiles.push_back(chain_tile(c, glow));
                 } else {
-                    draw_chains(auras->chains, scale, interactive, glow);
+                    std::vector<BarRow> rows;
+                    for (const auras::ChainEntry& c : auras->chains) rows.push_back(chain_row(c, glow));
+                    draw_bar_rows(rows, scale, interactive);
                 }
                 drew = true;
             }
             draw_tiles(alert_tiles, tile, scale, interactive);
 
-            const auto self = shown_auras(auras->on_self, s, in.now, true);
-            if (!self.empty()) {
+            // One list of effects, as tiles or as bars.
+            const auto draw_effects = [&](const std::vector<const auras::AuraEntry*>& entries) {
                 if (s.icons) {
                     std::vector<Tile> tiles;
-                    for (const auras::AuraEntry* e : self) tiles.push_back(effect_tile(*e, in.now));
+                    for (const auras::AuraEntry* e : entries) tiles.push_back(effect_tile(*e, in.now));
                     draw_tiles(tiles, tile, scale, interactive);
                 } else {
-                    draw_entries(self, in.now, scale, interactive);
+                    std::vector<BarRow> rows;
+                    for (const auras::AuraEntry* e : entries) rows.push_back(effect_row(*e, in.now));
+                    draw_bar_rows(rows, scale, interactive);
                 }
+            };
+            const auto self = shown_auras(auras->on_self, s, in.now, true);
+            if (!self.empty()) {
+                draw_effects(self);
                 drew = true;
             }
             const auto cooldowns = shown_cooldowns(auras->cooldowns, s, in.now);
             if (!cooldowns.empty()) {
-                section_title("Cooldowns");
+                chrome::section_title("Cooldowns", scale);
                 if (s.icons) {
                     std::vector<Tile> tiles;
                     for (const auras::CooldownEntry* c : cooldowns) tiles.push_back(cooldown_tile(*c, in.now, glow));
                     draw_tiles(tiles, tile, scale, interactive);
                 } else {
-                    draw_cooldowns(cooldowns, in.now, scale, interactive, glow);
+                    std::vector<BarRow> rows;
+                    for (const auras::CooldownEntry* c : cooldowns) rows.push_back(cooldown_row(*c, in.now, glow));
+                    draw_bar_rows(rows, scale, interactive);
                 }
                 drew = true;
             }
             if (s.show_target && auras->target != 0) {
                 const auto target = shown_auras(auras->on_target, s, in.now, false);
                 if (!target.empty()) {
-                    section_title("On " + auras->target_label);
-                    if (s.icons) {
-                        std::vector<Tile> tiles;
-                        for (const auras::AuraEntry* e : target) tiles.push_back(effect_tile(*e, in.now));
-                        draw_tiles(tiles, tile, scale, interactive);
-                    } else {
-                        draw_entries(target, in.now, scale, interactive);
-                    }
+                    chrome::section_title("On " + auras->target_label, scale);
+                    draw_effects(target);
                     drew = true;
                 }
             }
@@ -561,17 +567,9 @@ OverlayActions draw_auras(const AuraFrameInput& in) {
                                    : "No effects on you.");
         }
 
-        if (interactive) {
-            const float g = 12.0f * scale;
-            const ImVec2 br(io.DisplaySize.x - 2.0f, io.DisplaySize.y - 2.0f);
-            ImGui::GetWindowDrawList()->AddTriangleFilled(ImVec2(br.x - g, br.y), br, ImVec2(br.x, br.y - g),
-                                                          u32(colors::TextDim, 0.6f));
-            out.resize_grip = ClientRect{br.x - g, br.y - g, br.x + 2.0f, br.y + 2.0f};
-        }
+        if (interactive) out.resize_grip = chrome::resize_grip(scale);
     }
-    ImGui::End();
-    ImGui::PopStyleColor(3);
-    ImGui::PopStyleVar(3);
+    chrome::end();
     return out;
 }
 

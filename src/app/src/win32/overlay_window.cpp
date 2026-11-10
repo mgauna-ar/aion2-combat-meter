@@ -1,6 +1,6 @@
 #include "overlay_window.hpp"
 
-#include "app/game_icons.hpp"
+#include "app/overlay_chrome.hpp"
 #include "common/os/logger.hpp"
 
 #include <dwmapi.h>
@@ -28,6 +28,15 @@ constexpr int kMinHeight = 90;
 constexpr int kAuraDefaultY = 440;
 /// The ping overlay's: right of the meter overlay's default one, at its top.
 constexpr int kPingDefaultX = 490;
+
+/// A font file of Windows' own, or nothing where it is missing.
+std::string windows_font(const char* file) {
+    char dir[MAX_PATH] = {};
+    const UINT len = GetWindowsDirectoryA(dir, MAX_PATH);
+    const std::string path =
+        (len > 0 && len < MAX_PATH ? std::string(dir) : std::string("C:\\Windows")) + "\\Fonts\\" + file;
+    return GetFileAttributesA(path.c_str()) != INVALID_FILE_ATTRIBUTES ? path : std::string();
+}
 
 LRESULT CALLBACK overlay_wnd_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
     if (msg == WM_NCCREATE) {
@@ -227,26 +236,13 @@ void OverlayWindow::create_render_target() {
 
 void OverlayWindow::rebuild_fonts(float scale) {
     ImGuiIO& io = ImGui::GetIO();
-    io.Fonts->Clear();
-    char windows_dir[MAX_PATH] = {};
-    const UINT len = GetWindowsDirectoryA(windows_dir, MAX_PATH);
-    const std::string font = (len > 0 && len < MAX_PATH ? std::string(windows_dir) : std::string("C:\\Windows")) +
-                             "\\Fonts\\segoeui.ttf";
-    ImFont* loaded = nullptr;
-    if (GetFileAttributesA(font.c_str()) != INVALID_FILE_ATTRIBUTES) {
-        ImFontConfig cfg;
-        cfg.OversampleH = 2;
-        loaded = io.Fonts->AddFontFromFileTTF(font.c_str(), std::round(kBaseFontSize * scale), &cfg);
-    }
-    if (loaded == nullptr) {
-        io.Fonts->AddFontDefault();
-        io.FontGlobalScale = scale;
-    } else {
-        io.FontGlobalScale = 1.0f;
-    }
     // Class emblems and skill icons in the font's texture, at the size they are drawn:
-    // a text line, or the aura overlay's icon size.
-    build_atlas_with_icons(*io.Fonts, std::round((m_icon_px > 0.0f ? m_icon_px : kBaseFontSize) * scale));
+    // what the overlay asked for, else a text line.
+    const float icon_px = std::round((m_icon_px > 0.0f ? m_icon_px : kBaseFontSize) * scale);
+    const bool loaded = chrome::build_overlay_fonts(windows_font("segoeui.ttf"), windows_font("segoeuib.ttf"),
+                                                    kBaseFontSize * scale, icon_px);
+    // ImGui's own font, the fallback, comes at one size: it is scaled instead.
+    io.FontGlobalScale = loaded ? 1.0f : scale;
     m_built_icon_px = m_icon_px;
     // The atlas texture is rebuilt by the next NewFrame.
     ImGui_ImplDX11_InvalidateDeviceObjects();

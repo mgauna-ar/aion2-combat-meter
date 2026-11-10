@@ -152,6 +152,8 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     const bool capturing = runtime.start(std::move(source), capture_error);
 
     app::win32::OverlayWindow window;
+    // The class emblems, at the size the rows draw them.
+    window.set_icon_px(app::kMeterEmblemPx);
     std::string window_error;
     if (!window.create(app::win32::placement_of(settings.overlay, settings.plugins.combat_meter), L"AION 2 Combat Meter",
                        true, window_error)) {
@@ -472,7 +474,6 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
                 return app::draw_overlay(input);
             });
 
-            if (actions.end_fight) runtime.request_end_fight();
             if (actions.lock) {
                 settings.overlay.locked = true;
                 window.set_locked(true);
@@ -499,7 +500,8 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
                     input.now = app::aura_display_time(snapshot->now, static_cast<Micros>(since.count()));
                 }
                 input.pulse_s = std::chrono::duration<double>(Clock::now() - started).count();
-                aura_window.set_icon_px(settings.auras.icons ? static_cast<float>(settings.auras.icon_size) : 0.0f);
+                aura_window.set_icon_px(settings.auras.icons ? static_cast<float>(settings.auras.icon_size)
+                                                             : app::kAuraBarIconPx);
                 const app::OverlayActions actions = aura_window.render(settings.auras.scale, [&](float scale) {
                     input.scale = scale;
                     return app::draw_auras(input);

@@ -25,7 +25,7 @@ each skill is listed with its icon.
 **While unlocked** (Ctrl+Alt+L):
 - Drag the empty part of the header to move the overlay.
 - Drag the corner grip to resize it.
-- Use the header buttons: **End**, **App** (open the app window) and **Lock**.
+- Use the header buttons: the gear (open the app window) and the padlock (lock it).
 - Hover a row for that player's hit rates, healing and max hit.
 
 **Hotkeys:** Ctrl+Alt+H hides or shows it; Ctrl+Alt+R ends the current fight now.

@@ -139,7 +139,7 @@ const AtlasIcons* icons_of(const ImFontAtlas* atlas) {
 
 /// Draws custom rect `index`, painted at `px`, `size` square at (x, y).
 void draw_rect(ImDrawList* dl, const ImFontAtlas* atlas, int index, int px, float x, float y, float size,
-               float alpha) {
+               float alpha, float rounding = 0.0f) {
     const ImFontAtlasCustomRect* rect = &atlas->CustomRects[index];
     ImVec2 uv0;
     ImVec2 uv1;
@@ -148,8 +148,8 @@ void draw_rect(ImDrawList* dl, const ImFontAtlas* atlas, int index, int px, floa
     // keeps the image sharp, where the renderer's linear filter would blur it.
     const float side = std::fabs(size - static_cast<float>(px)) < 1.5f ? static_cast<float>(px) : size;
     const ImVec2 p0(std::round(x + (size - side) * 0.5f), std::round(y + (size - side) * 0.5f));
-    dl->AddImage(atlas->TexID, p0, ImVec2(p0.x + side, p0.y + side), uv0, uv1,
-                 ImGui::GetColorU32(ImVec4(1.0f, 1.0f, 1.0f, alpha)));
+    dl->AddImageRounded(atlas->TexID, p0, ImVec2(p0.x + side, p0.y + side), uv0, uv1,
+                        ImGui::GetColorU32(ImVec4(1.0f, 1.0f, 1.0f, alpha)), rounding);
 }
 
 } // namespace
@@ -187,12 +187,12 @@ void build_atlas_with_icons(ImFontAtlas& atlas, float icon_px, float mark_px) {
     if (icons || marked) g_atlases.push_back({&atlas, icons ? first : -1, px, marked ? mark_rect : -1, mpx});
 }
 
-void draw_icon(ImDrawList* dl, int slot, float x, float y, float size, float alpha) {
+void draw_icon(ImDrawList* dl, int slot, float x, float y, float size, float alpha, float rounding) {
     if (dl == nullptr || slot < 0 || slot >= kIconSlots) return;
     const ImFontAtlas* atlas = ImGui::GetIO().Fonts;
     const AtlasIcons* icons = icons_of(atlas);
     if (icons == nullptr || icons->first_rect < 0 || icons->first_rect + slot >= atlas->CustomRects.Size) return;
-    draw_rect(dl, atlas, icons->first_rect + slot, icons->px, x, y, size, alpha);
+    draw_rect(dl, atlas, icons->first_rect + slot, icons->px, x, y, size, alpha, rounding);
 }
 
 bool draw_app_mark(ImDrawList* dl, float x, float y, float size) {
@@ -208,7 +208,7 @@ bool draw_app_mark(ImDrawList* dl, float x, float y, float size) {
 
 void build_atlas_with_icons(ImFontAtlas&, float, float) {}
 
-void draw_icon(ImDrawList*, int, float, float, float, float) {}
+void draw_icon(ImDrawList*, int, float, float, float, float, float) {}
 
 bool draw_app_mark(ImDrawList*, float, float, float) { return false; }
 

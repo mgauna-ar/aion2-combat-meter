@@ -6,6 +6,8 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <initializer_list>
+#include <vector>
 
 namespace aion2::app {
 
@@ -78,17 +80,14 @@ PingGraph ping_graph(const ping::PingSnapshot& p, Micros now) {
 
 #ifdef HAVE_IMGUI
 
+#include "app/overlay_chrome.hpp"
+
 namespace aion2::app {
 
+using chrome::rgba;
+using chrome::u32;
+
 namespace {
-
-ImVec4 rgba(Rgb c, float a = 1.0f) { return ImVec4(c.r, c.g, c.b, a); }
-
-ImU32 u32(Rgb c, float a = 1.0f) { return ImGui::GetColorU32(rgba(c, a)); }
-
-float button_width(const char* label) {
-    return ImGui::CalcTextSize(label).x + ImGui::GetStyle().FramePadding.x * 2.0f;
-}
 
 Rgb level_color(PingLevel level) noexcept {
     switch (level) {
@@ -99,49 +98,84 @@ Rgb level_color(PingLevel level) noexcept {
     return colors::Text;
 }
 
+/// A quad under the ping's line, from it down to the graph's floor, fading as it goes.
+void fill_under(ImDrawList* dl, ImVec2 a, ImVec2 b, float floor_y, float top_y) {
+    const ImVec2 uv = ImGui::GetFontTexUvWhitePixel();
+    const float span = std::max(1.0f, floor_y - top_y);
+    // Brighter the higher the line runs, so a spike stands out.
+    const auto shade = [&](float y) { return u32(colors::Accent, 0.04f + 0.30f * std::clamp((floor_y - y) / span, 0.0f, 1.0f)); };
+    const ImU32 none = u32(colors::Accent, 0.02f);
+    dl->PrimReserve(6, 4);
+    const auto first = static_cast<ImDrawIdx>(dl->_VtxCurrentIdx);
+    dl->PrimWriteVtx(a, uv, shade(a.y));
+    dl->PrimWriteVtx(b, uv, shade(b.y));
+    dl->PrimWriteVtx(ImVec2(b.x, floor_y), uv, none);
+    dl->PrimWriteVtx(ImVec2(a.x, floor_y), uv, none);
+    for (const int i : {0, 1, 2, 0, 2, 3}) dl->PrimWriteIdx(static_cast<ImDrawIdx>(first + i));
+}
+
 /// The graph in the rectangle from `p0`, `w` by `h`: each second's lateness as a bar
-/// from the bottom, the ping as a line over them.
+/// from the bottom, the ping as a line over them with a soft fill under it.
 void draw_graph(const PingGraph& g, ImVec2 p0, float w, float h, float scale) {
     ImDrawList* dl = ImGui::GetWindowDrawList();
     const ImVec2 p1(p0.x + w, p0.y + h);
-    dl->AddRectFilled(p0, p1, u32(colors::Text, 0.04f), 2.0f * scale);
+    dl->AddRectFilled(p0, p1, u32(colors::Text, 0.05f), 3.0f * scale);
     const size_t n = g.columns.size();
     if (n == 0 || g.top_ms <= 0.0f) return;
     const float step = w / static_cast<float>(n);
     const auto y_of = [&](float ms) { return p1.y - h * std::clamp(ms / g.top_ms, 0.0f, 1.0f); };
+    // Half the scale, to read a height by.
+    const float mid_y = std::round(p0.y + h * 0.5f);
+    dl->AddLine(ImVec2(p0.x, mid_y), ImVec2(p1.x, mid_y), u32(colors::Text, 0.07f), 1.0f);
+
+    // Each second's point, where there is one.
+    std::vector<ImVec2> points(n);
+    std::vector<bool> have(n, false);
+    for (size_t i = 0; i < n; ++i) {
+        if (g.columns[i].ping_ms < 0.0f) continue;
+        points[i] = ImVec2(p0.x + step * (static_cast<float>(i) + 0.5f), y_of(g.columns[i].ping_ms));
+        have[i] = true;
+    }
+    for (size_t i = 1; i < n; ++i) {
+        if (have[i - 1] && have[i]) fill_under(dl, points[i - 1], points[i], p1.y, p0.y);
+    }
 
     for (size_t i = 0; i < n; ++i) {
         const float late = g.columns[i].late_ms;
         // Under a millisecond is the heartbeat's own resolution.
         if (late < 1.0f) continue;
         const float x0 = p0.x + step * static_cast<float>(i);
-        dl->AddRectFilled(ImVec2(x0, y_of(late)), ImVec2(std::max(x0 + step, x0 + 1.0f), p1.y), u32(colors::Warn, 0.55f));
+        dl->AddRectFilled(ImVec2(x0, y_of(late)), ImVec2(std::max(x0 + step, x0 + 1.0f), p1.y), u32(colors::Warn, 0.60f));
     }
 
     const float thickness = std::max(1.0f, 1.5f * scale);
-    bool have_prev = false;
-    ImVec2 prev;
+    size_t newest = n;
     for (size_t i = 0; i < n; ++i) {
-        const float ping = g.columns[i].ping_ms;
-        if (ping < 0.0f) {
-            have_prev = false;
-            continue;
-        }
-        const ImVec2 at(p0.x + step * (static_cast<float>(i) + 0.5f), y_of(ping));
-        if (have_prev) {
-            dl->AddLine(prev, at, u32(colors::Accent), thickness);
-        } else {
+        if (!have[i]) continue;
+        newest = i;
+        if (i > 0 && have[i - 1]) {
+            dl->AddLine(points[i - 1], points[i], u32(colors::Accent), thickness);
+        } else if (i + 1 >= n || !have[i + 1]) {
             // A second on its own still shows, as a dot.
-            dl->AddRectFilled(ImVec2(at.x - thickness, at.y - thickness), ImVec2(at.x + thickness, at.y + thickness),
-                              u32(colors::Accent));
+            dl->AddCircleFilled(points[i], thickness, u32(colors::Accent));
         }
-        prev = at;
-        have_prev = true;
+    }
+    // The newest second, where the eye starts.
+    if (newest < n) {
+        dl->AddCircleFilled(points[newest], 3.5f * scale, u32(colors::Accent, 0.30f));
+        dl->AddCircleFilled(points[newest], 2.0f * scale, u32(chrome::lighten(colors::Accent, 0.35f)));
     }
 
     char top[24];
     std::snprintf(top, sizeof(top), "%.0f ms", static_cast<double>(g.top_ms));
-    dl->AddText(ImVec2(p0.x + 3.0f * scale, p0.y + 1.0f * scale), u32(colors::TextDim, 0.75f), top);
+    dl->AddText(ImVec2(p0.x + 4.0f * scale, p0.y + 2.0f * scale), u32(colors::TextDim, 0.75f), top);
+}
+
+/// "min 64": a dim caption and its figure.
+void labelled(const char* label, float value, float scale) {
+    ImGui::TextColored(rgba(colors::TextDim), "%s", label);
+    ImGui::SameLine(0.0f, 4.0f * scale);
+    ImGui::Text("%.0f", static_cast<double>(value));
 }
 
 } // namespace
@@ -152,42 +186,17 @@ OverlayActions draw_ping(const PingFrameInput& in) {
     const PingSettings& s = in.settings != nullptr ? *in.settings : defaults;
     const float scale = in.scale;
     const bool interactive = !s.locked;
-    const ImGuiIO& io = ImGui::GetIO();
 
-    ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f));
-    ImGui::SetNextWindowSize(io.DisplaySize);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 6.0f * scale);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8.0f * scale, 6.0f * scale));
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1.0f);
-    ImGui::PushStyleColor(ImGuiCol_WindowBg, rgba(colors::Background, s.opacity));
-    ImGui::PushStyleColor(ImGuiCol_Border, rgba(colors::Border, interactive ? 1.0f : std::min(1.0f, s.opacity + 0.2f)));
-    ImGui::PushStyleColor(ImGuiCol_Text, rgba(colors::Text));
-
-    const ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
-                                   ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse |
-                                   ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar |
-                                   ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoBringToFrontOnFocus;
-    if (ImGui::Begin("##aion2ping", nullptr, flags)) {
+    if (chrome::begin("##aion2ping", s.opacity, scale, interactive)) {
         // Header, while it can be moved: a title and the buttons. Locked, the window
         // is only its figures.
         if (interactive) {
             ImGui::TextColored(rgba(colors::TextDim), "PING");
-            const float text_end_x = ImGui::GetItemRectMax().x;
-            const char* app_label = "App";
-            const char* lock_label = "Lock";
-            const float spacing = ImGui::GetStyle().ItemSpacing.x;
-            const float buttons_x =
-                ImGui::GetWindowContentRegionMax().x - (button_width(app_label) + button_width(lock_label) + spacing);
-            if (buttons_x > text_end_x + spacing) {
-                ImGui::SameLine(buttons_x);
-                if (ImGui::SmallButton(app_label)) out.open_app = true;
-                if (ImGui::IsItemHovered()) ImGui::SetTooltip("Open the app: the ping's settings are on its page.");
-                ImGui::SameLine();
-                if (ImGui::SmallButton(lock_label)) out.lock = true;
-                if (ImGui::IsItemHovered()) ImGui::SetTooltip("Click-through and fixed in place. Unlock it in the app.");
-            }
-            out.drag_area = ClientRect{0.0f, 0.0f, std::max(buttons_x, text_end_x), ImGui::GetCursorPosY()};
-            ImGui::Separator();
+            chrome::HeaderButtons buttons;
+            buttons.scale = scale;
+            buttons.app_tooltip = "Open the app: the ping's settings are on its page.";
+            buttons.lock_tooltip = "Click-through and fixed in place. Unlock it in the app.";
+            chrome::finish_header(buttons, out);
         }
 
         const ping::PingSnapshot none{};
@@ -195,12 +204,17 @@ OverlayActions draw_ping(const PingFrameInput& in) {
         const Micros now = in.snapshot != nullptr ? in.snapshot->now : 0;
         const float spacing = ImGui::GetStyle().ItemSpacing.x;
 
-        // The ping, and the jitter at the right edge while there is room beside it.
+        // A light in the ping's colour, the ping, and the jitter at the right edge
+        // while there is room beside it.
+        const std::optional<float> ping = shown_ping(p, now);
+        const Rgb level = ping ? level_color(ping_level(*ping, s)) : colors::TextDim;
+        chrome::dot(level, scale, ping ? 1.0f : 0.6f);
+        ImGui::SameLine(0.0f, 6.0f * scale);
         ImGui::TextColored(rgba(colors::TextDim), "Ping");
         ImGui::SameLine();
-        const std::optional<float> ping = shown_ping(p, now);
         if (ping) {
-            ImGui::TextColored(rgba(level_color(ping_level(*ping, s))), "%s", format_ms(*ping).c_str());
+            const chrome::BoldScope bold;
+            ImGui::TextColored(rgba(level), "%s", format_ms(*ping).c_str());
         } else {
             ImGui::TextColored(rgba(colors::TextDim), "-");
             if (interactive && ImGui::IsItemHovered()) ImGui::SetTooltip("%s.", ping_status(p, now));
@@ -227,24 +241,19 @@ OverlayActions draw_ping(const PingFrameInput& in) {
                 draw_graph(ping_graph(p, now), p0, avail.x, graph_h, scale);
             }
             if (p.samples > 0) {
-                ImGui::TextColored(rgba(colors::TextDim), "min %.0f  avg %.0f  max %.0f", static_cast<double>(p.min_ms),
-                                   static_cast<double>(p.avg_ms), static_cast<double>(p.max_ms));
+                labelled("min", p.min_ms, scale);
+                ImGui::SameLine(0.0f, 10.0f * scale);
+                labelled("avg", p.avg_ms, scale);
+                ImGui::SameLine(0.0f, 10.0f * scale);
+                labelled("max", p.max_ms, scale);
             } else {
                 ImGui::TextColored(rgba(colors::TextDim), "%s", ping_status(p, now));
             }
         }
 
-        if (interactive) {
-            const float g = 12.0f * scale;
-            const ImVec2 br(io.DisplaySize.x - 2.0f, io.DisplaySize.y - 2.0f);
-            ImGui::GetWindowDrawList()->AddTriangleFilled(ImVec2(br.x - g, br.y), br, ImVec2(br.x, br.y - g),
-                                                          u32(colors::TextDim, 0.6f));
-            out.resize_grip = ClientRect{br.x - g, br.y - g, br.x + 2.0f, br.y + 2.0f};
-        }
+        if (interactive) out.resize_grip = chrome::resize_grip(scale);
     }
-    ImGui::End();
-    ImGui::PopStyleColor(3);
-    ImGui::PopStyleVar(3);
+    chrome::end();
     return out;
 }
 
