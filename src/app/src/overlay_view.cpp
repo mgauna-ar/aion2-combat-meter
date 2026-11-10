@@ -3,6 +3,7 @@
 #include "app/display_format.hpp"
 #include "app/game_icons.hpp"
 #include "app/imgui_guard.hpp"
+#include "app/overlay_chrome.hpp"
 #include "common/time_format.hpp"
 #include "game/map_names.hpp"
 
@@ -15,34 +16,12 @@
 
 namespace aion2::app {
 
+using chrome::fit;
+using chrome::rgba;
+using chrome::text_right;
+using chrome::u32;
+
 namespace {
-
-ImVec4 rgba(Rgb c, float a = 1.0f) { return ImVec4(c.r, c.g, c.b, a); }
-
-ImU32 u32(Rgb c, float a = 1.0f) { return ImGui::GetColorU32(rgba(c, a)); }
-
-/// Text ending at `x_right`.
-void text_right(ImDrawList* dl, float x_right, float y, ImU32 col, const std::string& s) {
-    const ImVec2 size = ImGui::CalcTextSize(s.c_str());
-    dl->AddText(ImVec2(x_right - size.x, y), col, s.c_str());
-}
-
-/// `s` cut with "..." to fit `width`, by whole UTF-8 code points.
-std::string fit(const std::string& s, float width) {
-    if (ImGui::CalcTextSize(s.c_str()).x <= width) return s;
-    std::string out = s;
-    while (!out.empty() && ImGui::CalcTextSize((out + "...").c_str()).x > width) {
-        // Continuation bytes (10xxxxxx) go with the lead byte before them.
-        while (!out.empty() && (static_cast<unsigned char>(out.back()) & 0xC0) == 0x80) out.pop_back();
-        if (!out.empty()) out.pop_back();
-    }
-    return out + "...";
-}
-
-/// A small button's width, to lay the header's buttons out from the right.
-float button_width(const char* label) {
-    return ImGui::CalcTextSize(label).x + ImGui::GetStyle().FramePadding.x * 2.0f;
-}
 
 struct Column {
     const char* header;
@@ -53,7 +32,9 @@ struct Column {
 void draw_rows(const meter::FightSummary& f, const OverlaySettings& s, float scale, bool interactive) {
     ImDrawList* dl = ImGui::GetWindowDrawList();
     const float line = ImGui::GetTextLineHeight();
-    const float row_h = line + 5.0f * scale;
+    // A bar, and the gap under it.
+    const float gap = 2.0f * scale;
+    const float row_h = line + 8.0f * scale + gap;
     const ImVec2 origin = ImGui::GetCursorScreenPos();
     const float width = ImGui::GetContentRegionAvail().x;
 
@@ -71,66 +52,76 @@ void draw_rows(const meter::FightSummary& f, const OverlaySettings& s, float sca
     if (s.show_block) cols.push_back({"Block", 54.0f * scale});
     if (s.show_max_hit) cols.push_back({"Max", 58.0f * scale});
     if (s.show_heal) cols.push_back({"Heal", 60.0f * scale});
-    const float rank_w = 18.0f * scale;
+    const float rank_w = 22.0f * scale;
     float numbers_w = 0;
     for (const auto& c : cols) numbers_w += c.width;
     const float name_w = std::max(40.0f * scale, width - rank_w - numbers_w);
-    // The class emblem starts the name column, a text line square; every row keeps
-    // its place, so the names line up.
-    const float emblem = line;
-    const float name_x = origin.x + rank_w + emblem + 4.0f * scale;
+    // The class emblem starts the name column; every row keeps its place, so the
+    // names line up.
+    const float emblem = kMeterEmblemPx * scale;
+    const float name_x = origin.x + rank_w + emblem + 6.0f * scale;
+    const float pad = 6.0f * scale;
 
-    // Header.
+    // The captions.
     float y = origin.y;
-    const ImU32 dim = u32(colors::TextDim);
-    dl->AddText(ImVec2(origin.x, y), dim, "#");
+    const ImU32 dim = u32(colors::TextDim, 0.85f);
+    dl->AddText(ImVec2(origin.x + pad, y), dim, "#");
     dl->AddText(ImVec2(name_x, y), dim, "Player");
     float x = origin.x + rank_w + name_w;
     for (const auto& c : cols) {
         x += c.width;
-        text_right(dl, x - 4.0f * scale, y, dim, c.header);
+        text_right(dl, x - pad, y, dim, c.header);
     }
-    y += row_h;
+    y += line + 4.0f * scale;
 
     const double top = f.combatants.empty() ? 1.0 : std::max(f.combatants.front().dps, 1.0);
-    int line_no = 0;
     for (const ShownRow& shown : shown_rows(f.combatants, s.max_rows, s.show_heal)) {
         const meter::CombatantTotals& row = f.combatants[shown.index];
-        const int rank = shown.rank;
-        ++line_no;
         const ImVec2 row_min(origin.x, y);
-        const ImVec2 row_max(origin.x + width, y + row_h - 1.0f * scale);
-        if (line_no % 2 == 0) dl->AddRectFilled(row_min, row_max, u32(colors::Text, 0.03f));
+        const ImVec2 row_max(origin.x + width, y + row_h - gap);
         const float fraction = static_cast<float>(std::clamp(row.dps / top, 0.0, 1.0));
-        const Rgb bar = s.class_bars ? row_color(row) : colors::Accent;
-        dl->AddRectFilled(row_min, ImVec2(row_min.x + width * fraction, row_max.y), u32(bar, s.class_bars ? 0.38f : 0.28f),
-                          2.0f * scale);
+        chrome::draw_bar(dl, row_min, row_max, fraction, s.class_bars ? row_color(row) : colors::Accent, scale);
+        // The local player's row: a stripe down its left edge.
+        if (row.is_local) {
+            dl->AddRectFilled(row_min, ImVec2(row_min.x + 3.0f * scale, row_max.y), u32(colors::Accent),
+                              3.0f * scale, ImDrawFlags_RoundCornersLeft);
+        }
 
-        const float ty = y + (row_h - line) * 0.5f - 0.5f * scale;
+        const float ty = y + (row_h - gap - line) * 0.5f - 0.5f * scale;
         char rank_buf[8];
-        std::snprintf(rank_buf, sizeof(rank_buf), "%d", rank);
-        dl->AddText(ImVec2(origin.x + 2.0f * scale, ty), dim, rank_buf);
+        std::snprintf(rank_buf, sizeof(rank_buf), "%d", shown.rank);
+        dl->AddText(ImVec2(origin.x + pad, ty), u32(colors::Text, 0.60f), rank_buf);
 
         const int icon = class_icon(row.cls);
-        draw_icon(dl, icon, origin.x + rank_w, y + (row_h - 1.0f * scale - emblem) * 0.5f, emblem);
+        draw_icon(dl, icon, origin.x + rank_w, y + (row_h - gap - emblem) * 0.5f, emblem);
         // A class with no emblem (the Brawler) keeps its letters.
         std::string label = row.name;
         if (icon == kNoIcon && row.cls != game::AionClass::Unknown) {
             label = std::string(game::class_short(row.cls)) + " " + label;
         }
-        dl->AddText(ImVec2(name_x, ty), u32(row.is_local ? colors::Accent : colors::Text),
-                    fit(label, origin.x + rank_w + name_w - name_x - 6.0f * scale).c_str());
+        const float label_w = origin.x + rank_w + name_w - name_x - pad;
+        if (row.is_local) {
+            const chrome::BoldScope bold;
+            dl->AddText(ImVec2(name_x, ty), u32(colors::Text), fit(label, label_w).c_str());
+        } else {
+            dl->AddText(ImVec2(name_x, ty), u32(colors::Text), fit(label, label_w).c_str());
+        }
 
         x = origin.x + rank_w + name_w;
-        const ImU32 text = u32(colors::Text);
+        const ImU32 text = u32(colors::Text, 0.86f);
         size_t ci = 0;
         // The next column's value, right-aligned in it.
         const auto put = [&](const std::string& v) {
             x += cols[ci++].width;
-            text_right(dl, x - 4.0f * scale, ty, text, v);
+            text_right(dl, x - pad, ty, text, v);
         };
         const auto rate = [&](uint64_t meter::HitCounts::*count) { return format_percent(row.hits.rate(count)); };
-        put(format_rate(row.dps));
+        {
+            // The figure the rows are ranked by.
+            const chrome::BoldScope bold;
+            x += cols[ci++].width;
+            text_right(dl, x - pad, ty, u32(colors::Text), format_rate(row.dps));
+        }
         put(format_amount(row.damage));
         if (s.show_share) put(format_percent(row.share));
         if (s.show_hits) put(std::to_string(row.hits.hits));
@@ -166,21 +157,40 @@ void draw_rows(const meter::FightSummary& f, const OverlaySettings& s, float sca
 void draw_boss(const meter::FightSummary& f, float scale, bool interactive) {
     if (!f.boss.present()) return;
     const auto& b = f.boss;
-    std::string label = b.label;
-    if (b.is_boss) label = "Boss " + label;
-    if (b.killed) label += "  (killed)";
-    ImGui::TextUnformatted(label.c_str());
+    if (b.is_boss) {
+        ImGui::TextColored(rgba(colors::TextDim), "Boss");
+        ImGui::SameLine(0.0f, 5.0f * scale);
+    }
+    {
+        const chrome::BoldScope bold;
+        ImGui::TextUnformatted(b.label.c_str());
+    }
+    if (b.killed) {
+        ImGui::SameLine();
+        ImGui::TextColored(rgba(colors::TextDim), "killed");
+    }
     if (b.hp_known) {
+        // The bar, with what is left written in it and its share at the right.
         const bool estimate = !(b.killed || b.hp_exact);
-        char overlay[64];
-        std::snprintf(overlay, sizeof(overlay), "%s%s / %s", estimate ? "~" : "", format_amount(b.hp).c_str(),
-                      format_amount(b.max_hp).c_str());
-        ImGui::PushStyleColor(ImGuiCol_PlotHistogram, rgba(colors::BossHp, 0.85f));
-        ImGui::PushStyleColor(ImGuiCol_FrameBg, rgba(colors::Background, 0.9f));
-        ImGui::ProgressBar(static_cast<float>(b.hp_fraction()), ImVec2(-1.0f, 6.0f * scale + ImGui::GetTextLineHeight()),
-                           overlay);
-        ImGui::PopStyleColor(2);
-        if (estimate && interactive && ImGui::IsItemHovered()) {
+        const float line = ImGui::GetTextLineHeight();
+        const ImVec2 min = ImGui::GetCursorScreenPos();
+        const ImVec2 max(min.x + ImGui::GetContentRegionAvail().x, min.y + line + 7.0f * scale);
+        ImGui::Dummy(ImVec2(max.x - min.x, max.y - min.y));
+        const bool hovered = interactive && ImGui::IsItemHovered();
+        ImDrawList* dl = ImGui::GetWindowDrawList();
+        const auto fraction = static_cast<float>(b.hp_fraction());
+        chrome::draw_bar(dl, min, max, fraction, colors::BossHp, scale, chrome::BarStyle{3.0f, 0.90f, true});
+        const float ty = min.y + (max.y - min.y - line) * 0.5f - 0.5f * scale;
+        const std::string left =
+            std::string(estimate ? "~" : "") + format_amount(b.hp) + " / " + format_amount(b.max_hp);
+        chrome::shadowed_text(dl, ImVec2(min.x + 7.0f * scale, ty), left, scale);
+        {
+            const chrome::BoldScope bold;
+            const std::string share = format_percent(static_cast<double>(fraction));
+            chrome::shadowed_text(dl, ImVec2(max.x - 7.0f * scale - ImGui::CalcTextSize(share.c_str()).x, ty), share,
+                                  scale);
+        }
+        if (estimate && hovered) {
             ImGui::SetTooltip("An estimate (~): spawn HP less the damage the meter saw, until\n"
                               "the server sends the boss's HP.");
         }
@@ -194,7 +204,6 @@ void draw_boss(const meter::FightSummary& f, float scale, bool interactive) {
     } else if (!f.quality.clean()) {
         ImGui::TextColored(rgba(colors::Warn), "Capture lost some packets");
     }
-    (void)scale;
 }
 
 const char* status_label(const pipeline::LiveSnapshot* snap, const meter::FightSummary* f) {
@@ -219,58 +228,37 @@ OverlayActions draw_overlay(const OverlayFrameInput& in) {
     const OverlaySettings& s = in.settings != nullptr ? *in.settings : defaults;
     const float scale = in.scale;
     const bool interactive = !s.locked;
-    const ImGuiIO& io = ImGui::GetIO();
 
-    ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f));
-    ImGui::SetNextWindowSize(io.DisplaySize);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 6.0f * scale);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8.0f * scale, 6.0f * scale));
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1.0f);
-    ImGui::PushStyleColor(ImGuiCol_WindowBg, rgba(colors::Background, s.opacity));
-    ImGui::PushStyleColor(ImGuiCol_Border, rgba(colors::Border, std::min(1.0f, s.opacity + 0.2f)));
-    ImGui::PushStyleColor(ImGuiCol_Text, rgba(colors::Text));
-
-    const ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
-                                   ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse |
-                                   ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar |
-                                   ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoBringToFrontOnFocus;
-    if (ImGui::Begin("##aion2meter", nullptr, flags)) {
+    // The frame keeps the opacity's own border, locked or not: this overlay is never
+    // empty, so it needs no brighter one to be found by.
+    if (chrome::begin("##aion2meter", s.opacity, scale, false)) {
         const meter::FightSummary* fight =
             in.snapshot != nullptr && in.snapshot->fight.id != 0 ? &in.snapshot->fight : nullptr;
 
         // Header: status, timer, totals; buttons on the right.
         const char* status = status_label(in.snapshot, fight);
-        ImGui::TextColored(rgba(status_color(status)), "%s", status);
+        chrome::dot(status_color(status), scale);
+        ImGui::SameLine(0.0f, 5.0f * scale);
+        {
+            const chrome::BoldScope bold;
+            ImGui::TextColored(rgba(status_color(status)), "%s", status);
+            if (fight != nullptr) {
+                ImGui::SameLine();
+                ImGui::TextUnformatted(common::clock_duration(fight->duration_s).c_str());
+                ImGui::SameLine();
+                ImGui::TextColored(rgba(colors::Dps), "%s DPS", format_rate(fight->total_dps).c_str());
+            }
+        }
         if (fight != nullptr) {
-            ImGui::SameLine();
-            ImGui::TextUnformatted(common::clock_duration(fight->duration_s).c_str());
-            ImGui::SameLine();
-            ImGui::TextColored(rgba(colors::Dps), "%s DPS", format_rate(fight->total_dps).c_str());
             ImGui::SameLine();
             ImGui::TextColored(rgba(colors::TextDim), "%s", format_amount(fight->total_damage).c_str());
         }
-        const float text_end_x = ImGui::GetItemRectMax().x;
-
-        const char* app_label = "App";
-        const char* lock_label = "Lock";
-        const bool show_end = fight != nullptr && fight->live;
-        const float spacing = ImGui::GetStyle().ItemSpacing.x;
-        float buttons_w = button_width(app_label) + button_width(lock_label) + spacing;
-        if (show_end) buttons_w += button_width("End") + spacing;
-        const float buttons_x = ImGui::GetWindowContentRegionMax().x - buttons_w;
-        if (interactive && buttons_x > text_end_x + spacing) {
-            ImGui::SameLine(buttons_x);
-            if (show_end && ImGui::SmallButton("End")) out.end_fight = true;
-            if (show_end) ImGui::SameLine();
-            if (ImGui::SmallButton(app_label)) out.open_app = true;
-            if (ImGui::IsItemHovered()) ImGui::SetTooltip("Open the app: saved fights, skills and settings.");
-            ImGui::SameLine();
-            if (ImGui::SmallButton(lock_label)) out.lock = true;
-            if (ImGui::IsItemHovered()) ImGui::SetTooltip("Click-through and fixed in place. Ctrl+Alt+L unlocks.");
-        }
-        const float header_bottom = ImGui::GetCursorPosY();
-        out.drag_area = ClientRect{0.0f, 0.0f, interactive ? std::max(buttons_x, text_end_x) : 0.0f, header_bottom};
-        ImGui::Separator();
+        chrome::HeaderButtons buttons;
+        buttons.scale = scale;
+        buttons.interactive = interactive;
+        buttons.app_tooltip = "Open the app: saved fights, skills and settings.";
+        buttons.lock_tooltip = "Click-through and fixed in place. Ctrl+Alt+L unlocks.";
+        chrome::finish_header(buttons, out);
 
         const float footer_h = ImGui::GetTextLineHeightWithSpacing();
         if (fight != nullptr) {
@@ -285,7 +273,7 @@ OverlayActions draw_overlay(const OverlayFrameInput& in) {
         }
 
         // Footer: who and where, or what the capture is waiting for.
-        ImGui::SetCursorPosY(ImGui::GetWindowHeight() - footer_h - ImGui::GetStyle().WindowPadding.y + 2.0f);
+        ImGui::SetCursorPosY(ImGui::GetWindowHeight() - footer_h - ImGui::GetStyle().WindowPadding.y + 3.0f * scale);
         std::string footer;
         if (in.snapshot != nullptr && in.snapshot->capture != pipeline::CaptureState::Waiting) {
             if (!in.snapshot->local_name.empty()) footer = in.snapshot->local_name;
@@ -296,22 +284,17 @@ OverlayActions draw_overlay(const OverlayFrameInput& in) {
         } else {
             footer = in.source_status.empty() ? "Starting capture..." : in.source_status;
         }
-        if (in.recording) ImGui::TextColored(rgba(colors::Live), "REC");
-        if (in.recording) ImGui::SameLine();
+        if (in.recording) {
+            chrome::dot(colors::Live, scale);
+            ImGui::SameLine(0.0f, 5.0f * scale);
+            ImGui::TextColored(rgba(colors::Live), "REC");
+            ImGui::SameLine();
+        }
         ImGui::TextColored(rgba(colors::TextDim), "%s", fit(footer, ImGui::GetContentRegionAvail().x).c_str());
 
-        // Resize grip.
-        if (interactive) {
-            const float g = 12.0f * scale;
-            const ImVec2 br(io.DisplaySize.x - 2.0f, io.DisplaySize.y - 2.0f);
-            ImGui::GetWindowDrawList()->AddTriangleFilled(ImVec2(br.x - g, br.y), br, ImVec2(br.x, br.y - g),
-                                                          u32(colors::TextDim, 0.6f));
-            out.resize_grip = ClientRect{br.x - g, br.y - g, br.x + 2.0f, br.y + 2.0f};
-        }
+        if (interactive) out.resize_grip = chrome::resize_grip(scale);
     }
-    ImGui::End();
-    ImGui::PopStyleColor(3);
-    ImGui::PopStyleVar(3);
+    chrome::end();
     return out;
 }
 

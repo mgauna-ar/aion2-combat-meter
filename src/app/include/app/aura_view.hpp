@@ -94,6 +94,11 @@ struct MissingEffect {
 /// "2m", "12", "4.5": the time left on an icon, which has room for less.
 [[nodiscard]] std::string format_tile_time(Micros left);
 
+/// The side of a bar's icon, in pixels before the scale: what the window's atlas
+/// holds the game's icons at while the overlay draws bars (OverlayWindow::set_icon_px).
+/// As icons, it holds them at the settings' icon_size.
+inline constexpr float kAuraBarIconPx = 20.0f;
+
 /// Draws the aura overlay as one ImGui window filling the display, into the frame
 /// the caller has begun, as bars or icons: the alerts (low HP, missing watched
 /// effects, chain skills on offer), the effects on the local player, their
