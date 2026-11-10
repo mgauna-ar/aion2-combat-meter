@@ -31,12 +31,26 @@ TEST_CASE(MapNames, AOneTierPageKeepsItsOwnName) {
     TEST_ASSERT_EQ(std::string(map_name(910064)), std::string("Chamber of the Dead (Challenge)"));
 }
 
-TEST_CASE(MapNames, DungeonsAreTheImportedTiers) {
+TEST_CASE(MapNames, ADungeonGoesByItsIdNotTheTable) {
     TEST_ASSERT(is_dungeon(600001));
     TEST_ASSERT(is_dungeon(910064));
-    // Open-world zones are not listed, and 0 is no map load seen yet.
+    // A tier a patch added, which the table cannot name yet: a dungeon all the same.
+    TEST_ASSERT(map_name(600003).empty());
+    TEST_ASSERT(is_dungeon(600003));
+    TEST_ASSERT(map_name(910099).empty());
+    TEST_ASSERT(is_dungeon(910099));
+    TEST_ASSERT(is_dungeon(kFirstInstanceMapId));
+    // The open world (the second capture's town was 1010), and no map load seen yet.
+    TEST_ASSERT_FALSE(is_dungeon(kFirstInstanceMapId - 1));
     TEST_ASSERT_FALSE(is_dungeon(400001));
+    TEST_ASSERT_FALSE(is_dungeon(1010));
     TEST_ASSERT_FALSE(is_dungeon(0));
+}
+
+TEST_CASE(MapNames, AnUnnamedDungeonSaysItIsOne) {
+    TEST_ASSERT_EQ(map_label(600003), std::string("Dungeon 600003"));
+    TEST_ASSERT_EQ(map_label(910099), std::string("Dungeon 910099"));
+    TEST_ASSERT_EQ(map_label(1010), std::string("Map 1010"));
 }
 
 TEST_CASE(MapNames, UnlistedIdsHaveALabel) {

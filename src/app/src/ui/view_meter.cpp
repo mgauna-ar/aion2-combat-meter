@@ -715,7 +715,7 @@ void visibility_card(const AppFrameInput& in, AppActions& out) {
     if (!o.show_in_combat_only) ImGui::EndDisabled();
     setting_switch("Hide when the game is not in front", "Hidden while another program has the focus.",
                    &o.hide_when_game_unfocused, out);
-    setting_switch("Only in dungeons", "Hidden in the open world, and on maps the meter can't name.",
+    setting_switch("Only in dungeons", "Hidden in the open world. A new dungeon counts before the meter can name it.",
                    &o.show_in_dungeons_only, out);
     if (!o.locked) ImGui::EndDisabled();
     ImGui::Dummy(ImVec2(0.0f, m(2.0f)));
@@ -760,7 +760,7 @@ void tracking_card(const AppFrameInput& in, AppActions& out) {
     setting_slider("Shortest fight saved", "A fight with no boss is saved if it lasts this long.",
                    &s.min_saved_duration_s, 0.0, 600.0, "%.0f s", out, Applies::Engine);
     setting_switch("Save only dungeon fights",
-                   "Keeps the open world out. A dungeon shown as \"Map <number>\" is not one the meter knows.",
+                   "Keeps the open world out. A new dungeon counts before the meter can name it.",
                    &s.save_only_dungeons, out, Applies::Engine);
 
     begin_setting_row("Boss HP", "Max HP that makes an enemy a boss. A guess until captures calibrate it.");

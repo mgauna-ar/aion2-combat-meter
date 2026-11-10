@@ -22,8 +22,9 @@ struct MeterSettings {
     uint64_t boss_min_max_hp{1'000'000};
     /// Fights without a boss are saved when at least this long.
     double min_saved_duration_s{20.0};
-    /// Save only fights in a dungeon (is_dungeon): none in the open world, or before
-    /// the first map load.
+    /// Save only fights in a dungeon (is_dungeon, which goes by the map's id, so one
+    /// the meter cannot name counts): none in the open world, or before the first
+    /// map load.
     bool save_only_dungeons{false};
     /// A killed boss that lost less than this share of its HP (by the server's HP
     /// figures) with hits we saw makes the fight's data partial.
