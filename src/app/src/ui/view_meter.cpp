@@ -797,10 +797,17 @@ void top_bar(const Shown& shown, AppActions& out) {
 
 void overlay_card(const AppFrameInput& in, AppActions& out) {
     OverlaySettings& o = in.settings->overlay;
-    OverlayControls c{"##set_overlay",          &o.locked,                   &o.opacity,
-                      OverlaySettings{}.opacity, &o.scale,                    &o.hide_when_game_unfocused,
-                      &o.show_in_dungeons_only, &out.reset_overlay_position,
-                      "Back to the top-left corner of the main monitor."};
+    const OverlaySettings def{};
+    OverlayControls c;
+    c.id = "##set_overlay";
+    c.locked = &o.locked;
+    c.opacity = &o.opacity;
+    c.default_opacity = def.opacity;
+    c.scale = &o.scale;
+    c.hide_when_game_unfocused = &o.hide_when_game_unfocused;
+    c.show_in_dungeons_only = &o.show_in_dungeons_only;
+    c.reset_position = &out.reset_overlay_position;
+    c.position_help = "Back to the top-left corner of the main monitor.";
     c.before = [&] {
         setting_switch("Show the overlay", "Ctrl+Alt+H hides or shows it.", &o.visible, out, Applies::Overlay);
     };
@@ -808,7 +815,7 @@ void overlay_card(const AppFrameInput& in, AppActions& out) {
         setting_switch("Only in combat", "Hidden outside a fight.", &o.show_in_combat_only, out);
         if (!o.show_in_combat_only) ImGui::BeginDisabled();
         setting_slider("Hide after combat", "How long it stays up once a fight ends, to read the result.",
-                       &o.hide_after_combat_s, 0.0f, 60.0f, OverlaySettings{}.hide_after_combat_s, "%.0f s", out);
+                       &o.hide_after_combat_s, 0.0f, 60.0f, def.hide_after_combat_s, "%.0f s", out);
         if (!o.show_in_combat_only) ImGui::EndDisabled();
     };
     overlay_settings_card(c, out);
@@ -821,11 +828,12 @@ void columns_card(const AppFrameInput& in, AppActions& out) {
     text_dim("What each player's row shows, after their DPS and damage.");
     ImGui::PopTextWrapPos();
     ImGui::Dummy(ImVec2(0.0f, m(2.0f)));
-    const struct {
+    struct Chip {
         const char* label;
         const char* tip;
         bool* value;
-    } chips[] = {
+    };
+    const Chip chips[] = {
         {"Share", "Each player's share of the party's damage.", &o.show_share},
         {"Hits", "HIT: direct hits.", &o.show_hits},
         {"Crit", "CRI: critical hits.", &o.show_crit},
@@ -839,7 +847,7 @@ void columns_card(const AppFrameInput& in, AppActions& out) {
         {"Healing", "Each player's healing.", &o.show_heal},
     };
     bool first = true;
-    for (const auto& chip : chips) {
+    for (const Chip& chip : chips) {
         if (!first) same_line_if_room(toggle_chip_width(chip.label), 6.0f);
         first = false;
         if (toggle_chip(chip.label, chip.value)) {
@@ -850,7 +858,8 @@ void columns_card(const AppFrameInput& in, AppActions& out) {
     }
     ImGui::Dummy(ImVec2(0.0f, m(6.0f)));
     setting_switch("Class colours", "Bars in each player's class colour.", &o.class_bars, out);
-    setting_slider("Rows", "Players shown, best first.", &o.max_rows, 1, 24, OverlaySettings{}.max_rows, "%d", out);
+    const OverlaySettings def{};
+    setting_slider("Rows", "Players shown, best first.", &o.max_rows, 1, 24, def.max_rows, "%d", out);
     end_settings_card();
 }
 
@@ -912,8 +921,9 @@ void tracking_card(const AppFrameInput& in, AppActions& out) {
 
 void history_card(const AppFrameInput& in, AppActions& out) {
     begin_settings_card("##set_history", ICON_HISTORY, "SAVED FIGHTS", colors::Success);
+    const HistorySettings def{};
     setting_slider("Fights kept", "The oldest are deleted first.", &in.settings->history.max_fights, 10, 5000,
-                   HistorySettings{}.max_fights, "%d", out,
+                   def.max_fights, "%d", out,
                    Applies::Engine);
     if (button(ICON_FOLDER "  Open folder")) out.open = OpenTarget::History;
     end_settings_card();

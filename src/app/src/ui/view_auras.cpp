@@ -53,6 +53,7 @@ void cooldowns_card(const AppFrameInput& in, AppActions& out) {
 void alerts_card(const AppFrameInput& in, AppActions& out) {
     begin_settings_card("##auras_alerts", ICON_BELL, "ALERTS", colors::Warning);
     AuraSettings& a = in.settings->auras;
+    const AuraSettings def{};
     setting_switch("Chain skills", "Lights up a chain skill while the game offers it: Decisive Strike after Vicious Strike.",
                    &a.show_chains, out);
     setting_switch("Ready cooldowns",
@@ -61,7 +62,7 @@ void alerts_card(const AppFrameInput& in, AppActions& out) {
     setting_switch("Low HP", "Flags your HP under the threshold below, as a share of your max.", &a.low_hp_alert, out);
     if (!a.low_hp_alert) ImGui::BeginDisabled();
     setting_slider("Low HP under", "Your HP as a share of your max.", &a.low_hp_percent, 5, 90,
-                   AuraSettings{}.low_hp_percent, "%d%%", out);
+                   def.low_hp_percent, "%d%%", out);
     if (!a.low_hp_alert) ImGui::EndDisabled();
     end_settings_card();
 }
@@ -103,15 +104,23 @@ void watch_card(const AppFrameInput& in, AppActions& out) {
 
 void overlay_card(const AppFrameInput& in, AppActions& out) {
     AuraSettings& a = in.settings->auras;
-    OverlayControls c{"##auras_overlay",           &a.locked,                &a.opacity,
-                      AuraSettings{}.opacity,      &a.scale,                 &a.hide_when_game_unfocused,
-                      &a.show_in_dungeons_only,    &out.reset_aura_position, "Back to its spot under the meter overlay's."};
+    const AuraSettings def{};
+    OverlayControls c;
+    c.id = "##auras_overlay";
+    c.locked = &a.locked;
+    c.opacity = &a.opacity;
+    c.default_opacity = def.opacity;
+    c.scale = &a.scale;
+    c.hide_when_game_unfocused = &a.hide_when_game_unfocused;
+    c.show_in_dungeons_only = &a.show_in_dungeons_only;
+    c.reset_position = &out.reset_aura_position;
+    c.position_help = "Back to its spot under the meter overlay's.";
     c.look = [&] {
         setting_switch("Icons", "Icons in a grid, with their time left, instead of bars.", &a.icons, out,
                        Applies::Overlay);
         if (!a.icons) ImGui::BeginDisabled();
         setting_slider("Icon size", "In pixels, before the scale.", &a.icon_size, kMinAuraIcon, kMaxAuraIcon,
-                       AuraSettings{}.icon_size, "%d px", out, Applies::Overlay);
+                       def.icon_size, "%d px", out, Applies::Overlay);
         if (!a.icons) ImGui::EndDisabled();
     };
     overlay_settings_card(c, out);

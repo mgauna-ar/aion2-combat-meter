@@ -66,20 +66,20 @@ bool setting_slider(const char* label, const char* help, int* value, int min, in
 /// One overlay's settings, for the card every plugin page shows the same way.
 struct OverlayControls {
     /// The card's "##" id, which also keeps one page's rows apart from another's.
-    const char* id;
-    bool* locked;
-    float* opacity;
-    float default_opacity;
-    float* scale;
-    bool* hide_when_game_unfocused;
-    bool* show_in_dungeons_only;
+    const char* id{nullptr};
+    bool* locked{nullptr};
+    float* opacity{nullptr};
+    float default_opacity{0.0f};
+    float* scale{nullptr};
+    bool* hide_when_game_unfocused{nullptr};
+    bool* show_in_dungeons_only{nullptr};
     /// The AppActions flag that puts the overlay back where it starts.
-    bool* reset_position;
-    const char* position_help;
+    bool* reset_position{nullptr};
+    const char* position_help{nullptr};
     /// Rows of the page's own: above Lock, after it, and among the conditions.
-    std::function<void()> before{};
-    std::function<void()> look{};
-    std::function<void()> conditions{};
+    std::function<void()> before;
+    std::function<void()> look;
+    std::function<void()> conditions;
 };
 
 /// The "In-game overlay" card: lock, look and position, then when it shows.

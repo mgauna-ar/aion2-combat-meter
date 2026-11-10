@@ -70,16 +70,17 @@ void figures(const AppFrameInput& in) {
 void display_card(const AppFrameInput& in, AppActions& out) {
     begin_settings_card("##ping_display", ICON_GAUGE, "WHAT IT SHOWS", colors::Violet);
     PingSettings& p = in.settings->ping;
+    const PingSettings def{};
     setting_switch("Jitter", "How unevenly the heartbeats arrive: it moves within a second of a lag spike.",
                    &p.show_jitter, out, Applies::Overlay);
     setting_switch("Graph", "The last two minutes: the ping as a line, each second's lateness as bars, and the range.",
                    &p.show_graph, out, Applies::Overlay);
     if (setting_slider("Amber from", "A ping this high or higher shows in amber.", &p.warn_ms, kMinPingThreshold,
-                       kMaxPingThreshold, PingSettings{}.warn_ms, "%d ms", out, Applies::Overlay)) {
+                       kMaxPingThreshold, def.warn_ms, "%d ms", out, Applies::Overlay)) {
         p.bad_ms = std::max(p.bad_ms, p.warn_ms);
     }
     if (setting_slider("Red from", "A ping this high or higher shows in red.", &p.bad_ms, kMinPingThreshold,
-                       kMaxPingThreshold, PingSettings{}.bad_ms, "%d ms", out, Applies::Overlay)) {
+                       kMaxPingThreshold, def.bad_ms, "%d ms", out, Applies::Overlay)) {
         p.warn_ms = std::min(p.warn_ms, p.bad_ms);
     }
     end_settings_card();
@@ -110,10 +111,17 @@ void measure_card(const AppFrameInput& in) {
 
 void overlay_card(const AppFrameInput& in, AppActions& out) {
     PingSettings& p = in.settings->ping;
-    const OverlayControls c{"##ping_overlay",        &p.locked,                &p.opacity,
-                            PingSettings{}.opacity,  &p.scale,                 &p.hide_when_game_unfocused,
-                            &p.show_in_dungeons_only, &out.reset_ping_position,
-                            "Back to its spot beside the meter overlay's."};
+    const PingSettings def{};
+    OverlayControls c;
+    c.id = "##ping_overlay";
+    c.locked = &p.locked;
+    c.opacity = &p.opacity;
+    c.default_opacity = def.opacity;
+    c.scale = &p.scale;
+    c.hide_when_game_unfocused = &p.hide_when_game_unfocused;
+    c.show_in_dungeons_only = &p.show_in_dungeons_only;
+    c.reset_position = &out.reset_ping_position;
+    c.position_help = "Back to its spot beside the meter overlay's.";
     overlay_settings_card(c, out);
 }
 
