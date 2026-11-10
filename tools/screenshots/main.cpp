@@ -186,7 +186,28 @@ ping::PingSnapshot ping_demo(Micros now) {
     return p;
 }
 
-/// The ping overlay over the same backdrop.
+/// What of `canvas` was drawn on: the box around every pixel that is not see-through.
+/// A locked ping overlay draws its panel only, wherever in the window that is.
+shots::Rect drawn_bounds(const shots::Canvas& canvas) {
+    int x0 = canvas.width();
+    int y0 = canvas.height();
+    int x1 = -1;
+    int y1 = -1;
+    for (int y = 0; y < canvas.height(); ++y) {
+        for (int x = 0; x < canvas.width(); ++x) {
+            if (canvas.pixel(x, y).a <= 0.0f) continue;
+            x0 = std::min(x0, x);
+            y0 = std::min(y0, y);
+            x1 = std::max(x1, x);
+            y1 = std::max(y1, y);
+        }
+    }
+    if (x1 < x0) return shots::Rect{0, 0, canvas.width(), canvas.height()};
+    return shots::Rect{x0, y0, x1 - x0 + 1, y1 - y0 + 1};
+}
+
+/// The ping overlay over the same backdrop: what it draws of its window, so a locked
+/// one shows as the panel it is.
 bool render_ping(Scene& scene, const app::PingSettings& settings, const std::filesystem::path& out_dir) {
     ImGuiIO& io = ImGui::GetIO();
     const int w = static_cast<int>(std::lround(scene.width * kScale));
@@ -203,9 +224,10 @@ bool render_ping(Scene& scene, const app::PingSettings& settings, const std::fil
         (void)app::draw_ping(input);
         ImGui::Render();
     }
-    shots::Canvas overlay(w, h, shots::Rgba{0, 0, 0, 0});
-    overlay.draw(*ImGui::GetDrawData());
-    shots::Canvas picture = shots::make_backdrop(w + 2 * kMargin, h + 2 * kMargin);
+    shots::Canvas window(w, h, shots::Rgba{0, 0, 0, 0});
+    window.draw(*ImGui::GetDrawData());
+    const shots::Canvas overlay = window.crop(drawn_bounds(window));
+    shots::Canvas picture = shots::make_backdrop(overlay.width() + 2 * kMargin, overlay.height() + 2 * kMargin);
     picture.paste(overlay, kMargin, kMargin);
     const std::filesystem::path path = out_dir / scene.file;
     if (!picture.write_png(path.string())) {
@@ -442,12 +464,32 @@ int main(int argc, char** argv) {
     Scene ping_scene{"overlay-ping.png", static_cast<float>(ping_settings.width),
                      static_cast<float>(ping_settings.height), ping_snapshot};
     ok = render_ping(ping_scene, ping_settings, out_dir) && ok;
+    // Only the ping: the panel is as large as its line, whatever the window's size.
+    app::PingSettings ping_only = ping_settings;
+    ping_only.show_jitter = false;
+    ping_only.show_graph = false;
+    Scene ping_only_scene = ping_scene;
+    ping_only_scene.file = "overlay-ping-only.png";
+    ok = render_ping(ping_only_scene, ping_only, out_dir) && ok;
     if (all) {
+        // Unlocked, the same window with its header: the figures keep their place and size.
         app::PingSettings unlocked = ping_settings;
         unlocked.locked = false;
-        Scene scene{"overlay-ping-unlocked.png", static_cast<float>(ping_settings.width),
-                    static_cast<float>(ping_settings.height) + 26.0f, ping_snapshot};
+        Scene scene = ping_scene;
+        scene.file = "overlay-ping-unlocked.png";
         ok = render_ping(scene, unlocked, out_dir) && ok;
+        app::PingSettings only_unlocked = ping_only;
+        only_unlocked.locked = false;
+        scene.file = "overlay-ping-only-unlocked.png";
+        ok = render_ping(scene, only_unlocked, out_dir) && ok;
+        app::PingSettings no_graph = ping_settings;
+        no_graph.show_graph = false;
+        scene.file = "overlay-ping-no-graph.png";
+        ok = render_ping(scene, no_graph, out_dir) && ok;
+        // Too narrow for both: the jitter goes under the ping.
+        scene.file = "overlay-ping-no-graph-narrow.png";
+        scene.width = 150.0f;
+        ok = render_ping(scene, no_graph, out_dir) && ok;
     }
     ImGuiContext* overlay_ctx = ImGui::GetCurrentContext();
 

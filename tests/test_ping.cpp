@@ -366,3 +366,15 @@ TEST_CASE(PingView, EachSecondHasItsColumn) {
     TEST_ASSERT_EQ(empty.columns.size(), app::kPingGraphColumns);
     TEST_ASSERT_NEAR(empty.top_ms, 50.0f, 1e-6f);
 }
+
+TEST_CASE(PingView, TheJitterSitsBesideThePingWhileBothFit) {
+    // The ping alone is its own width, however narrow the window.
+    TEST_ASSERT(app::ping_row_layout(100.0f, 0.0f, 14.0f, 400.0f) == (app::PingRowLayout{1, 100.0f}));
+    TEST_ASSERT(app::ping_row_layout(100.0f, 0.0f, 14.0f, 60.0f) == (app::PingRowLayout{1, 100.0f}));
+    // Both on one line, the gap between them, up to exactly the room there is.
+    TEST_ASSERT(app::ping_row_layout(100.0f, 80.0f, 14.0f, 400.0f) == (app::PingRowLayout{1, 194.0f}));
+    TEST_ASSERT(app::ping_row_layout(100.0f, 80.0f, 14.0f, 194.0f) == (app::PingRowLayout{1, 194.0f}));
+    // A pixel short, and the jitter goes under: the line is as wide as the wider.
+    TEST_ASSERT(app::ping_row_layout(100.0f, 80.0f, 14.0f, 193.0f) == (app::PingRowLayout{2, 100.0f}));
+    TEST_ASSERT(app::ping_row_layout(60.0f, 80.0f, 14.0f, 100.0f) == (app::PingRowLayout{2, 80.0f}));
+}

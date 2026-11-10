@@ -23,6 +23,14 @@ A third window you place like the meter's (unlock with Ctrl+Alt+L, drag, resize)
   pings.
 - **Hiding it:** locked, it can hide while the game is not in front, and outside
   dungeons, by its own settings. Jitter and the graph each have a switch.
+- **Locking it changes nothing but the header.** Unlocked, a header to drag it by sits
+  on top; locked, the header goes and the figures stay where they were, at the size
+  they had. Size the graph unlocked and that is the graph you get.
+- **Only the ping:** with the graph switched off, the panel is as large as its one
+  line, whatever size the window was. Switch the jitter off too and it is the ping
+  alone. Unlocked, the window still shows around it, to move it by.
+
+![The ping overlay with jitter and graph switched off: a small panel with the ping alone](../../docs/images/overlay-ping-only.png)
 
 ![The Ping page: the plugin's switch, the ping, jitter and range now, what the overlay shows, and how it is measured](../../docs/images/app-ping.png)
 
@@ -62,9 +70,9 @@ and saves as you go.
 | `locked` | false | Click-through and fixed in place. |
 | `opacity` | 0.55 | Background opacity, 0 to 1. The figures and the graph stay opaque. |
 | `scale` | 1.0 | Size, 0.6 to 2.5, on top of the monitor's DPI scaling. |
-| `x`, `y`, `width`, `height` | -1, -1, 210, 130 | Position and size in screen pixels. -1, -1 places it right of the meter overlay's default spot. |
+| `x`, `y`, `width`, `height` | -1, -1, 210, 156 | Position and size in screen pixels, the header shown while unlocked included: locked, the panel is that much shorter. -1, -1 places it right of the meter overlay's default spot. |
 | `show_jitter` | true | The jitter, beside the ping. |
-| `show_graph` | true | The graph, and the least, average and most under it. |
+| `show_graph` | true | The graph, and the least, average and most under it. Off, the panel shrinks to its line of figures. |
 | `warn_ms` | 120 | A ping this high or higher shows in amber, 10 to 1000. |
 | `bad_ms` | 200 | A ping this high or higher shows in red; never under `warn_ms`. |
 | `hide_when_game_unfocused` | false | Hide it while neither the game nor the meter's window is in front. Applies only while locked. |

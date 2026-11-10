@@ -9,6 +9,7 @@
 #include "imgui_internal.h"
 
 #include <algorithm>
+#include <cfloat>
 #include <cmath>
 
 namespace aion2::app::chrome {
@@ -65,6 +66,11 @@ bool build_overlay_fonts(const std::string& regular_ttf, const std::string& bold
     return regular;
 }
 
+float bold_text_width(const std::string& s) {
+    const ImFont* font = bold_font();
+    return font->CalcTextSizeA(font->FontSize * ImGui::GetIO().FontGlobalScale, FLT_MAX, 0.0f, s.c_str()).x;
+}
+
 BoldScope::BoldScope() { ImGui::PushFont(bold_font()); }
 
 BoldScope::~BoldScope() { ImGui::PopFont(); }
@@ -90,13 +96,31 @@ std::string fit(const std::string& s, float width) {
     return out + "...";
 }
 
+ImVec2 window_padding(float scale) noexcept { return ImVec2(10.0f * scale, 8.0f * scale); }
+
+ImVec2 item_spacing(float scale) noexcept { return ImVec2(7.0f * scale, 4.0f * scale); }
+
+float header_height(float scale) {
+    // The title line (its buttons are no taller), and the rule with the spacing
+    // above and below it.
+    return ImGui::GetTextLineHeight() + 1.0f + 2.0f * item_spacing(scale).y;
+}
+
+float dot_width(float scale) noexcept { return 8.0f * scale; }
+
 bool begin(const char* id, float opacity, float scale, bool interactive) {
-    ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f));
-    ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
+    return begin(id, opacity, scale, interactive, ImVec2(0.0f, 0.0f), ImGui::GetIO().DisplaySize);
+}
+
+bool begin(const char* id, float opacity, float scale, bool interactive, ImVec2 pos, ImVec2 size) {
+    ImGui::SetNextWindowPos(pos);
+    ImGui::SetNextWindowSize(size);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 8.0f * scale);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(10.0f * scale, 8.0f * scale));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, window_padding(scale));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1.0f);
-    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(7.0f * scale, 4.0f * scale));
+    // A panel fitted to one line is under ImGui's own least window size.
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowMinSize, ImVec2(1.0f, 1.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, item_spacing(scale));
     ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f * scale);
     ImGui::PushStyleColor(ImGuiCol_WindowBg, rgba(colors::Background, opacity));
     ImGui::PushStyleColor(ImGuiCol_Border, rgba(colors::Border, interactive ? 1.0f : std::min(1.0f, opacity + 0.2f)));
@@ -111,12 +135,12 @@ bool begin(const char* id, float opacity, float scale, bool interactive) {
 void end() {
     ImGui::End();
     ImGui::PopStyleColor(3);
-    ImGui::PopStyleVar(5);
+    ImGui::PopStyleVar(6);
 }
 
 void dot(Rgb color, float scale, float alpha) {
     const float line = ImGui::GetTextLineHeight();
-    const float d = 8.0f * scale;
+    const float d = dot_width(scale);
     const ImVec2 p = ImGui::GetCursorScreenPos();
     ImGui::Dummy(ImVec2(d, line));
     const ImVec2 center(p.x + d * 0.5f, p.y + line * 0.5f + 0.5f * scale);

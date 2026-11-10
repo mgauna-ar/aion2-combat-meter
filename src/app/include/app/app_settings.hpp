@@ -120,7 +120,9 @@ struct PingSettings {
     int x{-1};
     int y{-1};
     int width{210};
-    int height{130};
+    /// The header's strip, shown while unlocked, is part of it: locked, the panel is
+    /// that much shorter.
+    int height{156};
     /// The heartbeats' jitter, beside the ping.
     bool show_jitter{true};
     /// The last two minutes, with the least, average and most under them.
