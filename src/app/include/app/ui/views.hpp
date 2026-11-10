@@ -8,6 +8,7 @@
 #include "app/imgui_guard.hpp"
 
 #include <cstdint>
+#include <functional>
 
 namespace aion2::app::ui {
 
@@ -48,13 +49,41 @@ enum class Applies : uint8_t {
 bool setting_switch(const char* label, const char* help, bool* value, AppActions& out,
                     Applies applies = Applies::Saved);
 /// A settings row with a slider. A drag marks the settings changed (and previews an
-/// overlay edit); letting go saves them and hands a meter edit to the engine.
-bool setting_slider(const char* label, const char* help, float* value, float min, float max, const char* format,
+/// overlay edit); letting go saves them and hands a meter edit to the engine. `def`
+/// is the setting's default: while the value is off it, the row shows a button that
+/// puts it back. True when the value changed, by the slider or by that button.
+bool setting_slider(const char* label, const char* help, float* value, float min, float max, float def,
+                    const char* format, AppActions& out, Applies applies = Applies::Saved);
+bool setting_slider(const char* label, const char* help, double* value, double min, double max, double def,
+                    const char* format, AppActions& out, Applies applies = Applies::Saved);
+bool setting_slider(const char* label, const char* help, int* value, int min, int max, int def, const char* format,
                     AppActions& out, Applies applies = Applies::Saved);
-bool setting_slider(const char* label, const char* help, double* value, double min, double max, const char* format,
-                    AppActions& out, Applies applies = Applies::Saved);
-bool setting_slider(const char* label, const char* help, int* value, int min, int max, const char* format,
-                    AppActions& out, Applies applies = Applies::Saved);
+
+/// The fold at the foot of a settings card that keeps its fine tuning out of the
+/// way: closed until asked for. True while open; the caller then emits its rows.
+[[nodiscard]] bool advanced_section(const char* id);
+
+/// One overlay's settings, for the card every plugin page shows the same way.
+struct OverlayControls {
+    /// The card's "##" id, which also keeps one page's rows apart from another's.
+    const char* id;
+    bool* locked;
+    float* opacity;
+    float default_opacity;
+    float* scale;
+    bool* hide_when_game_unfocused;
+    bool* show_in_dungeons_only;
+    /// The AppActions flag that puts the overlay back where it starts.
+    bool* reset_position;
+    const char* position_help;
+    /// Rows of the page's own: above Lock, after it, and among the conditions.
+    std::function<void()> before{};
+    std::function<void()> look{};
+    std::function<void()> conditions{};
+};
+
+/// The "In-game overlay" card: lock, look and position, then when it shows.
+void overlay_settings_card(const OverlayControls& c, AppActions& out);
 
 #endif // HAVE_IMGUI
 

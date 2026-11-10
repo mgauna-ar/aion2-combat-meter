@@ -39,7 +39,7 @@ void draw_shadow(ImDrawList* dl, const ImVec2& p_min, const ImVec2& p_max, float
         const float spread = m(static_cast<float>(i));
         dl->AddRectFilled(ImVec2(p_min.x - spread * 0.5f, p_min.y + spread * 0.4f),
                           ImVec2(p_max.x + spread * 0.5f, p_max.y + spread),
-                          colors::with_alpha(0x000000FFu, 0.055f), rounding + spread);
+                          colors::with_alpha(colors::rgb(0, 0, 0), 0.055f), rounding + spread);
     }
 }
 
@@ -515,9 +515,12 @@ void empty_state(const char* icon, const char* title, const char* hint) {
     ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (avail.x - title_size.x) * 0.5f);
     text_colored_u32(colors::TextMuted, "%s", title);
 
-    const ImVec2 hint_size = ImGui::CalcTextSize(hint);
-    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (avail.x - hint_size.x) * 0.5f);
+    // A hint wider than the pane wraps, centred as a block, rather than run off it.
+    const float hint_w = std::min(ImGui::CalcTextSize(hint).x, std::max(avail.x - m(24.0f), m(80.0f)));
+    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + std::max((avail.x - hint_w) * 0.5f, 0.0f));
+    ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + hint_w + 1.0f);
     text_dim("%s", hint);
+    ImGui::PopTextWrapPos();
 }
 
 // ---------------------------------------------------------------- inputs ----
@@ -544,6 +547,35 @@ bool toggle(const char* id, bool* value) {
     const float knob_x = on ? (p.x + width - radius) : (p.x + radius);
     dl->AddCircleFilled(ImVec2(knob_x, p.y + radius), radius - m(2.5f),
                         on ? colors::White : colors::TextDim);
+    return changed;
+}
+
+float toggle_chip_width(const char* label) {
+    return ImGui::CalcTextSize(label, nullptr, true).x + m(24.0f);
+}
+
+bool toggle_chip(const char* label, bool* value) {
+    const float width = toggle_chip_width(label);
+    const float height = ImGui::GetTextLineHeight() + m(10.0f);
+    const ImVec2 p = ImGui::GetCursorScreenPos();
+    ImGui::InvisibleButton(label, ImVec2(width, height));
+    const bool changed = ImGui::IsItemClicked();
+    if (changed) *value = !*value;
+
+    const bool on = *value;
+    const bool hovered = ImGui::IsItemHovered();
+    const ImVec2 p_max(p.x + width, p.y + height);
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    const float radius = height * 0.5f;
+    if (on) {
+        dl->AddRectFilled(p, p_max, colors::with_alpha(colors::Accent, hovered ? 0.42f : 0.30f), radius);
+        dl->AddRect(p, p_max, colors::with_alpha(colors::AccentHover, 0.85f), radius);
+    } else {
+        dl->AddRectFilled(p, p_max, hovered ? colors::SurfaceRaised : colors::SurfaceLow, radius);
+        dl->AddRect(p, p_max, colors::BorderStrong, radius);
+    }
+    const char* end = ImGui::FindRenderedTextEnd(label);
+    dl->AddText(ImVec2(p.x + m(12.0f), p.y + m(5.0f)), on ? colors::TextPrimary : colors::TextDim, label, end);
     return changed;
 }
 

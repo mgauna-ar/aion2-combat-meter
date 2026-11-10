@@ -528,6 +528,19 @@ int main(int argc, char** argv) {
         AppScene dashboard{"app-dashboard.png", done.snapshot, damage.history, {}};
         dashboard.view.page = app::AppPage::Dashboard;
         ok = render_app(dashboard, app_settings, out_dir) && ok;
+        // Before the game is found: what the dashboard and the meter page say to do.
+        AppScene waiting{"app-dashboard-waiting.png", pipeline::LiveSnapshot{}, {}, {}};
+        waiting.view.page = app::AppPage::Dashboard;
+        ok = render_app(waiting, app_settings, out_dir) && ok;
+        AppScene no_fight{"app-meter-waiting.png", pipeline::LiveSnapshot{}, {}, {}};
+        no_fight.view.open_meter_tab = app::MeterTab::Damage;
+        ok = render_app(no_fight, app_settings, out_dir) && ok;
+        // No player selected: the hint under the ranking.
+        AppScene unselected = damage;
+        unselected.file = "app-damage-unselected.png";
+        unselected.view.damage_player = 0;
+        unselected.view.open_meter_tab = app::MeterTab::Damage;
+        ok = render_app(unselected, app_settings, out_dir) && ok;
         AppScene app_page{"app-app-settings.png", done.snapshot, damage.history, {}};
         app_page.view.page = app::AppPage::Settings;
         // A newer release found, so the Updates card and the sidebar pill show.

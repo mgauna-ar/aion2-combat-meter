@@ -165,7 +165,8 @@ void stat_tile_row(const StatTileSpec* tiles, size_t count, const char* const* t
 /// the class is not known.
 void class_badge(game::AionClass cls);
 
-/// Centered placeholder for a table or graph with nothing in it yet.
+/// Centered placeholder for a table or graph with nothing in it yet. A hint wider
+/// than the space wraps.
 void empty_state(const char* icon, const char* title, const char* hint);
 
 // ---------------------------------------------------------------- inputs ----
@@ -173,6 +174,13 @@ void empty_state(const char* icon, const char* title, const char* hint);
 /// Sliding switch. Same contract as ImGui::Checkbox: returns true on the frame the
 /// value changed. `id` is a "##"-style identifier; the label belongs to setting_row.
 bool toggle(const char* id, bool* value);
+
+/// A switch as a pill with its label inside, lit while on: for a set of on/off
+/// choices too many for a row each. Same contract as toggle(). The label's "##" part
+/// is its id.
+bool toggle_chip(const char* label, bool* value);
+/// Width toggle_chip() takes for `label`, to wrap a run of them (same_line_if_room).
+[[nodiscard]] float toggle_chip_width(const char* label);
 
 enum class ButtonKind { Primary, Secondary, Danger };
 /// Small, Medium and Large are minimum widths: a longer label widens the button

@@ -75,11 +75,11 @@ void display_card(const AppFrameInput& in, AppActions& out) {
     setting_switch("Graph", "The last two minutes: the ping as a line, each second's lateness as bars, and the range.",
                    &p.show_graph, out, Applies::Overlay);
     if (setting_slider("Amber from", "A ping this high or higher shows in amber.", &p.warn_ms, kMinPingThreshold,
-                       kMaxPingThreshold, "%d ms", out, Applies::Overlay)) {
+                       kMaxPingThreshold, PingSettings{}.warn_ms, "%d ms", out, Applies::Overlay)) {
         p.bad_ms = std::max(p.bad_ms, p.warn_ms);
     }
     if (setting_slider("Red from", "A ping this high or higher shows in red.", &p.bad_ms, kMinPingThreshold,
-                       kMaxPingThreshold, "%d ms", out, Applies::Overlay)) {
+                       kMaxPingThreshold, PingSettings{}.bad_ms, "%d ms", out, Applies::Overlay)) {
         p.warn_ms = std::min(p.warn_ms, p.bad_ms);
     }
     end_settings_card();
@@ -109,41 +109,12 @@ void measure_card(const AppFrameInput& in) {
 }
 
 void overlay_card(const AppFrameInput& in, AppActions& out) {
-    begin_settings_card("##ping_overlay", ICON_MONITOR, "IN-GAME OVERLAY", colors::Accent);
     PingSettings& p = in.settings->ping;
-    setting_switch("Lock", "Click-through and fixed in place. Ctrl+Alt+L locks or unlocks every overlay.", &p.locked,
-                   out, Applies::Overlay);
-    setting_slider("Opacity", "Of its background; the figures stay solid.", &p.opacity, 0.0f, 1.0f, "%.2f", out,
-                   Applies::Overlay);
-    setting_slider("Scale", "On top of the monitor's own scaling.", &p.scale, 0.6f, 2.5f, "%.2fx", out,
-                   Applies::Overlay);
-    begin_setting_row("Position", "Back to its spot beside the meter overlay's.");
-    if (button(ICON_RESET "  Reset position##ping", ButtonKind::Secondary, ButtonSize::Fit)) {
-        out.reset_ping_position = true;
-    }
-    end_setting_row();
-    end_settings_card();
-}
-
-void visibility_card(const AppFrameInput& in, AppActions& out) {
-    begin_settings_card("##ping_visibility", ICON_EYE, "OVERLAY VISIBILITY", colors::Violet);
-    PingSettings& p = in.settings->ping;
-    // Conditions apply only while locked, so the overlay can always be dragged back.
-    if (!p.locked) ImGui::BeginDisabled();
-    setting_switch("Hide when the game is not in front", "Hidden while another program has the focus.",
-                   &p.hide_when_game_unfocused, out);
-    setting_switch("Only in dungeons", "Hidden in the open world. A new dungeon counts before the meter can name it.",
-                   &p.show_in_dungeons_only, out);
-    if (!p.locked) ImGui::EndDisabled();
-    ImGui::Dummy(ImVec2(0.0f, m(2.0f)));
-    ImGui::PushTextWrapPos(0.0f);
-    if (!p.locked) {
-        text_colored_u32(colors::WarningLight, ICON_WARNING "  Lock the overlay for these to apply.");
-    } else {
-        text_dim("They apply while the overlay is locked; unlocked, it always shows.");
-    }
-    ImGui::PopTextWrapPos();
-    end_settings_card();
+    const OverlayControls c{"##ping_overlay",        &p.locked,                &p.opacity,
+                            PingSettings{}.opacity,  &p.scale,                 &p.hide_when_game_unfocused,
+                            &p.show_in_dungeons_only, &out.reset_ping_position,
+                            "Back to its spot beside the meter overlay's."};
+    overlay_settings_card(c, out);
 }
 
 } // namespace
@@ -155,9 +126,8 @@ void render_ping_page(const AppFrameInput& in, AppViewState&, AppActions& out) {
     figures(in);
     const SettingsSection sections[] = {
         {[&] { display_card(in, out); }},
-        {[&] { measure_card(in); }},
         {[&] { overlay_card(in, out); }},
-        {[&] { visibility_card(in, out); }},
+        {[&] { measure_card(in); }},
     };
     render_settings_grid(sections, std::size(sections));
 }

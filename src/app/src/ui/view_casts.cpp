@@ -116,7 +116,8 @@ void casts_tab(const meter::FightSummary& f, AppViewState& state) {
         {"Active", 54.0f,
          "Time spent hitting: the gaps of 3 s or less between the player's own direct hits, of the fight.", 4},
     };
-    if (begin_table("##CastsTable", cols, static_cast<int>(std::size(cols)), table_height(open != nullptr))) {
+    if (begin_table("##CastsTable", cols, static_cast<int>(std::size(cols)),
+                    table_height(rows.size(), open != nullptr))) {
         const double top = std::max(rows.front()->casts_per_minute(f.duration_s), 1.0);
         int rank = 0;
         for (const auto* c : rows) {
@@ -136,7 +137,11 @@ void casts_tab(const meter::FightSummary& f, AppViewState& state) {
         }
         ImGui::EndTable();
     }
-    if (open != nullptr) casts_breakdown(f, *open, state.casts_player);
+    if (open == nullptr) {
+        select_hint("Click a row above for what that player pressed.");
+        return;
+    }
+    casts_breakdown(f, *open, state.casts_player);
 }
 
 #endif // HAVE_IMGUI
