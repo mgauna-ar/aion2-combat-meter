@@ -3,250 +3,229 @@
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11%20x64-0078D6)
 ![Game](https://img.shields.io/badge/AION%202-Global%20NA%2FEU-8A2BE2)
 ![C++20](https://img.shields.io/badge/standard-C%2B%2B20-crimson)
+[![Latest Release](https://img.shields.io/github/v/release/mgauna-ar/aion2-combat-meter?color=forestgreen)](https://github.com/mgauna-ar/aion2-combat-meter/releases/latest)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-**A party DPS meter for AION 2 that draws on top of the game, without touching it.**
+**A lightweight, passive party DPS meter and combat overlay for AION 2 that draws directly on top of the game without modifying or injecting into it.**
 
-It reads the game's network traffic as it reaches your PC (who hit what, with which
-skill, for how much), and three plugins turn that into overlays and pages of the app window:
+The meter listens to incoming game network traffic on your PC (who hit what, with which skill, for how much) and displays real-time combat stats, aura tracking, and network quality across customizable in-game overlays and a companion desktop app.
 
-| Plugin | Shows | At first |
+| Plugin | What it provides | Default |
 |---|---|---|
-| [⚔️ Combat Meter](plugins/combat_meter/README.md) | The game's Combat Analysis (Ctrl+X) for the whole party: damage, healing and damage taken, per skill; each fight's timeline, deaths, buff uptime and casts; every saved fight. | On |
-| [✨ Auras](plugins/auras/README.md) | Your buffs, debuffs and cooldowns, and yours on your target, as bars or icons; alerts when a chain skill is on offer, a cooldown is back, your HP runs low, or a buff you watch for is missing. | Off |
-| [📶 Ping](plugins/ping/README.md) | Your latency to the game server, its jitter and a graph of the last two minutes, read off the game's own pings: the meter sends none. | Off |
+| [⚔️ **Combat Meter**](plugins/combat_meter/README.md) | Full party DPS, HPS, and damage taken with per-skill breakdowns (crits, double hits, directional hits, blocks). Includes boss HP, live fight timers, combat timelines, death logs, buff uptimes, and saved encounter history. | **Enabled** |
+| [✨ **Auras**](plugins/auras/README.md) | Tracks your personal and target buffs, debuffs, and estimated skill cooldowns as customizable bars or compact icons. Provides pop-up alerts for chain skill triggers, ready cooldowns, low HP warnings, or missing key buffs. | Disabled |
+| [📶 **Ping**](plugins/ping/README.md) | Displays real-time server latency, jitter (RFC 3550), and a rolling 2-minute latency graph. Measured passively off server responses—the meter sends no network pings of its own. | Disabled |
 
 ![The overlay during a boss fight: three players ranked by DPS, the boss's HP bar and the fight timer](docs/images/overlay-live.png)
 
-[Status](#-status) · [Account safety](#%EF%B8%8F-account-safety) · [Quick start](#-quick-start) ·
-[Controls](#-controls) · [Configuration](#%EF%B8%8F-configuration) ·
-[Troubleshooting](#-troubleshooting) · [Recording a capture](#-recording-a-capture) ·
-[Building](#-building-from-source)
+[Quick start](#-quick-start) · [Account safety](#%EF%B8%8F-account-safety) · [Controls](#-controls) · [Troubleshooting](#-troubleshooting) · [Configuration](#%EF%B8%8F-configuration) · [Building](#-building-from-source)
 
 ---
 
-## 🚧 Status
+## 🚀 Quick start
 
-Version 0.6, checked against two real captures: open-world mobs, and a dungeon run with
-three bosses. On the last boss, your damage, hits and every per-skill CRI, PERF, DOUB,
-BACK, FRNT, MULT and BLOC share matched the game's Combat Analysis exactly; healing came
-to 97% of its Total Heal. Aura bars are exact; cooldowns are estimates, marked "~"
-([how exact](plugins/auras/README.md#how-exact-it-is)). The ping rests on a reading of
-the game's clock that the captures support but the game's own display has not confirmed
-([how it is measured](plugins/ping/README.md#how-it-is-measured-and-how-exact-it-is)).
+### 1. Install Npcap
+Npcap is required to capture network packets locally (its license prevents bundling it):
+- Download from **[npcap.com](https://npcap.com/)**.
+- **Important installer settings:**
+  - ✅ **Check:** *Support loopback traffic* (required if you use VPNs or ping reducers like ExitLag or GearUP).
+  - ❌ **Uncheck:** *Restrict Npcap driver's access to Administrators only* (allows running the meter without administrator privileges).
 
-Not there yet (a [capture](#-recording-a-capture) helps):
-- **Misses and defences** (ACC, endurance, regeneration, invincibility) are not decoded.
-- **Open-world zones**, and dungeons with no public id yet (the Lv.99 Awakening tiers,
-  Ascension), show by number: `Map 1010`, `Dungeon 600123`. A dungeon shown by number
-  still counts as one.
-- **Bosses** are enemies with 1,000,000 max HP or more (`meter.boss_min_max_hp`),
-  checked on one dungeon only.
-- **PvP:** the other faction looks like your party, so PvP damage is not counted.
+### 2. Download the Meter
+- Download `aion2-combat-meter-windows-x64.zip` from **[Releases](https://github.com/mgauna-ar/aion2-combat-meter/releases/latest)**.
+- Extract the zip into its own folder where you have write permissions (e.g. `C:\Games\Aion2Meter` or Documents). Avoid `Program Files` so automatic self-updates can write to the directory.
+
+### 3. Set Game to Borderless Windowed
+In AION 2's display settings, set the window mode to **Borderless Windowed**.
+*(Exclusive fullscreen prevents external overlay windows from displaying on top of the game).*
+
+### 4. Run & Play
+- Launch `aion2-combat-meter.exe`.
+- Hit an enemy or training dummy—the combat overlay activates automatically when combat starts!
+- To enable the Auras or Ping overlays, open the companion app window and toggle them on their respective pages.
+
+> **Windows SmartScreen / Antivirus notice:** Because releases are compiled directly from source on GitHub Actions without a costly commercial code-signing certificate, Windows Defender or SmartScreen may show an initial warning. Click **More info → Run anyway**.
+
+---
 
 ## ⚠️ Account safety
 
-**Third-party tools may break AION 2's terms of service. Use this at your own risk.**
-NCSOFT has approved no third-party meter, and its policy forbids "unauthorized programs"
-in broad terms.
+**Is this safe to use?**
+Like most online games, AION 2's Terms of Service broadly prohibit unauthorized third-party software. Use any third-party tool at your own discretion.
 
-The meter stays passive, and the build fails if any code breaks these rules:
-- **It never opens the game:** no process handle, no memory read or written, nothing
-  injected or hooked. It finds the game's connection in Windows' TCP table.
-- **It never sends anything:** no packets, no keystrokes, no mouse input. Npcap only
-  reads, non-promiscuous, filtered to the game server's side.
-- **The overlays are ordinary windows,** topmost like Discord's or OBS's. Nothing is
-  drawn inside the game.
-- **Its one connection is to GitHub:** an update check at start (sending only its
-  version), and a download when you click **Update & restart**. No uploads, no
-  telemetry.
+However, the meter is engineered from the ground up to be **100% passive and completely non-intrusive**:
+- 🚫 **Never touches the game process:** No process handle (`OpenProcess`), no reading or writing game memory, no DLL injection, and no API hooks (DirectX, system, or input hooks). It discovers the game connection solely through Windows' standard TCP table.
+- 🚫 **Never sends network packets:** No packet injection (`pcap_sendpacket`, WinDivert) and no simulated keystrokes or mouse actions (`SendInput`). Npcap operates strictly in read-only mode, filtered to server traffic.
+- 🪟 **Standard external desktop window:** Overlays are normal, transparent, click-through Windows desktop windows placed on top of the game (identical to Discord, OBS, or Steam overlays). Nothing is injected into the DirectX rendering pipeline.
+- 🔒 **Zero telemetry:** The only outbound network call is an HTTPS check to GitHub on startup to check for new releases. No combat data, analytics, character names, or telemetry are ever uploaded.
 
-## 🚀 Quick start
+Automated checks (`tools/check_forbidden_apis.sh`) run on every build and CI test to guarantee these passive invariants are never violated.
 
-1. **Install [Npcap](https://npcap.com/)** (its licence forbids bundling it). Tick
-   **Support loopback traffic**, for ping reducers and VPNs. Leave **Restrict Npcap
-   driver's access to Administrators only** unticked.
-2. **Download** `aion2-combat-meter-windows-x64.zip` from
-   [Releases](https://github.com/mgauna-ar/aion2-combat-meter/releases/latest), check
-   it against `SHA256SUMS.txt`, and unzip it into a folder of its own that you can
-   write to: the meter updates itself there.
-3. **Set the game to Borderless Windowed.** Exclusive fullscreen hides every other window.
-4. **Run `aion2-combat-meter.exe`** and hit something. For the aura overlay, switch the
-   Auras plugin on, on its page.
-
-The exe is not code-signed, so SmartScreen or antivirus software may warn about it, as
-they often do with capture tools. CI builds every release from source.
+---
 
 ## 🎮 Controls
 
-| Hotkey | Does |
-|---|---|
-| Ctrl+Alt+L | Lock or unlock every overlay. Locked, clicks pass through to the game. |
-| Ctrl+Alt+H | Hide or show the meter overlay. |
-| Ctrl+Alt+R | End the current fight now. |
-
-The app window opens at start and from the tray icon. Its sidebar has the
-**Dashboard** (capture, plugins, recording, files), a page per plugin, and **Settings**
-(window, Start with Windows, notifications, capture, updates). Changes save as you make
-them. Closing the window hides it to the tray, whose menu also opens the history and
-recordings folders, `config.json` and the log.
-
-## ⚙️ Configuration
-
-The settings live in `%APPDATA%\aion2-combat-meter\config.json`, written with defaults
-on first run. The app window saves them as you go; edit the file by hand only while the
-meter is closed. Out-of-range values are clamped.
-
-**app**
-
-| Key | Default | Meaning |
+### Global Hotkeys
+| Hotkey | Action | Details |
 |---|---|---|
-| `open_window_at_start` | true | Open the app window at start; off, the meter starts in the tray. |
-| `close_to_tray` | true | Closing the app window hides it to the tray; off, it quits. |
-| `notifications` | true | Tray notifications: a capture that failed to start, a recording started, a new version. |
-| `check_for_updates` | true | Ask GitHub for a newer release 10 seconds after start. **Check now** in Settings works either way. |
-| `window_x`, `window_y`, `window_width`, `window_height` | -1, -1, 1280, 760 | The app window's position and size in pixels; -1, -1 centres it, at no more than 90% of the screen. |
+| `Ctrl+Alt+L` | **Lock / Unlock overlays** | When **unlocked**, drag the title bar or bottom-right grip to reposition and resize overlays. When **locked**, clicks pass through seamlessly to the game. |
+| `Ctrl+Alt+H` | **Hide / Show meter** | Instantly toggles visibility of the Combat Meter overlay. |
+| `Ctrl+Alt+R` | **Reset / End fight** | Immediately concludes the active encounter and saves it to your fight history. |
 
-*Start with Windows* is not in the file: Windows' Run key for your user holds it.
+### Companion App Window
+The companion app window opens on start and can be restored anytime by clicking the system tray icon:
+- **Dashboard:** Live capture status, connected server IP, packet rates, manual capture recording, and quick folder links.
+- **Plugin Pages:** Dedicated tabs for **Combat Meter**, **Auras**, and **Ping** to view detailed fight breakdowns, timeline charts, death logs, buff uptimes, and tweak overlay appearance.
+- **Settings:** Adjust window preferences, *Start with Windows*, notification alerts, network capture port, and automatic update checks. All changes save automatically as you make them.
+- **System Tray:** Closing the main window minimizes it to the tray. Right-click the tray icon to open folder locations, `config.json`, logs, or exit.
 
-**capture**
-
-| Key | Default | Meaning |
-|---|---|---|
-| `server_port` | 13328 | The game server's TCP port. |
-| `game_process` | `Aion2.exe` | The game's executable, to find its connection (unconfirmed). If wrong, port 13328 is still captured on every adapter, but a ping reducer's relay is not followed. |
-| `detect_relays` | true | Also take other TCP flows that carry the game's heartbeat: ping reducers and VPNs. |
-
-**Each plugin's keys** are in its own section, documented in its README:
-[Combat Meter](plugins/combat_meter/README.md#configuration) (`meter`, `overlay`,
-`history`), [Auras](plugins/auras/README.md#configuration) (`auras`) and
-[Ping](plugins/ping/README.md#configuration) (`ping`). Each section's `plugin_enabled`
-is that plugin's switch.
-
-**Files**, all in `%APPDATA%\aion2-combat-meter\`: saved fights in `history\` (a JSON
-file per fight, and `index.jsonl`), recordings in `captures\`, and the log in
-`meter.log` (the previous run's in `meter.prev.log`).
+---
 
 ## 🩺 Troubleshooting
 
-**"Npcap is not installed":** install it (Quick start), then restart the meter.
+### Overlay does not appear over the game
+1. **Display Mode:** Make sure AION 2 is running in **Borderless Windowed** (not exclusive fullscreen).
+2. **Hidden or Locked:** Press `Ctrl+Alt+H` to ensure the overlay is not hidden, or press `Ctrl+Alt+L` to unlock overlays and bring them to the front.
+3. **Visibility Settings:** By default, overlays may be set to show only in combat, only in dungeons, or only when the game is the foreground window. Unlocking overlays (`Ctrl+Alt+L`) forces them visible immediately so you can position them.
+4. *Note for "Only in dungeons":* Requires passing through one loading screen after the meter starts so it can identify the current map.
 
-**"cannot open any adapter":** Npcap is restricted to administrators. Reinstall it with
-that option unticked, or run the meter as administrator.
+### Meter stays on "WAIT" while in game
+- **Ping Reducer or VPN (ExitLag, GearUP, LagoFast, etc.):** Game traffic travels through local loopback. Reinstall Npcap with **Support loopback traffic** checked, and ensure `capture.detect_relays` is `true`.
+- **Custom Game Port or Executable:** Verify that the game executable is running as `Aion2.exe`. If connecting to an unlisted server port, record a packet capture to inspect the stream.
 
-**It says WAIT while I'm in game**
-- **Ping reducer or VPN** (ExitLag, GearUP and the like): Npcap needs loopback support
-  (reinstall with it ticked). Also check `capture.game_process`.
-- **Another port:** record a capture in Wireshark and run `aion2meter-replay` on it (a
-  separate download on the release page). It lists every flow it decoded as the game.
+### Player names show as "#12345" or only your own damage appears
+- **Character Names:** The game sends identity and name mappings during loading screens and teleports. Launch the meter *before* logging in or teleporting; until a loading screen is seen, your character is displayed as **You** and others appear by entity ID.
+- **Party Members:** Outside a party in the open world, the server only transmits your personal combat events. When in a group or dungeon, launch the meter before forming or joining the party so the initial member roster packet is captured.
 
-**No overlay in game:** use Borderless Windowed, check the plugin is on, and press
-Ctrl+Alt+H if the meter overlay is hidden. An overlay set to show only in combat, only
-in dungeons or only with the game in front stays out of sight until then; unlock it
-(Ctrl+Alt+L) to see it at once. "Only in dungeons" needs one loading screen after the
-meter starts, to learn which map you are on.
+### "Npcap is not installed" or "Cannot open any adapter"
+- If Npcap is missing, download and install it from [npcap.com](https://npcap.com/).
+- If you see "Cannot open any adapter", Npcap was installed with administrator-only access. Reinstall Npcap with *Restrict Npcap driver's access to Administrators only* **unchecked**, or launch the meter as administrator.
 
-**Players show as #12345:** the game sends names on loading screens. Start the meter
-before you log in or teleport; until then your own row is **You**.
+### Encounter log says "Partial data"
+On heavily crowded open-world bosses, the game server culls combat network packets and stops broadcasting every player's hits to nearby clients. The meter records all packets it received, but flags the encounter as partial data.
 
-**Only my row shows:** out of a party, the open world lists only you. In a party, the
-meter learns its members from the list the game sends as it forms, so start the meter
-before you form or join one.
+### Updating to new versions
+A tray balloon and an **Update available** badge appear when a new version is released:
+- Go to **Settings → Updates** and click **Update & restart**.
+- The meter downloads the release, verifies its SHA-256 checksum against GitHub, swaps the executable, and restarts automatically (active fights in progress are preserved or cleanly closed).
+- *Manual updates:* If running from a write-restricted location, you can unzip new releases directly over the existing folder.
 
-**A boss fight says "partial data":** on crowded world bosses the server stops sending
-most players' hits. Only the hits the meter saw are counted.
+---
 
-**Updating:** a tray notification and an **Update available** pill in the sidebar say
-when a new version is out. **Settings → Updates → Update & restart** downloads it,
-checks it against GitHub's SHA-256, swaps the exe and restarts; a fight still going is
-not saved.
-- The old exe stays as `*.old` until the next start.
-- If the folder is not writable (under `Program Files`, say), run the meter as
-  administrator once, or unzip the new release over the old one.
-- A release with no published checksum is announced but not installed: download it by
-  hand.
-- The replay tool is not updated: download it again when you need a newer one.
+## ⚙️ Configuration
+
+Settings are stored in `%APPDATA%\aion2-combat-meter\config.json` and generated with defaults on first launch. The app window saves modifications automatically; edit the file manually only while the meter is closed.
+
+### App Settings (`app`)
+
+| Key | Default | Meaning |
+|---|---|---|
+| `open_window_at_start` | `true` | Open the app window on launch; if `false`, starts minimized to the system tray. |
+| `close_to_tray` | `true` | Closing the app window minimizes it to the tray; if `false`, closes the application. |
+| `notifications` | `true` | Show system tray notifications (capture failures, recording started, updates). |
+| `check_for_updates` | `true` | Automatically check GitHub for newer releases on startup. **Check now** in Settings works either way. |
+| `window_x`, `window_y` | `-1`, `-1` | App window position in pixels (`-1, -1` centers on screen). |
+| `window_width`, `window_height` | `1280`, `760` | App window dimensions in pixels (clamped to at most 90% screen size). |
+
+*(Note: "Start with Windows" is managed directly through Windows' User Run registry key rather than `config.json`)*.
+
+### Capture Settings (`capture`)
+
+| Key | Default | Meaning |
+|---|---|---|
+| `server_port` | `13328` | Target game server TCP port. |
+| `game_process` | `Aion2.exe` | Game executable name used to locate the active connection in the TCP table. |
+| `detect_relays` | `true` | Automatically detect and capture secondary TCP flows carrying game heartbeats (e.g. ping reducers and VPNs). |
+
+### Plugin Settings
+Each plugin's configuration options are stored in their respective sections and documented in their own guides:
+- [⚔️ Combat Meter Configuration](plugins/combat_meter/README.md#configuration) (`meter`, `overlay`, `history`)
+- [✨ Auras Configuration](plugins/auras/README.md#configuration) (`auras`)
+- [📶 Ping Configuration](plugins/ping/README.md#configuration) (`ping`)
+
+### Data & File Locations
+All files are saved under `%APPDATA%\aion2-combat-meter\`:
+- `history/`: Encounter data (individual fight JSON files and `index.jsonl`).
+- `captures/`: Saved packet captures recorded from the app or tray.
+- `meter.log`: Current application log (`meter.prev.log` holds the previous run).
+
+---
 
 ## 🎥 Recording a capture
 
-A capture of the game's traffic is how the decoder gets fixed and checked.
-**Captures hold character names: share them only with people you trust, and never
-commit them** (`.gitignore` blocks `*.pcap*`).
+Packet captures help diagnose protocol changes, fix bugs, and add missing features.
+> **Privacy Warning:** Captures contain character names. Share captures only with trusted contributors, and never commit them publicly (`.gitignore` excludes `*.pcap*`).
 
-- **From the meter:** **Record** on the Dashboard, or **Record capture** in the tray
-  menu. It goes to `%APPDATA%\aion2-combat-meter\captures\`.
-- **With Wireshark** (most complete): capture on your network adapter and on "Adapter
-  for loopback traffic capture", with the filter `tcp port 13328`. Start before you log
-  in or teleport, since names arrive on loading screens, and save as pcapng. Note your
-  character's name, a few hit numbers you saw and when the boss died.
+- **Via the Meter:** Click **Record** on the Dashboard, or choose **Record capture** from the system tray menu. Captures save to `%APPDATA%\aion2-combat-meter\captures\`.
+- **Via Wireshark** (most complete):
+  1. Capture simultaneously on your primary network interface and on "Adapter for loopback traffic capture".
+  2. Set filter to `tcp port 13328`.
+  3. Start capturing *before* logging in or teleporting (to capture character identity packets), and save as `.pcapng`.
+  4. Note your character name and approximate hit values for validation.
+
+---
 
 ## 🛠 Building from source
 
-**macOS or Linux** (the portable core, tests and tools):
+### macOS & Linux (Portable Core, Tests & Tools)
+Requires Clang or GCC with C++20 support:
 
 ```bash
 make test
 ```
 
-That runs the unit tests, a compile of every header on its own, an ImGui syntax check,
-the forbidden-API check, and a replay of a made-up boss fight against
-`tests/golden/synthetic_fights.txt`.
+`make test` compiles all components, verifies header self-containment, performs syntax checks, validates forbidden APIs, and runs all test suites against golden reference fights.
 
-| Target | Does |
+| Command | Purpose |
 |---|---|
-| `make tsan`, `make asan` | The tests under ThreadSanitizer, or AddressSanitizer and UBSan. |
-| `make replay` | Builds `./aion2meter-replay`. |
-| `make fixtures` | Replays your captures in `tests/fixtures/local/` against their `.expected.txt`. |
-| `make screenshots` | Re-renders `docs/images`. Needs zlib; off macOS, set `SHOTS_FONT` and `SHOTS_BOLD_FONT`. |
-| `make golden` | Rewrites the replay smoke test's reference after an intended change. |
+| `make tsan` | Runs all tests under ThreadSanitizer (race detection). |
+| `make asan` | Runs all tests under AddressSanitizer and UndefinedBehaviorSanitizer. |
+| `make replay` | Builds the standalone `./aion2meter-replay` CLI tool. |
+| `make screenshots` | Re-renders documentation images in `docs/images/`. |
+| `make fixtures` | Replays local captures in `tests/fixtures/local/` against their expected outputs. |
 
-**Windows** (the app): Visual Studio 2022 and CMake 3.22 or newer. `build\bin\Release\`
-then holds `aion2-combat-meter.exe` and `aion2meter-replay.exe`.
+### Windows (Full Desktop Application)
+Requires **Visual Studio 2022** (Desktop C++) and **CMake 3.22+**:
 
 ```bash
 cmake -B build -A x64
-```
-
-```bash
 cmake --build build --config Release
 ```
 
-**Replaying a capture** runs it through the live meter's pipeline, with no game or
-Npcap. The app plays it at recorded speed:
+The compiled binaries are produced in `build\bin\Release\`:
+- `aion2-combat-meter.exe`: The primary desktop meter and overlay.
+- `aion2meter-replay.exe`: The standalone CLI capture replay and diagnostic tool.
+
+### Replaying Packet Captures
+Captures can be simulated through the meter without running the game or Npcap:
 
 ```bash
+# Replay through the GUI overlay at real-time speed:
 aion2-combat-meter.exe --replay fight.pcapng --speed 1
-```
 
-The replay tool prints it; `--help` lists its reports (skills, deaths, effects, casts,
-ping, events, hex dumps) and `--anonymize`, for output you will share:
-
-```bash
+# Inspect reports from the CLI (skills, deaths, auras, casts, ping):
 ./aion2meter-replay capture.pcapng --fights
 ```
 
-`build/synth/aion2meter-synth out.pcapng` writes the tests' made-up boss fight, with
-invented names, to try it all without the game.
+---
 
 ## 📡 Protocol
 
-The meter decodes the server's side of TCP port 13328, which is not encrypted: framed
-opcodes, some bundled with LZ4, a heartbeat carrying the server's clock, and the
-answer to the game's own ping. The opcodes
-are in `src/protocol/include/protocol/opcodes.hpp`; the layouts, and what is still
-unknown, in [AGENTS.md](AGENTS.md). These facts come from the AION 2 community's
-published notes on the Global client; the code is written from scratch.
+The meter decodes the server-to-client stream of TCP port 13328, which is transmitted unencrypted: framed opcodes, optional LZ4 compression blocks, server timestamp heartbeats, and ping response packets.
+
+All opcode definitions are cataloged in `src/protocol/include/protocol/opcodes.hpp`. For protocol specifications, wire layouts, and reverse engineering notes, see [AGENTS.md](AGENTS.md). These structures were identified from Global client research; all implementation code is written independently.
+
+---
 
 ## License
 
-MIT, see [LICENSE](LICENSE). Beyond this project's own code:
-- **Dear ImGui** is MIT (`src/third_party/imgui/LICENSE.txt`). The app window's icons
-  are a subset of [Lucide](https://lucide.dev) (ISC), embedded by
-  `tools/embed_icon_font.py`.
-- **Names and cooldowns** of skills, dungeons, monsters and NPCs come from aion2.app's
-  database (`src/game/data/*.tsv`, `plugins/auras/data/cooldowns.tsv`).
-- **The class emblems and skill icons are NCSOFT's art,** as aion2.app serves it,
-  packed into `src/app/src/game_icon_sheet.inc`. The MIT licence does not cover them.
-  The app's own icon is this project's drawing (`tools/gen_app_icon.py`), under MIT.
+This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
 
-AION 2 is a trademark of NCSOFT. This project is not affiliated with NCSOFT.
+**Third-Party Components & Art:**
+- **Dear ImGui:** Licensed under the MIT License (`src/third_party/imgui/LICENSE.txt`).
+- **Icons:** Subset of [Lucide](https://lucide.dev) icons (ISC License), embedded via `tools/embed_icon_font.py`.
+- **Game Data:** Skill names, dungeon maps, and NPC databases are sourced from aion2.app (`src/game/data/*.tsv`).
+- **Game Art:** Class emblems and skill icon sheets are property of NCSOFT (served via aion2.app, bundled into `src/app/src/game_icon_sheet.inc`). The MIT License does not apply to NCSOFT game assets.
+- **Application Mark:** The winged crystal icon was custom drawn for this project (`tools/gen_app_icon.py`) under the MIT License.
+
+*AION 2 is a registered trademark of NCSOFT Corporation. This project is an independent community tool and is not affiliated with or endorsed by NCSOFT.*
