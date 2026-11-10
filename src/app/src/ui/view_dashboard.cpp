@@ -48,6 +48,64 @@ CaptureLook capture_look(const pipeline::LiveSnapshot* s) {
     return {"Waiting", "No game traffic yet", colors::TextMuted};
 }
 
+/// What to do next, above everything else, until a fight is going: the page's other
+/// cards say what the meter sees, this one what the player should do about it.
+void next_step_banner(const AppFrameInput& in, AppViewState& state) {
+    const pipeline::LiveSnapshot* s = in.snapshot;
+    const bool connected = s != nullptr && s->capture == pipeline::CaptureState::Live;
+    if (connected && s->fight.live) return;
+    const bool meter_on = in.settings == nullptr || in.settings->plugins.enabled(plugins::PluginId::CombatMeter);
+
+    const char* icon = ICON_GAMEPAD;
+    uint32_t accent = colors::Accent;
+    const char* title = "Start AION 2";
+    std::string detail = "Log in to a character: the meter finds the game by itself, a few seconds after its "
+                         "traffic starts.";
+    if (s != nullptr && s->capture == pipeline::CaptureState::Quiet) {
+        icon = ICON_WARNING;
+        accent = colors::Warning;
+        title = "The game went quiet";
+        detail = "Its traffic stopped. If the game is still running, a loading screen or a new login brings it back.";
+    } else if (connected && !meter_on) {
+        icon = ICON_POWER;
+        title = "The Combat Meter is off";
+        detail = "The game is connected, and no fight is being counted. Switch the Combat Meter on on its page.";
+    } else if (connected) {
+        icon = ICON_SWORDS;
+        accent = colors::Success;
+        title = "Connected. Hit something";
+        detail = "The meter starts on the party's first hit, in the overlay and on the Combat Meter page.";
+    }
+
+    CardOptions opts{};
+    opts.auto_height = true;
+    begin_card("##dash_next", ImVec2(0.0f, 0.0f), opts);
+    const char* open_label = ICON_SWORDS "  Open Combat Meter";
+    const float action_w = connected ? button_width(open_label, ButtonSize::Fit) + m(metrics::Gutter) : 0.0f;
+    const float top = ImGui::GetCursorPosY();
+    icon_chip(icon, accent, metrics::ChipSizeLg);
+    ImGui::SameLine(0.0f, m(12.0f));
+    ImGui::BeginGroup();
+    ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + std::max(ImGui::GetContentRegionAvail().x - action_w, m(160.0f)));
+    ImGui::PushFont(bold_font());
+    text_colored_u32(colors::TextPrimary, "%s", title);
+    ImGui::PopFont();
+    text_muted("%s", detail.c_str());
+    // While nothing arrives, what the capture itself reports: a missing Npcap shows here.
+    if (!connected && !in.source_status.empty()) text_dim("%s", in.source_status.c_str());
+    ImGui::PopTextWrapPos();
+    ImGui::EndGroup();
+    if (connected) {
+        const float bottom = ImGui::GetCursorPosY();
+        ImGui::SameLine();
+        right_align(action_w - m(metrics::Gutter));
+        ImGui::SetCursorPosY(top + std::max((bottom - top - m(metrics::ButtonH)) * 0.5f, 0.0f));
+        if (button(open_label, ButtonKind::Primary, ButtonSize::Fit)) state.page = AppPage::Meter;
+    }
+    end_card();
+    ImGui::Dummy(ImVec2(0.0f, m(metrics::Gutter)));
+}
+
 void capture_card(const AppFrameInput& in) {
     begin_settings_card("##dash_capture", ICON_ACTIVITY, "CAPTURE", colors::Accent);
     ImGui::PushTextWrapPos(0.0f);
@@ -136,6 +194,8 @@ void safety_card() {
 void render_dashboard(const AppFrameInput& in, AppViewState& state, AppActions& out) {
     page_header(ICON_DASHBOARD, "Dashboard", "What the capture sees, the plugins, and recordings");
     ImGui::Dummy(ImVec2(0.0f, m(4.0f)));
+
+    next_step_banner(in, state);
 
     const CaptureLook look = capture_look(in.snapshot);
     const pipeline::LiveSnapshot* s = in.snapshot;

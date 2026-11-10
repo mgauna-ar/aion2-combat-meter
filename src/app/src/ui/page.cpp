@@ -73,10 +73,12 @@ void end_settings_card() { end_card(); }
 void render_settings_grid(const SettingsSection* sections, size_t count) {
     if (sections == nullptr || count == 0) return;
 
+    // One scrolling region for the whole grid: two columns that each scrolled on
+    // their own hid half the page behind a second scrollbar.
+    ImGui::BeginChild("##SettingsGrid", ImVec2(0.0f, fill_h(0.0f)), ImGuiChildFlags_None,
+                      ImGuiWindowFlags_NoBackground);
     const int columns = grid_columns(2, metrics::GridMinCol);
     if (columns == 1) {
-        ImGui::BeginChild("##SettingsGridSingle", ImVec2(0.0f, fill_h(0.0f)), ImGuiChildFlags_None,
-                          ImGuiWindowFlags_NoBackground);
         for (size_t i = 0; i < count; ++i) {
             if (i > 0) ImGui::Dummy(ImVec2(0.0f, m(metrics::Gutter)));
             sections[i].body();
@@ -86,22 +88,27 @@ void render_settings_grid(const SettingsSection* sections, size_t count) {
     }
 
     // Sections alternate between the columns rather than filling the left one
-    // first, so a long section does not leave the right column empty.
+    // first, so a long section does not leave the right column empty. Each column
+    // is as tall as its cards and leaves the wheel to the region around it.
     const float col_w = split_w(columns);
-    const float col_h = fill_h(0.0f);
     for (int col = 0; col < columns; ++col) {
         if (col > 0) ImGui::SameLine(0.0f, m(metrics::Gutter));
         char child_id[32];
         std::snprintf(child_id, sizeof(child_id), "##SettingsGridCol%d", col);
-        ImGui::BeginChild(child_id, ImVec2(col_w, col_h), ImGuiChildFlags_None, ImGuiWindowFlags_NoBackground);
+        ImGui::BeginChild(child_id, ImVec2(col_w, 0.0f), ImGuiChildFlags_AutoResizeY,
+                          ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoScrollbar |
+                              ImGuiWindowFlags_NoScrollWithMouse);
         bool first = true;
         for (size_t i = static_cast<size_t>(col); i < count; i += static_cast<size_t>(columns)) {
             if (!first) ImGui::Dummy(ImVec2(0.0f, m(metrics::Gutter)));
             first = false;
             sections[i].body();
         }
+        // Room for the last card's shadow, which the column would clip.
+        ImGui::Dummy(ImVec2(0.0f, m(4.0f)));
         ImGui::EndChild();
     }
+    ImGui::EndChild();
 }
 
 #endif // HAVE_IMGUI

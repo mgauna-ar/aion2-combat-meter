@@ -32,7 +32,8 @@ struct SettingsSection {
     std::function<void()> body;
 };
 
-/// Settings sections in two balanced columns when there is room, one otherwise.
+/// Settings sections in two balanced columns when there is room, one otherwise,
+/// all in one scrolling region.
 void render_settings_grid(const SettingsSection* sections, size_t count);
 
 /// Opens a titled card in a settings grid. Always paired with end_settings_card().

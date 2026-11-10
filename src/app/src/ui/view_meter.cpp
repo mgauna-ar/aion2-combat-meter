@@ -29,6 +29,9 @@ namespace aion2::app::ui {
 
 namespace {
 
+/// " · ", between two facts on one line. Escaped: the source stays ASCII.
+const char* const kDot = " \xC2\xB7 ";
+
 struct Badge {
     const char* label;
     uint32_t color;
@@ -101,7 +104,17 @@ const char* const kTipBlock = "BLOC: hits the target blocked, of the direct hits
 
 } // namespace
 
-float table_height(bool breakdown_open) { return breakdown_open ? fill_h(0.0f) * 0.5f : fill_h(0.0f); }
+float table_height(size_t rows, bool breakdown_open) {
+    // The header and the rows, with a little slack so a table that fits never scrolls.
+    const float row_h = ImGui::GetTextLineHeight() + ImGui::GetStyle().CellPadding.y * 2.0f;
+    const float fit = static_cast<float>(rows + 1) * row_h + m(6.0f);
+    return std::min(fit, breakdown_open ? fill_h(0.0f) * 0.5f : fill_h(0.0f));
+}
+
+void select_hint(const char* what) {
+    if (ImGui::GetContentRegionAvail().y < m(120.0f)) return;
+    empty_state(ICON_CROSSHAIR, "Select a player", what);
+}
 
 const meter::CombatantTotals* find_row(const meter::FightSummary& f, meter::EntityId id) {
     if (id == 0) return nullptr;
@@ -217,7 +230,8 @@ void damage_tab(const meter::FightSummary& f, AppViewState& state) {
         {"BLOC", 50.0f, kTipBlock, 15},
         {"Max", 58.0f, "The player's biggest hit.", 12},
     };
-    if (begin_table("##DamageTable", cols, static_cast<int>(std::size(cols)), table_height(open != nullptr))) {
+    if (begin_table("##DamageTable", cols, static_cast<int>(std::size(cols)),
+                    table_height(rows.size(), open != nullptr))) {
         const double top = std::max(rows.front()->dps, 1.0);
         int rank = 0;
         for (const auto* c : rows) {
@@ -254,7 +268,11 @@ void damage_tab(const meter::FightSummary& f, AppViewState& state) {
         }
         ImGui::EndTable();
     }
-    if (open != nullptr) damage_breakdown(*open, state.damage_player);
+    if (open == nullptr) {
+        select_hint("Click a row above for that player's skills.");
+        return;
+    }
+    damage_breakdown(*open, state.damage_player);
 }
 
 // ----------------------------------------------------------------- healing ---
@@ -280,7 +298,8 @@ void healing_tab(const meter::FightSummary& f, AppViewState& state) {
         {"Share", 52.0f, "Of the party's healing.", 3},
         {"Heals", 50.0f, "Heal records and heal ticks.", 4},
     };
-    if (begin_table("##HealTable", cols, static_cast<int>(std::size(cols)), table_height(open != nullptr))) {
+    if (begin_table("##HealTable", cols, static_cast<int>(std::size(cols)),
+                    table_height(rows.size(), open != nullptr))) {
         const double top = std::max(rows.front()->hps, 1.0);
         int rank = 0;
         for (const auto* c : rows) {
@@ -300,7 +319,11 @@ void healing_tab(const meter::FightSummary& f, AppViewState& state) {
         }
         ImGui::EndTable();
     }
-    if (open == nullptr || !begin_breakdown("##HealBreakdown", "HEALS", *open, state.heal_player)) return;
+    if (open == nullptr) {
+        select_hint("Click a row above for that player's heals, skill by skill.");
+        return;
+    }
+    if (!begin_breakdown("##HealBreakdown", "HEALS", *open, state.heal_player)) return;
     const Column skill_cols[] = {
         {"Skill", 0.0f, nullptr, 0},
         {"Healing", 64.0f, nullptr, 1},
@@ -349,7 +372,8 @@ void taken_tab(const meter::FightSummary& f, AppViewState& state) {
         {"PERF", 50.0f, "Perfect hits, of the hits taken.", 4},
         {"FRNT", 50.0f, "Hits to the player's front, of the hits taken.", 5},
     };
-    if (begin_table("##TakenTable", cols, static_cast<int>(std::size(cols)), table_height(open != nullptr))) {
+    if (begin_table("##TakenTable", cols, static_cast<int>(std::size(cols)),
+                    table_height(rows.size(), open != nullptr))) {
         const uint64_t top = std::max<uint64_t>(rows.front()->damage_taken, 1);
         int rank = 0;
         for (const auto* c : rows) {
@@ -367,7 +391,11 @@ void taken_tab(const meter::FightSummary& f, AppViewState& state) {
         }
         ImGui::EndTable();
     }
-    if (open == nullptr || !begin_breakdown("##TakenBreakdown", "HIT BY", *open, state.taken_player)) return;
+    if (open == nullptr) {
+        select_hint("Click a row above for what hit that player.");
+        return;
+    }
+    if (!begin_breakdown("##TakenBreakdown", "HIT BY", *open, state.taken_player)) return;
     const Column skill_cols[] = {
         {"Skill", 0.0f, "The enemy's skill. Enemy skills have no names in the table: their codes show.", 0},
         {"Source", 100.0f, nullptr, 3},
@@ -396,66 +424,6 @@ void taken_tab(const meter::FightSummary& f, AppViewState& state) {
 
 // -------------------------------------------------------------------- rail ---
 
-float rail_row_height() { return ImGui::GetTextLineHeight() + m(6.0f); }
-
-/// One saved fight: outcome dot, number and duration, then the boss's HP left and
-/// the start time while they fit. The tooltip carries all of it.
-bool pull_row(const meter::HistoryEntry& e, int number_in_visit, bool selected, float number_w) {
-    const ImVec2 pos = ImGui::GetCursorScreenPos();
-    const float right = pos.x + ImGui::GetContentRegionAvail().x;
-    const float row_h = rail_row_height();
-    const bool clicked = ImGui::Selectable(("##pull" + e.file).c_str(), selected, ImGuiSelectableFlags_None,
-                                           ImVec2(0.0f, row_h));
-    // A long visit lists every fight; only the rows on screen are worth formatting.
-    if (!ImGui::IsItemVisible()) return clicked;
-
-    const Badge o = outcome(false, e.killed, e.end_reason);
-    const std::string num = "#" + std::to_string(number_in_visit);
-    const std::string duration = common::clock_duration(e.duration_s);
-    const std::string clock = common::local_clock(e.start_ts);
-    const std::string boss_hp = e.boss_hp_known ? format_percent(e.boss_hp_left) : std::string();
-    if (ImGui::IsItemHovered()) {
-        std::string tip = "Fight " + num + " - " + o.label;
-        if (!e.boss_label.empty()) tip += "\n" + std::string(e.is_boss ? "Boss " : "") + e.boss_label;
-        if (!boss_hp.empty()) tip += " at " + boss_hp;
-        tip += "\nStarted " + clock + ", " + duration + ", " + format_rate(e.total_dps) + " party DPS";
-        tip += "\nEnded by " + std::string(reason_text(e.end_reason));
-        if (e.partial) tip += "\nPartial data: the server sent only some players' hits";
-        ImGui::SetTooltip("%s", tip.c_str());
-    }
-
-    ImDrawList* dl = ImGui::GetWindowDrawList();
-    const float line_h = ImGui::GetTextLineHeight();
-    const float text_y = pos.y + (row_h - line_h) * 0.5f;
-    const float gap = m(8.0f);
-    const float dot_r = m(3.0f);
-    float x = pos.x;
-    dl->AddCircleFilled(ImVec2(x + dot_r, text_y + line_h * 0.5f), dot_r, o.color);
-    x += dot_r * 2.0f + m(6.0f);
-    dl->AddText(ImVec2(x, text_y), selected ? colors::TextPrimary : colors::TextMuted, num.c_str());
-    x += number_w + gap;
-    const float duration_w = ImGui::CalcTextSize(duration.c_str()).x;
-    if (x + duration_w > right) return clicked;
-    dl->AddText(ImVec2(x, text_y), selected ? colors::TextPrimary : colors::TextBody, duration.c_str());
-    x += duration_w + gap;
-    if (!boss_hp.empty()) {
-        const float boss_w = ImGui::CalcTextSize(boss_hp.c_str()).x;
-        if (x + boss_w > right) return clicked;
-        dl->AddText(ImVec2(x, text_y), colors::TextMuted, boss_hp.c_str());
-        x += boss_w + gap;
-    }
-    if (e.partial) {
-        const char* mark = ICON_WARNING;
-        const float mark_w = ImGui::CalcTextSize(mark).x;
-        if (x + mark_w > right) return clicked;
-        dl->AddText(ImVec2(x, text_y), colors::WarningLight, mark);
-        x += mark_w + gap;
-    }
-    const float clock_w = ImGui::CalcTextSize(clock.c_str()).x;
-    if (x + clock_w <= right) dl->AddText(ImVec2(right - clock_w, text_y), colors::TextDim, clock.c_str());
-    return clicked;
-}
-
 /// `text` cut to fit `width`, ending in "..." when cut.
 std::string fit_text(const std::string& text, float width) {
     if (ImGui::CalcTextSize(text.c_str()).x <= width) return text;
@@ -468,11 +436,97 @@ std::string fit_text(const std::string& text, float width) {
     return cut + "...";
 }
 
+/// A saved fight's row: two lines of text.
+float pull_row_height() { return ImGui::GetTextLineHeight() * 2.0f + m(10.0f); }
+
+/// How a saved fight ended, in words: the list's rows say it, not only their dots.
+struct PullOutcome {
+    std::string text;
+    uint32_t color;
+};
+
+PullOutcome pull_outcome(const meter::HistoryEntry& e) {
+    // Whole percents: the row has little room, and the tooltip has the decimal.
+    std::string left;
+    if (e.boss_hp_known) {
+        char buf[16];
+        std::snprintf(buf, sizeof(buf), "%.0f%%", e.boss_hp_left * 100.0);
+        left = buf;
+    }
+    if (e.killed) return {"Killed", colors::Gold};
+    if (e.end_reason == meter::EndReason::Wipe) return {left.empty() ? "Wipe" : "Wipe " + left, colors::DangerLight};
+    if (!left.empty()) return {left + " left", colors::TextMuted};
+    return {"Ended", colors::TextDim};
+}
+
+/// One saved fight, on two lines: what was fought and how it ended, then its number
+/// in the visit, its length and when it started. The tooltip carries all of it.
+bool pull_row(const meter::HistoryEntry& e, int number_in_visit, bool selected) {
+    const ImVec2 pos = ImGui::GetCursorScreenPos();
+    const float right = pos.x + ImGui::GetContentRegionAvail().x;
+    const float row_h = pull_row_height();
+    const bool clicked = ImGui::Selectable(("##pull" + e.file).c_str(), selected, ImGuiSelectableFlags_None,
+                                           ImVec2(0.0f, row_h));
+    // A long visit lists every fight; only the rows on screen are worth formatting.
+    if (!ImGui::IsItemVisible()) return clicked;
+
+    const Badge o = outcome(false, e.killed, e.end_reason);
+    const PullOutcome ended = pull_outcome(e);
+    const std::string num = "#" + std::to_string(number_in_visit);
+    const std::string duration = common::clock_duration(e.duration_s);
+    const std::string clock = common::local_clock(e.start_ts);
+    if (ImGui::IsItemHovered()) {
+        std::string tip = "Fight " + num + " - " + o.label;
+        if (!e.boss_label.empty()) tip += "\n" + std::string(e.is_boss ? "Boss " : "") + e.boss_label;
+        if (e.boss_hp_known) tip += " at " + format_percent(e.boss_hp_left);
+        tip += "\nStarted " + clock + ", " + duration + ", " + format_rate(e.total_dps) + " party DPS";
+        tip += "\nEnded by " + std::string(reason_text(e.end_reason));
+        if (e.partial) tip += "\nPartial data: the server sent only some players' hits";
+        ImGui::SetTooltip("%s", tip.c_str());
+    }
+
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    const float line_h = ImGui::GetTextLineHeight();
+    const float top_y = pos.y + m(4.0f);
+    const float bottom_y = top_y + line_h + m(2.0f);
+    const float gap = m(8.0f);
+    const float dot_r = m(3.0f);
+    const float pad = m(6.0f);
+    dl->AddCircleFilled(ImVec2(pos.x + pad + dot_r, top_y + line_h * 0.5f), dot_r, o.color);
+    const float text_x = pos.x + pad + dot_r * 2.0f + m(7.0f);
+
+    // Line one: the outcome keeps the right edge, the name takes what is left.
+    const float ended_w = ImGui::CalcTextSize(ended.text.c_str()).x;
+    const float ended_x = right - pad - ended_w;
+    const bool ended_fits = ended_x > text_x + m(40.0f);
+    if (ended_fits) dl->AddText(ImVec2(ended_x, top_y), ended.color, ended.text.c_str());
+    const std::string name = e.boss_label.empty() ? "Fight " + num : e.boss_label;
+    const float name_w = (ended_fits ? ended_x - gap : right - pad) - text_x;
+    if (name_w > 0.0f) {
+        dl->AddText(ImVec2(text_x, top_y), selected ? colors::TextPrimary : colors::TextBody,
+                    fit_text(name, name_w).c_str());
+    }
+
+    // Line two, dimmer: which pull, how long, when.
+    std::string detail = num + kDot + duration;
+    if (e.partial) detail += std::string(kDot) + "partial";
+    const float clock_w = ImGui::CalcTextSize(clock.c_str()).x;
+    const float clock_x = right - pad - clock_w;
+    const bool clock_fits = clock_x > text_x + m(40.0f);
+    if (clock_fits) dl->AddText(ImVec2(clock_x, bottom_y), colors::TextDim, clock.c_str());
+    const float detail_w = (clock_fits ? clock_x - gap : right - pad) - text_x;
+    if (detail_w > 0.0f) {
+        dl->AddText(ImVec2(text_x, bottom_y), e.partial ? colors::WarningLight : colors::TextDim,
+                    fit_text(detail, detail_w).c_str());
+    }
+    return clicked;
+}
+
 /// A map visit's folding row. The tree node draws only its arrow. The visit's time keeps
 /// the right edge, as the fights' times do below it: runs of one dungeon share a name,
 /// and the time tells them apart. A name too long for the rest is cut; the tooltip
 /// holds both.
-bool visit_header(const std::string& map, const std::string& clock) {
+bool visit_header(const std::string& map, const std::string& clock, size_t fights) {
     const ImVec2 pos = ImGui::GetCursorScreenPos();
     const float right = pos.x + ImGui::GetContentRegionAvail().x;
     ImGui::PushStyleColor(ImGuiCol_Text, v4(colors::TextMuted));
@@ -487,7 +541,15 @@ bool visit_header(const std::string& map, const std::string& clock) {
     const float clock_w = ImGui::CalcTextSize(clock.c_str()).x;
     const float name_w = right - clock_w - m(8.0f) - text_x;
     dl->AddText(ImVec2(right - clock_w, text_y), colors::TextDim, clock.c_str());
-    if (name_w > 0.0f) dl->AddText(ImVec2(text_x, text_y), colors::TextMuted, fit_text(map, name_w).c_str());
+    if (name_w <= 0.0f) return open;
+    const std::string name = fit_text(map, name_w);
+    dl->AddText(ImVec2(text_x, text_y), colors::TextMuted, name.c_str());
+    // How many fights it holds, while the whole name left room for it.
+    const std::string count = std::to_string(fights);
+    const float used = ImGui::CalcTextSize(name.c_str()).x + m(8.0f);
+    if (name == map && used + ImGui::CalcTextSize(count.c_str()).x <= name_w) {
+        dl->AddText(ImVec2(text_x + used, text_y), colors::TextFaint, count.c_str());
+    }
     return open;
 }
 
@@ -524,33 +586,71 @@ void rail(const AppFrameInput& in, AppViewState& state, AppActions& out, const s
     const auto& history = in.history != nullptr ? *in.history : none;
     begin_card("##Rail", ImVec2(width, fill_h(0.0f)));
 
-    // Live first.
+    // Live first: a row that looks like the button it is.
     const bool live = in.snapshot != nullptr && in.snapshot->fight.live;
-    ImGui::PushStyleVar(ImGuiStyleVar_SelectableTextAlign, ImVec2(0.0f, 0.5f));
-    if (ImGui::Selectable("Live##LiveRow", state.selected_file.empty(), ImGuiSelectableFlags_AllowOverlap,
-                          ImVec2(0.0f, rail_row_height()))) {
-        state.selected_file.clear();
-        state.selected_fight.reset();
+    const bool on_live = state.selected_file.empty();
+    {
+        const ImVec2 pos = ImGui::GetCursorScreenPos();
+        const float row_w = ImGui::GetContentRegionAvail().x;
+        const float row_h = m(metrics::ButtonH + 4.0f);
+        if (ImGui::InvisibleButton("##LiveRow", ImVec2(row_w, row_h))) {
+            state.selected_file.clear();
+            state.selected_fight.reset();
+        }
+        const bool hovered = ImGui::IsItemHovered();
+        if (hovered && !on_live) ImGui::SetTooltip("Back to the fight going on now");
+        ImDrawList* dl = ImGui::GetWindowDrawList();
+        const ImVec2 pos_max(pos.x + row_w, pos.y + row_h);
+        const float rounding = m(6.0f);
+        if (on_live) {
+            dl->AddRectFilled(pos, pos_max, colors::with_alpha(colors::Accent, 0.18f), rounding);
+            dl->AddRect(pos, pos_max, colors::with_alpha(colors::Accent, 0.55f), rounding);
+        } else {
+            dl->AddRectFilled(pos, pos_max, hovered ? colors::SurfaceRaised : colors::SurfaceLow, rounding);
+            dl->AddRect(pos, pos_max, colors::BorderStrong, rounding);
+        }
+        const float text_y = pos.y + (row_h - ImGui::GetTextLineHeight()) * 0.5f;
+        const uint32_t ink = on_live ? colors::TextPrimary : colors::TextBody;
+        dl->AddText(ImVec2(pos.x + m(10.0f), text_y), on_live ? colors::AccentHover : colors::TextMuted, ICON_ACTIVITY);
+        dl->AddText(ImVec2(pos.x + m(34.0f), text_y), ink, on_live ? "Live fight" : "Back to live");
+        const Badge live_badge = live ? Badge{"In combat", colors::SuccessLight} : Badge{"Idle", colors::TextDim};
+        const float badge_w = pill_width(live_badge.label);
+        if (row_w > m(34.0f) + ImGui::CalcTextSize("Back to live").x + badge_w + m(16.0f)) {
+            const ImVec2 after = ImGui::GetCursorScreenPos();
+            ImGui::SetCursorScreenPos(ImVec2(pos_max.x - badge_w - m(8.0f), pos.y + (row_h - pill_height()) * 0.5f));
+            pill(live_badge.label, live_badge.color);
+            ImGui::SetCursorScreenPos(after);
+        }
     }
-    ImGui::PopStyleVar();
-    ImGui::SameLine();
-    const Badge live_badge = live ? Badge{"In combat", colors::SuccessLight} : Badge{"Idle", colors::TextDim};
-    right_align(pill_width(live_badge.label));
-    pill(live_badge.label, live_badge.color);
 
-    // The saved fights, by visit, with the trash on the header's line.
-    ImGui::Dummy(ImVec2(0.0f, m(6.0f)));
-    const float icon_w = ImGui::GetFrameHeight();
+    // The saved fights, by visit, with Clear on the header's line.
+    ImGui::Dummy(ImVec2(0.0f, m(8.0f)));
+    // Clear spelled out while the rail has room for it beside the caption; its icon
+    // alone, with the tooltip, on a narrow one.
+    const char* caption = "SAVED FIGHTS";
+    const char* clear_text = ICON_TRASH "  Clear##ClearHistory";
+    const char* clear_icon = ICON_TRASH "##ClearHistory";
+    const bool spelled = ImGui::CalcTextSize(caption).x + m(10.0f) + button_width(clear_text, ButtonSize::Fit) <=
+                         ImGui::GetContentRegionAvail().x;
+    const float clear_w = spelled ? button_width(clear_text, ButtonSize::Fit) : ImGui::GetFrameHeight();
+    const float clear_h = spelled ? m(metrics::ButtonH) : ImGui::GetFrameHeight();
     const float start_y = ImGui::GetCursorPosY();
-    ImGui::SetCursorPosY(start_y + (icon_w - ImGui::GetTextLineHeight()) * 0.5f);
-    text_dim("SAVED FIGHTS");
-    ImGui::SameLine();
-    right_align(icon_w);
-    ImGui::SetCursorPosY(start_y);
-    ImGui::BeginDisabled(history.empty());
-    if (button(ICON_TRASH "##ClearHistory", ButtonKind::Danger, ButtonSize::Icon)) ImGui::OpenPopup("##ConfirmClear");
-    ImGui::EndDisabled();
-    if (!history.empty() && ImGui::IsItemHovered()) ImGui::SetTooltip("Delete the saved fights");
+    ImGui::SetCursorPosY(start_y + (clear_h - ImGui::GetTextLineHeight()) * 0.5f);
+    text_dim("%s", caption);
+    if (!history.empty()) {
+        ImGui::SameLine();
+        right_align(clear_w);
+        ImGui::SetCursorPosY(start_y);
+        const bool pressed = spelled ? button(clear_text, ButtonKind::Danger, ButtonSize::Fit)
+                                     : button(clear_icon, ButtonKind::Danger, ButtonSize::Icon);
+        if (pressed) ImGui::OpenPopup("##ConfirmClear");
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip(history.size() == 1 ? "Delete the saved fight" : "Delete all %zu saved fights",
+                              history.size());
+        }
+    } else {
+        ImGui::SetCursorPosY(start_y + clear_h);
+    }
     ImGui::Dummy(ImVec2(0.0f, m(2.0f)));
 
     if (history.empty()) {
@@ -563,10 +663,6 @@ void rail(const AppFrameInput& in, AppViewState& state, AppActions& out, const s
     } else {
         ImGui::BeginChild("##PullList", ImVec2(0.0f, fill_h(0.0f)), ImGuiChildFlags_None,
                           ImGuiWindowFlags_NoBackground);
-        // Sized to the widest number, so every duration starts in one column.
-        size_t widest = 1;
-        for (const auto& g : groups) widest = std::max(widest, g.pulls.size());
-        const float number_w = ImGui::CalcTextSize(("#" + std::to_string(widest)).c_str()).x;
         for (size_t gi = 0; gi < groups.size(); ++gi) {
             const auto& g = groups[gi];
             const bool holds_selection = std::any_of(g.pulls.begin(), g.pulls.end(), [&](const meter::PullRef& p) {
@@ -579,7 +675,7 @@ void rail(const AppFrameInput& in, AppViewState& state, AppActions& out, const s
             const Micros started = g.visit_ts != 0 ? g.visit_ts : history[g.pulls.back().index].start_ts;
             const std::string map = game::map_label(g.map_id);
             const std::string clock = common::local_clock(started);
-            const bool open = visit_header(map, clock);
+            const bool open = visit_header(map, clock, g.pulls.size());
             if (ImGui::IsItemHovered()) {
                 const size_t n = g.pulls.size();
                 ImGui::SetTooltip("%s, from %s\n%zu %s", map.c_str(), clock.c_str(), n,
@@ -588,7 +684,7 @@ void rail(const AppFrameInput& in, AppViewState& state, AppActions& out, const s
             if (open) {
                 for (const auto& p : g.pulls) {
                     const auto& e = history[p.index];
-                    if (pull_row(e, p.number, e.file == state.selected_file, number_w)) {
+                    if (pull_row(e, p.number, e.file == state.selected_file)) {
                         state.selected_file = e.file;
                         out.load_file = e.file;
                     }
@@ -610,12 +706,24 @@ void top_bar(const Shown& shown, AppActions& out) {
     opts.auto_height = true;
     begin_card("##TopBar", ImVec2(0.0f, 0.0f), opts);
     const meter::FightSummary& f = *shown.fight;
+    // The boss first: it is what tells one fight from the next. Where and which
+    // pull follow it, dimmer.
     std::string title = f.live ? "Live fight" : "Last fight";
-    if (shown.entry != nullptr) title = game::map_label(f.map_id) + "  -  Fight #" + std::to_string(shown.number);
-    if (f.boss.present()) title += "  -  " + std::string(f.boss.is_boss ? "Boss " : "") + f.boss.label;
+    std::string where;
+    if (shown.entry != nullptr) where = game::map_label(f.map_id) + kDot + "Fight #" + std::to_string(shown.number);
+    if (f.boss.present()) {
+        if (shown.entry == nullptr) where = title;
+        title = f.boss.label;
+    } else if (shown.entry != nullptr) {
+        title = "Fight #" + std::to_string(shown.number);
+        where = game::map_label(f.map_id);
+    }
     ImGui::PushFont(bold_font());
     text_colored_u32(colors::TextPrimary, "%s", title.c_str());
     ImGui::PopFont();
+    if (!where.empty() && same_line_if_room(ImGui::CalcTextSize(where.c_str()).x, 10.0f)) {
+        text_colored_u32(colors::TextDim, "%s", where.c_str());
+    }
     ImGui::Dummy(ImVec2(0.0f, m(2.0f)));
 
     // Label-over-value pairs that wrap to the next line rather than run off the card.
@@ -646,9 +754,8 @@ void top_bar(const Shown& shown, AppActions& out) {
         stat("DEATHS", std::to_string(deaths), deaths > 0 ? colors::DangerLight : colors::TextPrimary,
              "Party members whose HP reached 0 during the fight. The Deaths tab has what hit them.");
     }
-    if (f.boss.present() && f.boss.killed) {
-        stat("BOSS HP", "Killed", colors::Gold, nullptr);
-    } else if (f.boss.present() && f.boss.hp_known) {
+    // A killed boss needs no HP figure: the pill at the right says so.
+    if (f.boss.present() && !f.boss.killed && f.boss.hp_known) {
         const bool estimate = !f.boss.hp_exact;
         stat("BOSS HP", (estimate ? "~" : "") + format_percent(f.boss.hp_fraction()), colors::TextPrimary,
              estimate ? "An estimate (~): spawn HP less the damage the meter saw, until the server sends the "
@@ -689,104 +796,134 @@ void top_bar(const Shown& shown, AppActions& out) {
 // ---------------------------------------------------------------- settings ---
 
 void overlay_card(const AppFrameInput& in, AppActions& out) {
-    begin_settings_card("##set_overlay", ICON_MONITOR, "OVERLAY", colors::Accent);
     OverlaySettings& o = in.settings->overlay;
-    setting_switch("Show the overlay", "Ctrl+Alt+H hides or shows it.", &o.visible, out, Applies::Overlay);
-    setting_switch("Lock", "Click-through and fixed in place. Ctrl+Alt+L.", &o.locked, out, Applies::Overlay);
-    setting_slider("Opacity", "Of its background; the text stays solid.", &o.opacity, 0.0f, 1.0f, "%.2f", out,
-                   Applies::Overlay);
-    setting_slider("Scale", "On top of the monitor's own scaling.", &o.scale, 0.6f, 2.5f, "%.2fx", out,
-                   Applies::Overlay);
-    begin_setting_row("Position", "Back to the top-left corner of the main monitor.");
-    if (button(ICON_RESET "  Reset position", ButtonKind::Secondary, ButtonSize::Fit)) out.reset_overlay_position = true;
-    end_setting_row();
-    end_settings_card();
-}
-
-void visibility_card(const AppFrameInput& in, AppActions& out) {
-    begin_settings_card("##set_visibility", ICON_EYE, "OVERLAY VISIBILITY", colors::Violet);
-    OverlaySettings& o = in.settings->overlay;
-    // Conditions apply only while locked, so the overlay can always be dragged back.
-    if (!o.locked) ImGui::BeginDisabled();
-    setting_switch("Only in combat", "Hidden outside a fight.", &o.show_in_combat_only, out);
-    if (!o.show_in_combat_only) ImGui::BeginDisabled();
-    setting_slider("Hide after combat", "How long it stays up once a fight ends, to read the result.",
-                   &o.hide_after_combat_s, 0.0f, 60.0f, "%.0f s", out);
-    if (!o.show_in_combat_only) ImGui::EndDisabled();
-    setting_switch("Hide when the game is not in front", "Hidden while another program has the focus.",
-                   &o.hide_when_game_unfocused, out);
-    setting_switch("Only in dungeons", "Hidden in the open world. A new dungeon counts before the meter can name it.",
-                   &o.show_in_dungeons_only, out);
-    if (!o.locked) ImGui::EndDisabled();
-    ImGui::Dummy(ImVec2(0.0f, m(2.0f)));
-    ImGui::PushTextWrapPos(0.0f);
-    if (!o.locked) {
-        text_colored_u32(colors::WarningLight, ICON_WARNING "  Lock the overlay for these to apply.");
-    } else {
-        text_dim("They apply while the overlay is locked; unlocked, it always shows.");
-    }
-    ImGui::PopTextWrapPos();
-    end_settings_card();
+    const OverlaySettings def{};
+    OverlayControls c;
+    c.id = "##set_overlay";
+    c.locked = &o.locked;
+    c.opacity = &o.opacity;
+    c.default_opacity = def.opacity;
+    c.scale = &o.scale;
+    c.hide_when_game_unfocused = &o.hide_when_game_unfocused;
+    c.show_in_dungeons_only = &o.show_in_dungeons_only;
+    c.reset_position = &out.reset_overlay_position;
+    c.position_help = "Back to the top-left corner of the main monitor.";
+    c.before = [&] {
+        setting_switch("Show the overlay", "Ctrl+Alt+H hides or shows it.", &o.visible, out, Applies::Overlay);
+    };
+    c.conditions = [&] {
+        setting_switch("Only in combat", "Hidden outside a fight.", &o.show_in_combat_only, out);
+        if (!o.show_in_combat_only) ImGui::BeginDisabled();
+        setting_slider("Hide after combat", "How long it stays up once a fight ends, to read the result.",
+                       &o.hide_after_combat_s, 0.0f, 60.0f, def.hide_after_combat_s, "%.0f s", out);
+        if (!o.show_in_combat_only) ImGui::EndDisabled();
+    };
+    overlay_settings_card(c, out);
 }
 
 void columns_card(const AppFrameInput& in, AppActions& out) {
     begin_settings_card("##set_columns", ICON_SLIDERS, "OVERLAY COLUMNS", colors::Accent);
     OverlaySettings& o = in.settings->overlay;
-    setting_switch("Share", "Each player's share of the party's damage.", &o.show_share, out);
-    setting_switch("Hits", "HIT: direct hits.", &o.show_hits, out);
-    setting_switch("Crit", "CRI: critical hits.", &o.show_crit, out);
-    setting_switch("Perfect", "PERF: perfect hits.", &o.show_perfect, out);
-    setting_switch("Double", "DOUB: double hits.", &o.show_double, out);
-    setting_switch("Back", "BACK: hits from behind.", &o.show_back, out);
-    setting_switch("Front", "FRNT: hits from the front.", &o.show_front, out);
-    setting_switch("Multi", "MULT: multi-hits.", &o.show_multi, out);
-    setting_switch("Block", "BLOC: hits the target blocked.", &o.show_block, out);
-    setting_switch("Max hit", "The player's biggest hit.", &o.show_max_hit, out);
-    setting_switch("Healing", "Each player's healing.", &o.show_heal, out);
+    ImGui::PushTextWrapPos(0.0f);
+    text_dim("What each player's row shows, after their DPS and damage.");
+    ImGui::PopTextWrapPos();
+    ImGui::Dummy(ImVec2(0.0f, m(2.0f)));
+    struct Chip {
+        const char* label;
+        const char* tip;
+        bool* value;
+    };
+    const Chip chips[] = {
+        {"Share", "Each player's share of the party's damage.", &o.show_share},
+        {"Hits", "HIT: direct hits.", &o.show_hits},
+        {"Crit", "CRI: critical hits.", &o.show_crit},
+        {"Perfect", "PERF: perfect hits.", &o.show_perfect},
+        {"Double", "DOUB: double hits.", &o.show_double},
+        {"Back", "BACK: hits from behind.", &o.show_back},
+        {"Front", "FRNT: hits from the front.", &o.show_front},
+        {"Multi", "MULT: multi-hits.", &o.show_multi},
+        {"Block", "BLOC: hits the target blocked.", &o.show_block},
+        {"Max hit", "The player's biggest hit.", &o.show_max_hit},
+        {"Healing", "Each player's healing.", &o.show_heal},
+    };
+    bool first = true;
+    for (const Chip& chip : chips) {
+        if (!first) same_line_if_room(toggle_chip_width(chip.label), 6.0f);
+        first = false;
+        if (toggle_chip(chip.label, chip.value)) {
+            out.settings_changed = true;
+            out.save_settings = true;
+        }
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", chip.tip);
+    }
+    ImGui::Dummy(ImVec2(0.0f, m(6.0f)));
     setting_switch("Class colours", "Bars in each player's class colour.", &o.class_bars, out);
-    setting_slider("Rows", "Players shown, best first.", &o.max_rows, 1, 24, "%d", out);
+    const OverlaySettings def{};
+    setting_slider("Rows", "Players shown, best first.", &o.max_rows, 1, 24, def.max_rows, "%d", out);
     end_settings_card();
 }
 
 void tracking_card(const AppFrameInput& in, AppActions& out) {
     begin_settings_card("##set_tracking", ICON_TIMER, "FIGHT TRACKING", colors::Warning);
     meter::MeterSettings& s = in.settings->meter;
-    setting_slider("Idle end", "No party hit for this long ends a fight.", &s.idle_timeout_s, 2.0, 120.0, "%.0f s",
-                   out, Applies::Engine);
-    setting_slider("Idle end with a boss up", "The same while a boss still stands: phases it can't be hit.",
-                   &s.boss_idle_timeout_s, s.idle_timeout_s, 300.0, "%.0f s", out, Applies::Engine);
-    setting_slider("Kill grace", "Hits this long after the boss dies still count.", &s.kill_grace_s, 0.0, 10.0,
-                   "%.1f s", out, Applies::Engine);
+    const meter::MeterSettings def{};
+    setting_slider("Idle end", "No party hit for this long ends a fight.", &s.idle_timeout_s, 2.0, 120.0,
+                   def.idle_timeout_s, "%.0f s", out, Applies::Engine);
     setting_slider("Shortest fight saved", "A fight with no boss is saved if it lasts this long.",
-                   &s.min_saved_duration_s, 0.0, 600.0, "%.0f s", out, Applies::Engine);
+                   &s.min_saved_duration_s, 0.0, 600.0, def.min_saved_duration_s, "%.0f s", out, Applies::Engine);
     setting_switch("Save only dungeon fights",
                    "Keeps the open world out. A new dungeon counts before the meter can name it.",
                    &s.save_only_dungeons, out, Applies::Engine);
 
-    begin_setting_row("Boss HP", "Max HP that makes an enemy a boss. A guess until captures calibrate it.");
-    uint64_t hp = s.boss_min_max_hp;
-    if (ImGui::InputScalar("##boss_hp", ImGuiDataType_U64, &hp, nullptr, nullptr, "%llu")) {
-        s.boss_min_max_hp = std::max<uint64_t>(hp, 1);
-        out.settings_changed = true;
-    }
-    if (ImGui::IsItemDeactivatedAfterEdit()) {
-        out.save_settings = true;
-        out.engine_changed = true;
-    }
-    end_setting_row();
+    if (advanced_section("##set_tracking_adv")) {
+        setting_slider("Idle end with a boss up", "The same while a boss still stands: phases it can't be hit.",
+                       &s.boss_idle_timeout_s, s.idle_timeout_s, 300.0, def.boss_idle_timeout_s, "%.0f s", out,
+                       Applies::Engine);
+        setting_slider("Kill grace", "Hits this long after the boss dies still count.", &s.kill_grace_s, 0.0, 10.0,
+                       def.kill_grace_s, "%.1f s", out, Applies::Engine);
 
-    setting_slider("Partial data under", "A killed boss that lost less than this share of its HP with hits seen.",
-                   &s.partial_damage_ratio, 0.0, 1.0, "%.2f", out, Applies::Engine);
-    setting_switch("Wipe ends the fight",
-                   "When every party member in it is dead at once. Off: a party can all go down and get "
-                   "back up mid-fight.",
-                   &s.wipe_detection, out, Applies::Engine);
+        begin_setting_row("Boss HP", "Max HP that makes an enemy a boss. A guess until captures calibrate it.");
+        uint64_t hp = s.boss_min_max_hp;
+        if (hp != def.boss_min_max_hp) {
+            const float control_w = ImGui::CalcItemWidth();
+            if (button(ICON_RESET "##boss_hp_reset", ButtonKind::Secondary, ButtonSize::Icon)) {
+                s.boss_min_max_hp = hp = def.boss_min_max_hp;
+                out.settings_changed = true;
+                out.save_settings = true;
+                out.engine_changed = true;
+            }
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip("Back to the default, %llu", static_cast<unsigned long long>(def.boss_min_max_hp));
+            }
+            ImGui::SameLine(0.0f, m(6.0f));
+            ImGui::SetNextItemWidth(control_w - ImGui::GetFrameHeight() - m(6.0f));
+        }
+        if (ImGui::InputScalar("##boss_hp", ImGuiDataType_U64, &hp, nullptr, nullptr, "%llu")) {
+            s.boss_min_max_hp = std::max<uint64_t>(hp, 1);
+            out.settings_changed = true;
+        }
+        if (ImGui::IsItemDeactivatedAfterEdit()) {
+            out.save_settings = true;
+            out.engine_changed = true;
+        }
+        end_setting_row();
+
+        setting_slider("Partial data under",
+                       "A killed boss that lost less than this share of its HP with hits seen.",
+                       &s.partial_damage_ratio, 0.0, 1.0, def.partial_damage_ratio, "%.2f", out, Applies::Engine);
+        setting_switch("Wipe ends the fight",
+                       "When every party member in it is dead at once. Off: a party can all go down and get "
+                       "back up mid-fight.",
+                       &s.wipe_detection, out, Applies::Engine);
+    }
     end_settings_card();
 }
 
 void history_card(const AppFrameInput& in, AppActions& out) {
     begin_settings_card("##set_history", ICON_HISTORY, "SAVED FIGHTS", colors::Success);
-    setting_slider("Fights kept", "The oldest are deleted first.", &in.settings->history.max_fights, 10, 5000, "%d", out,
+    const HistorySettings def{};
+    setting_slider("Fights kept", "The oldest are deleted first.", &in.settings->history.max_fights, 10, 5000,
+                   def.max_fights, "%d", out,
                    Applies::Engine);
     if (button(ICON_FOLDER "  Open folder")) out.open = OpenTarget::History;
     end_settings_card();
@@ -797,9 +934,8 @@ void settings_tab(const AppFrameInput& in, AppActions& out) {
     const SettingsSection sections[] = {
         {[&] { overlay_card(in, out); }},
         {[&] { tracking_card(in, out); }},
-        {[&] { visibility_card(in, out); }},
-        {[&] { history_card(in, out); }},
         {[&] { columns_card(in, out); }},
+        {[&] { history_card(in, out); }},
     };
     render_settings_grid(sections, std::size(sections));
 }
@@ -811,7 +947,7 @@ template <typename Body>
 void pull_view(const AppFrameInput& in, AppViewState& state, AppActions& out, const std::vector<meter::PullGroup>& groups,
                const Shown& shown, const char* id, Body body) {
     const float avail = ImGui::GetContentRegionAvail().x;
-    const float rail_w = avail < m(900.0f) ? m(200.0f) : std::clamp(avail * 0.2f, m(220.0f), m(metrics::RailW));
+    const float rail_w = avail < m(900.0f) ? m(210.0f) : std::clamp(avail * 0.22f, m(230.0f), m(metrics::RailW));
     rail(in, state, out, groups, rail_w);
     ImGui::SameLine(0.0f, m(metrics::Gutter));
     ImGui::BeginChild(id, ImVec2(0.0f, fill_h(0.0f)), ImGuiChildFlags_None,
@@ -820,7 +956,16 @@ void pull_view(const AppFrameInput& in, AppViewState& state, AppActions& out, co
         if (!state.selected_file.empty()) {
             empty_state(ICON_WARNING, "That fight could not be read", "Its file is missing or damaged.");
         } else {
-            empty_state(ICON_SWORDS, "No fight yet", "Hit something in game: the meter starts on the party's first hit.");
+            // What is missing: the game itself, or only a fight.
+            const bool connected = in.snapshot != nullptr && in.snapshot->capture == pipeline::CaptureState::Live;
+            if (connected) {
+                empty_state(ICON_SWORDS, "No fight yet",
+                            "Hit something in game: the meter starts on the party's first hit.");
+            } else {
+                empty_state(ICON_GAMEPAD, "Waiting for the game",
+                            "Start AION 2 and log in: the meter finds the game by itself. The Dashboard shows what "
+                            "the capture sees.");
+            }
         }
     } else {
         top_bar(shown, out);

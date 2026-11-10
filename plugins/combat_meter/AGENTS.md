@@ -190,5 +190,5 @@ is switched off the pipeline feeds it nothing; switching it off ends its live fi
     dungeon is its own. So does the first fight after the meter starts.
   - A cut-off index line is skipped. A missing index is rebuilt from the files.
   - Pruning keeps `history.max_fights`, in batches of 50.
-  - Clearing (the app window's trash button) deletes the fight records and the index,
+  - Clearing (the app window's Clear button) deletes the fight records and the index,
     on the engine thread; other files in the folder stay.

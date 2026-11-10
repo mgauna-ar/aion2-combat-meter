@@ -7,6 +7,8 @@
 #include "app/imgui_guard.hpp"
 #include "meter/types.hpp"
 
+#include <cstddef>
+
 namespace aion2::app::ui {
 
 #ifdef HAVE_IMGUI
@@ -30,8 +32,12 @@ void no_detail_state(const char* icon);
 /// The row's player: a selectable across the row, which opens their breakdown in
 /// `selected` (or closes it). `tab` keeps the ids of two tabs apart.
 void name_cell(int column, const meter::CombatantTotals& c, meter::EntityId& selected, const char* tab);
-/// The table's height when a breakdown shares the space under it.
-[[nodiscard]] float table_height(bool breakdown_open);
+/// A ranking table's height: its `rows` and its header, and no more than half the
+/// space when a breakdown shares it.
+[[nodiscard]] float table_height(size_t rows, bool breakdown_open);
+/// What fills the space under a ranking table while no player is selected: that a
+/// row can be clicked, and `what` for. Nothing when there is too little room.
+void select_hint(const char* what);
 /// The fight's row for `id`; null for 0 or a player not in it.
 [[nodiscard]] const meter::CombatantTotals* find_row(const meter::FightSummary& f, meter::EntityId id);
 /// The card a breakdown sits in, titled with the player, with a Close button. False

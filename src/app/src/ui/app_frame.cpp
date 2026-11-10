@@ -165,7 +165,7 @@ void render_sidebar(const AppFrameInput& in, AppViewState& state) {
     pill(badge.label, badge.color);
     if (ImGui::IsItemHovered() && !in.source_status.empty()) ImGui::SetTooltip("%s", in.source_status.c_str());
     if (in.snapshot != nullptr && !in.snapshot->local_name.empty()) {
-        text_colored_u32(colors::TextFaint, "%s", in.snapshot->local_name.c_str());
+        text_colored_u32(colors::TextDim, "Playing as %s", in.snapshot->local_name.c_str());
     } else {
         text_colored_u32(colors::TextFaint, "passive capture only");
     }

@@ -60,7 +60,7 @@ always be found and dragged back. Switching the plugin off hides it too.
 - Healing between two players counts only when it lands on the party, since a PvP hit
   looks the same.
 
-![The app window's Combat Meter page: saved fights by map visit on the left, the selected fight's ranking with the in-game window's hit columns, and one player's skills below](../../docs/images/app-damage.png)
+![The app window's Combat Meter page: saved fights by map visit on the left, each with its boss and how it ended, the selected fight's ranking with the in-game window's hit columns, and one player's skills below](../../docs/images/app-damage.png)
 
 ## The fight in detail
 
@@ -99,7 +99,7 @@ A fight saved by a version before these has none of them, and each tab says so.
 
 ![The Casts tab: three players ranked by casts a minute, and one player's skills with their casts, share, casts a minute, average gap and hits per cast](../../docs/images/app-casts.png)
 
-![The Combat Meter page's Settings tab: the overlay, its visibility, fight tracking and saved fights](../../docs/images/app-settings.png)
+![The Combat Meter page's Settings tab: the overlay and when it shows, fight tracking with its fine tuning folded under Advanced, the overlay's columns and saved fights](../../docs/images/app-settings.png)
 
 ## Configuration
 
@@ -148,7 +148,7 @@ and saves as you go.
 | `max_fights` | 500 | Saved fights kept on disk; the oldest are deleted first. |
 
 **Saved fights** go to `%APPDATA%\aion2-combat-meter\history\`, one JSON file per fight
-plus `index.jsonl`. The trash button on the page deletes them.
+plus `index.jsonl`. The **Clear** button over the list on the page deletes them.
 
 ## For developers
 
