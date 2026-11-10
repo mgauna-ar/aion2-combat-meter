@@ -4,6 +4,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -39,6 +40,11 @@ public:
     [[nodiscard]] virtual Micros now() const = 0;
     /// Packets the driver dropped before we read them.
     [[nodiscard]] virtual uint64_t dropped() const = 0;
+    /// Packet timestamps less the machine's performance counter
+    /// (os::performance_counter_now), which the game stamps its pings with: what
+    /// turns a capture time into the counter's. Nothing for a capture file, whose
+    /// counter is long gone, and before a live capture's first packet.
+    [[nodiscard]] virtual std::optional<Micros> counter_offset() const { return std::nullopt; }
     /// One line for the overlay and the log: what is being captured.
     [[nodiscard]] virtual std::string status() const = 0;
     /// A file source that has played everything; never true for live capture.

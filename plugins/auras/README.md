@@ -2,8 +2,8 @@
 
 **Your buffs and debuffs, yours on the enemy you fight, and your cooldowns, as bars or
 icons in an overlay of their own, with alerts: a chain skill on offer, a cooldown back,
-your HP running low, a buff you watch for missing.** One of the meter's two plugins
-(the other is the [Combat Meter](../combat_meter/README.md)). Off until you switch it
+your HP running low, a buff you watch for missing.** One of the meter's three plugins
+(the others are the [Combat Meter](../combat_meter/README.md) and [Ping](../ping/README.md)). Off until you switch it
 on, at the top right of the app window's **Auras** page; switching it on shows its
 overlay.
 
@@ -11,7 +11,7 @@ overlay.
 
 ## The overlay
 
-A second window you place like the meter's (unlock with Ctrl+Alt+L, drag, resize).
+A window of its own, which you place like the meter's (unlock with Ctrl+Alt+L, drag, resize).
 **Alerts** come first:
 - **Low HP:** a pulsing red "Low HP 23%" while your HP is under the threshold you set
   (30% of your max by default). Your max is the game's own figure, sent at login and

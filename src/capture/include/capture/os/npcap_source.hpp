@@ -4,6 +4,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -44,6 +45,8 @@ public:
     void stop() override;
     [[nodiscard]] Micros now() const override { return wall_clock_now(); }
     [[nodiscard]] uint64_t dropped() const override;
+    /// Measured on every packet, as a capture thread reads it (ClockOffsetEstimator).
+    [[nodiscard]] std::optional<Micros> counter_offset() const override;
     [[nodiscard]] std::string status() const override;
 
     /// The BPF filter for the loopback adapter given the relays' ports: the

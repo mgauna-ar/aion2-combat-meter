@@ -21,4 +21,13 @@ bool auras_shown(const AppSettings& settings, const OverlayConditions& now) noex
     return true;
 }
 
+bool ping_shown(const AppSettings& settings, const OverlayConditions& now) noexcept {
+    const PingSettings& p = settings.ping;
+    if (!settings.plugins.ping) return false;
+    if (!p.locked) return true;
+    if (p.hide_when_game_unfocused && !now.game_in_front) return false;
+    if (p.show_in_dungeons_only && !now.in_dungeon) return false;
+    return true;
+}
+
 } // namespace aion2::app

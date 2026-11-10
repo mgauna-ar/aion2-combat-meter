@@ -26,6 +26,8 @@ constexpr int kMinWidth = 160;
 constexpr int kMinHeight = 90;
 /// The aura overlay's default spot: under the meter overlay's default one.
 constexpr int kAuraDefaultY = 440;
+/// The ping overlay's: right of the meter overlay's default one, at its top.
+constexpr int kPingDefaultX = 490;
 
 LRESULT CALLBACK overlay_wnd_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
     if (msg == WM_NCCREATE) {
@@ -82,6 +84,19 @@ OverlayPlacement placement_of(const AuraSettings& s, bool plugin_enabled) {
     return p;
 }
 
+OverlayPlacement placement_of(const PingSettings& s, bool plugin_enabled) {
+    OverlayPlacement p;
+    p.locked = s.locked;
+    p.visible = plugin_enabled;
+    p.scale = s.scale;
+    p.x = s.x;
+    p.y = s.y;
+    p.width = s.width;
+    p.height = s.height;
+    p.default_x = kPingDefaultX;
+    return p;
+}
+
 OverlayWindow::~OverlayWindow() { destroy(); }
 
 bool OverlayWindow::create(const OverlayPlacement& placement, const wchar_t* title, bool hotkeys,
@@ -95,7 +110,7 @@ bool OverlayWindow::create(const OverlayPlacement& placement, const wchar_t* tit
     wc.hCursor = LoadCursorW(nullptr, IDC_ARROW);
     wc.hIcon = LoadIconW(inst, MAKEINTRESOURCEW(kIconResource));
     wc.lpszClassName = kWindowClass;
-    // The second overlay finds the class registered by the first: that call fails, harmlessly.
+    // Each further overlay finds the class registered by the first: that call fails, harmlessly.
     RegisterClassExW(&wc);
 
     m_locked = placement.locked;

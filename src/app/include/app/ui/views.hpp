@@ -16,6 +16,7 @@ namespace aion2::app::ui {
 void render_dashboard(const AppFrameInput& in, AppViewState& state, AppActions& out);
 void render_meter_page(const AppFrameInput& in, AppViewState& state, AppActions& out);
 void render_auras_page(const AppFrameInput& in, AppViewState& state, AppActions& out);
+void render_ping_page(const AppFrameInput& in, AppViewState& state, AppActions& out);
 void render_settings_page(const AppFrameInput& in, AppViewState& state, AppActions& out);
 
 /// A plugin's icon and page, for the sidebar and the dashboard.

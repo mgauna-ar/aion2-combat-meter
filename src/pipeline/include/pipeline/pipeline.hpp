@@ -6,12 +6,14 @@
 #include "meter/encounter_engine.hpp"
 #include "meter/meter_settings.hpp"
 #include "meter/types.hpp"
+#include "ping/ping_plugin.hpp"
 #include "pipeline/stream_demux.hpp"
 #include "protocol/frame_decoder.hpp"
 #include "protocol/packet_parser.hpp"
 
 #include <cstdint>
 #include <functional>
+#include <optional>
 #include <span>
 #include <string>
 #include <vector>
@@ -25,7 +27,7 @@ enum class FrameOutcome : uint8_t {
     Failed,
     /// An opcode the parser does not read.
     Unknown,
-    /// An opcode the parser knows and skips (pong, cast).
+    /// An opcode the parser knows and skips. None is, since the pong is read.
     Ignored,
 };
 
@@ -63,11 +65,14 @@ struct LiveSnapshot {
     /// The Auras plugin's: effects on the local player, and theirs on the enemy they
     /// fight. Empty while the plugin is off.
     aion2::auras::AuraSnapshot auras;
+    /// The Ping plugin's: the latency, its jitter and the graph's seconds. Empty
+    /// while the plugin is off.
+    aion2::ping::PingSnapshot ping;
 };
 
 /**
  * @brief Captured packets to the plugins: demux, frame decoder, parser, then each
- * plugin switched on (the combat meter's engine, the auras).
+ * plugin switched on (the combat meter's engine, the auras, the ping).
  *
  * One instance runs on one thread: the live engine thread, or the replay tool.
  * Both drive it the same way, on the capture clock, so a replay of a recording
@@ -90,9 +95,13 @@ public:
     /// Packets the capture threads dropped, cumulative.
     void set_dropped_packets(uint64_t dropped) noexcept { m_dropped = dropped; }
     void set_meter_settings(const meter::MeterSettings& settings) { m_engine.set_settings(settings); }
+    /// How far the capture's clock sits from the machine's performance counter
+    /// (capture::PacketSource::counter_offset), for the Ping plugin. It is data from
+    /// the source, like the dropped count: the pipeline still reads no clock.
+    void set_counter_offset(std::optional<Micros> offset) noexcept { m_ping.set_counter_offset(offset); }
     /// Switches plugins on and off at capture time `now`. The meter switched off ends
-    /// its live fight first; the auras switched off forget what they knew, since they
-    /// will miss what happens meanwhile.
+    /// its live fight first; the auras and the ping switched off forget what they
+    /// knew, since they will miss what happens meanwhile.
     void set_plugins(const aion2::plugins::PluginSwitches& on, Micros now);
     [[nodiscard]] const aion2::plugins::PluginSwitches& plugin_switches() const noexcept { return m_plugins; }
 
@@ -110,6 +119,7 @@ public:
     [[nodiscard]] const proto::PacketParser& parser() const noexcept { return m_parser; }
     [[nodiscard]] const meter::EncounterEngine& engine() const noexcept { return m_engine; }
     [[nodiscard]] const aion2::auras::AuraPlugin& aura_plugin() const noexcept { return m_auras; }
+    [[nodiscard]] const aion2::ping::PingPlugin& ping_plugin() const noexcept { return m_ping; }
 
 private:
     void on_frame(const proto::Frame& frame) override;
@@ -119,6 +129,7 @@ private:
     proto::PacketParser m_parser;
     meter::EncounterEngine m_engine;
     aion2::auras::AuraPlugin m_auras;
+    aion2::ping::PingPlugin m_ping;
     aion2::plugins::PluginSwitches m_plugins;
     std::vector<proto::ParsedEvent> m_events;
     uint64_t m_dropped{0};

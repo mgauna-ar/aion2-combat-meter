@@ -2,6 +2,7 @@
 #include "wire_builder.hpp"
 
 #include "capture/capture_file.hpp"
+#include "capture/clock_offset.hpp"
 #include "capture/packet_headers.hpp"
 #include "capture/pcapng_writer.hpp"
 #include "capture/tcp_reassembler.hpp"
@@ -452,4 +453,45 @@ TEST_CASE(TcpReassembler, HolesBehindOneAnotherExpireTogether) {
     r.expire(1 + TcpReassembler::kHoleTimeout, sink);
     TEST_ASSERT_EQ(sink.gaps.size(), size_t{2});
     TEST_ASSERT_EQ(sink.data, std::string("abbcc"));
+}
+
+// --- The capture clock against the performance counter ---
+
+TEST_CASE(ClockOffset, TheLargestOfTheLatelySeenIsTheOffset) {
+    ClockOffsetEstimator e;
+    TEST_ASSERT_FALSE(e.offset().has_value());
+    // The capture's clock is Unix time; the counter has run an hour.
+    constexpr Micros kOffset = 1'792'152'000'000'000ULL;
+    constexpr Micros kCounter = 3'600 * kMicrosPerSecond;
+    // A packet read 900 us after it was stamped, then one read after 40 us, then a
+    // slow one: the quickest delivery is the closest to the truth.
+    e.sample(kOffset + kCounter, kCounter + 900);
+    TEST_ASSERT_EQ(*e.offset(), kOffset - 900);
+    e.sample(kOffset + kCounter + 50'000, kCounter + 50'040);
+    TEST_ASSERT_EQ(*e.offset(), kOffset - 40);
+    e.sample(kOffset + kCounter + 100'000, kCounter + 103'000);
+    TEST_ASSERT_EQ(*e.offset(), kOffset - 40);
+    // A stamp that is no Unix time says nothing.
+    e.sample(5, 10);
+    TEST_ASSERT_EQ(*e.offset(), kOffset - 40);
+}
+
+TEST_CASE(ClockOffset, OldSamplesGiveWay) {
+    ClockOffsetEstimator e;
+    constexpr Micros kOffset = 1'792'152'000'000'000ULL;
+    constexpr Micros kCounter = 3'600 * kMicrosPerSecond;
+    // A sample a little over half a window after the one before: each opens a half.
+    const Micros step = ClockOffsetEstimator::kWindow / 2 + kMicrosPerSecond;
+    e.sample(kOffset + kCounter, kCounter + 40);
+    // In the next half the earlier one still counts.
+    e.sample(kOffset + kCounter + step, kCounter + step + 500);
+    TEST_ASSERT_EQ(*e.offset(), kOffset - 40);
+    // A half later it has gone, and the clocks may have drifted: here by 2 ms.
+    e.sample(kOffset - 2'000 + kCounter + 2 * step, kCounter + 2 * step + 100);
+    TEST_ASSERT_EQ(*e.offset(), kOffset - 500);
+    e.sample(kOffset - 2'000 + kCounter + 3 * step, kCounter + 3 * step + 100);
+    TEST_ASSERT_EQ(*e.offset(), kOffset - 2'100);
+    // After a silence longer than the window, only what comes now.
+    e.sample(kOffset - 9'000 + kCounter + 10 * step, kCounter + 10 * step + 100);
+    TEST_ASSERT_EQ(*e.offset(), kOffset - 9'100);
 }

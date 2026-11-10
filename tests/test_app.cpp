@@ -354,6 +354,94 @@ TEST_CASE(OverlayVisibility, AurasFollowTheirPluginAndTheirOwnConditions) {
     TEST_ASSERT_FALSE(overlay_shown(s, now));
 }
 
+TEST_CASE(AppSettings, PingRoundTripsAndKeepsItsThresholdsInOrder) {
+    TEST_ASSERT_FALSE(AppSettings{}.plugins.ping);
+    AppSettings s;
+    s.plugins.ping = true;
+    s.ping.locked = true;
+    s.ping.x = 900;
+    s.ping.width = 260;
+    s.ping.show_jitter = false;
+    s.ping.show_graph = false;
+    s.ping.warn_ms = 90;
+    s.ping.bad_ms = 150;
+    s.ping.show_in_dungeons_only = true;
+    const config::JsonValue json = settings_to_json(s);
+    TEST_ASSERT(json["ping"]["plugin_enabled"].as_bool(false));
+    const AppSettings back = settings_from_json(json);
+    TEST_ASSERT(back.plugins.ping);
+    TEST_ASSERT(back.ping.locked);
+    TEST_ASSERT_EQ(back.ping.x, 900);
+    TEST_ASSERT_EQ(back.ping.width, 260);
+    TEST_ASSERT_FALSE(back.ping.show_jitter);
+    TEST_ASSERT_FALSE(back.ping.show_graph);
+    TEST_ASSERT_EQ(back.ping.warn_ms, 90);
+    TEST_ASSERT_EQ(back.ping.bad_ms, 150);
+    TEST_ASSERT(back.ping.show_in_dungeons_only);
+    TEST_ASSERT_FALSE(back.ping.hide_when_game_unfocused);
+    // The other plugins' switches are their own.
+    TEST_ASSERT(back.plugins.combat_meter);
+    TEST_ASSERT_FALSE(back.plugins.auras);
+
+    config::JsonValue bad = json;
+    bad["ping"]["warn_ms"] = 400.0;
+    bad["ping"]["bad_ms"] = 100.0;
+    bad["ping"]["width"] = 5.0;
+    bad["ping"]["scale"] = 9.0;
+    const AppSettings clean = settings_from_json(bad);
+    TEST_ASSERT_EQ(clean.ping.warn_ms, 400);
+    TEST_ASSERT_EQ(clean.ping.bad_ms, 400);  // red is never under amber
+    TEST_ASSERT_EQ(clean.ping.width, 160);
+    TEST_ASSERT_NEAR(clean.ping.scale, 2.5f, 1e-6f);
+    bad["ping"]["warn_ms"] = 0.0;
+    bad["ping"]["bad_ms"] = 99999.0;
+    TEST_ASSERT_EQ(settings_from_json(bad).ping.warn_ms, kMinPingThreshold);
+    TEST_ASSERT_EQ(settings_from_json(bad).ping.bad_ms, kMaxPingThreshold);
+}
+
+TEST_CASE(OverlayVisibility, PingFollowsItsPluginAndItsOwnConditions) {
+    AppSettings s;
+    PingSettings& p = s.ping;
+    OverlayConditions now;
+    TEST_ASSERT_FALSE(ping_shown(s, now));
+    s.plugins.ping = true;
+    TEST_ASSERT(ping_shown(s, now));
+    // The other overlays' conditions are theirs.
+    s.overlay.locked = true;
+    s.overlay.show_in_combat_only = true;
+    s.auras.locked = true;
+    s.auras.hide_when_game_unfocused = true;
+    p.locked = true;
+    now.game_in_front = false;
+    TEST_ASSERT(ping_shown(s, now));
+    p.hide_when_game_unfocused = true;
+    TEST_ASSERT_FALSE(ping_shown(s, now));
+    p.locked = false;
+    TEST_ASSERT(ping_shown(s, now));  // unlocked: always findable
+    p.locked = true;
+    now.game_in_front = true;
+    p.show_in_dungeons_only = true;
+    TEST_ASSERT_FALSE(ping_shown(s, now));
+    now.in_dungeon = true;
+    TEST_ASSERT(ping_shown(s, now));
+    // The meter switched off leaves it alone.
+    s.plugins.combat_meter = false;
+    TEST_ASSERT(ping_shown(s, now));
+    TEST_ASSERT_FALSE(overlay_shown(s, now));
+}
+
+TEST_CASE(Plugins, EverySwitchIsReachedByItsId) {
+    aion2::plugins::PluginSwitches on{false, false, false};
+    for (const auto& d : aion2::plugins::ALL) {
+        TEST_ASSERT_FALSE(on.enabled(d.id));
+        on.set(d.id, true);
+        TEST_ASSERT(on.enabled(d.id));
+        TEST_ASSERT(aion2::plugins::find(d.id).id == d.id);
+    }
+    TEST_ASSERT(on == aion2::plugins::ALL_ON);
+    TEST_ASSERT_EQ(aion2::plugins::ALL.size(), size_t{3});
+}
+
 TEST_CASE(AppSettings, MissingFileGivesDefaults) {
     const AppSettings s = load_settings("/nonexistent/aion2/config.json");
     TEST_ASSERT_EQ(s.capture.server_port, 13328);

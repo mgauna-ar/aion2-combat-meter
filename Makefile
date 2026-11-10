@@ -8,7 +8,7 @@ CXXFLAGS = -std=c++20 -Wall -Wextra -Wpedantic -Werror
 
 # Each layer compiles against only the include roots of the layers AGENTS.md lets
 # it depend on, so an #include across a layer does not compile. Each plugin sees
-# the game layer and not the other plugin. The replay tool sits on the pipeline;
+# the game layer and no other plugin. The replay tool sits on the pipeline;
 # the tests see everything.
 COMMON_INC = -Iinclude -Isrc/common/include
 CAPTURE_INC = $(COMMON_INC) -Isrc/capture/include
@@ -16,7 +16,9 @@ PROTOCOL_INC = $(COMMON_INC) -Isrc/protocol/include
 GAME_INC = $(PROTOCOL_INC) -Isrc/game/include
 METER_INC = $(GAME_INC) -Iplugins/combat_meter/include
 AURAS_INC = $(GAME_INC) -Iplugins/auras/include
+PING_INC = $(GAME_INC) -Iplugins/ping/include
 PIPELINE_INC = $(GAME_INC) -Isrc/capture/include -Iplugins/combat_meter/include -Iplugins/auras/include \
+               -Iplugins/ping/include \
                -Isrc/pipeline/include
 APP_INC = $(PIPELINE_INC) -Isrc/app/include
 TOOLS_INC = $(PIPELINE_INC)
@@ -30,15 +32,16 @@ layer_inc = $(strip \
     $(if $(filter src/game/%,$(1)),$(GAME_INC), \
     $(if $(filter plugins/combat_meter/%,$(1)),$(METER_INC), \
     $(if $(filter plugins/auras/%,$(1)),$(AURAS_INC), \
+    $(if $(filter plugins/ping/%,$(1)),$(PING_INC), \
     $(if $(filter src/pipeline/%,$(1)),$(PIPELINE_INC), \
     $(if $(filter src/app/%,$(1)),$(APP_INC), \
     $(if $(filter tools/synth/%,$(1)),$(TEST_INC), \
     $(if $(filter tools/%,$(1)),$(TOOLS_INC), \
-    $(TEST_INC))))))))))))
+    $(TEST_INC)))))))))))))
 
 # Recorded in each variant's flags stamp, so a change of include roots rebuilds.
 LAYER_INC_STAMP = $(COMMON_INC) | $(CAPTURE_INC) | $(PROTOCOL_INC) | $(GAME_INC) | $(METER_INC) | \
-                  $(AURAS_INC) | $(PIPELINE_INC) | $(APP_INC) | $(TOOLS_INC) | $(TEST_INC)
+                  $(AURAS_INC) | $(PING_INC) | $(PIPELINE_INC) | $(APP_INC) | $(TOOLS_INC) | $(TEST_INC)
 
 COMMON_SRCS = $(wildcard src/common/src/*.cpp) $(wildcard src/common/src/*/*.cpp)
 # capture/src/os holds the Win32 capture edge; off Windows it compiles to its mocks.
@@ -47,12 +50,13 @@ PROTOCOL_SRCS = $(wildcard src/protocol/src/*.cpp)
 GAME_SRCS = $(wildcard src/game/src/*.cpp)
 METER_SRCS = $(wildcard plugins/combat_meter/src/*.cpp)
 AURAS_SRCS = $(wildcard plugins/auras/src/*.cpp)
+PING_SRCS = $(wildcard plugins/ping/src/*.cpp)
 PIPELINE_SRCS = $(wildcard src/pipeline/src/*.cpp)
 # src/app/src/win32 (WinMain, the windows, hotkeys) only builds on Windows; src/app/src/ui
 # is the desktop window's ImGui pages, which build everywhere.
 APP_SRCS = $(wildcard src/app/src/*.cpp) $(wildcard src/app/src/ui/*.cpp)
-LIB_SRCS = $(COMMON_SRCS) $(CAPTURE_SRCS) $(PROTOCOL_SRCS) $(GAME_SRCS) $(METER_SRCS) $(AURAS_SRCS) $(PIPELINE_SRCS) \
-           $(APP_SRCS)
+LIB_SRCS = $(COMMON_SRCS) $(CAPTURE_SRCS) $(PROTOCOL_SRCS) $(GAME_SRCS) $(METER_SRCS) $(AURAS_SRCS) $(PING_SRCS) \
+           $(PIPELINE_SRCS) $(APP_SRCS)
 
 TEST_SRCS = $(wildcard tests/*.cpp)
 REPLAY_SRCS = $(wildcard tools/replay/*.cpp)
@@ -165,6 +169,7 @@ build/check-ui/flags: FORCE
 # keeps each header self-contained. One stamp per header, as check-ui.
 HEADERS = $(shell find include src/common/include src/capture/include src/protocol/include \
                        src/game/include plugins/combat_meter/include plugins/auras/include \
+                       plugins/ping/include \
                        src/pipeline/include src/app/include tests \
                        -name '*.hpp' 2>/dev/null)
 HEADER_CHECK_STAMPS = $(patsubst %.hpp,build/check-headers/%.ok,$(HEADERS))

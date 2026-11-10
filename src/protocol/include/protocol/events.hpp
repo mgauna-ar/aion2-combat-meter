@@ -17,6 +17,16 @@ struct Heartbeat {
     uint64_t server_ms{0};
 };
 
+/// 03 36: the server's answer to the client's ping, every 10 s on each connection.
+struct Pong {
+    /// The client's own clock as it sent the ping, echoed back: milliseconds of
+    /// Unreal's FPlatformTime::Seconds(), the performance counter since boot plus
+    /// 16,777,216 s (AGENTS.md, Protocol). It steps by exactly 10,000 a pong.
+    uint64_t client_ms{0};
+    /// The server's Unix milliseconds as it answered, as the heartbeat's.
+    uint64_t server_ms{0};
+};
+
 /// A player's name and class: the local character (`own`), another player, or one
 /// found inside some other packet by scan_identities.
 struct Identity {
@@ -245,7 +255,8 @@ struct ChainWithdrawn {
 };
 
 using Event = std::variant<Heartbeat, Identity, Spawn, Death, MapLoad, Damage, Tick, PartyRoster, RemainingHp,
-                           BuffApplied, BuffRemoved, SkillUsed, CooldownSet, SkillCast, ChainOffered, ChainWithdrawn>;
+                           BuffApplied, BuffRemoved, SkillUsed, CooldownSet, SkillCast, ChainOffered, ChainWithdrawn,
+                           Pong>;
 
 struct ParsedEvent {
     Micros ts{0};

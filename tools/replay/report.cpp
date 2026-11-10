@@ -106,7 +106,53 @@ void Report::on_frame(const proto::Frame& f, pipeline::FrameOutcome outcome) {
     }
 }
 
+void Report::note_ping(const proto::ParsedEvent& pe) {
+    if (const auto* pong = std::get_if<proto::Pong>(&pe.event)) {
+        PingFlow& flow = m_ping_flows[pe.connection];
+        const double uptime_s =
+            (static_cast<double>(pong->client_ms) - static_cast<double>(ping::kClientClockBaseMs)) / 1000.0;
+        const double echo_ms = static_cast<double>(pe.ts) / 1000.0 - static_cast<double>(pong->client_ms);
+        if (flow.echo_ms.empty()) flow.uptime_s = uptime_s;
+        // Against the connection's first: the figure itself is the two clocks' gap.
+        std::printf("%+.3f  pong      connection %u  uptime %.3f s  echo %+.1f ms against the first\n", rel(pe.ts),
+                    pe.connection, uptime_s, echo_ms - (flow.echo_ms.empty() ? echo_ms : flow.echo_ms.front()));
+        flow.echo_ms.push_back(echo_ms);
+    } else if (const auto* beat = std::get_if<proto::Heartbeat>(&pe.event)) {
+        m_ping.on_heartbeat(beat->server_ms, pe.connection, pe.ts);
+        // The tracker follows the newest connection only.
+        if (!m_ping_flows.empty() && pe.connection < m_ping_flows.rbegin()->first) return;
+        PingFlow& flow = m_ping_flows[pe.connection];
+        ++flow.heartbeats;
+        if (const auto jitter = m_ping.jitter_ms()) {
+            flow.jitter_sum += *jitter;
+            flow.jitter_max = std::max(flow.jitter_max, *jitter);
+        }
+    }
+}
+
+void Report::print_ping() const {
+    for (const auto& [connection, flow] : m_ping_flows) {
+        std::printf("ping, connection %u: %zu pongs", connection, flow.echo_ms.size());
+        if (!flow.echo_ms.empty()) {
+            std::vector<double> above = flow.echo_ms;
+            const double least = *std::min_element(above.begin(), above.end());
+            for (double& v : above) v -= least;
+            std::sort(above.begin(), above.end());
+            std::printf(", uptime %.2f h; echo above its least: median %.1f ms, p95 %.1f, max %.1f", flow.uptime_s / 3600.0,
+                        above[above.size() / 2], above[std::min(above.size() - 1, above.size() * 95 / 100)],
+                        above.back());
+        }
+        std::printf("\n  %" PRIu64 " heartbeats", flow.heartbeats);
+        if (flow.heartbeats > 1) {
+            std::printf("; jitter mean %.1f ms, max %.1f", flow.jitter_sum / static_cast<double>(flow.heartbeats),
+                        flow.jitter_max);
+        }
+        std::printf("\n");
+    }
+}
+
 void Report::on_event(const proto::ParsedEvent& pe, const meter::CombatantRegistry& reg) {
+    if (m_opt.ping) note_ping(pe);
     if (!m_opt.events && !m_opt.auras) return;
     const double t = rel(pe.ts);
     const bool aura = std::holds_alternative<proto::BuffApplied>(pe.event) ||
@@ -147,8 +193,9 @@ void Report::on_event(const proto::ParsedEvent& pe, const meter::CombatantRegist
                 std::printf("%+.3f  cast      %s -> %s  %s (%u) %s\n", t, who(e.caster, reg).c_str(),
                             who(e.target, reg).c_str(), game::skill_label(e.skill).c_str(), e.skill,
                             e.pressed ? "pressed" : "proc");
-            } else if constexpr (std::is_same_v<T, proto::Heartbeat>) {
-                // Twenty a second: the flow summary counts them.
+            } else if constexpr (std::is_same_v<T, proto::Heartbeat> || std::is_same_v<T, proto::Pong>) {
+                // Twenty heartbeats a second: the flow summary counts them. --ping
+                // prints the pongs.
             } else if constexpr (std::is_same_v<T, proto::Identity>) {
                 std::printf("%+.3f  identity  %s%s %u \"%s\" server %u class %u\n", t, e.own ? "own " : "",
                             e.scanned ? "scanned" : "", e.id, name(e.name, e.id).c_str(), unsigned{e.server},

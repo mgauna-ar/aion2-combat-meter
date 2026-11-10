@@ -47,9 +47,12 @@ void usage() {
                  "                    debuffs on the party, the party's effects on enemies\n"
                  "  --casts           --fights, and each player's casts per skill: how many, a\n"
                  "                    minute, and the average time between them\n"
-                 "  --events          every decoded event but heartbeats and --auras', one per line\n"
+                 "  --events          every decoded event but heartbeats, pongs and --auras', one\n"
+                 "                    per line\n"
                  "  --auras           effects put on and taken off, and the local player's skill\n"
                  "                    uses, cooldown changes and chain skills on offer\n"
+                 "  --ping            each pong, and per connection how its echo and the\n"
+                 "                    heartbeats spread: a capture has no ping, only its spread\n"
                  "  --opcodes         count, body sizes and parse failures per opcode\n"
                  "  --unknown         hex dump frames the parser does not read or failed on\n"
                  "  --dump OPS        hex dump frames of these opcodes: hex, comma separated\n"
@@ -109,6 +112,8 @@ bool parse_args(int argc, char** argv, Options& opt) {
             opt.report.events = true;
         } else if (arg == "--auras") {
             opt.report.auras = true;
+        } else if (arg == "--ping") {
+            opt.report.ping = true;
         } else if (arg == "--opcodes") {
             opt.report.opcodes = true;
         } else if (arg == "--unknown") {
@@ -222,6 +227,7 @@ int main(int argc, char** argv) {
     pipe.tick(last_ts + std::max(capture::TcpReassembler::kHoleTimeout, from_seconds(options.meter.kill_grace_s)));
     pipe.end_fight(meter::EndReason::CaptureLost, last_ts);
     drain_fights();
+    if (opt.report.ping) report.print_ping();
     if (opt.quiet) return 0;
 
     std::printf("\n%s: %" PRIu64 " packets, %" PRIu64 " TCP segments, %" PRIu64 " frames, %zu opcodes, %.1f s, "

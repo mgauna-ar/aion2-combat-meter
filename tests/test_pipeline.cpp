@@ -185,6 +185,63 @@ TEST_CASE(Pipeline, SwitchingTheMeterOffEndsItsFightAndTheAurasForget) {
     TEST_ASSERT(fights[0].total_damage < session.truth.boss_damage);
 }
 
+TEST_CASE(Pipeline, ThePingPluginReadsThePongsAgainstTheCounter) {
+    // Thirty seconds of heartbeats, each arriving 200 ms after its server time, and
+    // a pong at 5, 15 and 25 s: 80 ms, then 90, then 100.
+    const Micros start = kStartMs * kMicrosPerMilli;
+    const Micros offset = start - 3'600 * kMicrosPerSecond;  // the machine an hour up
+    const auto client_ms = [&](double at_s, uint64_t rtt_ms) {
+        return ping::kClientClockBaseMs + (start + from_seconds(at_s) - offset) / kMicrosPerMilli - rtt_ms;
+    };
+    std::vector<std::pair<double, Bytes>> script;
+    for (int i = 0; i <= 30 * 20; ++i) script.emplace_back(i * 0.05, heartbeat(kStartMs + static_cast<uint64_t>(i) * 50 - 200));
+    script.emplace_back(5.0, pong(client_ms(5.0, 80), kStartMs + 4'960));
+    script.emplace_back(15.0, pong(client_ms(15.0, 90), kStartMs + 14'955));
+    script.emplace_back(25.0, pong(client_ms(25.0, 100), kStartMs + 24'950));
+    std::stable_sort(script.begin(), script.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
+    SessionWriter w;
+    for (const auto& [t, frame] : script) w.at(t, frame);
+    const Bytes capture = w.finish();
+    const Micros end = start + 30 * kMicrosPerSecond;
+
+    Pipeline live;
+    live.set_counter_offset(offset);
+    (void)replay(capture, live);
+    const ping::PingSnapshot seen = live.snapshot(end).ping;
+    TEST_ASSERT(seen.state == ping::PingState::Measured);
+    TEST_ASSERT_NEAR(seen.ping_ms, 100.0f, 1e-3f);
+    TEST_ASSERT_EQ(seen.samples, uint32_t{3});
+    TEST_ASSERT_NEAR(seen.min_ms, 80.0f, 1e-3f);
+    TEST_ASSERT_NEAR(seen.avg_ms, 90.0f, 1e-3f);
+    TEST_ASSERT(seen.has_jitter);
+    TEST_ASSERT_NEAR(seen.jitter_ms, 0.0f, 1e-3f);
+    TEST_ASSERT_EQ(seen.seconds.size(), size_t{31});
+    TEST_ASSERT_EQ(live.parser().stats().failed, uint64_t{0});
+
+    // A capture file has no counter: the pongs are seen, and give no ping.
+    Pipeline replayed;
+    (void)replay(capture, replayed);
+    TEST_ASSERT(replayed.snapshot(end).ping.state == ping::PingState::NoCounter);
+    TEST_ASSERT_EQ(replayed.snapshot(end).ping.pongs, uint64_t{3});
+    TEST_ASSERT(replayed.snapshot(end).ping.has_jitter);
+
+    // Switched off it is fed nothing; switched off midway it forgets.
+    PipelineOptions off;
+    off.plugins.ping = false;
+    Pipeline without(off);
+    without.set_counter_offset(offset);
+    (void)replay(capture, without);
+    TEST_ASSERT_EQ(without.snapshot(end).ping.pongs, uint64_t{0});
+    TEST_ASSERT(without.snapshot(end).ping.seconds.empty());
+
+    aion2::plugins::PluginSwitches no_ping = aion2::plugins::ALL_ON;
+    no_ping.ping = false;
+    live.set_plugins(no_ping, end);
+    TEST_ASSERT(live.snapshot(end).ping.state == ping::PingState::Waiting);
+    live.set_plugins(aion2::plugins::ALL_ON, end);
+    TEST_ASSERT_EQ(live.snapshot(end).ping.pongs, uint64_t{0});
+}
+
 TEST_CASE(Pipeline, TheAurasSeeTheLocalPlayersHpAndChainSkills) {
     const Session session = boss_session();
     const Micros scene = kStartMs * kMicrosPerMilli + 30 * kMicrosPerSecond;
