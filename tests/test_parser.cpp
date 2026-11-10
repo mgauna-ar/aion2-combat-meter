@@ -389,7 +389,7 @@ TEST_CASE(Parser, DeathAndMap) {
     TEST_ASSERT_EQ(only<Death>(parse_one(p, opcode::Death, death_body(16500))).id, EntityId{16500});
     const auto& map = only<MapLoad>(parse_one(p, opcode::MapLoad, map_load_body(3, 610010)));
     TEST_ASSERT_EQ(map.map_id, 610010u);
-    TEST_ASSERT(map.is_instance());
+    TEST_ASSERT_EQ(map.load_count, 3u);
 }
 
 TEST_CASE(Parser, EntityValuesHpAndSelf) {

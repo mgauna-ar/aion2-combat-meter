@@ -1,5 +1,6 @@
 #include "meter/encounter_engine.hpp"
 
+#include "game/map_names.hpp"
 #include "game/npc_names.hpp"
 #include "game/skill_names.hpp"
 
@@ -436,7 +437,7 @@ void EncounterEngine::on_map(const proto::MapLoad& m, uint32_t connection, Micro
     m_effects.on_map_load(ts);
     m_map_id = m.map_id;
     m_visit_ts = ts;
-    m_registry.on_map_change(m.is_instance());
+    m_registry.on_map_change(game::is_dungeon(m.map_id));
     m_damage_since_spawn.clear();
     m_hp_loss.clear();
     m_held_casts.clear();

@@ -299,6 +299,9 @@ TEST_CASE(History, WorthSavingOnlyInDungeons) {
     s.save_only_dungeons = true;
     f.map_id = dungeon;
     TEST_ASSERT(worth_saving(f, s));
+    // A dungeon newer than the map table has no name, and is saved all the same.
+    f.map_id = 600003;
+    TEST_ASSERT(worth_saving(f, s));
     f.map_id = open_world;
     TEST_ASSERT_FALSE(worth_saving(f, s));
     // No map load seen yet: not known to be a dungeon.

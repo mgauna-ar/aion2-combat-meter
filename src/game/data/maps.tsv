@@ -1,6 +1,6 @@
-# AION 2 map names by map id, as the map load (21 36) carries it. By the
-# community's notes ids 600000 to 700000 are instances; the Awakening tiers
-# here sit at 910000 and up.
+# AION 2 map names by map id, as the map load (21 36) carries it. Names only:
+# whether a map is a dungeon goes by its id (600000 and up, game::is_dungeon),
+# so a dungeon missing here still counts as one.
 #
 # Source: aion2.app's dungeon pages (aion2.app/db/dungeons/<name>), retrieved
 # 2026-11-05: one row per difficulty tier, keyed by the tier's id. Checked once:
@@ -8,7 +8,7 @@
 # was, so the tier ids are the ids 21 36 carries. No second source gives tier
 # ids to compare with. Some dungeons the site lists have no tier ids on their
 # pages (the Lv.99 Awakening tiers, Ascension, Legion and more): they show as
-# "Map <id>" until a capture shows their id.
+# "Dungeon <id>" until a capture shows their id.
 #
 # Open-world zones have no public ids. The game's own files cannot be read for
 # them (they are encrypted), and no site lists numeric ids for open-world maps.
