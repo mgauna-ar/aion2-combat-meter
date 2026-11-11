@@ -151,8 +151,8 @@ struct PowerSettings {
     int y{-1};
     int width{260};
     int height{190};
-    /// Everyone on the map under the target, while they number list_max_players or
-    /// fewer: an arena's opponents, a dungeon's party.
+    /// The map's players, strongest first, list_max_players of them at most: an
+    /// arena's opponents, a dungeon's party, a town's strongest.
     bool show_list{true};
     int list_max_players{8};
     /// As the meter overlay's: while locked, only in a dungeon, and hidden while

@@ -32,7 +32,7 @@ void figures(const AppFrameInput& in) {
     const bool listed = !p.players.empty();
     const std::string top_value = listed ? format_power(p.players.front().combat_power) : std::string("-");
     const std::string top_note =
-        listed ? p.players.front().name : std::string(p.in_view == 0 ? "No players in view yet" : "Too many to list");
+        listed ? p.players.front().name : std::string("No players in view yet");
     const std::string in_view = std::to_string(p.in_view);
 
     const StatTileSpec tiles[] = {
@@ -45,8 +45,8 @@ void figures(const AppFrameInput& in) {
     };
     const char* const tooltips[] = {
         "The last player you used a skill on, for half a minute after it.",
-        "The highest combat power among the players listed: an arena's opponents, a dungeon's party.",
-        "Players the game has shown you on this map. In a crowd only the target shows.",
+        "The highest combat power among the players the game has shown you on this map.",
+        "Players the game has shown you on this map. The overlay lists the strongest of them.",
     };
     stat_tile_row(tiles, std::size(tiles), tooltips);
     ImGui::Dummy(ImVec2(0.0f, m(metrics::Gutter)));
@@ -57,10 +57,10 @@ void display_card(const AppFrameInput& in, AppActions& out) {
     PowerSettings& p = in.settings->power;
     const PowerSettings def{};
     setting_switch("List the map's players",
-                   "Everyone on the map with you, strongest first, with your target marked: an arena's opponents, a "
-                   "dungeon's party. Off, only your target shows.",
+                   "The players on the map with you, strongest first, with your target marked: an arena's opponents, "
+                   "a dungeon's party, a town's strongest. Off, only your target shows.",
                    &p.show_list, out, Applies::Overlay);
-    setting_slider("List up to", "With more players than this on the map, a town's crowd, only your target shows.",
+    setting_slider("List up to", "In a crowd, the strongest this many, and a count of the rest.",
                    &p.list_max_players, kMinPowerList, kMaxPowerList, def.list_max_players, "%d players", out,
                    Applies::Overlay);
     end_settings_card();

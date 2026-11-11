@@ -30,10 +30,10 @@ struct PowerRow {
 struct PowerSnapshot {
     /// The player the local player last used a skill on; `target.id` 0 for none.
     PowerRow target;
-    /// The other players on the map, strongest first, while they number
-    /// PowerTracker::kMaxListed or fewer: an arena's opponents, a dungeon's party.
-    /// Empty in a crowd, where `in_view` still counts them.
+    /// The other players on the map, strongest first: all of an arena's opponents or
+    /// a dungeon's party, and of a crowd the PowerTracker::kMaxListed strongest.
     std::vector<PowerRow> players;
+    /// How many there are, listed or not.
     uint32_t in_view{0};
     uint32_t map_id{0};
 
@@ -66,8 +66,7 @@ public:
     static constexpr Micros kTargetMemory = 30 * kMicrosPerSecond;
     /// How long before a map's 21 36 its players may be named.
     static constexpr Micros kEarlyArrival = 2 * kMicrosPerSecond;
-    /// Most players a snapshot lists: above it the map is a crowd, and only the
-    /// target shows.
+    /// Most players a snapshot lists: of a crowd, the strongest.
     static constexpr size_t kMaxListed = 12;
     /// Most players remembered; a misread flood stops here.
     static constexpr size_t kMaxPlayers = 2048;

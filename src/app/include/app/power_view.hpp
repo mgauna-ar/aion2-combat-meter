@@ -25,26 +25,30 @@ struct PowerFrameInput {
 
 /// What the overlay draws, as data: no ImGui here, so the tests check it on the Mac.
 struct PowerLayout {
-    /// The target on a line of its own: only while the list is not shown, since a
-    /// listed target is marked in its row instead. `id` 0 for none.
+    /// The target on a line of its own, above the list: only while they are not in
+    /// it, since a listed target is marked in its row instead. `id` 0 for none.
     combat_power::PowerRow target_line;
-    /// The map's players, strongest first; empty in a crowd or with the list off.
+    /// The map's players, strongest first: list_max_players of them at most. Empty
+    /// with the list off.
     std::vector<combat_power::PowerRow> rows;
     /// The row to mark as the target; 0 for none.
     combat_power::EntityId target{0};
-    /// The strongest row's figure, which the bars are measured against; 0 for none.
+    /// The strongest figure drawn, which the bars are measured against; 0 for none.
     uint32_t top{0};
+    /// The map's players the list leaves out: a crowd's weaker ones. 0 with the list
+    /// off.
+    uint32_t more{0};
 
     [[nodiscard]] bool empty() const noexcept { return target_line.id == 0 && rows.empty(); }
 };
 
-/// The list while `show_list` is on and the map's players number list_max_players or
-/// fewer, with the target marked in it; else the target alone.
+/// With `show_list`, the map's list_max_players strongest, the target marked among
+/// them or on a line above them; without it, the target alone.
 [[nodiscard]] PowerLayout power_layout(const combat_power::PowerSnapshot& power, const PowerSettings& settings);
 
 /// Draws the combat power overlay into the frame the caller has begun: a header to
-/// drag it by while unlocked, then the target or the map's players, each with a bar
-/// measured against the strongest. A no-op where ImGui is not built (HAVE_IMGUI
+/// drag it by while unlocked, then the target and the map's strongest players, each with a
+/// bar measured against the strongest, and how many more there are. A no-op where ImGui is not built (HAVE_IMGUI
 /// unset).
 OverlayActions draw_power(const PowerFrameInput& input);
 

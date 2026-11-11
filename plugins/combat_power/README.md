@@ -1,7 +1,7 @@
 # 🎯 Combat Power
 
-**The combat power of the player you are fighting, and of everyone in an arena or a
-dungeon with you, in an overlay of their own.** One of the meter's four plugins (the
+**The combat power of the player you are fighting, and of the strongest players on the
+map with you, in an overlay of their own.** One of the meter's four plugins (the
 others are the [Combat Meter](../combat_meter/README.md), [Auras](../auras/README.md)
 and [Ping](../ping/README.md)). Off until you switch it on, at the top right of the app
 window's **Combat Power** page; switching it on shows its overlay.
@@ -17,9 +17,12 @@ A fourth window you place like the meter's (unlock with Ctrl+Alt+L, drag, resize
   the strongest.
 - **Your target** is the player you last used a skill on, for half a minute after it.
   In the list, their row carries a red stripe and a bold name.
-- **In a crowd** (a town, the open world) the list would be everyone around you, so it
-  goes: only your target shows, on a line of their own. "A crowd" is more players than
-  **List up to** (8 unless you change it).
+- **In a crowd** (a town, the open world) the list is the strongest players the game
+  has shown you on this map, as many as **List up to** (8 unless you change it), with
+  "+N more" under them. A target who is not among them shows on a line of their own
+  above the list.
+- **Players who walk away stay listed** until the next map: nothing the meter reads
+  says a player has left your view.
 - **A class emblem** appears once that player has used a skill: the game does not say
   the class, their skills do.
 - **"-"** means that player's record carried no figure the plugin could read.
@@ -62,8 +65,8 @@ and saves as you go.
 | `opacity` | 0.55 | Background opacity, 0 to 1. The names and figures stay opaque. |
 | `scale` | 1.0 | Size, 0.6 to 2.5, on top of the monitor's DPI scaling. |
 | `x`, `y`, `width`, `height` | -1, -1, 260, 190 | Position and size in screen pixels. -1, -1 places it right of the ping overlay's default spot. |
-| `show_list` | true | List the map's players while they are few. Off, only your target shows. |
-| `list_max_players` | 8 | With more other players than this on the map, only your target shows; 1 to 12. |
+| `show_list` | true | List the map's players, strongest first. Off, only your target shows. |
+| `list_max_players` | 8 | The most players listed, 1 to 12. With more on the map, these are the strongest, and a count of the rest follows. |
 | `hide_when_game_unfocused` | false | Hide it while neither the game nor the meter's window is in front, and while the game is not running. Applies only while locked. |
 | `show_in_dungeons_only` | false | Show it only in a dungeon (as the meter overlay's setting of that name). An arena is not one. Applies only while locked. |
 

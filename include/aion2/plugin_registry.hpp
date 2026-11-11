@@ -53,7 +53,7 @@ inline constexpr PluginDescriptor PING{
 inline constexpr PluginDescriptor COMBAT_POWER{
     PluginId::CombatPower,
     "Combat Power",
-    "The combat power of the player you are fighting, and of everyone in an arena or a dungeon with you",
+    "The combat power of the player you are fighting, and of the strongest players on the map with you",
     "combat_power",
     false,
 };

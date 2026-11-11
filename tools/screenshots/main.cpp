@@ -529,16 +529,16 @@ int main(int argc, char** argv) {
     Scene power_scene{"overlay-combat-power.png", static_cast<float>(power_settings.width), 78.0f, power_snapshot};
     ok = render_power(power_scene, power_settings, out_dir) && ok;
     if (all) {
-        // Unlocked, with its header; and a crowd, where only the target shows.
+        // Unlocked, with its header; and a crowd: the target above its strongest.
         app::PowerSettings unlocked = power_settings;
         unlocked.locked = false;
         Scene scene = power_scene;
         scene.file = "overlay-combat-power-unlocked.png";
         scene.height = 112.0f;
         ok = render_power(scene, unlocked, out_dir) && ok;
-        scene.file = "overlay-combat-power-target.png";
-        scene.height = 48.0f;
-        scene.snapshot.power.players.clear();
+        scene.file = "overlay-combat-power-crowd.png";
+        scene.height = 132.0f;
+        scene.snapshot.power.target = {512, "Vaizel", 9, game::AionClass::Ranger, 98'300};
         scene.snapshot.power.in_view = 40;
         ok = render_power(scene, power_settings, out_dir) && ok;
         scene.file = "overlay-combat-power-empty.png";

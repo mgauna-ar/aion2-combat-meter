@@ -68,15 +68,17 @@ carried no figure shows "-".
 
 ## 📋 The list
 
-- **A snapshot lists** every player on the map, strongest first (then by name),
-  while they number `kMaxListed` (12) or fewer. Above it the map is a crowd:
-  `players` is empty, and `in_view` still counts them.
+- **A snapshot lists** the map's players strongest first (then by name), the
+  `kMaxListed` (12) strongest of a crowd; `in_view` counts them all.
 - **The view narrows it** (`power_layout`): `show_list` and `list_max_players` are
-  the user's. With the list shown, the target is marked in its row; without it, the
-  target has a line of its own.
-- **Why a count and not the map:** an arena's map id is known for one arena (61).
-  A rule by id would miss every other, and a count needs none: an arena's opponents
-  and a dungeon's party are few, a town's crowd is not.
+  the user's, and what the list leaves out is counted under it ("+N more"). A
+  target in the list is marked in its row; one outside it, or with the list off,
+  has a line of its own above.
+- **Never empty in a crowd.** The list once went away above `list_max_players`, and
+  in a town that read as the overlay losing its players a few seconds after it
+  showed them. A crowd shows its strongest instead.
+- **Why not the arena's map:** an arena's map id is known for one arena (61). A rule
+  by id would miss every other, and the strongest few need none.
 
 ---
 

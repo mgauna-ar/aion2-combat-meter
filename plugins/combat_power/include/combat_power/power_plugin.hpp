@@ -9,7 +9,7 @@ namespace aion2::combat_power {
 
 /**
  * @brief The Combat Power plugin: the combat power of the player the local player is
- * fighting, and of everyone in an arena or a dungeon with them, for its overlay.
+ * fighting, and of the strongest players on the map with them, for its overlay.
  *
  * Fed by the pipeline like the others, on the same thread and the same capture
  * clock. Everything it shows the server sent on its own as each player came into

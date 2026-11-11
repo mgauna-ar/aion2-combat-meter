@@ -112,7 +112,7 @@ TEST_CASE(CombatPower, OnlyTheLocalPlayersPressesAim) {
     TEST_ASSERT_EQ(t.snapshot(at(10)).target.id, EntityId{0});
 }
 
-TEST_CASE(CombatPower, PlayersAreListedStrongestFirstAndNotInACrowd) {
+TEST_CASE(CombatPower, PlayersAreListedStrongestFirstAndOfACrowdTheStrongest) {
     PowerTracker t = duel();
     t.on_identity(player(300, "Zikel", 201'900), 2, at(2));
     t.on_identity(player(301, "Vaizel", 0), 2, at(2));  // a record whose end did not read
@@ -122,15 +122,19 @@ TEST_CASE(CombatPower, PlayersAreListedStrongestFirstAndNotInACrowd) {
     TEST_ASSERT_EQ(s.players[1].name, std::string("Nezekan"));
     TEST_ASSERT_EQ(s.players[2].combat_power, 0u);
 
-    // A town: more than a snapshot lists. The target still shows.
+    // A town: more than a snapshot lists. The strongest stay, and all are counted.
     for (EntityId id = 1000; id < 1000 + PowerTracker::kMaxListed; ++id) {
         t.on_identity(player(id, ("Crowd" + std::to_string(id)).c_str(), 50'000 + id), 2, at(4));
     }
-    t.on_cast(press(kMe, 300), at(5));
+    t.on_cast(press(kMe, 301), at(5));
     s = t.snapshot(at(6));
-    TEST_ASSERT(s.players.empty());
+    TEST_ASSERT_EQ(s.players.size(), PowerTracker::kMaxListed);
     TEST_ASSERT_EQ(s.in_view, static_cast<uint32_t>(3 + PowerTracker::kMaxListed));
-    TEST_ASSERT_EQ(s.target.name, std::string("Zikel"));
+    TEST_ASSERT_EQ(s.players[0].name, std::string("Zikel"));
+    TEST_ASSERT_EQ(s.players[1].name, std::string("Nezekan"));
+    TEST_ASSERT(s.players.back().combat_power > 50'000u);
+    // The target is whoever was aimed at, listed or not.
+    TEST_ASSERT_EQ(s.target.name, std::string("Vaizel"));
 }
 
 TEST_CASE(CombatPower, TheClassComesFromTheSkillsTheyUse) {
@@ -231,7 +235,7 @@ TEST_CASE(PowerView, FormatsWithThousandsSeparators) {
     TEST_ASSERT_EQ(app::format_power(1'234'567), std::string("1,234,567"));
 }
 
-TEST_CASE(PowerView, TheListMarksTheTargetAndACrowdShowsItAlone) {
+TEST_CASE(PowerView, TheListMarksTheTargetOrShowsItAboveTheStrongest) {
     PowerTracker t = duel();
     t.on_identity(player(300, "Zikel", 201'900), 2, at(2));
     t.on_cast(press(kMe, 227), at(3));
@@ -244,15 +248,34 @@ TEST_CASE(PowerView, TheListMarksTheTargetAndACrowdShowsItAlone) {
     TEST_ASSERT_EQ(layout.target_line.id, EntityId{0});  // marked in its row instead
     TEST_ASSERT_EQ(layout.top, 201'900u);
 
-    // More players than the setting lists, or the list switched off: the target alone.
+    TEST_ASSERT_EQ(layout.more, 0u);
+
+    // More players than the setting lists: the strongest, a count of the rest, and
+    // the target on a line of their own when they are not among them.
     settings.list_max_players = 1;
     layout = app::power_layout(s, settings);
-    TEST_ASSERT(layout.rows.empty());
+    TEST_ASSERT_EQ(layout.rows.size(), size_t{1});
+    TEST_ASSERT_EQ(layout.rows[0].name, std::string("Zikel"));
+    TEST_ASSERT_EQ(layout.more, 1u);
+    TEST_ASSERT_EQ(layout.target, EntityId{0});
     TEST_ASSERT_EQ(layout.target_line.id, EntityId{227});
-    TEST_ASSERT_EQ(layout.top, 134'667u);
+    TEST_ASSERT_EQ(layout.top, 201'900u);
+    TEST_ASSERT_FALSE(layout.empty());
+    // The list switched off: the target alone.
     settings = app::PowerSettings{};
     settings.show_list = false;
-    TEST_ASSERT_EQ(app::power_layout(s, settings).target_line.name, std::string("Nezekan"));
+    layout = app::power_layout(s, settings);
+    TEST_ASSERT(layout.rows.empty());
+    TEST_ASSERT_EQ(layout.more, 0u);
+    TEST_ASSERT_EQ(layout.target_line.name, std::string("Nezekan"));
+    TEST_ASSERT_EQ(layout.top, 134'667u);
+    // With no target, a crowd still lists its strongest.
+    PowerSnapshot crowd = s;
+    crowd.target = PowerRow{};
+    crowd.in_view = 40;
+    layout = app::power_layout(crowd, app::PowerSettings{});
+    TEST_ASSERT_EQ(layout.rows.size(), size_t{2});
+    TEST_ASSERT_EQ(layout.more, 38u);
 
     // Nothing to draw before anyone is seen.
     TEST_ASSERT(app::power_layout(PowerSnapshot{}, app::PowerSettings{}).empty());

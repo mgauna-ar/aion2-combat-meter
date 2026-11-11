@@ -548,7 +548,8 @@ capture, where all 17,182 records parse):
 - the arenas' map ids: the one-on-one arena of the third capture was 61, and has no
   row in `maps.tsv` yet;
 - whether anything says a player has gone out of view: the Combat Power plugin's list
-  of a map's players only grows until the next map;
+  of a map's players only grows until the next map, so a town's strongest are the
+  strongest seen there, gone or not;
 - tick effects 08 and 38;
 - in `02 38`, the byte before the skill (8, 12 or 32 on a few records), and why two
   self-buffs come back in mode 0;
@@ -624,7 +625,7 @@ capture, one tray and one updater, around them.
 | Combat Meter | `plugins/combat_meter` | fights: damage, healing, damage taken, the boss, the history; the meter overlay | on |
 | Auras | `plugins/auras` | effects on the local player and theirs on their target, their cooldowns; the aura overlay | off |
 | Ping | `plugins/ping` | the latency to the game server off the game's own pong, the heartbeats' jitter, a graph; the ping overlay | off |
-| Combat Power | `plugins/combat_power` | other players' combat power as the game sends it: the target's, and everyone's in an arena or a dungeon; the combat power overlay | off |
+| Combat Power | `plugins/combat_power` | other players' combat power as the game sends it: the target's, and the strongest on the map's (all of an arena's or a dungeon's); the combat power overlay | off |
 
 - **One table names them.** `include/aion2/plugin_registry.hpp` holds each plugin's id,
   name, description, config section and default switch; the sidebar, the dashboard,
