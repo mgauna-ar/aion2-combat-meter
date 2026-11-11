@@ -88,16 +88,16 @@ CommandLine parse_command_line() {
     return cl;
 }
 
-/// Whether the foreground window is the game's or one of the meter's, by process id
-/// alone: GetWindowThreadProcessId opens no handle. True when the game's process
-/// was not found, so the condition never hides the overlay on a guess.
+/// Whether the game is running and in front (app::foreground_is_game), by process id
+/// alone: GetWindowThreadProcessId opens no handle.
 bool game_in_front(const std::vector<uint32_t>& game_pids) {
-    if (game_pids.empty()) return true;
-    HWND fg = GetForegroundWindow();
-    if (fg == nullptr) return true;
-    DWORD pid = 0;
-    GetWindowThreadProcessId(fg, &pid);
-    return pid == GetCurrentProcessId() || std::find(game_pids.begin(), game_pids.end(), pid) != game_pids.end();
+    std::optional<uint32_t> foreground;
+    if (HWND fg = GetForegroundWindow(); fg != nullptr) {
+        DWORD pid = 0;
+        GetWindowThreadProcessId(fg, &pid);
+        if (pid != 0) foreground = static_cast<uint32_t>(pid);
+    }
+    return app::foreground_is_game(game_pids, foreground, static_cast<uint32_t>(GetCurrentProcessId()));
 }
 
 std::filesystem::path data_dir() {

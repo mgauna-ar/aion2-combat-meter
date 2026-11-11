@@ -95,7 +95,7 @@ and saves as you go.
 | `low_hp_alert` | true | Flag your HP under `low_hp_percent`. |
 | `low_hp_percent` | 30 | Of your max HP, 5 to 90. |
 | `watch` | `[]` | Effects to flag while they are not on you: the skill codes the *Watch list* stores, at most 64. |
-| `hide_when_game_unfocused` | false | Hide it while neither the game nor the meter's window is in front. Applies only while locked. |
+| `hide_when_game_unfocused` | false | Hide it while neither the game nor the meter's window is in front, and while the game is not running. Applies only while locked. |
 | `show_in_dungeons_only` | false | Show it only in a dungeon (as the meter overlay's setting of that name). Applies only while locked. |
 
 ## For developers

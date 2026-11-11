@@ -17,6 +17,7 @@
 #include <chrono>
 #include <cmath>
 #include <fstream>
+#include <optional>
 #include <thread>
 #include <utility>
 #include <vector>
@@ -818,6 +819,22 @@ TEST_CASE(OverlayVisibility, DungeonsOnly) {
     TEST_ASSERT_FALSE(overlay_shown(app, now));
     now.fight_live = true;
     TEST_ASSERT(overlay_shown(app, now));
+}
+
+TEST_CASE(OverlayVisibility, TheGameNotRunningIsNotInFront) {
+    const uint32_t own = 100;
+    const std::vector<uint32_t> none;
+    const std::vector<uint32_t> game{4242, 4243};
+    // No game process: hidden, whatever has the focus, the meter's own window included.
+    TEST_ASSERT_FALSE(foreground_is_game(none, 555u, own));
+    TEST_ASSERT_FALSE(foreground_is_game(none, own, own));
+    TEST_ASSERT_FALSE(foreground_is_game(none, std::nullopt, own));
+    // The game running: in front when it or the meter has the focus.
+    TEST_ASSERT(foreground_is_game(game, 4243u, own));
+    TEST_ASSERT(foreground_is_game(game, own, own));
+    TEST_ASSERT_FALSE(foreground_is_game(game, 555u, own));
+    // Focus passing between windows does not count against it.
+    TEST_ASSERT(foreground_is_game(game, std::nullopt, own));
 }
 
 TEST_CASE(OverlayVisibility, ConditionsWaitForTheLock) {
