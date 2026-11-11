@@ -207,6 +207,43 @@ inline Bytes identity_body(uint64_t id, std::string_view name, uint16_t server, 
     return b;
 }
 
+/// The shapes the end of a real 45 36 took in the arena capture.
+enum class PlayerTrailer : uint8_t {
+    /// The tag, a title, a rank, the combat power, five zeros: 63 of its 77.
+    Plain,
+    /// One byte more after the zeros, a 01: 6 of them.
+    ExtraOne,
+    /// One byte more after the zeros, a 00: 5. Read from the end, the figure would
+    /// come out 256 times too small.
+    ExtraZero,
+    /// A 01 between the rank and the combat power: 2.
+    Inserted,
+    /// No title and no rank: one, a level-11 character.
+    Untitled,
+    /// No tag before the title: none seen; what another patch might send.
+    NoTag,
+};
+
+/// 45 36 as the game sends it: the identity, some 1,200 bytes of gear and looks
+/// (filler here), then the tag's u32, a title and a rank (u32 each), the combat
+/// power and five zeros, as `trailer` varies them.
+inline Bytes player_body(uint64_t id, std::string_view name, uint16_t server, uint32_t combat_power,
+                         PlayerTrailer trailer = PlayerTrailer::Plain) {
+    Bytes b = identity_body(id, name, server, 0x02010000);
+    b.resize(b.size() + 1200, 0x64);
+    if (trailer != PlayerTrailer::NoTag) put_le32(b, 0x1FCBF421);
+    if (trailer != PlayerTrailer::Untitled) {
+        put_le32(b, 1172);
+        put_le32(b, 14);
+    }
+    if (trailer == PlayerTrailer::Inserted) b.push_back(0x01);
+    put_le32(b, combat_power);
+    b.resize(b.size() + 5, 0x00);
+    if (trailer == PlayerTrailer::ExtraOne) b.push_back(0x01);
+    if (trailer == PlayerTrailer::ExtraZero) b.push_back(0x00);
+    return b;
+}
+
 /// 33 36: the same record, with the u16 the real ones carry between the name and
 /// the server (1406 in all of the second capture's).
 inline Bytes own_identity_body(uint64_t id, std::string_view name, uint16_t server, uint32_t class_code) {

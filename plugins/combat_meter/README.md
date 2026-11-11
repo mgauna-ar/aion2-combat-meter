@@ -1,8 +1,9 @@
 # ⚔️ Combat Meter
 
 **The party's DPS, healing and damage taken, fight by fight: live on an overlay, and in
-detail in the app window.** One of the meter's three plugins (the others are
-[Auras](../auras/README.md) and [Ping](../ping/README.md)). On by default; its switch is at the top right of its
+detail in the app window.** One of the meter's four plugins (the others are
+[Auras](../auras/README.md), [Ping](../ping/README.md) and
+[Combat Power](../combat_power/README.md)). On by default; its switch is at the top right of its
 page.
 
 It shows what the game's own Combat Analysis window (Ctrl+X) shows, but for every party

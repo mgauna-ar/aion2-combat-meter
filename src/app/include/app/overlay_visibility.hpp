@@ -50,4 +50,9 @@ struct OverlayConditions {
 /// Lag matters out of combat too, so it has no show_in_combat_only either.
 [[nodiscard]] bool ping_shown(const AppSettings& settings, const OverlayConditions& now) noexcept;
 
+/// Whether the combat power overlay shows now: the Combat Power plugin's master
+/// switch first, then, while it is locked, its own hide_when_game_unfocused and
+/// show_in_dungeons_only. An arena is no dungeon, so the second is off by default.
+[[nodiscard]] bool power_shown(const AppSettings& settings, const OverlayConditions& now) noexcept;
+
 } // namespace aion2::app

@@ -13,6 +13,7 @@ constexpr const char* kCapture = "capture";
 constexpr const char* kOverlay = "overlay";
 constexpr const char* kAuras = aion2::plugins::AURAS.config_section;
 constexpr const char* kPing = aion2::plugins::PING.config_section;
+constexpr const char* kPower = aion2::plugins::COMBAT_POWER.config_section;
 constexpr const char* kMeter = aion2::plugins::COMBAT_METER.config_section;
 constexpr const char* kHistory = "history";
 
@@ -89,6 +90,11 @@ void sanitize(AppSettings& s) {
     s.ping.height = std::clamp(s.ping.height, 90, 4000);
     s.ping.warn_ms = std::clamp(s.ping.warn_ms, kMinPingThreshold, kMaxPingThreshold);
     s.ping.bad_ms = std::clamp(s.ping.bad_ms, s.ping.warn_ms, kMaxPingThreshold);
+    s.power.opacity = std::clamp(s.power.opacity, 0.0f, 1.0f);
+    s.power.scale = std::clamp(s.power.scale, 0.6f, 2.5f);
+    s.power.width = std::clamp(s.power.width, 160, 4000);
+    s.power.height = std::clamp(s.power.height, 90, 4000);
+    s.power.list_max_players = std::clamp(s.power.list_max_players, kMinPowerList, kMaxPowerList);
     s.meter.idle_timeout_s = std::clamp(s.meter.idle_timeout_s, 2.0, 600.0);
     s.meter.boss_idle_timeout_s = std::clamp(s.meter.boss_idle_timeout_s, s.meter.idle_timeout_s, 1800.0);
     s.meter.capture_lost_s = std::clamp(s.meter.capture_lost_s, 5.0, 600.0);
@@ -122,6 +128,9 @@ config::JsonValue settings_to_json(const AppSettings& s) {
     config::JsonValue ping;
     config::write_keys<PingSettings>(kPingKeys, s.ping, ping);
     root[kPing] = std::move(ping);
+    config::JsonValue power;
+    config::write_keys<PowerSettings>(kPowerKeys, s.power, power);
+    root[kPower] = std::move(power);
     config::JsonValue meter;
     config::write_keys<meter::MeterSettings>(meter::kMeterSettingKeys, s.meter, meter);
     root[kMeter] = std::move(meter);
@@ -142,6 +151,7 @@ AppSettings settings_from_json(const config::JsonValue& json) {
     config::read_keys<AuraSettings>(kAuraKeys, json[kAuras], s.auras);
     s.auras.watch = read_watch(json[kAuras]["watch"]);
     config::read_keys<PingSettings>(kPingKeys, json[kPing], s.ping);
+    config::read_keys<PowerSettings>(kPowerKeys, json[kPower], s.power);
     config::read_keys<meter::MeterSettings>(meter::kMeterSettingKeys, json[kMeter], s.meter);
     config::read_keys<HistorySettings>(kHistoryKeys, json[kHistory], s.history);
     sanitize(s);

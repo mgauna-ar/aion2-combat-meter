@@ -418,6 +418,7 @@ bool PacketParser::parse_known(const Frame& frame, std::vector<ParsedEvent>& out
             auto id = read_identity_record(r, own);
             if (!id) return false;
             id->own = own;
+            if (!own && !id->name.empty()) id->combat_power = read_combat_power(frame.body);
             if (!id->name.empty()) remember_server(id->server);
             emit(std::move(*id));
             return true;

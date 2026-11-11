@@ -27,8 +27,8 @@ enum class Hotkey : int {
     EndFight = 3,
 };
 
-/// Where an overlay window starts, and how: from OverlaySettings, AuraSettings or
-/// PingSettings.
+/// Where an overlay window starts, and how: from OverlaySettings, AuraSettings,
+/// PingSettings or PowerSettings.
 struct OverlayPlacement {
     bool locked{false};
     bool visible{true};
@@ -44,12 +44,15 @@ struct OverlayPlacement {
 };
 
 /// An overlay starts hidden while its plugin is switched off (`plugin_enabled`); after
-/// that, overlay_shown(), auras_shown() and ping_shown() decide each frame.
+/// that, overlay_shown(), auras_shown(), ping_shown() and power_shown() decide each frame.
 [[nodiscard]] OverlayPlacement placement_of(const OverlaySettings& s, bool plugin_enabled);
 /// Under the meter overlay's default spot. The Auras plugin's switch is its only one.
 [[nodiscard]] OverlayPlacement placement_of(const AuraSettings& s, bool plugin_enabled);
 /// Right of the meter overlay's default spot. The Ping plugin's switch is its only one.
 [[nodiscard]] OverlayPlacement placement_of(const PingSettings& s, bool plugin_enabled);
+/// Right of the ping overlay's default spot. The Combat Power plugin's switch is its
+/// only one.
+[[nodiscard]] OverlayPlacement placement_of(const PowerSettings& s, bool plugin_enabled);
 
 /**
  * @brief A transparent, always-on-top, non-activating window for the meter.
@@ -63,8 +66,8 @@ struct OverlayPlacement {
  * HTBOTTOMRIGHT. It is a separate window: nothing is drawn inside the game, which
  * needs borderless windowed mode for the overlay to show on top of it. It has its
  * own ImGui context, made current before every message and frame, beside the app
- * window's. The meter, aura and ping overlays are three of these; the meter's
- * holds the global hotkeys.
+ * window's. The meter, aura, ping and combat power overlays are four of these; the
+ * meter's holds the global hotkeys.
  */
 class OverlayWindow {
 public:
@@ -97,8 +100,8 @@ public:
     /// for a text line. The font atlas holds them at that size, rebuilt on a change.
     void set_icon_px(float px) noexcept { m_icon_px = px; }
 
-    /// Draws one frame with `draw` (draw_overlay, draw_auras or draw_ping), which gets the
-    /// settings' `scale` times the monitor's DPI scale.
+    /// Draws one frame with `draw` (draw_overlay, draw_auras, draw_ping or draw_power),
+    /// which gets the settings' `scale` times the monitor's DPI scale.
     OverlayActions render(float scale, const std::function<OverlayActions(float scale)>& draw);
 
     std::function<void(Hotkey)> on_hotkey;

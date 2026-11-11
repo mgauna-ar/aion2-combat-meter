@@ -197,9 +197,11 @@ void Report::on_event(const proto::ParsedEvent& pe, const meter::CombatantRegist
                 // Twenty heartbeats a second: the flow summary counts them. --ping
                 // prints the pongs.
             } else if constexpr (std::is_same_v<T, proto::Identity>) {
-                std::printf("%+.3f  identity  %s%s %u \"%s\" server %u class %u\n", t, e.own ? "own " : "",
+                std::printf("%+.3f  identity  %s%s %u \"%s\" server %u class %u", t, e.own ? "own " : "",
                             e.scanned ? "scanned" : "", e.id, name(e.name, e.id).c_str(), unsigned{e.server},
                             e.class_code);
+                if (e.combat_power != 0) std::printf(" cp %u", e.combat_power);
+                std::printf("\n");
             } else if constexpr (std::is_same_v<T, proto::Spawn>) {
                 std::printf("%+.3f  spawn     %u kind %02x npc %u%s", t, e.id, unsigned{e.kind}, e.npc_code,
                             name_suffix(game::npc_name(e.npc_code)).c_str());

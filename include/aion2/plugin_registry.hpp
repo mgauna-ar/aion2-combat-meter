@@ -12,6 +12,7 @@ enum class PluginId : uint8_t {
     CombatMeter,
     Auras,
     Ping,
+    CombatPower,
 };
 
 struct PluginDescriptor {
@@ -49,11 +50,19 @@ inline constexpr PluginDescriptor PING{
     false,
 };
 
+inline constexpr PluginDescriptor COMBAT_POWER{
+    PluginId::CombatPower,
+    "Combat Power",
+    "The combat power of the player you are fighting, and of everyone in an arena or a dungeon with you",
+    "combat_power",
+    false,
+};
+
 /// Key of every plugin's master switch in its config section.
 inline constexpr const char* MASTER_SWITCH_KEY = "plugin_enabled";
 
 /// Every plugin, in the order the app lists them.
-inline constexpr std::array ALL{COMBAT_METER, AURAS, PING};
+inline constexpr std::array ALL{COMBAT_METER, AURAS, PING, COMBAT_POWER};
 
 /// Which plugins are switched on: the settings' master switches, and what the
 /// pipeline feeds.
@@ -61,12 +70,14 @@ struct PluginSwitches {
     bool combat_meter{COMBAT_METER.enabled_by_default};
     bool auras{AURAS.enabled_by_default};
     bool ping{PING.enabled_by_default};
+    bool combat_power{COMBAT_POWER.enabled_by_default};
 
     [[nodiscard]] constexpr bool enabled(PluginId id) const noexcept {
         switch (id) {
             case PluginId::CombatMeter: return combat_meter;
             case PluginId::Auras: return auras;
             case PluginId::Ping: return ping;
+            case PluginId::CombatPower: return combat_power;
         }
         return false;
     }
@@ -75,6 +86,7 @@ struct PluginSwitches {
             case PluginId::CombatMeter: combat_meter = on; break;
             case PluginId::Auras: auras = on; break;
             case PluginId::Ping: ping = on; break;
+            case PluginId::CombatPower: combat_power = on; break;
         }
     }
 
@@ -82,7 +94,7 @@ struct PluginSwitches {
 };
 
 /// Every plugin on: the replay tool's and the tests' pipeline.
-inline constexpr PluginSwitches ALL_ON{true, true, true};
+inline constexpr PluginSwitches ALL_ON{true, true, true, true};
 
 /// The descriptor for `id`.
 [[nodiscard]] constexpr const PluginDescriptor& find(PluginId id) noexcept {
