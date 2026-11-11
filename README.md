@@ -15,7 +15,7 @@ The meter listens to incoming game network traffic on your PC (who hit what, wit
 | [⚔️ **Combat Meter**](plugins/combat_meter/README.md) | Full party DPS, HPS, and damage taken with per-skill breakdowns (crits, double hits, directional hits, blocks). Includes boss HP, live fight timers, combat timelines, death logs, buff uptimes, and saved encounter history. | **Enabled** |
 | [✨ **Auras**](plugins/auras/README.md) | Tracks your personal and target buffs, debuffs, and estimated skill cooldowns as customizable bars or compact icons. Provides pop-up alerts for chain skill triggers, ready cooldowns, low HP warnings, or missing key buffs. | Disabled |
 | [📶 **Ping**](plugins/ping/README.md) | Displays real-time server latency, jitter (RFC 3550), and a rolling 2-minute latency graph. Measured passively off server responses—the meter sends no network pings of its own. | Disabled |
-| [🎯 **Combat Power**](plugins/combat_power/README.md) | Shows the combat power of the player you are fighting, and of everyone in an arena or dungeon with you, strongest first. Read from what the game already sends as players come into view—nothing is looked up online. | Disabled |
+| [🎯 **Combat Power**](plugins/combat_power/README.md) | Shows the combat power of the player you are fighting, and of the strongest players on the map with you: all of an arena's opponents or a dungeon's party. Read from what the game already sends as players come into view—nothing is looked up online. | Disabled |
 
 ![The overlay during a boss fight: three players ranked by DPS, the boss's HP bar and the fight timer](docs/images/overlay-live.png)
 

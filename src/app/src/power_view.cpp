@@ -20,17 +20,17 @@ std::string format_power(uint32_t combat_power) {
 
 PowerLayout power_layout(const combat_power::PowerSnapshot& power, const PowerSettings& settings) {
     PowerLayout layout;
-    const bool listed = settings.show_list && !power.players.empty() &&
-                        power.players.size() <= static_cast<size_t>(std::max(settings.list_max_players, 0));
-    if (!listed) {
-        layout.target_line = power.target;
-        layout.top = power.target.combat_power;
-        return layout;
+    if (settings.show_list) {
+        const size_t shown = std::min(power.players.size(), static_cast<size_t>(std::max(settings.list_max_players, 0)));
+        layout.rows.assign(power.players.begin(), power.players.begin() + static_cast<std::ptrdiff_t>(shown));
+        layout.more = power.in_view > shown ? power.in_view - static_cast<uint32_t>(shown) : 0;
     }
-    layout.rows = power.players;
-    layout.target = power.target.id;
-    // Strongest first, as the tracker sorts them.
-    layout.top = layout.rows.front().combat_power;
+    const bool listed = std::any_of(layout.rows.begin(), layout.rows.end(),
+                                    [&](const combat_power::PowerRow& row) { return row.id == power.target.id; });
+    if (listed) layout.target = power.target.id;
+    else layout.target_line = power.target;
+    // Strongest first, as the tracker sorts them; the target may be stronger still.
+    layout.top = std::max(layout.rows.empty() ? 0u : layout.rows.front().combat_power, layout.target_line.combat_power);
     return layout;
 }
 
@@ -135,6 +135,9 @@ OverlayActions draw_power(const PowerFrameInput& in) {
             draw_row(row, layout.top, row.id == layout.target, scale);
         }
         ImGui::PopStyleVar();
+        if (layout.more != 0) {
+            ImGui::TextColored(rgba(colors::TextDim), "+%u more", layout.more);
+        }
         // Nothing to show is said only while it can be moved: locked, an empty
         // overlay is out of the way.
         if (layout.empty() && interactive) {

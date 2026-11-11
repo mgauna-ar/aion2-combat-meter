@@ -3,7 +3,9 @@
 #include "game/skill_names.hpp"
 
 #include <algorithm>
+#include <cstddef>
 #include <iterator>
+#include <vector>
 
 namespace aion2::combat_power {
 
@@ -123,15 +125,20 @@ PowerSnapshot PowerTracker::snapshot(Micros now) const {
     if (m_target != 0 && now <= m_target_at + kTargetMemory) {
         if (const auto target = m_players.find(m_target); target != m_players.end()) s.target = target->second.row;
     }
-    if (m_players.size() > kMaxListed) return s;
-    s.players.reserve(m_players.size());
-    std::transform(m_players.begin(), m_players.end(), std::back_inserter(s.players),
-                   [](const auto& entry) { return entry.second.row; });
-    std::sort(s.players.begin(), s.players.end(), [](const PowerRow& a, const PowerRow& b) {
-        if (a.combat_power != b.combat_power) return a.combat_power > b.combat_power;
-        if (a.name != b.name) return a.name < b.name;
-        return a.id < b.id;
-    });
+    // Pointers first: a town's crowd is sorted without copying its names.
+    std::vector<const PowerRow*> rows;
+    rows.reserve(m_players.size());
+    std::transform(m_players.begin(), m_players.end(), std::back_inserter(rows),
+                   [](const auto& entry) { return &entry.second.row; });
+    const size_t listed = std::min(rows.size(), kMaxListed);
+    std::partial_sort(rows.begin(), rows.begin() + static_cast<std::ptrdiff_t>(listed), rows.end(),
+                      [](const PowerRow* a, const PowerRow* b) {
+                          if (a->combat_power != b->combat_power) return a->combat_power > b->combat_power;
+                          if (a->name != b->name) return a->name < b->name;
+                          return a->id < b->id;
+                      });
+    s.players.reserve(listed);
+    for (size_t i = 0; i < listed; ++i) s.players.push_back(*rows[i]);
     return s;
 }
 
