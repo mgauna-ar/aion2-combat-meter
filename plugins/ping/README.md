@@ -1,8 +1,9 @@
 # 📶 Ping
 
 **Your latency to the game server, its jitter, and a graph of the last two minutes, in
-an overlay of their own.** One of the meter's three plugins (the others are the
-[Combat Meter](../combat_meter/README.md) and [Auras](../auras/README.md)). Off until
+an overlay of their own.** One of the meter's four plugins (the others are the
+[Combat Meter](../combat_meter/README.md), [Auras](../auras/README.md) and
+[Combat Power](../combat_power/README.md)). Off until
 you switch it on, at the top right of the app window's **Ping** page; switching it on
 shows its overlay.
 

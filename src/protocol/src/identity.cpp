@@ -85,6 +85,51 @@ std::optional<Identity> read_identity_record(ByteReader& r, bool own) {
     return id;
 }
 
+namespace {
+
+/// The three bytes every 45 36 of the arena capture had 12 bytes before its combat
+/// power, after a first byte of 21, 24 or 26: a u32 of unknown meaning.
+constexpr uint8_t kPowerTag[] = {0xF4, 0xCB, 0x1F};
+/// How far from the end the tag is looked for: it sat 20 to 21 bytes from it.
+constexpr size_t kPowerTagWindow = 40;
+/// The 00 bytes after the combat power.
+constexpr size_t kPowerZeros = 5;
+
+/// The combat power at `at`: a u32 no player's is above, then kPowerZeros 00 bytes.
+[[nodiscard]] uint32_t combat_power_at(std::span<const uint8_t> body, size_t at) noexcept {
+    if (at + sizeof(uint32_t) + kPowerZeros > body.size()) return 0;
+    const auto field = body.subspan(at, sizeof(uint32_t) + kPowerZeros);
+    if (!std::all_of(field.begin() + sizeof(uint32_t), field.end(), [](uint8_t b) { return b == 0; })) return 0;
+    const uint32_t power = uint32_t{field[0]} | (uint32_t{field[1]} << 8) | (uint32_t{field[2]} << 16) |
+                           (uint32_t{field[3]} << 24);
+    return power <= kMaxCombatPower ? power : 0;
+}
+
+} // namespace
+
+uint32_t read_combat_power(std::span<const uint8_t> body) noexcept {
+    if (body.size() < kMinCombatPowerBody) return 0;
+    // The tag's u32, then a title and a rank (u32 each), then the figure. From the
+    // tag, since the record's end varies: 11 of the capture's 77 had a byte more
+    // after the zeros (00 or 01), and a small figure's own high bytes are zeros too.
+    const auto window = body.last(kPowerTagWindow);
+    const auto tag = std::find_end(window.begin(), window.end(), std::begin(kPowerTag), std::end(kPowerTag));
+    if (tag != window.end()) {
+        const size_t after_tag = body.size() - static_cast<size_t>(window.end() - tag) + std::size(kPowerTag);
+        constexpr size_t kTitleAndRank = 2 * sizeof(uint32_t);
+        if (const uint32_t power = combat_power_at(body, after_tag + kTitleAndRank)) return power;
+        // Two had one byte more (01) between the rank and the figure.
+        if (const uint32_t power = combat_power_at(body, after_tag + kTitleAndRank + 1)) return power;
+        // A level-11 character's had neither title nor rank, and ended there.
+        if (after_tag + sizeof(uint32_t) + kPowerZeros == body.size()) return combat_power_at(body, after_tag);
+        return 0;
+    }
+    // No tag (another patch's, perhaps): from the end, past a last byte that is not
+    // a zero.
+    if (body.back() != 0) body = body.first(body.size() - 1);
+    return combat_power_at(body, body.size() - sizeof(uint32_t) - kPowerZeros);
+}
+
 std::vector<Identity> scan_identities(std::span<const uint8_t> bytes, std::span<const uint16_t> known_servers) {
     std::vector<Identity> found;
     if (known_servers.empty()) return found;

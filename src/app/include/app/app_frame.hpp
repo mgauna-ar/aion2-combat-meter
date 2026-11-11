@@ -21,7 +21,7 @@
 
 namespace aion2::app {
 
-enum class AppPage : uint8_t { Dashboard, Meter, Auras, Ping, Settings };
+enum class AppPage : uint8_t { Dashboard, Meter, Auras, Ping, Power, Settings };
 
 /// The Combat Meter page's tabs, in their order.
 enum class MeterTab : int { Damage, Healing, Taken, Buffs, Casts, Timeline, Deaths, Settings };
@@ -91,6 +91,7 @@ struct AppActions {
     bool reset_overlay_position{false};
     bool reset_aura_position{false};
     bool reset_ping_position{false};
+    bool reset_power_position{false};
     OpenTarget open{OpenTarget::None};
     /// A saved fight to load into AppViewState::selected_fight.
     std::string load_file;

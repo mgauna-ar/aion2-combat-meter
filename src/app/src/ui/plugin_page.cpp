@@ -39,6 +39,7 @@ const char* plugin_icon(plugins::PluginId id) noexcept {
         case plugins::PluginId::CombatMeter: return ICON_SWORDS;
         case plugins::PluginId::Auras: return ICON_SPARKLE;
         case plugins::PluginId::Ping: return ICON_ACTIVITY;
+        case plugins::PluginId::CombatPower: return ICON_CROSSHAIR;
     }
     return ICON_PLUG;
 }
@@ -48,6 +49,7 @@ AppPage plugin_page(plugins::PluginId id) noexcept {
         case plugins::PluginId::CombatMeter: return AppPage::Meter;
         case plugins::PluginId::Auras: return AppPage::Auras;
         case plugins::PluginId::Ping: return AppPage::Ping;
+        case plugins::PluginId::CombatPower: return AppPage::Power;
     }
     return AppPage::Dashboard;
 }

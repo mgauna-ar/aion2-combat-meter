@@ -136,6 +136,36 @@ struct PingSettings {
     bool hide_when_game_unfocused{false};
 };
 
+/// The Combat Power plugin's overlay: the combat power of the player the local
+/// player is fighting, and of the map's players while they are few, in a window of
+/// its own (power_view.hpp). The plugin's master switch (AppSettings::plugins) shows
+/// and hides it.
+struct PowerSettings {
+    /// Locked: click-through, and cannot be moved or resized.
+    bool locked{false};
+    /// Of the background only; the names and figures stay opaque.
+    float opacity{0.55f};
+    float scale{1.0f};
+    /// Screen position and size; x and y of -1 place it right of the ping's default spot.
+    int x{-1};
+    int y{-1};
+    int width{260};
+    int height{190};
+    /// Everyone on the map under the target, while they number list_max_players or
+    /// fewer: an arena's opponents, a dungeon's party.
+    bool show_list{true};
+    int list_max_players{8};
+    /// As the meter overlay's: while locked, only in a dungeon, and hidden while
+    /// neither the game nor one of the meter's windows is in front.
+    bool show_in_dungeons_only{false};
+    bool hide_when_game_unfocused{false};
+};
+
+/// The list's range: one other player (a duel) to the most a snapshot lists
+/// (combat_power::PowerTracker::kMaxListed).
+inline constexpr int kMinPowerList = 1;
+inline constexpr int kMaxPowerList = 12;
+
 struct HistorySettings {
     /// Saved fights kept on disk; the oldest go first.
     int max_fights{500};
@@ -171,6 +201,7 @@ struct AppSettings {
     OverlaySettings overlay;
     AuraSettings auras;
     PingSettings ping;
+    PowerSettings power;
     /// Spelled from aion2:: because GCC rejects a member named `meter` after an
     /// unqualified `meter::` in the same class ("changes meaning").
     aion2::meter::MeterSettings meter;
@@ -248,6 +279,20 @@ inline constexpr std::array<config::ConfigKey<PingSettings>, 13> kPingKeys{{
     config::field<PingSettings, &PingSettings::bad_ms>("bad_ms"),
     config::field<PingSettings, &PingSettings::show_in_dungeons_only>("show_in_dungeons_only"),
     config::field<PingSettings, &PingSettings::hide_when_game_unfocused>("hide_when_game_unfocused"),
+}};
+
+inline constexpr std::array<config::ConfigKey<PowerSettings>, 11> kPowerKeys{{
+    config::field<PowerSettings, &PowerSettings::locked>("locked"),
+    config::field<PowerSettings, &PowerSettings::opacity>("opacity"),
+    config::field<PowerSettings, &PowerSettings::scale>("scale"),
+    config::field<PowerSettings, &PowerSettings::x>("x"),
+    config::field<PowerSettings, &PowerSettings::y>("y"),
+    config::field<PowerSettings, &PowerSettings::width>("width"),
+    config::field<PowerSettings, &PowerSettings::height>("height"),
+    config::field<PowerSettings, &PowerSettings::show_list>("show_list"),
+    config::field<PowerSettings, &PowerSettings::list_max_players>("list_max_players"),
+    config::field<PowerSettings, &PowerSettings::show_in_dungeons_only>("show_in_dungeons_only"),
+    config::field<PowerSettings, &PowerSettings::hide_when_game_unfocused>("hide_when_game_unfocused"),
 }};
 
 /// The ping thresholds' range, in ms. The red one is never under the amber one.

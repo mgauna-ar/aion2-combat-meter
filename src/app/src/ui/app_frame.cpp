@@ -29,6 +29,7 @@ constexpr NavItem kNavItems[] = {
     {plugins::COMBAT_METER.name, ICON_SWORDS, AppPage::Meter},
     {plugins::AURAS.name, ICON_SPARKLE, AppPage::Auras},
     {plugins::PING.name, ICON_ACTIVITY, AppPage::Ping},
+    {plugins::COMBAT_POWER.name, ICON_CROSSHAIR, AppPage::Power},
     {"Settings", ICON_SETTINGS, AppPage::Settings},
 };
 
@@ -205,6 +206,7 @@ AppActions draw_app(const AppFrameInput& in, AppViewState& state) {
         case AppPage::Meter: render_meter_page(in, state, out); break;
         case AppPage::Auras: render_auras_page(in, state, out); break;
         case AppPage::Ping: render_ping_page(in, state, out); break;
+        case AppPage::Power: render_power_page(in, state, out); break;
         case AppPage::Settings: render_settings_page(in, state, out); break;
     }
     ImGui::EndChild();

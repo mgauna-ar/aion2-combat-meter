@@ -2,6 +2,7 @@
 
 #include "aion2/plugin_registry.hpp"
 #include "auras/aura_plugin.hpp"
+#include "combat_power/power_plugin.hpp"
 #include "common/micros.hpp"
 #include "meter/encounter_engine.hpp"
 #include "meter/meter_settings.hpp"
@@ -68,11 +69,14 @@ struct LiveSnapshot {
     /// The Ping plugin's: the latency, its jitter and the graph's seconds. Empty
     /// while the plugin is off.
     aion2::ping::PingSnapshot ping;
+    /// The Combat Power plugin's: the target's combat power and the map's players'.
+    /// Empty while the plugin is off.
+    aion2::combat_power::PowerSnapshot power;
 };
 
 /**
  * @brief Captured packets to the plugins: demux, frame decoder, parser, then each
- * plugin switched on (the combat meter's engine, the auras, the ping).
+ * plugin switched on (the combat meter's engine, the auras, the ping, the combat power).
  *
  * One instance runs on one thread: the live engine thread, or the replay tool.
  * Both drive it the same way, on the capture clock, so a replay of a recording
@@ -100,8 +104,8 @@ public:
     /// the source, like the dropped count: the pipeline still reads no clock.
     void set_counter_offset(std::optional<Micros> offset) noexcept { m_ping.set_counter_offset(offset); }
     /// Switches plugins on and off at capture time `now`. The meter switched off ends
-    /// its live fight first; the auras and the ping switched off forget what they
-    /// knew, since they will miss what happens meanwhile.
+    /// its live fight first; the auras, the ping and the combat power switched off
+    /// forget what they knew, since they will miss what happens meanwhile.
     void set_plugins(const aion2::plugins::PluginSwitches& on, Micros now);
     [[nodiscard]] const aion2::plugins::PluginSwitches& plugin_switches() const noexcept { return m_plugins; }
 
@@ -120,6 +124,7 @@ public:
     [[nodiscard]] const meter::EncounterEngine& engine() const noexcept { return m_engine; }
     [[nodiscard]] const aion2::auras::AuraPlugin& aura_plugin() const noexcept { return m_auras; }
     [[nodiscard]] const aion2::ping::PingPlugin& ping_plugin() const noexcept { return m_ping; }
+    [[nodiscard]] const aion2::combat_power::PowerPlugin& power_plugin() const noexcept { return m_power; }
 
 private:
     void on_frame(const proto::Frame& frame) override;
@@ -130,6 +135,7 @@ private:
     meter::EncounterEngine m_engine;
     aion2::auras::AuraPlugin m_auras;
     aion2::ping::PingPlugin m_ping;
+    aion2::combat_power::PowerPlugin m_power;
     aion2::plugins::PluginSwitches m_plugins;
     std::vector<proto::ParsedEvent> m_events;
     uint64_t m_dropped{0};

@@ -31,6 +31,7 @@ void Pipeline::on_frame(const proto::Frame& frame) {
         if (m_plugins.combat_meter) m_engine.on_event(e);
         if (m_plugins.auras) m_auras.on_event(e);
         if (m_plugins.ping) m_ping.on_event(e);
+        if (m_plugins.combat_power) m_power.on_event(e);
     }
 }
 
@@ -43,6 +44,7 @@ void Pipeline::tick(Micros now) {
     }
     if (m_plugins.auras) m_auras.tick(now);
     if (m_plugins.ping) m_ping.tick(now);
+    if (m_plugins.combat_power) m_power.tick(now);
 }
 
 void Pipeline::end_fight(meter::EndReason reason, Micros now) {
@@ -58,6 +60,7 @@ void Pipeline::set_plugins(const aion2::plugins::PluginSwitches& on, Micros now)
     }
     if (m_plugins.auras && !on.auras) m_auras.clear();
     if (m_plugins.ping && !on.ping) m_ping.clear();
+    if (m_plugins.combat_power && !on.combat_power) m_power.clear();
     m_plugins = on;
 }
 
@@ -91,6 +94,7 @@ LiveSnapshot Pipeline::snapshot(Micros now) const {
     s.capture_totals = capture_totals();
     if (m_plugins.auras) s.auras = m_auras.snapshot(now);
     if (m_plugins.ping) s.ping = m_ping.snapshot(now);
+    if (m_plugins.combat_power) s.power = m_power.snapshot(now);
     return s;
 }
 

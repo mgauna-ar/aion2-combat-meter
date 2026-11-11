@@ -11,7 +11,9 @@ a plugin:
 - [`plugins/auras/AGENTS.md`](plugins/auras/AGENTS.md): effects, the target, the
   cooldown estimates;
 - [`plugins/ping/AGENTS.md`](plugins/ping/AGENTS.md): the ping off the game's own
-  pong, the jitter, the counter offset.
+  pong, the jitter, the counter offset;
+- [`plugins/combat_power/AGENTS.md`](plugins/combat_power/AGENTS.md): other players'
+  combat power as the game sends it, the target, the list.
 
 Occasional procedures are skills under `.claude/skills/`:
 - `decode-capture`: check and fix the decoder against a real capture. The decoder
@@ -146,13 +148,18 @@ plugins/auras/   aion2::auras (include prefix auras/; its AGENTS.md and README.m
 plugins/ping/    aion2::ping (include prefix ping/; its AGENTS.md and README.md)
     ping_plugin, ping_tracker (the pong's round trip, the heartbeats' jitter and
     lateness, the graph's seconds)
+plugins/combat_power/  aion2::combat_power (include prefix combat_power/; its AGENTS.md
+                 and README.md)
+    power_plugin, power_tracker (the map's players and their combat power, the
+    local player's target)
 src/pipeline/    aion2::pipeline   stream_demux (flows -> frames), pipeline (parser, then
                  each plugin switched on)
 src/app/         aion2::app
     app_settings, app_runtime (threads, history, recording), display_format,
-    overlay_view (the Combat Meter's overlay), aura_view (the Auras') and ping_view
-    (the Ping's; ImGui, behind HAVE_IMGUI), overlay_chrome (what the three share, so
-    they stay one look: the fonts, the frame, the header's buttons, the grip, the bars),
+    overlay_view (the Combat Meter's overlay), aura_view (the Auras'), ping_view
+    (the Ping's) and power_view (the Combat Power's; ImGui, behind HAVE_IMGUI),
+    overlay_chrome (what the four share, so they stay one look: the fonts, the frame,
+    the header's buttons, the grip, the bars),
     overlay_visibility, app_frame (the app window's contents),
     update_check (release parsing, versions, the update balloon) and updater (check,
     download, stage, swap), both ported from ffxiv-hub,
@@ -200,7 +207,7 @@ plugin; capture + the plugins ← pipeline ← app. No plugin depends on another
 | Capture (one per Npcap adapter, or the FileSource thread) | its pcap handle | `BoundedQueue<OwnedPacket>` (8192), `try_push` only. A full queue drops and counts, and the drop shows up as a TCP gap. Each Npcap thread also samples the capture clock against the performance counter (`ClockOffsetEstimator`, under its own mutex), which the engine reads each tick. |
 | Npcap watcher | the loopback filter text | a mutex plus an atomic generation counter. Each capture thread applies a new filter itself between `pcap_next_ex` calls, because a pcap handle is not shared. |
 | Engine (`AppRuntime::run`) | `Pipeline`, `HistoryStore` writes, the recorder | publishes `LiveSnapshot` into a `SnapshotSlot` every 200 ms of capture time, and whenever the queue runs dry. A fight's `FightDetail` is shared, never copied: a snapshot holds a pointer to it. |
-| UI (`wWinMain`) | the four windows (the app window and the meter, aura and ping overlays, each with its own ImGui context), the tray, `AppSettings`, the `Updater` | reads snapshots and the history index (copied under a mutex). Requests go to the engine as atomics: end fight, recording on/off, clear history. New meter and history settings and the plugin switches go through `AppRuntime::update_settings`, under the mutex; the engine applies them on its next pass. |
+| UI (`wWinMain`) | the five windows (the app window and the meter, aura, ping and combat power overlays, each with its own ImGui context), the tray, `AppSettings`, the `Updater` | reads snapshots and the history index (copied under a mutex). Requests go to the engine as atomics: end fight, recording on/off, clear history. New meter and history settings and the plugin switches go through `AppRuntime::update_settings`, under the mutex; the engine applies them on its next pass. |
 | Updater worker (one at a time) | the check or the download | `Updater::status()`, copied under its mutex, which the UI reads each frame. Staged files are moved into place on the UI thread (`apply_staged`). `stop()` cancels a download and joins, before the engine stops. |
 
 `make tsan` runs the suite under ThreadSanitizer. The `AppRuntime` tests drive real
@@ -208,7 +215,7 @@ threads with a FileSource.
 
 ---
 
-## 📡 Protocol (Global client; from the community's notes, checked against two captures)
+## 📡 Protocol (Global client; from the community's notes, checked against three captures)
 
 All of it lives in `src/protocol`. `opcodes.hpp` is the one place opcodes are spelled.
 
@@ -217,6 +224,10 @@ Island), from login through three boss kills and back to town, whose final boss 
 was checked against the game's own Combat Analysis window (Ctrl+X). For the local
 player there, damage (2,265,310), hits (862) and every per-skill CRI, PERF, DOUB,
 BACK, FRNT, MULT and BLOC share matched it exactly.
+
+A third, the arena capture: three minutes of a town, a one-on-one arena match (map
+61) and the town again, 79 player records in all. It gave the combat power (Identity,
+below).
 
 **Transport**
 - TCP, server port 13328.
@@ -365,6 +376,28 @@ BACK, FRNT, MULT and BLOC share matched it exactly.
     party packets, as a dungeon was entered and finished. Replay still prints them.
   - A name is at most 16 letters or digits, with at least one letter.
   - A name starting with `$` is a tutorial placeholder.
+  - **Combat power:** 45 36 is the player's whole record, 1,162 to 2,151 bytes in the
+    arena capture: after the fields above come their HP, their gear slot by slot,
+    their looks. Its last fields are a u32 of unknown meaning (the tag: `F4 CB 1F`
+    after a byte of 21, 24 or 26), a title and a rank perhaps (u32 each: 1,001 to
+    1,299, and 3 to 19), the combat power (u32), and five 00 bytes
+    (`read_combat_power`).
+    - **Checked against public character pages** (which give the official site's
+      figure): the arena opponent's read 134,667 and another player's 188,962, both
+      their page's figure to the point. A third read 187,649 against 188,087 hours
+      later, and a level-11 character 4,756 against 6,189: characters still gaining.
+    - All 77 of the capture's 45 36 records read one, 4,756 to 210,515.
+    - **It is found from the tag,** not from the end: 11 records had one byte more
+      after the zeros (01 in 6, 00 in 5), and a figure's own high bytes are zeros, so
+      from the end those five read 256 times too small.
+    - **The other shapes:** 2 records had a 01 between the rank and the figure; the
+      level-11 character's had no title and no rank, the figure straight after the
+      tag. A record with no tag is read from the end, past a last byte that is not 0.
+    - Item level (2,700 on the opponent's page) is not among these fields.
+    - **33 36 does not end with it:** the local player's own record ends in a list of
+      small u32s, and their combat power has not been found.
+    - The arena sent the opponent's record three times in the match, the figure the
+      same each time: it is neither hidden nor equalised there.
 - **Spawn `41 36`:**
   - **Id:** a varint. An id over 1,000,000 is folded to `(raw & 0x3FFF) | 0x4000`, in
     `entity_id.cpp` only.
@@ -507,6 +540,15 @@ capture, where all 17,182 records parse):
 - misses, and the target's endurance, regeneration and invincibility (above);
 - where the class is in 33 36 / 45 36, and what their "class" u32 and 33 36's extra
   u16 hold (`game/class_codes.cpp` is empty; skill codes give the class instead);
+- **around the combat power** (Identity, above): where the local player's own is,
+  what the tag, the two u32s before it and the stray bytes around it are (the
+  frame's length, perhaps, where a byte follows the zeros), and whether a battlefield
+  or another arena sends the record whole as the one-on-one arena did. The Combat
+  Power plugin shows "-" for a record whose end does not read;
+- the arenas' map ids: the one-on-one arena of the third capture was 61, and has no
+  row in `maps.tsv` yet;
+- whether anything says a player has gone out of view: the Combat Power plugin's list
+  of a map's players only grows until the next map;
 - tick effects 08 and 38;
 - in `02 38`, the byte before the skill (8, 12 or 32 on a few records), and why two
   self-buffs come back in mode 0;
@@ -582,6 +624,7 @@ capture, one tray and one updater, around them.
 | Combat Meter | `plugins/combat_meter` | fights: damage, healing, damage taken, the boss, the history; the meter overlay | on |
 | Auras | `plugins/auras` | effects on the local player and theirs on their target, their cooldowns; the aura overlay | off |
 | Ping | `plugins/ping` | the latency to the game server off the game's own pong, the heartbeats' jitter, a graph; the ping overlay | off |
+| Combat Power | `plugins/combat_power` | other players' combat power as the game sends it: the target's, and everyone's in an arena or a dungeon; the combat power overlay | off |
 
 - **One table names them.** `include/aion2/plugin_registry.hpp` holds each plugin's id,
   name, description, config section and default switch; the sidebar, the dashboard,
@@ -596,8 +639,8 @@ capture, one tray and one updater, around them.
   only the panel that turns it back on (`render_plugin_disabled_gate`). Off means the
   pipeline feeds it no events and no ticks, and its overlay hides. Switching it off
   takes effect on the engine thread through `AppRuntime::update_settings`
-  (`Pipeline::set_plugins`): the meter ends its live fight, the auras and the ping
-  forget everything.
+  (`Pipeline::set_plugins`): the meter ends its live fight, the auras, the ping and
+  the combat power forget everything.
 - **A plugin's page** opens with its header and switch, then its own settings, then its
   overlay's, as ffxiv-hub orders them. Overlays it draws are separate windows of the
   app (`win32/overlay_window`), each shown by its plugin's switch and its own hide

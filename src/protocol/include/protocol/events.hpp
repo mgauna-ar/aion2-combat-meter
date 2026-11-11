@@ -40,6 +40,10 @@ struct Identity {
     /// meter does not name anyone by it: in the second capture none of 38 had the
     /// right id.
     bool scanned{false};
+    /// The player's combat power, the figure the game and its character pages show,
+    /// from the end of another player's record (read_combat_power); 0 for none. The
+    /// local player's own record does not end with it.
+    uint32_t combat_power{0};
 };
 
 /// Something appeared: an NPC, a summon, a skill effect.

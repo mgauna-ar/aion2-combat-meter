@@ -54,7 +54,7 @@ find_package(Threads REQUIRED)
 
 # -----------------------------------------------------------------------------
 # Layers (AGENTS.md): common <- capture, protocol <- game <- each plugin
-# (plugins/combat_meter, plugins/auras, plugins/ping) <- pipeline <- app. Each
+# (plugins/combat_meter, plugins/auras, plugins/ping, plugins/combat_power) <- pipeline <- app. Each
 # publishes only its own include root, so an #include across the layering does not
 # compile, and no plugin links another.
 # -----------------------------------------------------------------------------
@@ -102,10 +102,15 @@ add_library(aion2_ping STATIC ${AION2_PING_SOURCES})
 target_include_directories(aion2_ping PUBLIC plugins/ping/include)
 target_link_libraries(aion2_ping PUBLIC aion2_game PRIVATE aion2_warnings)
 
+file(GLOB AION2_COMBAT_POWER_SOURCES CONFIGURE_DEPENDS plugins/combat_power/src/*.cpp)
+add_library(aion2_combat_power STATIC ${AION2_COMBAT_POWER_SOURCES})
+target_include_directories(aion2_combat_power PUBLIC plugins/combat_power/include)
+target_link_libraries(aion2_combat_power PUBLIC aion2_game PRIVATE aion2_warnings)
+
 file(GLOB AION2_PIPELINE_SOURCES CONFIGURE_DEPENDS src/pipeline/src/*.cpp)
 add_library(aion2_pipeline STATIC ${AION2_PIPELINE_SOURCES})
 target_include_directories(aion2_pipeline PUBLIC src/pipeline/include)
-target_link_libraries(aion2_pipeline PUBLIC aion2_capture aion2_meter aion2_auras aion2_ping PRIVATE aion2_warnings)
+target_link_libraries(aion2_pipeline PUBLIC aion2_capture aion2_meter aion2_auras aion2_ping aion2_combat_power PRIVATE aion2_warnings)
 
 # Dear ImGui with its Win32 and DX11 backends: Windows only. Its headers are SYSTEM
 # includes, so our warnings-as-errors leaves them alone.

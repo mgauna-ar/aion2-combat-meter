@@ -89,6 +89,54 @@ TEST_CASE(Parser, OwnAndOtherIdentity) {
     TEST_ASSERT_EQ(p.stats().decoded, uint64_t{2});
 }
 
+TEST_CASE(Parser, AnotherPlayersRecordEndsWithTheirCombatPower) {
+    PacketParser p;
+    const auto power = [&](uint32_t figure, PlayerTrailer trailer) {
+        return only<Identity>(parse_one(p, opcode::OtherPlayer, player_body(227, "Nezekan", kServer, figure, trailer)))
+            .combat_power;
+    };
+    // The arena capture's opponent, whose character page gave the same figure.
+    TEST_ASSERT_EQ(power(134'667, PlayerTrailer::Plain), 134'667u);
+    // One byte more after the zeros: a 01, as the second page that matched.
+    TEST_ASSERT_EQ(power(188'962, PlayerTrailer::ExtraOne), 188'962u);
+    // A 00 there: from the end this one would read 292.
+    TEST_ASSERT_EQ(power(74'992, PlayerTrailer::ExtraZero), 74'992u);
+    // A byte between the rank and the figure.
+    TEST_ASSERT_EQ(power(187'649, PlayerTrailer::Inserted), 187'649u);
+    // A character with no title yet: the figure follows the tag.
+    TEST_ASSERT_EQ(power(4'756, PlayerTrailer::Untitled), 4'756u);
+    // A small figure's own high bytes are zeros too.
+    TEST_ASSERT_EQ(power(753, PlayerTrailer::Plain), 753u);
+    TEST_ASSERT_EQ(power(753, PlayerTrailer::ExtraZero), 753u);
+    // Without the tag, from the end.
+    TEST_ASSERT_EQ(power(134'667, PlayerTrailer::NoTag), 134'667u);
+    TEST_ASSERT_EQ(p.stats().failed, uint64_t{0});
+}
+
+TEST_CASE(Parser, ARecordThatDoesNotEndThatWayCarriesNoCombatPower) {
+    PacketParser p;
+    // Too short to be the whole record: the tests' older identity bodies.
+    TEST_ASSERT_EQ(only<Identity>(parse_one(p, opcode::OtherPlayer, identity_body(502, "Israphel", kServer, 3)))
+                       .combat_power,
+                   0u);
+    // No run of zeros after the figure.
+    Bytes noisy = player_body(503, "Lumiel", kServer, 90'000);
+    noisy[noisy.size() - 3] = 0x7F;
+    TEST_ASSERT_EQ(only<Identity>(parse_one(p, opcode::OtherPlayer, noisy)).combat_power, 0u);
+    // A figure no player has.
+    const Bytes huge = player_body(504, "Triniel", kServer, kMaxCombatPower + 1);
+    TEST_ASSERT_EQ(only<Identity>(parse_one(p, opcode::OtherPlayer, huge)).combat_power, 0u);
+    // The local player's own record has another layout: its end is not read.
+    Bytes own = own_identity_body(501, "Ariel", kServer, 7);
+    own.resize(own.size() + 1200, 0x64);
+    put_le32(own, 150'000);
+    own.resize(own.size() + 5, 0x00);
+    TEST_ASSERT_EQ(only<Identity>(parse_one(p, opcode::OwnCharacter, own)).combat_power, 0u);
+    // The name still reads in every case: nothing failed.
+    TEST_ASSERT_EQ(p.stats().failed, uint64_t{0});
+    TEST_ASSERT_EQ(read_combat_power({}), 0u);
+}
+
 TEST_CASE(Parser, ScansUnknownPacketsOnlyForKnownServers) {
     PacketParser p;
     Bytes blob = {0x10, 0x20, 0x30};

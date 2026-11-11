@@ -17,6 +17,7 @@
 #include "app/app_settings.hpp"
 #include "app/aura_view.hpp"
 #include "app/ping_view.hpp"
+#include "app/power_view.hpp"
 #include "app/game_icons.hpp"
 #include "app/overlay_chrome.hpp"
 #include "app/overlay_view.hpp"
@@ -206,22 +207,19 @@ shots::Rect drawn_bounds(const shots::Canvas& canvas) {
     return shots::Rect{x0, y0, x1 - x0 + 1, y1 - y0 + 1};
 }
 
-/// The ping overlay over the same backdrop: what it draws of its window, so a locked
-/// one shows as the panel it is.
-bool render_ping(Scene& scene, const app::PingSettings& settings, const std::filesystem::path& out_dir) {
+/// An overlay over the same backdrop, cut to what `draw` draws of its window, so a
+/// locked one shows as the panel it is.
+template <typename Draw>
+bool render_drawn(Scene& scene, const std::filesystem::path& out_dir, Draw&& draw) {
     ImGuiIO& io = ImGui::GetIO();
     const int w = static_cast<int>(std::lround(scene.width * kScale));
     const int h = static_cast<int>(std::lround(scene.height * kScale));
-    app::PingFrameInput input;
-    input.snapshot = &scene.snapshot;
-    input.settings = &settings;
-    input.scale = kScale;
     for (int frame = 0; frame < 3; ++frame) {
         io.DisplaySize = ImVec2(static_cast<float>(w), static_cast<float>(h));
         io.DeltaTime = 1.0f / 60.0f;
         io.AddMousePosEvent(-FLT_MAX, -FLT_MAX);
         ImGui::NewFrame();
-        (void)app::draw_ping(input);
+        draw();
         ImGui::Render();
     }
     shots::Canvas window(w, h, shots::Rgba{0, 0, 0, 0});
@@ -236,6 +234,38 @@ bool render_ping(Scene& scene, const app::PingSettings& settings, const std::fil
     }
     std::printf("wrote %s\n", path.string().c_str());
     return true;
+}
+
+/// The ping overlay.
+bool render_ping(Scene& scene, const app::PingSettings& settings, const std::filesystem::path& out_dir) {
+    app::PingFrameInput input;
+    input.snapshot = &scene.snapshot;
+    input.settings = &settings;
+    input.scale = kScale;
+    return render_drawn(scene, out_dir, [&] { (void)app::draw_ping(input); });
+}
+
+/// The combat power overlay.
+bool render_power(Scene& scene, const app::PowerSettings& settings, const std::filesystem::path& out_dir) {
+    app::PowerFrameInput input;
+    input.snapshot = &scene.snapshot;
+    input.settings = &settings;
+    input.scale = kScale;
+    return render_drawn(scene, out_dir, [&] { (void)app::draw_power(input); });
+}
+
+/// An arena's two opponents, the one being fought marked: what the Combat Power
+/// plugin holds a minute into a two-on-two match.
+combat_power::PowerSnapshot power_demo() {
+    combat_power::PowerSnapshot p;
+    p.map_id = 61;
+    p.players = {
+        {227, "Nezekan", 9, game::AionClass::Templar, 134'667},
+        {301, "Triniel", 9, game::AionClass::Assassin, 121'480},
+    };
+    p.in_view = static_cast<uint32_t>(p.players.size());
+    p.target = p.players.front();
+    return p;
 }
 
 /// The aura overlay over the same backdrop, at the scene's own capture time.
@@ -491,6 +521,31 @@ int main(int argc, char** argv) {
         scene.width = 150.0f;
         ok = render_ping(scene, no_graph, out_dir) && ok;
     }
+    // The combat power overlay, locked, in an arena: both opponents, the target marked.
+    app::PowerSettings power_settings;
+    power_settings.locked = true;
+    pipeline::LiveSnapshot power_snapshot = live.snapshot;
+    power_snapshot.power = power_demo();
+    Scene power_scene{"overlay-combat-power.png", static_cast<float>(power_settings.width), 78.0f, power_snapshot};
+    ok = render_power(power_scene, power_settings, out_dir) && ok;
+    if (all) {
+        // Unlocked, with its header; and a crowd, where only the target shows.
+        app::PowerSettings unlocked = power_settings;
+        unlocked.locked = false;
+        Scene scene = power_scene;
+        scene.file = "overlay-combat-power-unlocked.png";
+        scene.height = 112.0f;
+        ok = render_power(scene, unlocked, out_dir) && ok;
+        scene.file = "overlay-combat-power-target.png";
+        scene.height = 48.0f;
+        scene.snapshot.power.players.clear();
+        scene.snapshot.power.in_view = 40;
+        ok = render_power(scene, power_settings, out_dir) && ok;
+        scene.file = "overlay-combat-power-empty.png";
+        scene.height = 112.0f;
+        scene.snapshot.power = combat_power::PowerSnapshot{};
+        ok = render_power(scene, unlocked, out_dir) && ok;
+    }
     ImGuiContext* overlay_ctx = ImGui::GetCurrentContext();
 
     setup_app_imgui(font, bold);
@@ -556,6 +611,14 @@ int main(int argc, char** argv) {
     ping_app_settings.plugins.ping = true;
     ping_app_settings.ping = ping_settings;
     ok = render_app(ping_page, ping_app_settings, out_dir) && ok;
+    // The Combat Power plugin's page, switched on.
+    pipeline::LiveSnapshot power_page_snapshot = done.snapshot;
+    power_page_snapshot.power = power_demo();
+    AppScene power_page{"app-combat-power.png", power_page_snapshot, damage.history, {}};
+    power_page.view.page = app::AppPage::Power;
+    app::AppSettings power_app_settings = app_settings;
+    power_app_settings.plugins.combat_power = true;
+    ok = render_app(power_page, power_app_settings, out_dir) && ok;
     if (all) {
         AppScene healing = damage;
         healing.file = "app-healing.png";

@@ -28,6 +28,8 @@ constexpr int kMinHeight = 90;
 constexpr int kAuraDefaultY = 440;
 /// The ping overlay's: right of the meter overlay's default one, at its top.
 constexpr int kPingDefaultX = 490;
+/// The combat power overlay's: right of the ping overlay's default one.
+constexpr int kPowerDefaultX = 720;
 
 /// A font file of Windows' own, or nothing where it is missing.
 std::string windows_font(const char* file) {
@@ -103,6 +105,19 @@ OverlayPlacement placement_of(const PingSettings& s, bool plugin_enabled) {
     p.width = s.width;
     p.height = s.height;
     p.default_x = kPingDefaultX;
+    return p;
+}
+
+OverlayPlacement placement_of(const PowerSettings& s, bool plugin_enabled) {
+    OverlayPlacement p;
+    p.locked = s.locked;
+    p.visible = plugin_enabled;
+    p.scale = s.scale;
+    p.x = s.x;
+    p.y = s.y;
+    p.width = s.width;
+    p.height = s.height;
+    p.default_x = kPowerDefaultX;
     return p;
 }
 

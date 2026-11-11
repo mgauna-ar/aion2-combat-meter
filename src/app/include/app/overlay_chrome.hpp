@@ -6,8 +6,8 @@
 
 #include <string>
 
-// What the meter, aura and ping overlays share, so the three stay one look: the
-// fonts, the window's frame, the header and its buttons, the resize grip, and the
+// What the meter, aura, ping and combat power overlays share, so they stay one look:
+// the fonts, the window's frame, the header and its buttons, the resize grip, and the
 // bars. All of it draws, so all of it is ImGui's: nothing here exists where ImGui is
 // not built (HAVE_IMGUI unset), as nothing there calls it.
 

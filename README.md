@@ -8,13 +8,14 @@
 
 **A lightweight, passive party DPS meter and combat overlay for AION 2 that draws directly on top of the game without modifying or injecting into it.**
 
-The meter listens to incoming game network traffic on your PC (who hit what, with which skill, for how much) and displays real-time combat stats, aura tracking, and network quality across customizable in-game overlays and a companion desktop app.
+The meter listens to incoming game network traffic on your PC (who hit what, with which skill, for how much) and displays real-time combat stats, aura tracking, network quality, and other players' combat power across customizable in-game overlays and a companion desktop app.
 
 | Plugin | What it provides | Default |
 |---|---|---|
 | [⚔️ **Combat Meter**](plugins/combat_meter/README.md) | Full party DPS, HPS, and damage taken with per-skill breakdowns (crits, double hits, directional hits, blocks). Includes boss HP, live fight timers, combat timelines, death logs, buff uptimes, and saved encounter history. | **Enabled** |
 | [✨ **Auras**](plugins/auras/README.md) | Tracks your personal and target buffs, debuffs, and estimated skill cooldowns as customizable bars or compact icons. Provides pop-up alerts for chain skill triggers, ready cooldowns, low HP warnings, or missing key buffs. | Disabled |
 | [📶 **Ping**](plugins/ping/README.md) | Displays real-time server latency, jitter (RFC 3550), and a rolling 2-minute latency graph. Measured passively off server responses—the meter sends no network pings of its own. | Disabled |
+| [🎯 **Combat Power**](plugins/combat_power/README.md) | Shows the combat power of the player you are fighting, and of everyone in an arena or dungeon with you, strongest first. Read from what the game already sends as players come into view—nothing is looked up online. | Disabled |
 
 ![The overlay during a boss fight: three players ranked by DPS, the boss's HP bar and the fight timer](docs/images/overlay-live.png)
 
@@ -42,7 +43,7 @@ In AION 2's display settings, set the window mode to **Borderless Windowed**.
 ### 4. Run & Play
 - Launch `aion2-combat-meter.exe`.
 - Hit an enemy or training dummy—the combat overlay activates automatically when combat starts!
-- To enable the Auras or Ping overlays, open the companion app window and toggle them on their respective pages.
+- To enable the Auras, Ping or Combat Power overlays, open the companion app window and toggle them on their respective pages.
 
 > **Windows SmartScreen / Antivirus notice:** Because releases are compiled directly from source on GitHub Actions without a costly commercial code-signing certificate, Windows Defender or SmartScreen may show an initial warning. Click **More info → Run anyway**.
 
@@ -75,7 +76,7 @@ Automated checks (`tools/check_forbidden_apis.sh`) run on every build and CI tes
 ### Companion App Window
 The companion app window opens on start and can be restored anytime by clicking the system tray icon:
 - **Dashboard:** Live capture status, connected server IP, packet rates, manual capture recording, and quick folder links.
-- **Plugin Pages:** Dedicated tabs for **Combat Meter**, **Auras**, and **Ping** to view detailed fight breakdowns, timeline charts, death logs, buff uptimes, and tweak overlay appearance.
+- **Plugin Pages:** Dedicated tabs for **Combat Meter**, **Auras**, **Ping**, and **Combat Power** to view detailed fight breakdowns, timeline charts, death logs, buff uptimes, and tweak overlay appearance.
 - **Settings:** Adjust window preferences, *Start with Windows*, notification alerts, network capture port, and automatic update checks. All changes save automatically as you make them.
 - **System Tray:** Closing the main window minimizes it to the tray. Right-click the tray icon to open folder locations, `config.json`, logs, or exit.
 
@@ -142,6 +143,7 @@ Each plugin's configuration options are stored in their respective sections and 
 - [⚔️ Combat Meter Configuration](plugins/combat_meter/README.md#configuration) (`meter`, `overlay`, `history`)
 - [✨ Auras Configuration](plugins/auras/README.md#configuration) (`auras`)
 - [📶 Ping Configuration](plugins/ping/README.md#configuration) (`ping`)
+- [🎯 Combat Power Configuration](plugins/combat_power/README.md#configuration) (`combat_power`)
 
 ### Data & File Locations
 All files are saved under `%APPDATA%\aion2-combat-meter\`:
@@ -211,7 +213,7 @@ aion2-combat-meter.exe --replay fight.pcapng --speed 1
 
 ## 📡 Protocol
 
-The meter decodes the server-to-client stream of TCP port 13328, which is transmitted unencrypted: framed opcodes, optional LZ4 compression blocks, server timestamp heartbeats, and ping response packets.
+The meter decodes the server-to-client stream of TCP port 13328, which is transmitted unencrypted: framed opcodes, optional LZ4 compression blocks, server timestamp heartbeats, ping response packets, and the player records that carry each player's combat power.
 
 All opcode definitions are cataloged in `src/protocol/include/protocol/opcodes.hpp`. For protocol specifications, wire layouts, and reverse engineering notes, see [AGENTS.md](AGENTS.md). These structures were identified from Global client research; all implementation code is written independently.
 

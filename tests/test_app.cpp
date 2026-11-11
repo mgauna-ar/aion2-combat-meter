@@ -431,8 +431,67 @@ TEST_CASE(OverlayVisibility, PingFollowsItsPluginAndItsOwnConditions) {
     TEST_ASSERT_FALSE(overlay_shown(s, now));
 }
 
+TEST_CASE(AppSettings, CombatPowerSettingsRoundTripAndAreSanitized) {
+    AppSettings s;
+    TEST_ASSERT_FALSE(s.plugins.combat_power);  // off until asked for
+    s.plugins.combat_power = true;
+    s.power.locked = true;
+    s.power.x = 700;
+    s.power.width = 300;
+    s.power.show_list = false;
+    s.power.list_max_players = 4;
+    s.power.hide_when_game_unfocused = true;
+    const config::JsonValue json = settings_to_json(s);
+    TEST_ASSERT(json["combat_power"]["plugin_enabled"].as_bool(false));
+    const AppSettings back = settings_from_json(json);
+    TEST_ASSERT(back.plugins.combat_power);
+    TEST_ASSERT(back.power.locked);
+    TEST_ASSERT_EQ(back.power.x, 700);
+    TEST_ASSERT_EQ(back.power.width, 300);
+    TEST_ASSERT_FALSE(back.power.show_list);
+    TEST_ASSERT_EQ(back.power.list_max_players, 4);
+    TEST_ASSERT(back.power.hide_when_game_unfocused);
+    TEST_ASSERT_FALSE(back.power.show_in_dungeons_only);
+    // The other plugins' switches are their own.
+    TEST_ASSERT_FALSE(back.plugins.ping);
+
+    config::JsonValue bad = json;
+    bad["combat_power"]["list_max_players"] = 500.0;
+    bad["combat_power"]["width"] = 5.0;
+    bad["combat_power"]["opacity"] = 7.0;
+    const AppSettings clean = settings_from_json(bad);
+    TEST_ASSERT_EQ(clean.power.list_max_players, kMaxPowerList);
+    TEST_ASSERT_EQ(clean.power.width, 160);
+    TEST_ASSERT_NEAR(clean.power.opacity, 1.0f, 1e-6f);
+    bad["combat_power"]["list_max_players"] = 0.0;
+    TEST_ASSERT_EQ(settings_from_json(bad).power.list_max_players, kMinPowerList);
+}
+
+TEST_CASE(OverlayVisibility, CombatPowerFollowsItsPluginAndItsOwnConditions) {
+    AppSettings s;
+    OverlayConditions now;
+    now.game_in_front = false;
+    TEST_ASSERT_FALSE(power_shown(s, now));  // the plugin is off by default
+    s.plugins.combat_power = true;
+    TEST_ASSERT(power_shown(s, now));
+    s.power.hide_when_game_unfocused = true;
+    TEST_ASSERT(power_shown(s, now));  // unlocked: always findable
+    s.power.locked = true;
+    TEST_ASSERT_FALSE(power_shown(s, now));
+    now.game_in_front = true;
+    TEST_ASSERT(power_shown(s, now));
+    // An arena is no dungeon: the switch is there, and off by default.
+    s.power.show_in_dungeons_only = true;
+    TEST_ASSERT_FALSE(power_shown(s, now));
+    now.in_dungeon = true;
+    TEST_ASSERT(power_shown(s, now));
+    // The meter switched off leaves it alone.
+    s.plugins.combat_meter = false;
+    TEST_ASSERT(power_shown(s, now));
+}
+
 TEST_CASE(Plugins, EverySwitchIsReachedByItsId) {
-    aion2::plugins::PluginSwitches on{false, false, false};
+    aion2::plugins::PluginSwitches on{false, false, false, false};
     for (const auto& d : aion2::plugins::ALL) {
         TEST_ASSERT_FALSE(on.enabled(d.id));
         on.set(d.id, true);
@@ -440,7 +499,7 @@ TEST_CASE(Plugins, EverySwitchIsReachedByItsId) {
         TEST_ASSERT(aion2::plugins::find(d.id).id == d.id);
     }
     TEST_ASSERT(on == aion2::plugins::ALL_ON);
-    TEST_ASSERT_EQ(aion2::plugins::ALL.size(), size_t{3});
+    TEST_ASSERT_EQ(aion2::plugins::ALL.size(), size_t{4});
 }
 
 TEST_CASE(AppSettings, MissingFileGivesDefaults) {

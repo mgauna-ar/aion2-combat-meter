@@ -33,6 +33,19 @@ inline constexpr size_t kMinFoundNameChars = 2;
 /// nullopt when the record does not parse or the name is not one.
 [[nodiscard]] std::optional<Identity> read_identity_record(ByteReader& r, bool own = false);
 
+/// The most combat power believed: the highest seen was 210,515.
+inline constexpr uint32_t kMaxCombatPower = 10'000'000;
+/// The shortest 45 36 body whose end is read: the real ones run 1,162 bytes and up.
+inline constexpr size_t kMinCombatPowerBody = 256;
+
+/// The combat power another player's whole record (45 36) ends with: a u32, then
+/// five 00 bytes, and at times one byte more. The opponent's in the arena capture
+/// read 134,667, the figure their character page gave. It is found from the u32
+/// that comes three fields before it in every record seen, and from the end where
+/// that is missing (AGENTS.md, Protocol, Identity). 0 when the body is too short,
+/// holds no such figure, or reads above kMaxCombatPower.
+[[nodiscard]] uint32_t read_combat_power(std::span<const uint8_t> body) noexcept;
+
 /**
  * @brief Identity records embedded in a packet the parser does not otherwise read.
  *
