@@ -75,7 +75,7 @@ and saves as you go.
 | `show_graph` | true | The graph, and the least, average and most under it. Off, the panel shrinks to its line of figures. |
 | `warn_ms` | 120 | A ping this high or higher shows in amber, 10 to 1000. |
 | `bad_ms` | 200 | A ping this high or higher shows in red; never under `warn_ms`. |
-| `hide_when_game_unfocused` | false | Hide it while neither the game nor the meter's window is in front. Applies only while locked. |
+| `hide_when_game_unfocused` | false | Hide it while neither the game nor the meter's window is in front, and while the game is not running. Applies only while locked. |
 | `show_in_dungeons_only` | false | Show it only in a dungeon (as the meter overlay's setting of that name). Applies only while locked. |
 
 ## For developers

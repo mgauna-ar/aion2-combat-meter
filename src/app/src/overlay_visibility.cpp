@@ -1,6 +1,15 @@
 #include "app/overlay_visibility.hpp"
 
+#include <algorithm>
+
 namespace aion2::app {
+
+bool foreground_is_game(std::span<const uint32_t> game_pids, std::optional<uint32_t> foreground_pid,
+                        uint32_t own_pid) noexcept {
+    if (game_pids.empty()) return false;
+    if (!foreground_pid) return true;
+    return *foreground_pid == own_pid || std::find(game_pids.begin(), game_pids.end(), *foreground_pid) != game_pids.end();
+}
 
 bool overlay_shown(const AppSettings& settings, const OverlayConditions& now) noexcept {
     const OverlaySettings& s = settings.overlay;

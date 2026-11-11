@@ -141,7 +141,7 @@ void overlay_settings_card(const OverlayControls& c, AppActions& out) {
     const bool locked = *c.locked;
     if (!locked) ImGui::BeginDisabled();
     if (c.conditions) c.conditions();
-    setting_switch("Hide when the game is not in front", "Hidden while another program has the focus.",
+    setting_switch("Hide when the game is not in front", "Hidden while another program has the focus, and while the game is not running.",
                    c.hide_when_game_unfocused, out);
     setting_switch("Only in dungeons", "Hidden in the open world. A new dungeon counts before the meter can name it.",
                    c.show_in_dungeons_only, out);

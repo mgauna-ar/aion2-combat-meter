@@ -41,7 +41,8 @@ It runs in `make test` and in CI, so a violation fails the build. Finding the ga
 connection uses a Toolhelp process snapshot and `GetExtendedTcpTable`. Neither opens a
 handle to another process; keep it that way. "Is the game in front" (the overlay's
 hide condition) compares `GetWindowThreadProcessId` of the foreground window with
-those snapshot ids: no handle either. The Ping plugin sends no ping of its own: it
+those snapshot ids: no handle either. No game process found means the game is not
+in front (`foreground_is_game`). The Ping plugin sends no ping of its own: it
 times the game's, against the machine's performance counter
 (`QueryPerformanceCounter`), which is system-wide and read in our own process. AION 2
 has anti-cheat, and the user cares about account safety: when in doubt, don't.
