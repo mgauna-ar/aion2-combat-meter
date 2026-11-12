@@ -3,11 +3,26 @@
 #include "game/skill_names.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <iterator>
 #include <vector>
 
 namespace aion2::combat_power {
+
+namespace {
+
+/// The game's units to a metre.
+constexpr float kUnitsPerMetre = 100.0f;
+
+[[nodiscard]] float metres_between(const proto::Point& a, const proto::Point& b) noexcept {
+    const float dx = a.x - b.x;
+    const float dy = a.y - b.y;
+    const float dz = a.z - b.z;
+    return std::sqrt(dx * dx + dy * dy + dz * dz) / kUnitsPerMetre;
+}
+
+} // namespace
 
 bool PowerTracker::follow(uint32_t connection) {
     if (!m_has_connection) {
@@ -24,6 +39,7 @@ bool PowerTracker::follow(uint32_t connection) {
         m_target = 0;
         m_local = 0;
         m_map_id = 0;
+        m_has_local_position = false;
     }
     return true;
 }
@@ -33,9 +49,12 @@ void PowerTracker::on_identity(const proto::Identity& identity, uint32_t connect
     if (identity.id == 0 || identity.scanned) return;
     if (!follow(connection)) return;
     if (identity.own) {
+        // Another id is another map's: where they stood there says nothing here.
+        if (m_local != identity.id) m_has_local_position = false;
         m_local = identity.id;
         // The id was someone else's on the map before.
         if (m_players.erase(identity.id) != 0 && m_target == identity.id) m_target = 0;
+        if (identity.has_position) place(identity.id, identity.position, ts);
         return;
     }
     if (identity.id == m_local) m_local = 0;
@@ -71,11 +90,40 @@ void PowerTracker::on_identity(const proto::Identity& identity, uint32_t connect
     // A record whose end did not read leaves the figure it gave before.
     if (identity.combat_power != 0) player.row.combat_power = identity.combat_power;
     player.seen = ts;
+    // Where the last holder of the id stood is not where this one does.
+    if (!same) player.has_position = false;
+    if (identity.has_position) {
+        player.has_position = true;
+        player.at = identity.position;
+    }
+}
+
+void PowerTracker::place(EntityId id, const proto::Point& at, Micros ts) {
+    if (id == 0) return;
+    if (id == m_local) {
+        m_has_local_position = true;
+        m_local_at = at;
+        m_local_at_ts = ts;
+        return;
+    }
+    if (const auto player = m_players.find(id); player != m_players.end()) {
+        player->second.has_position = true;
+        player->second.at = at;
+    }
+}
+
+void PowerTracker::on_position(const proto::Position& position, uint32_t connection, Micros ts) {
+    if (current(connection)) place(position.id, position.at, ts);
+}
+
+void PowerTracker::on_effect(const proto::BuffApplied& effect, uint32_t connection, Micros ts) {
+    if (current(connection)) place(effect.caster, effect.caster_position, ts);
 }
 
 void PowerTracker::on_values(const proto::RemainingHp& values, uint32_t connection) {
     if (values.id == 0 || !values.self) return;
     if (!follow(connection) || m_players.contains(values.id)) return;
+    if (m_local != values.id) m_has_local_position = false;
     m_local = values.id;
 }
 
@@ -112,6 +160,8 @@ void PowerTracker::on_map_load(const proto::MapLoad& map, uint32_t connection, M
     if (m_map_id != 0 && m_map_id != map.map_id) {
         std::erase_if(m_players, [&](const auto& entry) { return entry.second.seen + kEarlyArrival < ts; });
         if (!m_players.contains(m_target)) m_target = 0;
+        // Theirs too can come ahead of the load: their own record does.
+        if (m_local_at_ts + kEarlyArrival < ts) m_has_local_position = false;
     }
     m_map_id = map.map_id;
 }
@@ -122,23 +172,54 @@ PowerSnapshot PowerTracker::snapshot(Micros now) const {
     PowerSnapshot s;
     s.map_id = m_map_id;
     s.in_view = static_cast<uint32_t>(m_players.size());
+    s.has_local_position = m_local != 0 && m_has_local_position;
+    if (s.has_local_position) s.local_position_age = now > m_local_at_ts ? now - m_local_at_ts : 0;
+
+    // A row with its distance worked out: only for the few a snapshot carries.
+    const auto row_of = [&](const Player& player) {
+        PowerRow row = player.row;
+        if (s.has_local_position && player.has_position) row.distance_m = metres_between(player.at, m_local_at);
+        return row;
+    };
     if (m_target != 0 && now <= m_target_at + kTargetMemory) {
-        if (const auto target = m_players.find(m_target); target != m_players.end()) s.target = target->second.row;
+        if (const auto target = m_players.find(m_target); target != m_players.end()) s.target = row_of(target->second);
     }
+
     // Pointers first: a town's crowd is sorted without copying its names.
-    std::vector<const PowerRow*> rows;
+    std::vector<const Player*> rows;
     rows.reserve(m_players.size());
     std::transform(m_players.begin(), m_players.end(), std::back_inserter(rows),
-                   [](const auto& entry) { return &entry.second.row; });
-    const size_t listed = std::min(rows.size(), kMaxListed);
-    std::partial_sort(rows.begin(), rows.begin() + static_cast<std::ptrdiff_t>(listed), rows.end(),
-                      [](const PowerRow* a, const PowerRow* b) {
-                          if (a->combat_power != b->combat_power) return a->combat_power > b->combat_power;
-                          if (a->name != b->name) return a->name < b->name;
-                          return a->id < b->id;
-                      });
-    s.players.reserve(listed);
-    for (size_t i = 0; i < listed; ++i) s.players.push_back(*rows[i]);
+                   [](const auto& entry) { return &entry.second; });
+    const auto listed = static_cast<std::ptrdiff_t>(std::min(rows.size(), kMaxListed));
+    const auto stronger = [](const Player* a, const Player* b) {
+        if (a->row.combat_power != b->row.combat_power) return a->row.combat_power > b->row.combat_power;
+        if (a->row.name != b->row.name) return a->row.name < b->row.name;
+        return a->row.id < b->row.id;
+    };
+    std::partial_sort(rows.begin(), rows.begin() + listed, rows.end(), stronger);
+    s.players.reserve(static_cast<size_t>(listed));
+    for (std::ptrdiff_t i = 0; i < listed; ++i) s.players.push_back(row_of(*rows[static_cast<size_t>(i)]));
+    if (!s.has_local_position) return s;
+
+    // The nearest: squared distances order as distances do. One whose position is
+    // not known comes after all that are, the strongest of those first.
+    const auto squared = [&](const Player* p) {
+        const float dx = p->at.x - m_local_at.x;
+        const float dy = p->at.y - m_local_at.y;
+        const float dz = p->at.z - m_local_at.z;
+        return dx * dx + dy * dy + dz * dz;
+    };
+    std::partial_sort(rows.begin(), rows.begin() + listed, rows.end(), [&](const Player* a, const Player* b) {
+        if (a->has_position != b->has_position) return a->has_position;
+        if (a->has_position) {
+            const float da = squared(a);
+            const float db = squared(b);
+            if (da != db) return da < db;
+        }
+        return stronger(a, b);
+    });
+    s.nearest.reserve(static_cast<size_t>(listed));
+    for (std::ptrdiff_t i = 0; i < listed; ++i) s.nearest.push_back(row_of(*rows[static_cast<size_t>(i)]));
     return s;
 }
 

@@ -161,6 +161,52 @@ bool read_tick(ByteReader& r, std::optional<Tick>& out) {
 
 [[nodiscard]] bool plausible_coordinate(float v) noexcept { return std::isfinite(v) && std::fabs(v) < kMaxCoordinate; }
 
+/// How many bytes sit between a movement packet's id and its position.
+/// - 1a 37: two (00 00 in the captures).
+/// - 1b 37, 1c 37, 29 37: a flags byte, and one more when its lowest bit is set (05
+///   03 for a player's, 04 for a monster's).
+/// - 2e 37: six. 2f 37 and 3c 37: one.
+/// One rule read all 12,300 of them in the three captures as a point on their map.
+[[nodiscard]] size_t position_header(uint16_t op, uint8_t first) noexcept {
+    switch (op) {
+        case opcode::MoveStop: return 2;
+        case opcode::MoveStart:
+        case opcode::MoveStep:
+        case opcode::MovePath: return (first & 0x01) != 0 ? 2 : 1;
+        case opcode::MoveJump: return 6;
+        default: return 1;
+    }
+}
+
+/// A movement packet: id varint, its header, then x, y, z. What follows (a heading,
+/// a speed, where they are going) is not read.
+std::optional<Position> read_position(ByteReader& r, uint16_t op) {
+    Position p;
+    p.id = normalize_entity_id(r.varint());
+    const size_t header = r.remaining() > 0 ? position_header(op, r.rest().front()) : 1;
+    r.skip(header);
+    p.at.x = r.f32le();
+    p.at.y = r.f32le();
+    p.at.z = r.f32le();
+    if (!r.ok() || p.id == 0 || !plausible_coordinate(p.at.x) || !plausible_coordinate(p.at.y) ||
+        !plausible_coordinate(p.at.z)) {
+        return std::nullopt;
+    }
+    return p;
+}
+
+/// Where a player's record (33 36, 45 36) says they stand, read after its class:
+/// two bytes on in another player's, 156 on in the local player's own (the same in
+/// all five of the captures'). Nothing for a record too short to hold it, or whose
+/// floats are no point: the name it gave stands either way.
+void read_identity_position(ByteReader r, Identity& id) {
+    r.skip(id.own ? 156 : 2);
+    const Point at{r.f32le(), r.f32le(), r.f32le()};
+    if (!r.ok() || !plausible_coordinate(at.x) || !plausible_coordinate(at.y) || !plausible_coordinate(at.z)) return;
+    id.has_position = true;
+    id.position = at;
+}
+
 std::optional<Spawn> read_spawn(std::span<const uint8_t> body) {
     ByteReader r(body);
     Spawn s;
@@ -287,6 +333,7 @@ std::optional<BuffApplied> read_buff(ByteReader& r, bool renewed) {
         return std::nullopt;
     }
     b.instance = static_cast<uint32_t>(instance);
+    b.caster_position = Point{x, y, z};
     b.permanent = duration == kBuffPermanent;
     b.duration_ms = b.permanent ? 0 : duration;
     if (b.permanent) b.expires_server_ms = 0;
@@ -371,6 +418,13 @@ void PacketParser::parse(const Frame& frame, std::vector<ParsedEvent>& out) {
         case opcode::BuffRenew:
         case opcode::BuffRemove:
         case opcode::Cast:
+        case opcode::MoveStop:
+        case opcode::MoveStart:
+        case opcode::MoveStep:
+        case opcode::MovePath:
+        case opcode::MoveJump:
+        case opcode::MoveAir:
+        case opcode::MoveBySkill:
             if (parse_known(frame, out)) {
                 ++m_stats.decoded;
             } else {
@@ -418,6 +472,7 @@ bool PacketParser::parse_known(const Frame& frame, std::vector<ParsedEvent>& out
             auto id = read_identity_record(r, own);
             if (!id) return false;
             id->own = own;
+            if (!id->name.empty()) read_identity_position(r, *id);
             if (!own && !id->name.empty()) id->combat_power = read_combat_power(frame.body);
             if (!id->name.empty()) remember_server(id->server);
             emit(std::move(*id));
@@ -516,6 +571,18 @@ bool PacketParser::parse_known(const Frame& frame, std::vector<ParsedEvent>& out
                     emit(ChainWithdrawn{skill});
                 }
             }
+            return true;
+        }
+        case opcode::MoveStop:
+        case opcode::MoveStart:
+        case opcode::MoveStep:
+        case opcode::MovePath:
+        case opcode::MoveJump:
+        case opcode::MoveAir:
+        case opcode::MoveBySkill: {
+            const auto position = read_position(r, frame.opcode);
+            if (!position) return false;
+            emit(*position);
             return true;
         }
         case opcode::BuffAdd:

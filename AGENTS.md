@@ -151,8 +151,8 @@ plugins/ping/    aion2::ping (include prefix ping/; its AGENTS.md and README.md)
     lateness, the graph's seconds)
 plugins/combat_power/  aion2::combat_power (include prefix combat_power/; its AGENTS.md
                  and README.md)
-    power_plugin, power_tracker (the map's players and their combat power, the
-    local player's target)
+    power_plugin, power_tracker (the map's players, their combat power and how far
+    they are, the local player's target)
 src/pipeline/    aion2::pipeline   stream_demux (flows -> frames), pipeline (parser, then
                  each plugin switched on)
 src/app/         aion2::app
@@ -491,7 +491,7 @@ capture, where all 17,182 records parse):
   in all 4,008), kind u8, instance varint, effect u32, duration u64 (ms; all ones for no
   end), end u64 (the server's Unix ms, as the heartbeat's), caster varint, level u8,
   (kind 0x13 only: the applying skill u32), a byte (00, or 02 on most renewals), and a
-  position (three f32, the caster's or the target's). Kind 0x11 has no skill; no other
+  position (three f32: the caster's, below). Kind 0x11 has no skill; no other
   kind was seen.
   - **Instances are stacks.** Each application gets the next instance number on its
     target, and an effect applied again while it runs is a second instance (a Templar
@@ -519,6 +519,10 @@ capture, where all 17,182 records parse):
     capture): permanent ones at login (4031 to 4115, 12011, 12031, 80001), short system
     marks (200 at 0.3 s with every dodge, 231, 10002 for 5 s on entering a map), and
     some of the bosses' (1604xxxx, from skills 1604xxx).
+  - **The position is the caster's.** In the arena capture the opponent's effects
+    (on anyone) sat on the opponent's own last movement position, 0 units off in
+    the median; the local player's sat a median 222 units from the opponent, a
+    melee's reach. It is the one steady source of the local player's own position.
 - **Effect gone `1a 92`:** target varint, effect u32. It names the effect, not the
   instance: a stack of three is taken off by three.
 - **Skill used `01 38`:** three bytes (00 00 00 in 1,154 of 1,176), the skill u32. Only
@@ -543,8 +547,33 @@ capture, where all 17,182 records parse):
   whose level the capture gave, the count of picks matched the slots.
 - **Seen, not read:** `1b 92` is a party member's HP and MP (id, cur and max HP varints,
   MP u32 twice; 21,750 / 23,170), `1c 92` their position and legion name; `4a 36` the
-  local player's stats (id, count u8, then stat u16 and value u32 pairs); `29 37` and
-  `2a 37` movement (an id and f32 positions in the spawn's space).
+  local player's stats (id, count u8, then stat u16 and value u32 pairs); `2a 37`
+  and `1d 37` movement of some other shape (`1d 37` is the most frequent packet
+  after the heartbeat, 8 to 12 bytes: steps as small differences, perhaps).
+
+**Positions** (the Combat Power plugin's distances; all 12,300 movement records of
+the three captures read as a point on their map):
+- **Units** are Unreal's: centimetres. The arena's two starting corners were 135 m
+  apart, and two players in melee 1 to 2 m.
+- **Movement:** an id varint, a few bytes, then x, y, z (f32 each); what follows (a
+  heading, a speed, a destination) is not read. The bytes between differ by opcode
+  (`position_header`):
+  - `1a 37` (they stopped): two, 00 00.
+  - `1b 37`, `1c 37` (they set off, they turn or go on) and `29 37` (a path, mostly
+    monsters'): a flags byte, and one more when its lowest bit is set. 05 03 for a
+    player's, 04 for a monster's, 03 03 or 02 on 29 37.
+  - `2e 37` (a jump): six. `2f 37` (in the air): one.
+  - `3c 37` (a skill moved them: a charge, a pull, with the skill's code after the
+    point): one.
+- **Everyone's but the local player's.** The server does not send a player their own
+  steps: in the arena match the opponent got 240 movement packets and the local
+  player none. Of these only `3c 37` names them (9 times in the match).
+- **A player's record** carries where they stand: `45 36` two bytes after its
+  "class" u32, `33 36` 156 bytes after its own (the same in all five). So the local
+  player's position is known on entering each map.
+- **A pressed cast's tail** (`02 38`, mode 2) is a heading (f32, degrees) and a point:
+  the target's last position to the unit in many records, some metres from it in
+  others. An aim point, perhaps; not read.
 
 **Unknown or guessed. Each needs a real capture (skill `decode-capture`):**
 - whether the "optional 00 pad" can be confused with a scalar of 0;
@@ -564,6 +593,11 @@ capture, where all 17,182 records parse):
   Power plugin shows "-" for a record whose end does not read;
 - the arenas' map ids: the one-on-one arena of the third capture was 61, and has no
   row in `maps.tsv` yet;
+- **the local player's position between their skills.** Nothing found streams it
+  (above), so the Combat Power plugin's distances are from where they last cast an
+  effect. Whether some packet does (`1d 37`? a correction when they are pushed?)
+  needs a capture of walking with no skill used, against a player standing still;
+- what the point in a pressed cast's tail is (above);
 - whether anything says a player has gone out of view: the Combat Power plugin's list
   of a map's players only grows until the next map, so a town's strongest are the
   strongest seen there, gone or not;
@@ -642,7 +676,7 @@ capture, one tray and one updater, around them.
 | Combat Meter | `plugins/combat_meter` | fights: damage, healing, damage taken, the boss, the history; the meter overlay | on |
 | Auras | `plugins/auras` | effects on the local player and theirs on their target, their cooldowns; the aura overlay | off |
 | Ping | `plugins/ping` | the latency to the game server off the game's own pong, the heartbeats' jitter, a graph; the ping overlay | off |
-| Combat Power | `plugins/combat_power` | other players' combat power as the game sends it: the target's, and the strongest on the map's (all of an arena's or a dungeon's); the combat power overlay | off |
+| Combat Power | `plugins/combat_power` | other players' combat power as the game sends it: the target's, and the strongest on the map's (all of an arena's or a dungeon's), or the nearest; the combat power overlay | off |
 
 - **One table names them.** `include/aion2/plugin_registry.hpp` holds each plugin's id,
   name, description, config section and default switch; the sidebar, the dashboard,

@@ -23,6 +23,11 @@ A fourth window you place like the meter's (unlock with Ctrl+Alt+L, drag, resize
   above the list.
 - **Players who walk away stay listed** until the next map: nothing the meter reads
   says a player has left your view.
+- **Sorted by distance** (a switch on the page, off unless you turn it on) the list
+  is the nearest players instead, each with how far they are in metres. The bars
+  still compare combat power. See below for what the distance is measured from.
+
+![The combat power overlay sorted by distance: the three nearest players with their distance and combat power, the target third, and nine more counted](../../docs/images/overlay-combat-power-distance.png)
 - **A class emblem** appears once that player has used a skill: the game does not say
   the class, their skills do.
 - **"-"** means that player's record carried no figure the plugin could read.
@@ -50,6 +55,23 @@ A fourth window you place like the meter's (unlock with Ctrl+Alt+L, drag, resize
   sends them again: start the meter before you log in or queue.
 - **Switched off**, it forgets what it knew.
 
+## How distance is measured, and where it falls short
+
+- **Other players:** the game sends where each one is as they come into view and
+  with every step they take, so their side is current.
+- **You:** the game never sends you your own steps. The plugin knows where you are
+  from your own record as you enter a map, from every effect you cast (it carries
+  where you stood), and from a skill that moves you, such as a charge.
+- **So it is exact while you fight** (in one arena match your position came several
+  times a second) **and stale while you only walk:** distances are then measured
+  from where you last used a skill. They dim once that is 5 seconds old; use any
+  skill and they are right again.
+- **Until your position is known** (the meter started while you stood somewhere, and
+  you have not used a skill since) the list stays strongest first, with no
+  distances.
+- **A player who has left your view** keeps the last place the game gave for them.
+- A metre is 100 of the game's units; height counts.
+
 ## Configuration
 
 Its keys live in `%APPDATA%\aion2-combat-meter\config.json`, beside the app's
@@ -66,7 +88,8 @@ and saves as you go.
 | `scale` | 1.0 | Size, 0.6 to 2.5, on top of the monitor's DPI scaling. |
 | `x`, `y`, `width`, `height` | -1, -1, 260, 190 | Position and size in screen pixels. -1, -1 places it right of the ping overlay's default spot. |
 | `show_list` | true | List the map's players, strongest first. Off, only your target shows. |
-| `list_max_players` | 8 | The most players listed, 1 to 12. With more on the map, these are the strongest, and a count of the rest follows. |
+| `sort_by_distance` | false | List the nearest players first, each with its distance, instead of the strongest. |
+| `list_max_players` | 8 | The most players listed, 1 to 12. With more on the map, these are the strongest (the nearest, with `sort_by_distance`), and a count of the rest follows. |
 | `hide_when_game_unfocused` | false | Hide it while neither the game nor the meter's window is in front, and while the game is not running. Applies only while locked. |
 | `show_in_dungeons_only` | false | Show it only in a dungeon (as the meter overlay's setting of that name). An arena is not one. Applies only while locked. |
 

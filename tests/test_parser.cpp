@@ -113,6 +113,78 @@ TEST_CASE(Parser, AnotherPlayersRecordEndsWithTheirCombatPower) {
     TEST_ASSERT_EQ(p.stats().failed, uint64_t{0});
 }
 
+TEST_CASE(Parser, MovementPacketsSayWhereSomeoneIs) {
+    PacketParser p;
+    const auto at = [&](uint16_t op, const Bytes& header, uint64_t id = 227, size_t tail = 4) {
+        return only<Position>(parse_one(p, op, position_body(id, header, 230.5f, -2111.25f, 2413.75f, tail)));
+    };
+    // Each opcode's own run of bytes between the id and the position.
+    for (const Position& pos : {
+             at(opcode::MoveStop, {0x00, 0x00}, 227, 2),
+             at(opcode::MoveStart, {0x05, 0x03}),
+             at(opcode::MoveStep, {0x05, 0x03}),
+             // A monster's: no second byte, and an id of three bytes.
+             at(opcode::MoveStep, {0x04}, 16'430, 5),
+             at(opcode::MovePath, {0x03, 0x03}, 227, 14),
+             at(opcode::MovePath, {0x02}, 16'430, 15),
+             at(opcode::MoveJump, {0x73, 0x25, 0xD9, 0xA7, 0x00, 0x01}, 227, 33),
+             at(opcode::MoveAir, {0x02}, 227, 17),
+             at(opcode::MoveBySkill, {0x03}, 227, 16),
+         }) {
+        TEST_ASSERT(pos.id == EntityId{227} || pos.id == EntityId{16'430});
+        TEST_ASSERT_NEAR(pos.at.x, 230.5f, 1e-3f);
+        TEST_ASSERT_NEAR(pos.at.y, -2111.25f, 1e-3f);
+        TEST_ASSERT_NEAR(pos.at.z, 2413.75f, 1e-3f);
+    }
+    TEST_ASSERT_EQ(p.stats().failed, uint64_t{0});
+
+    // No point at all, or cut short: a failure of its opcode, and no event.
+    Bytes wild = position_body(227, {0x05, 0x03}, 1.0f, 2.0f, 3.0f);
+    wild[4] = wild[5] = wild[6] = wild[7] = 0xFF;  // x: not a number
+    TEST_ASSERT(parse_one(p, opcode::MoveStep, wild).empty());
+    Bytes cut = position_body(227, {0x00, 0x00}, 1.0f, 2.0f, 3.0f, 0);
+    cut.resize(cut.size() - 2);
+    TEST_ASSERT(parse_one(p, opcode::MoveStop, cut).empty());
+    TEST_ASSERT_EQ(p.stats().failed, uint64_t{2});
+}
+
+TEST_CASE(Parser, APlayersRecordAndAnEffectCarryAPosition) {
+    PacketParser p;
+    // Another player's record: where they stood coming into view.
+    const Identity other = only<Identity>(parse_one(
+        p, opcode::OtherPlayer, player_body(227, "Nezekan", kServer, 134'667, PlayerTrailer::Plain, 194.0f, -6586.0f, 2442.0f)));
+    TEST_ASSERT(other.has_position);
+    TEST_ASSERT_NEAR(other.position.x, 194.0f, 1e-3f);
+    TEST_ASSERT_NEAR(other.position.y, -6586.0f, 1e-3f);
+    TEST_ASSERT_EQ(other.combat_power, 134'667u);
+    // The local player's own: deeper in the record.
+    const Identity own =
+        only<Identity>(parse_one(p, opcode::OwnCharacter, own_player_body(501, "Ariel", kServer, -364.0f, 6863.0f, 2443.0f)));
+    TEST_ASSERT(own.own && own.has_position);
+    TEST_ASSERT_NEAR(own.position.y, 6863.0f, 1e-3f);
+    // A record too short to hold one still names its player.
+    const Identity brief = only<Identity>(parse_one(p, opcode::OwnCharacter, own_identity_body(501, "Ariel", kServer, 7)));
+    TEST_ASSERT_FALSE(brief.has_position);
+    TEST_ASSERT_EQ(brief.name, std::string("Ariel"));
+    TEST_ASSERT_FALSE(only<Identity>(parse_one(p, opcode::OtherPlayer, identity_body(502, "Israphel", kServer, 3)))
+                          .has_position);
+
+    // An effect: its last three floats are its caster's position.
+    BuffSpec spec;
+    spec.target = 227;
+    spec.caster = 501;
+    spec.buff_id = 120'900'001;
+    spec.duration_ms = 20'000;
+    spec.x = 232.25f;
+    spec.y = -1825.5f;
+    spec.z = 2426.0f;
+    const BuffApplied effect = only<BuffApplied>(parse_one(p, opcode::BuffAdd, buff_body(spec)));
+    TEST_ASSERT_EQ(effect.caster, EntityId{501});
+    TEST_ASSERT_NEAR(effect.caster_position.x, 232.25f, 1e-3f);
+    TEST_ASSERT_NEAR(effect.caster_position.z, 2426.0f, 1e-3f);
+    TEST_ASSERT_EQ(p.stats().failed, uint64_t{0});
+}
+
 TEST_CASE(Parser, ARecordThatDoesNotEndThatWayCarriesNoCombatPower) {
     PacketParser p;
     // Too short to be the whole record: the tests' older identity bodies.
