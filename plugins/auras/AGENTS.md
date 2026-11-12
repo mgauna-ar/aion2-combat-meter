@@ -80,10 +80,27 @@ watch list and what the overlay shows are the tracker's own.
   before it.
 - The snapshot carries the local player's effects (an enemy's marked hostile, their own
   and their summons' marked mine) and their own on the target.
-- It also carries every helpful effect seen on the local player this session, which is
-  what the watch list offers. Enemies' debuffs are left out.
-- Stacks: instances of one effect from one caster are one entry, ending with the last
-  of them. Two Chanters' mantras are two entries.
+- **Names:** `game::effect_label`: the effect's own from `effects.tsv`, else its
+  skill's. One with neither that an enemy put there takes the enemy's name
+  (`Entities::label`), so a boss's debuff reads "Vakron", not "Effect 16044202".
+- **One entry per skill per caster** (`game::effect_key` and the caster), ending with
+  the last of its instances. Doom Shield's two effects (120700271, 120700071) are one
+  row; two Chanters' mantras are two.
+- **Stacks** count the instances of the entry's own effect id that end. A passive sent
+  again under a new number (each map sends them up to three times) is no stack, and a
+  passive whose skill goes off (Punishing Benediction) gives its entry to the proc
+  until that ends.
+- **In the order they were put on,** permanent ones last. By time left, every renewal
+  and every proc reshuffled the list: in the second capture's fights something on
+  the local player changed about twice a second.
+- **Sustained:** an instance of `kSustainedMaxMs` (5 s) or less that was renewed and
+  has run for more than `kSustainedSpans` (2) of its own length is kept up, not
+  counted down: a Chanter's mantra lasts 2.4 s and is renewed each second (529
+  renewals on the local player in the second capture). The overlay draws it as a full
+  bar with no time. Longer effects keep their countdown however often renewed: Fury's
+  20 s says when to use it again.
+- It also carries every effect seen on the local player this session (`seen`, an
+  enemy's marked hostile), which is what the page's Watch and Hide switches offer.
 - The overlay counts down between snapshots on the wall clock, at most 250 ms past the
   snapshot's own time (`aura_display_time`): drawing only, never the plugin.
 
@@ -128,6 +145,15 @@ watch list and what the overlay shows are the tracker's own.
   `show_in_dungeons_only` (`auras_shown`), never by the meter overlay's. It has no
   "only in combat": buffs matter between fights too.
 - Ctrl+Alt+L locks every overlay at once; that is the app's, not a plugin's.
+- **The hide list** (`auras.hidden`, effect keys) leaves an effect out of the overlay,
+  on the local player and on the target: `shown_auras`. It is the answer to procs that
+  come and go all fight (Judgment 81 times in the second capture), which no shortest
+  duration tells from a buff worth seeing. A hidden effect can still be watched.
+- **Icons** (`effect_icon`): an item's effect has the item's own (a scroll, food, a
+  potion: `effects.tsv`'s fourth column, packed into the sheet), any other its
+  skill's. With neither, an item's effect whose icon the site does not serve shows a
+  flask (`game::EffectKind::Item`), and the rest their label's initials, "?" for a
+  label that is only a number (`tile_initials`).
 - **Alerts first,** in both styles: low HP (`low_hp_percent`: under the threshold of a
   known max, never at HP 0, which is a death), the watch list's missing effects, the
   chain skills on offer. Then the effects on the local player, their cooldowns, and

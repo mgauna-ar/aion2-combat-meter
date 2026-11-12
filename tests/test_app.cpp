@@ -107,6 +107,7 @@ TEST_CASE(AppSettings, AurasRoundTripWithTheirWatchList) {
     s.auras.x = 300;
     s.auras.min_duration_s = 2.5f;
     s.auras.watch = {18'190'000, 3'539'981'065u};
+    s.auras.hidden = {12'240'000};
     s.auras.icons = true;
     s.auras.icon_size = 48;
     s.auras.show_chains = false;
@@ -122,6 +123,7 @@ TEST_CASE(AppSettings, AurasRoundTripWithTheirWatchList) {
     TEST_ASSERT_NEAR(back.auras.min_duration_s, 2.5f, 1e-6f);
     TEST_ASSERT_EQ(back.auras.watch.size(), size_t{2});
     TEST_ASSERT_EQ(back.auras.watch[1], uint32_t{3'539'981'065u});
+    TEST_ASSERT(back.auras.hidden == std::vector<uint32_t>{12'240'000});
     TEST_ASSERT(back.auras.icons);
     TEST_ASSERT_EQ(back.auras.icon_size, 48);
     TEST_ASSERT_FALSE(back.auras.show_chains);
@@ -215,6 +217,10 @@ TEST_CASE(AuraView, FiltersAndTheMissingWatchList) {
     TEST_ASSERT_EQ(shown[1]->key, uint32_t{12'710'000});
     // An enemy's effect on the boss side is not the local player's to hide.
     TEST_ASSERT_EQ(shown_auras({debuff}, s, now, false).size(), size_t{1});
+    // The hide list leaves an effect out wherever it is.
+    s.hidden = {20'111'011, 12'710'000};
+    TEST_ASSERT_EQ(shown_auras(a.on_self, s, now, true).size(), size_t{1});
+    TEST_ASSERT(shown_auras({debuff}, s, now, false).empty());
 
     // Watched: the mantra is on; Dodge's and an unknown effect are missing.
     const auto missing = missing_effects(a, {18'190'000, 12'000'000, 777}, now);
@@ -316,7 +322,10 @@ TEST_CASE(AuraView, TilesWrapAcrossTheWindow) {
     TEST_ASSERT(tile_layout(264.0f, 36.0f, 4.0f, 0) == (TileLayout{6, 0}));
     TEST_ASSERT_EQ(tile_initials("Delayed Explosion"), std::string("DE"));
     TEST_ASSERT_EQ(tile_initials("poison"), std::string("Po"));
-    TEST_ASSERT_EQ(tile_initials("Effect 2920107"), std::string("E2"));
+    // An effect with no name: the "E" of "Effect" would say nothing.
+    TEST_ASSERT_EQ(tile_initials("Effect 2920107"), std::string("?"));
+    TEST_ASSERT_EQ(tile_initials("NPC #777"), std::string("?"));
+    TEST_ASSERT_EQ(tile_initials("Effect of Light"), std::string("Eo"));
     TEST_ASSERT_EQ(tile_initials(""), std::string("?"));
     // An icon has room for less than a bar.
     TEST_ASSERT_EQ(format_tile_time(82 * kMicrosPerSecond), std::string("1m"));

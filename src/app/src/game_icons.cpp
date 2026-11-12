@@ -58,6 +58,10 @@ int skill_icon(uint32_t code) noexcept {
 }
 
 int effect_icon(uint32_t buff_id, uint32_t source_skill) noexcept {
+    // An item's effect has the item's own icon: a scroll, food, a potion.
+    const auto* it = std::lower_bound(std::begin(kEffectIcons), std::end(kEffectIcons), buff_id,
+                                      [](const SkillIconRow& row, uint32_t c) { return row.code < c; });
+    if (it != std::end(kEffectIcons) && it->code == buff_id) return it->slot;
     const uint32_t skill = game::effect_skill(buff_id, source_skill);
     return skill != 0 ? skill_icon(skill) : kNoIcon;
 }

@@ -151,8 +151,68 @@ void Report::print_ping() const {
     }
 }
 
+void Report::note_unnamed(const proto::ParsedEvent& pe, const meter::CombatantRegistry& reg) {
+    const auto skill = [&](uint32_t code) {
+        if (code != 0 && game::skill_name(code).empty()) ++m_unnamed_skills[code];
+    };
+    if (const auto* b = std::get_if<proto::BuffApplied>(&pe.event)) {
+        if (b->renewed || !game::effect_name(b->buff_id, b->source_skill).empty()) return;
+        UnnamedEffect& u = m_unnamed_effects[b->buff_id];
+        if (b->permanent) {
+            u.permanent = true;
+        } else {
+            u.min_ms = u.count == 0 || u.min_ms == 0 ? b->duration_ms : std::min(u.min_ms, b->duration_ms);
+            u.max_ms = std::max(u.max_ms, b->duration_ms);
+        }
+        ++u.count;
+        if (b->source_skill != 0) u.source_skill = b->source_skill;
+        const meter::Actor* caster = reg.find(b->caster);
+        if (b->caster == b->target) {
+            u.from = "self";
+        } else if (caster != nullptr && caster->npc_code != 0) {
+            u.from = game::npc_label(caster->npc_code);
+        } else {
+            u.from = reg.character(reg.character_of(b->caster)) != nullptr ? "player" : "?";
+        }
+    } else if (const auto* d = std::get_if<proto::Damage>(&pe.event)) {
+        skill(d->skill);
+    } else if (const auto* t = std::get_if<proto::Tick>(&pe.event)) {
+        skill(t->skill);
+    } else if (const auto* u = std::get_if<proto::SkillUsed>(&pe.event)) {
+        skill(u->skill);
+    }
+}
+
+void Report::print_unnamed() const {
+    std::vector<std::pair<uint32_t, UnnamedEffect>> effects(m_unnamed_effects.begin(), m_unnamed_effects.end());
+    std::stable_sort(effects.begin(), effects.end(),
+                     [](const auto& a, const auto& b) { return a.second.count > b.second.count; });
+    std::printf("\nunnamed effects: %zu\n", effects.size());
+    for (const auto& [id, u] : effects) {
+        std::printf("  %10u  x%-5" PRIu64 " ", id, u.count);
+        if (u.max_ms == 0) {
+            std::printf("%-15s", "permanent");
+        } else if (u.min_ms == u.max_ms) {
+            std::printf("%-15s", (std::to_string(u.max_ms / 1000) + "." + std::to_string(u.max_ms % 1000 / 100) + " s").c_str());
+        } else {
+            std::printf("%-15s", (std::to_string(u.min_ms / 1000) + "." + std::to_string(u.min_ms % 1000 / 100) + "-" +
+                                  std::to_string(u.max_ms / 1000) + "." + std::to_string(u.max_ms % 1000 / 100) + " s")
+                                     .c_str());
+        }
+        std::printf(" from %s", u.from.c_str());
+        if (u.source_skill != 0) std::printf(", skill %u", u.source_skill);
+        if (u.permanent && u.max_ms != 0) std::printf(", permanent too");
+        std::printf("\n");
+    }
+    std::vector<std::pair<uint32_t, uint64_t>> skills(m_unnamed_skills.begin(), m_unnamed_skills.end());
+    std::stable_sort(skills.begin(), skills.end(), [](const auto& a, const auto& b) { return a.second > b.second; });
+    std::printf("unnamed skills: %zu\n", skills.size());
+    for (const auto& [code, count] : skills) std::printf("  %10u  x%" PRIu64 "\n", code, count);
+}
+
 void Report::on_event(const proto::ParsedEvent& pe, const meter::CombatantRegistry& reg) {
     if (m_opt.ping) note_ping(pe);
+    if (m_opt.unnamed) note_unnamed(pe, reg);
     if (!m_opt.events && !m_opt.auras) return;
     const double t = rel(pe.ts);
     const bool aura = std::holds_alternative<proto::BuffApplied>(pe.event) ||

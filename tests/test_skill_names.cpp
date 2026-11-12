@@ -77,9 +77,29 @@ TEST_CASE(SkillNames, EffectsTakeTheirSkillsName) {
     // The applying skill first, then the skill the effect's id points to (id / 10).
     TEST_ASSERT_EQ(std::string(effect_name(181'900'211, 18'190'021)), std::string("Undefeated Mantra"));
     TEST_ASSERT_EQ(std::string(effect_name(181'900'211)), std::string("Undefeated Mantra"));
-    TEST_ASSERT_EQ(std::string(effect_name(111'000'071, 11'190'137)), std::string("Leaping Slam"));
-    // Monster, item and system effects: no name, and a label with the id.
-    TEST_ASSERT(effect_name(20'111'011, 2'011'101).empty());
+    TEST_ASSERT_EQ(std::string(effect_name(111'000'099, 11'190'137)), std::string("Leaping Slam"));
+    // The effect's own name first of all: the one Leaping Slam puts on.
+    TEST_ASSERT_EQ(std::string(effect_name(111'000'071, 11'190'137)), std::string("Prepare for Battle"));
+    // An item's effect has its name, and says it is an item's.
+    TEST_ASSERT_EQ(std::string(effect_name(20'111'011, 2'011'101)), std::string("Life Potion"));
+    TEST_ASSERT(effect_kind(20'111'011) == EffectKind::Item);
+    TEST_ASSERT_EQ(std::string(effect_name(22'101'031)), std::string("Speed Scroll"));
+    // A boss's and a system mark: no name, and a label with the id.
+    TEST_ASSERT(effect_name(16'044'202, 1'604'420).empty());
     TEST_ASSERT(effect_name(200).empty());
     TEST_ASSERT_EQ(effect_label(200), std::string("Effect 200"));
+}
+
+TEST_CASE(SkillNames, AnEffectsOwnNameComesBeforeItsSkills) {
+    // src/game/data/effects.tsv: what Punishment puts on is Executor, as the game
+    // shows it.
+    TEST_ASSERT_EQ(std::string(effect_name(120'900'001, 12'090'233)), std::string("Executor"));
+    TEST_ASSERT_EQ(effect_label(120'900'001), std::string("Executor"));
+    TEST_ASSERT(effect_kind(120'900'001) == EffectKind::Skill);
+    // Still one effect to a watch list, whatever it is called.
+    TEST_ASSERT_EQ(effect_key(120'900'001, 12'090'233), uint32_t{12'090'000});
+
+    // Not listed: a skill's by its skill, no one's otherwise.
+    TEST_ASSERT(effect_kind(181'900'211, 18'190'021) == EffectKind::Skill);
+    TEST_ASSERT(effect_kind(200) == EffectKind::Unknown);
 }

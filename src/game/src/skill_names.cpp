@@ -16,6 +16,22 @@ constexpr SkillRow kSkills[] = {
 #include "skill_table.inc"
 };
 
+struct EffectRow {
+    uint32_t id;
+    const char* name;
+    EffectKind kind;
+};
+
+constexpr EffectRow kEffects[] = {
+#include "effect_table.inc"
+};
+
+const EffectRow* find_effect(uint32_t id) noexcept {
+    const auto* it = std::lower_bound(std::begin(kEffects), std::end(kEffects), id,
+                                      [](const EffectRow& row, uint32_t i) { return row.id < i; });
+    return it != std::end(kEffects) && it->id == id ? it : nullptr;
+}
+
 constexpr uint32_t kClassCodeMin = 10'000'000;
 constexpr uint32_t kClassCodeMax = 19'999'999;
 
@@ -72,7 +88,13 @@ uint32_t effect_skill(uint32_t buff_id, uint32_t source_skill) noexcept {
     return skill;
 }
 
+EffectKind effect_kind(uint32_t buff_id, uint32_t source_skill) noexcept {
+    if (const EffectRow* row = find_effect(buff_id)) return row->kind;
+    return effect_skill(buff_id, source_skill) != 0 ? EffectKind::Skill : EffectKind::Unknown;
+}
+
 std::string_view effect_name(uint32_t buff_id, uint32_t source_skill) noexcept {
+    if (const EffectRow* row = find_effect(buff_id)) return row->name;
     const uint32_t skill = effect_skill(buff_id, source_skill);
     return skill != 0 ? skill_name(skill) : std::string_view{};
 }

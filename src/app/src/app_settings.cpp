@@ -27,7 +27,7 @@ bool plausible_exe_name(const std::string& name) {
     });
 }
 
-/// The watch list's codes: whole numbers that fit a u32, each once, at most
+/// The watch list's codes, and the hide list's: whole numbers that fit a u32, each once, at most
 /// kMaxWatchedEffects. Anything else in a hand-edited file is dropped.
 std::vector<uint32_t> read_watch(const config::JsonValue& json) {
     std::vector<uint32_t> out;
@@ -84,6 +84,7 @@ void sanitize(AppSettings& s) {
     s.auras.icon_size = std::clamp(s.auras.icon_size, kMinAuraIcon, kMaxAuraIcon);
     s.auras.low_hp_percent = std::clamp(s.auras.low_hp_percent, 5, 90);
     if (s.auras.watch.size() > kMaxWatchedEffects) s.auras.watch.resize(kMaxWatchedEffects);
+    if (s.auras.hidden.size() > kMaxWatchedEffects) s.auras.hidden.resize(kMaxWatchedEffects);
     s.ping.opacity = std::clamp(s.ping.opacity, 0.0f, 1.0f);
     s.ping.scale = std::clamp(s.ping.scale, 0.6f, 2.5f);
     s.ping.width = std::clamp(s.ping.width, 160, 4000);
@@ -124,6 +125,9 @@ config::JsonValue settings_to_json(const AppSettings& s) {
     config::JsonValue::ArrayType watch;
     for (const uint32_t code : s.auras.watch) watch.emplace_back(static_cast<double>(code));
     auras["watch"] = config::JsonValue(std::move(watch));
+    config::JsonValue::ArrayType hidden;
+    for (const uint32_t code : s.auras.hidden) hidden.emplace_back(static_cast<double>(code));
+    auras["hidden"] = config::JsonValue(std::move(hidden));
     root[kAuras] = std::move(auras);
     config::JsonValue ping;
     config::write_keys<PingSettings>(kPingKeys, s.ping, ping);
@@ -150,6 +154,7 @@ AppSettings settings_from_json(const config::JsonValue& json) {
     config::read_keys<OverlaySettings>(kOverlayKeys, json[kOverlay], s.overlay);
     config::read_keys<AuraSettings>(kAuraKeys, json[kAuras], s.auras);
     s.auras.watch = read_watch(json[kAuras]["watch"]);
+    s.auras.hidden = read_watch(json[kAuras]["hidden"]);
     config::read_keys<PingSettings>(kPingKeys, json[kPing], s.ping);
     config::read_keys<PowerSettings>(kPowerKeys, json[kPower], s.power);
     config::read_keys<meter::MeterSettings>(meter::kMeterSettingKeys, json[kMeter], s.meter);

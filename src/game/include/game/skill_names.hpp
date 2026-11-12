@@ -35,10 +35,23 @@ namespace aion2::game {
 /// id over ten). 0 for neither: monster, item and system effects.
 [[nodiscard]] uint32_t effect_skill(uint32_t buff_id, uint32_t source_skill = 0) noexcept;
 
-/// An effect's name (proto::BuffApplied): the skill that applied it, when the record
-/// names one the table lists, else the skill its id points to (the id over ten:
-/// Undefeated Mantra's 181900411 is 18190041). Empty for neither: monster, item and
-/// system effects. In the second capture 78% of effects got a name.
+/// What puts an effect on, as src/game/data/effects.tsv says; for an effect it does
+/// not list, Skill when a skill names it (effect_skill), else Unknown.
+enum class EffectKind : uint8_t {
+    Unknown,
+    /// A class skill's.
+    Skill,
+    /// An item's: a scroll, food, a potion.
+    Item,
+};
+
+[[nodiscard]] EffectKind effect_kind(uint32_t buff_id, uint32_t source_skill = 0) noexcept;
+
+/// An effect's name (proto::BuffApplied): its own, from src/game/data/effects.tsv
+/// (Punishment's 120900001 is Executor); else the skill that applied it, when the
+/// record names one the skill table lists; else the skill its id points to (the id
+/// over ten: Undefeated Mantra's 181900411 is 18190041). Empty for none of them. In
+/// the second capture 78% of effects got a name from the skills alone.
 [[nodiscard]] std::string_view effect_name(uint32_t buff_id, uint32_t source_skill = 0) noexcept;
 
 /// effect_name, or "Effect <id>".

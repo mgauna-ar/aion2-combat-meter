@@ -226,8 +226,8 @@ This project is licensed under the **MIT License** — see the [LICENSE](LICENSE
 **Third-Party Components & Art:**
 - **Dear ImGui:** Licensed under the MIT License (`src/third_party/imgui/LICENSE.txt`).
 - **Icons:** Subset of [Lucide](https://lucide.dev) icons (ISC License), embedded via `tools/embed_icon_font.py`.
-- **Game Data:** Skill names, dungeon maps, and NPC databases are sourced from aion2.app (`src/game/data/*.tsv`).
-- **Game Art:** Class emblems and skill icon sheets are property of NCSOFT (served via aion2.app, bundled into `src/app/src/game_icon_sheet.inc`). The MIT License does not apply to NCSOFT game assets.
+- **Game Data:** Skill names, dungeon maps, and NPC databases are sourced from aion2.app, effect names from questlog.gg (`src/game/data/*.tsv`).
+- **Game Art:** Class emblems, skill icons and item icons are property of NCSOFT (served via aion2.app, bundled into `src/app/src/game_icon_sheet.inc`). The MIT License does not apply to NCSOFT game assets.
 - **Application Mark:** The winged crystal icon was custom drawn for this project (`tools/gen_app_icon.py`) under the MIT License.
 
 *AION 2 is a registered trademark of NCSOFT Corporation. This project is an independent community tool and is not affiliated with or endorsed by NCSOFT.*

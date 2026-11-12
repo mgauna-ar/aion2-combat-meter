@@ -32,6 +32,7 @@ std::vector<const auras::AuraEntry*> shown_auras(const std::vector<auras::AuraEn
         if (!running(e, now)) continue;
         if (e.permanent ? !s.show_permanent : e.duration_ms < min_ms) continue;
         if (self && e.hostile && !s.show_debuffs) continue;
+        if (std::find(s.hidden.begin(), s.hidden.end(), e.key) != s.hidden.end()) continue;
         out.push_back(&e);
     }
     return out;
@@ -76,19 +77,30 @@ TileLayout tile_layout(float width, float size, float gap, size_t count) noexcep
 
 std::string tile_initials(const std::string& label) {
     // Words of ASCII letters and digits: the first letter of the first two, or the
-    // first two of a single word.
+    // first two of a single word. A number is no word, so "Effect 22101031", the
+    // label of an effect with no name, has none: its "E" would say nothing.
     std::vector<std::string> words;
     std::string word;
+    bool numbered = false;
+    const auto end_word = [&] {
+        if (word.empty()) return;
+        if (std::all_of(word.begin(), word.end(), [](char c) { return std::isdigit(static_cast<unsigned char>(c)) != 0; })) {
+            numbered = true;
+        } else {
+            words.push_back(word);
+        }
+        word.clear();
+    };
     for (const char ch : label) {
         const auto c = static_cast<unsigned char>(ch);
         if (c < 0x80 && std::isalnum(c) != 0) {
             word += ch;
-        } else if (!word.empty()) {
-            words.push_back(std::move(word));
-            word.clear();
+        } else {
+            end_word();
         }
     }
-    if (!word.empty()) words.push_back(std::move(word));
+    end_word();
+    if (numbered && words.size() == 1 && (words[0] == "Effect" || words[0] == "Skill" || words[0] == "NPC")) return "?";
     std::string out;
     if (words.size() >= 2) {
         out = {words[0][0], words[1][0]};
@@ -172,13 +184,22 @@ std::string effect_tooltip(const auras::AuraEntry& e) {
     std::string out = e.label + "\neffect " + std::to_string(e.buff_id);
     if (e.source_skill != 0) out += ", skill " + std::to_string(e.source_skill);
     out += e.hostile ? "\nan enemy's" : (e.mine ? "\nyours" : "\nan ally's");
+    if (e.sustained) out += "\nkept up: renewed before it runs out";
     return out;
+}
+
+/// What stands in for the icon of an effect that has none: a flask for an item's (a
+/// scroll, food, a potion), nothing for the rest.
+const char* effect_glyph(const auras::AuraEntry& e) {
+    return game::effect_kind(e.buff_id, e.source_skill) == game::EffectKind::Item ? ICON_FLASK : nullptr;
 }
 
 /// One row of the overlay as bars: an icon in its own square, then a bar with a
 /// label in it, a dim note after the label, and a figure at its right end.
 struct BarRow {
     int icon{kNoIcon};
+    /// Drawn in the icon's square when there is no icon: an item effect's flask.
+    const char* glyph{nullptr};
     std::string label;
     /// After the label, dim: an effect's stacks.
     std::string note;
@@ -226,6 +247,11 @@ void draw_bar_rows(const std::vector<BarRow>& rows, float scale, bool interactiv
             draw_icon(dl, r.icon, row_min.x, row_min.y, m.icon, 1.0f, rounding);
         } else {
             dl->AddRectFilled(row_min, icon_max, u32(r.color, 0.30f), rounding);
+            if (r.glyph != nullptr) {
+                const ImVec2 gs = ImGui::CalcTextSize(r.glyph);
+                dl->AddText(ImVec2(row_min.x + (m.icon - gs.x) * 0.5f, row_min.y + (m.icon - gs.y) * 0.5f),
+                            u32(colors::Text), r.glyph);
+            }
         }
         const ImVec2 bar_min(icon_max.x + 3.0f * scale, y);
         chrome::BarStyle style;
@@ -262,10 +288,11 @@ void draw_bar_rows(const std::vector<BarRow>& rows, float scale, bool interactiv
 BarRow effect_row(const auras::AuraEntry& e, Micros now) {
     BarRow r;
     r.icon = effect_icon(e.buff_id, e.source_skill);
+    r.glyph = effect_glyph(e);
     r.label = e.label;
     if (e.stacks > 1) r.note = "x" + std::to_string(e.stacks);
     r.color = aura_color(e);
-    if (!e.permanent) {
+    if (!e.permanent && !e.sustained) {
         const Micros remaining = e.expires_at > now ? e.expires_at - now : 0;
         const double total = static_cast<double>(e.duration_ms) * static_cast<double>(kMicrosPerMilli);
         r.fraction =
@@ -337,6 +364,8 @@ void draw_alert(const std::string& text, float scale, float pulse) {
 /// part of it, a time in the middle and a count in the corner, and a border.
 struct Tile {
     int icon{kNoIcon};
+    /// With no icon: a glyph in the middle when there is one, else the initials.
+    const char* glyph{nullptr};
     std::string initials;
     /// The border's colour, and the fill of a tile with no icon.
     Rgb tint{colors::Accent};
@@ -371,8 +400,15 @@ void draw_tiles(const std::vector<Tile>& tiles, float size, float scale, bool in
             draw_icon(dl, t.icon, min.x, min.y, size, t.icon_alpha, rounding);
         } else {
             dl->AddRectFilled(min, max, u32(t.tint, 0.35f * t.icon_alpha), rounding);
-            dl->AddText(ImVec2(min.x + 4.0f * scale, min.y + 3.0f * scale), u32(colors::Text, t.icon_alpha),
-                        t.initials.c_str());
+            if (t.glyph != nullptr) {
+                const ImVec2 gs = ImGui::CalcTextSize(t.glyph);
+                // Above the middle, clear of the time left.
+                dl->AddText(ImVec2(min.x + (size - gs.x) * 0.5f, min.y + 3.0f * scale),
+                            u32(colors::Text, 0.75f * t.icon_alpha), t.glyph);
+            } else {
+                dl->AddText(ImVec2(min.x + 4.0f * scale, min.y + 3.0f * scale), u32(colors::Text, t.icon_alpha),
+                            t.initials.c_str());
+            }
         }
         if (t.shade > 0.0f) {
             const float shade = std::clamp(t.shade, 0.0f, 1.0f);
@@ -402,9 +438,10 @@ void draw_tiles(const std::vector<Tile>& tiles, float size, float scale, bool in
 Tile effect_tile(const auras::AuraEntry& e, Micros now) {
     Tile t;
     t.icon = effect_icon(e.buff_id, e.source_skill);
+    t.glyph = effect_glyph(e);
     t.initials = tile_initials(e.label);
     t.tint = aura_color(e);
-    if (!e.permanent) {
+    if (!e.permanent && !e.sustained) {
         const Micros left = e.expires_at > now ? e.expires_at - now : 0;
         const double total = static_cast<double>(e.duration_ms) * static_cast<double>(kMicrosPerMilli);
         const double share_left = total > 0.0 ? std::clamp(static_cast<double>(left) / total, 0.0, 1.0) : 0.0;

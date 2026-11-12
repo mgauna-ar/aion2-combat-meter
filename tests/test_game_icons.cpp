@@ -113,3 +113,17 @@ TEST_CASE(GameIcons, ResamplingAveragesByArea) {
     TEST_ASSERT_EQ(int{copy[12 + 7]}, 0);
     TEST_ASSERT_EQ(int{copy[8]}, 0);
 }
+
+TEST_CASE(GameIcons, AnItemsEffectHasTheItemsIcon) {
+    // effects.tsv's fourth column: a scroll's effect shows the scroll, a potion's the
+    // potion, with no skill behind either.
+    const int scroll = effect_icon(22'101'031);  // Speed Scroll
+    const int potion = effect_icon(20'111'011);  // Life Potion
+    TEST_ASSERT(scroll != kNoIcon);
+    TEST_ASSERT(potion != kNoIcon);
+    TEST_ASSERT(scroll != potion);
+    TEST_ASSERT(scroll < icon_slot_count());
+    // A skill's effect keeps its skill's icon, and a boss's has none.
+    TEST_ASSERT_EQ(effect_icon(181'900'211, 18'190'021), skill_icon(18'190'021));
+    TEST_ASSERT_EQ(effect_icon(16'044'202, 1'604'420), kNoIcon);
+}
