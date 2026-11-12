@@ -42,18 +42,23 @@ A patch can add or rename skills. Rows the meter cannot name read "Skill 1234567
    ```bash
    mkdir -p /tmp/skills && for p in $(seq 1 12); do curl -sSL -o /tmp/skills/page$p.html "https://aion2.app/db/skills?page=$p"; sleep 1; done
    ```
-   Stop at the first page that lists no skills.
+   Stop at the first page that lists no skills. aion2.app lists some skills with no
+   English name (the Brawler's, since 2026-11); questlog.gg's list names them, so
+   take its pages into the same folder (`pageCount` in a page says how many):
+   ```bash
+   for p in $(seq 1 10); do curl -sSL -G -o /tmp/skills/questlog$p.json --data-urlencode "input={\"language\":\"en\",\"page\":$p}" "https://questlog.gg/aion-2/api/trpc/database.getSkills"; sleep 1; done
+   ```
 2. **Rebuild the table.** Run `python3 tools/gen_skill_table.py --import-pages /tmp/skills`.
    It rewrites `src/game/data/skills.tsv` (names, and each skill's icon) and
-   `skill_table.inc`. A skill the pages list with no English name keeps the name the
-   TSV had (the Brawler's, since 2026-11).
+   `skill_table.inc`. A skill aion2.app lists with no English name takes
+   questlog.gg's, or failing that keeps the name the TSV had.
 3. **Check the diff.** Renamed rows are expected. A class whose codes stopped starting
    with its two digits (`class_of_skill`) is not, and means the codes were renumbered.
-4. **Rebuild the icons**, when the icon column changed (`make test`'s `check-icons`
+4. **Rebuild the icons**, when an icon column changed, here or in `effects.tsv` (3b) (`make test`'s `check-icons`
    fails until they are). Download every image the sheet needs, then pack them; it
    needs Pillow with WebP (`pip install pillow`):
    ```bash
-   mkdir -p /tmp/icons/skills /tmp/icons/classes
+   mkdir -p /tmp/icons/skills /tmp/icons/classes /tmp/icons/items
    python3 tools/gen_icon_sheet.py --urls > /tmp/icons/urls.txt
    while IFS=$'\t' read -r dest url; do [ -s "/tmp/icons/$dest" ] || curl -sSfL -o "/tmp/icons/$dest" "$url"; sleep 0.5; done < /tmp/icons/urls.txt
    python3 tools/gen_icon_sheet.py --icons /tmp/icons --preview /tmp/icons/sheet.png
@@ -61,6 +66,28 @@ A patch can add or rename skills. Rows the meter cannot name read "Skill 1234567
    Look over `sheet.png`: the emblems first, then every skill icon. The class colours
    it prints are the emblems' own; `class_color` (`src/app/src/display_format.cpp`)
    takes them, so a changed one goes there too. Then re-run `make screenshots`.
+
+## 3b. Refresh the effect names
+
+An effect the meter cannot name reads "Effect 12345678" (`aion2meter-replay --unnamed`
+counts a capture's). Their names come from questlog.gg's status-effect database, whose
+list pages are drawn by script from one JSON list.
+
+1. **Download the list.** It stops at 1,000 results, so take the debuffs, then the
+   buffs by name in both directions (25 pages of 40 each way cover up to 2,000):
+   ```bash
+   mkdir -p /tmp/effects && cd /tmp/effects
+   get() { curl -sSL -G -o "$1" --data-urlencode "input=$2" "https://questlog.gg/aion-2/api/trpc/database.getStatusEffects"; sleep 1; }
+   for p in $(seq 1 25); do get debuff$p.json "{\"language\":\"en\",\"page\":$p,\"mainCategory\":\"debuff\"}"; done
+   for o in asc desc; do for p in $(seq 1 25); do get buff-$o$p.json "{\"language\":\"en\",\"page\":$p,\"sortBy\":\"name\",\"sortType\":\"$o\",\"mainCategory\":\"buff\"}"; done; done
+   ```
+   A page's `pageCount` says how many pages its list has: more than 25 of debuffs, or
+   more than 50 of buffs, and the list has outgrown this.
+2. **Rebuild the table.** Run `python3 tools/gen_effect_table.py --import-pages /tmp/effects`.
+   It rewrites `src/game/data/effects.tsv` and `effect_table.inc`, and prints how many
+   effects it found of each kind (skill, item, other).
+3. **Check it against a capture.** `aion2meter-replay --unnamed <capture>` should list
+   fewer effects than before. The table takes no rows by hand.
 
 ## 4. Refresh the map names
 

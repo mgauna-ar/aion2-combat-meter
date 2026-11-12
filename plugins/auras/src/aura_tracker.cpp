@@ -17,6 +17,13 @@ void AuraTracker::on_death(EntityId id) { (void)m_book.on_death(id); }
 
 void AuraTracker::on_map_load(Micros ts) { (void)m_book.on_map_load(ts); }
 
+std::string AuraTracker::label(const game::EffectInstance& i, const Entities& entities) {
+    if (game::effect_name(i.buff_id, i.source_skill).empty() && entities.is_enemy(i.caster)) {
+        return entities.label(entities.resolve(i.caster));
+    }
+    return game::effect_label(i.buff_id, i.source_skill);
+}
+
 void AuraTracker::prune(Micros now, const Entities& entities) {
     m_book.prune(now);
     const EntityId local = entities.local();
@@ -25,8 +32,8 @@ void AuraTracker::prune(Micros now, const Entities& entities) {
     if (on == nullptr) return;
     for (const auto& [instance, i] : *on) {
         if (m_seen.size() >= kMaxSeen) break;
-        if (entities.is_enemy(i.caster)) continue;
-        m_seen.try_emplace(game::effect_key(i.buff_id, i.source_skill), game::effect_label(i.buff_id, i.source_skill));
+        const uint32_t key = game::effect_key(i.buff_id, i.source_skill);
+        m_seen.try_emplace(key, SeenEffect{key, label(i, entities), entities.is_enemy(i.caster)});
     }
 }
 
@@ -41,33 +48,57 @@ std::vector<AuraEntry> AuraTracker::entries(EntityId id, Micros now, const Entit
         if (!i.runs_at(now)) continue;
         const bool mine = entities.mine(i.caster);
         if (only_mine && !mine) continue;
-        const auto same = std::find_if(out.begin(), out.end(), [&](const AuraEntry& e) {
-            return e.buff_id == i.buff_id && e.caster == i.caster;
-        });
+        const uint64_t age_ms = now > i.applied_at ? (now - i.applied_at) / kMicrosPerMilli : 0;
+        const bool sustained = !i.permanent && i.updated_at != i.applied_at && i.duration_ms <= kSustainedMaxMs &&
+                               age_ms > kSustainedSpans * i.duration_ms;
+        const uint32_t key = game::effect_key(i.buff_id, i.source_skill);
+        const auto same = std::find_if(out.begin(), out.end(),
+                                       [&](const AuraEntry& e) { return e.key == key && e.caster == i.caster; });
         if (same != out.end()) {
-            ++same->stacks;
-            if (!i.permanent && (same->permanent || i.expires_at > same->expires_at)) {
+            // A passive sent again under a new number is no stack, nor is the
+            // skill's other effect.
+            if (!i.permanent && !same->permanent && i.buff_id == same->buff_id) ++same->stacks;
+            if (i.permanent) continue;
+            if (same->permanent) {
+                // The skill's passive gives way to what it set off, which ends.
                 same->permanent = false;
+                same->buff_id = i.buff_id;
+                same->source_skill = i.source_skill;
+                same->label = label(i, entities);
                 same->expires_at = i.expires_at;
                 same->duration_ms = i.duration_ms;
+                same->applied_at = i.applied_at;
+                same->sustained = sustained;
+                continue;
+            }
+            same->applied_at = std::min(same->applied_at, i.applied_at);
+            if (i.expires_at > same->expires_at) {
+                same->expires_at = i.expires_at;
+                same->duration_ms = i.duration_ms;
+                same->sustained = sustained;
             }
             continue;
         }
         AuraEntry e;
-        e.key = game::effect_key(i.buff_id, i.source_skill);
+        e.key = key;
         e.buff_id = i.buff_id;
         e.source_skill = i.source_skill;
         e.caster = i.caster;
-        e.label = game::effect_label(i.buff_id, i.source_skill);
+        e.label = label(i, entities);
         e.permanent = i.permanent;
         e.expires_at = i.expires_at;
         e.duration_ms = i.duration_ms;
+        e.applied_at = i.applied_at;
+        e.sustained = sustained;
         e.mine = mine;
         e.hostile = entities.is_enemy(i.caster);
         out.push_back(std::move(e));
     }
+    // In the order they were put on, so a renewal moves nothing and a new effect
+    // goes to the end.
     std::sort(out.begin(), out.end(), [](const AuraEntry& a, const AuraEntry& b) {
-        return std::tuple(a.permanent, a.expires_at, a.label) < std::tuple(b.permanent, b.expires_at, b.label);
+        return std::tuple(a.permanent, a.applied_at, a.label, a.caster) <
+               std::tuple(b.permanent, b.applied_at, b.label, b.caster);
     });
     return out;
 }
@@ -82,7 +113,7 @@ AuraSnapshot AuraTracker::snapshot(Micros now, const Entities& entities, EntityI
         s.on_target = entries(target, now, entities, true);
     }
     s.seen.reserve(m_seen.size());
-    for (const auto& [key, label] : m_seen) s.seen.push_back(SeenEffect{key, label});
+    for (const auto& [key, seen] : m_seen) s.seen.push_back(seen);
     std::sort(s.seen.begin(), s.seen.end(),
               [](const SeenEffect& a, const SeenEffect& b) { return std::tie(a.label, a.key) < std::tie(b.label, b.key); });
     return s;

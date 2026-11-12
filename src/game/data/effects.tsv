@@ -1,0 +1,2724 @@
+# AION 2 effect names by effect id, as an effect put on (2a 38) carries it.
+# The third column says what puts it on: skill (a class skill), item (a
+# scroll, food, a potion) or other (a monster, a zone, the system). An effect
+# not listed takes the name of the skill behind it (game::effect_name). The
+# fourth column, on an item's effect, names the item's icon, which
+# tools/gen_icon_sheet.py packs for the app.
+#
+# Source: questlog.gg's status-effect database
+# (questlog.gg/aion-2/en/db/status-effects), retrieved 2026-11-12. English names as
+# the site lists them. Regenerate with tools/gen_effect_table.py.
+100	Stun	other
+101	Trigger Activation	other
+103	Stun for stack testing (no level) / Separate	other
+104	For Stack Testing Physical Attack increase (level exists) / Renew	other
+130	Focused Block	other
+140	Prayer of Swiftness	other
+180	Frozen (Hold)	other
+181	Frozen (Hold)	other
+194	Dodge [Mobile]	other
+195	Dodge [Nimble]	other
+196	Dodge [Success]	other
+197	Dodge [Mobile][Nimble]	other
+198	Dodge [Nimble][Success]	other
+199	Dodge [Success][Mobile]	other
+206	Taunt	other
+249	For Testing Closet ItemPassive (Attack Boost)	other
+252	Test_Magic Attack increase ItemPassive	other
+253	For Testing CastSkill for periodic Meteor	other
+254	For Testing CastSkill for periodic invisible NPC spawn	other
+255	For Testing TriggerSkillByGetDamage	other
+256	For Testing TriggerSkillByGetDamage (TargetSkill)	other
+257	For Testing Polymorph that transforms into the caster's skin	other
+258	For Testing CastSkill for periodic Pull	other
+259	For Testing Pull Proportional to Distance	other
+260	For Testing Pull Proportional to Distance	other
+261	For Testing Pull Proportional to Distance	other
+262	For Testing Pull Proportional to Distance	other
+263	For Testing Pull Proportional to Distance	other
+264	For Testing BlockTargeting	other
+265	For Testing_Bakarma Polymorph Summon Pattern_Abnormal held by Summoner 1	other
+266	For Testing_Bakarma Polymorph Summon Pattern_Abnormal held by Summoner 2	other
+267	For Testing_Bakarma Polymorph Summon Pattern_Abnormal held by Summoner 3	other
+268	For Testing_Bakarma Polymorph Summon Pattern_Abnormal held by Summoner 4	other
+269	For Testing_Bakarma Polymorph Summon Pattern_Stackable Abnormal (Separator)	other
+270	For Testing_Bakarma Polymorph Summon Pattern_CastSkill to move Polymorph	other
+271	For Testing_10% of Max HP damage, Capped at 1,000 (EndDamage_AbnormalOwnerStat)	other
+272	For Testing_Current HP Proportional 10% Damage, Capped at 1000 (EndDamage_AbnormalOwnerStat)	other
+273	Test_Move_Push (Skill Usable)	other
+274	Test_Move_Knockback (Skill Usable)	other
+275	Test_For Spawning Replace (abnormal id 275)	other
+276	Test_For Spawning Replace (abnormal id 276)	other
+277	Test_For Spawning PriorityReplace (abnormal id 277, priority 1)	other
+278	Test_For Spawning PriorityReplace (abnormal id 278, priority 2)	other
+279	Test_For Level Scaling Physical Attack, Magic Attack, Physical Defense, Magic Defense increase	other
+280	For Testing IgnoreCollision	other
+281	Test_For Level Scaling Physical Defense reduction (1)	other
+282	Test_For Level Scaling Physical Defense reduction (2)	other
+283	Test_For Level Scaling Physical Defense reduction (3)	other
+284	Test_For Level Scaling Physical Defense reduction (4)	other
+285	Test_For Level Scaling Physical Defense reduction (5)	other
+286	Test_For Level Scaling Physical Defense reduction (6)	other
+287	Test_For Level Scaling Physical Defense reduction (7)	other
+288	Test_For Level Scaling Physical Defense reduction (8)	other
+289	Test_For Level Scaling Physical Defense reduction (9)	other
+290	Test_For Level Scaling Physical Defense reduction (10)	other
+291	Per Tick Dot_Dmg	other
+292	Per Tick Dot_TargetHP	other
+293	Per Tick Dot_TargetMaxHP	other
+294	Per Tick Hot	other
+295	Per Tick Hot_Ratio	other
+296	Per Tick Hot_Item	other
+297	Per Tick HotRatio_Item	other
+298	Per Tick Mot	other
+299	Per Tick Mot_Ratio	other
+300	Per Tick Mot_Item	other
+301	Per Tick MotRatio_Item	other
+302	Per Tick Sot	other
+303	Per Tick Sot_Ratio	other
+304	Per Tick Sot_Item	other
+305	Per Tick SotRatio_Item	other
+306	For Testing Beam FX	other
+308	Knockdown	other
+311	Restrain	other
+402	PvP Test Stun using OnExpireAbnormal	other
+421	PvP Test_Sleep	other
+422	PvP Test_Swift	other
+423	PvP Test_Weaken	other
+446	PvP Test_Protective Shield (Max 20 stacks)	other
+454	PvP Test_Invincibility Granted When Enemy Spectators Intervene	other
+455	PvP Test_Abnormal held by Combatants	other
+456	PvP Test_Abnormal held by Side Red Stone	other
+457	PvP Test_Abnormal for checking Side Red Stone Skill Check (beamfx)	other
+459	PvP Test_Suicide at Falling Point	other
+461	PvP Test_Poison Zone Danger Notification	other
+462	PvP Test_Participant 1 Abnormal	other
+463	PvP Test_Participant 2 Abnormal	other
+464	PvP Test_Participant 3 Abnormal	other
+465	PvP Test_Participant 4 Abnormal	other
+466	PvP Test_Participant 5 Abnormal	other
+467	PvP Test_Participant 6 Abnormal	other
+468	PvP Test_Participant 7 Abnormal	other
+469	PvP Test_Participant 8 Abnormal	other
+483	Invincible	other
+484	Rapid	other
+509	Buff Level 1	other
+510	Buff Level 2	other
+511	Buff Level 3	other
+512	Buff Level 4	other
+562	Per-Tick Oot	other
+563	Per-Tick Oot_Ratio	other
+564	Per-Tick Oot_Item	other
+565	Per-Tick OotRatio_Item	other
+567	Test_BlockRotate	other
+595	Equip Mushroom Transformation Bomb	other
+596	Equip Strong Damage Bomb	other
+597	Equip Invincibility Bomb	other
+599	Invincible	other
+600	Fungie Transformation	other
+607	Attack Increase	other
+608	Attack Speed Increase	other
+609	Increases Cooldown Reduction	other
+610	Defense Increase	other
+990	Test_BlockMoveControl	other
+991	Test_BlockMove	other
+992	Test_BlockGlide	other
+993	Test_BlockFlight	other
+1002	HP Preservation	other
+1003	For Testing_ForceCriticalDamageByCaste (3 Times)	other
+1004	For Testing_ForceCriticalDamageByCaste (1 Time)	other
+1005	For Testing StanceEvade	other
+1008	Doppelganger Skill	other
+1009	For Testing DamageMultiply	other
+1010	For Testing DamageMultiply	other
+1011	For Testing DamageMultiply	other
+1012	FXFor Testing Physical Attack increase Replace	other
+1013	FXFor Testing Physical Attack increase Stack	other
+1014	For Testing Dot_Dmg	other
+1015	For Testing_Dot_TargetHP	other
+1016	For Testing_Dot_TargetMaxHP	other
+1017	For Testing_Dot_DPot	other
+1018	For Testing_Dot_DPot_Ratio	other
+1019	For Testing_Dot_DPot_Item	other
+1020	For Testing_Dot_DPotRatio_Item	other
+1021	For Testing_target_abnormal_type_AbnormalId	other
+1022	For Testing_target_abnormal_type_AbnormalGroupId	other
+1023	For Testing_target_abnormal_type_AbnormalEffectType	other
+1024	For Testing_need_condition_HasAbnormalId_TRUE	other
+1025	For Testing_need_condition_HasAbnormalId_FALSE	other
+1026	For Testing_need_condition_HasAbnormalGroupId_TRUE	other
+1027	For Testing_need_condition_HasAbnormalGroupId_FALSE	other
+1028	For Testing_need_condition_HasAbnormalEffectType_TRUE	other
+1029	For Testing_need_condition_HasAbnormalEffectType_FALSE	other
+1030	For Testing_need_condition_MaxHPRatio_Lower_TRUE	other
+1031	For Testing_need_condition_MaxHPRatio_Lower_FALSE	other
+1032	For Testing_need_condition_MaxHPRatio_Upper_TRUE	other
+1033	For Testing_need_condition_MaxHPRatio_Upper_FALSE	other
+1034	For Testing_need_condition_MaxMPRatio_Lower_TRUE	other
+1035	For Testing_need_condition_MaxMPRatio_Lower_FALSE	other
+1036	For Testing_need_condition_MaxMPRatio_Upper_TRUE	other
+1037	For Testing_need_condition_MaxMPRatio_Upper_FALSE	other
+1038	For Testing_need_condition_Combat_TRUE	other
+1039	For Testing_need_condition_Combat_FALSE	other
+1040	Trigger Activation	other
+1041	For Testing TriggerSkillByGetAbnormal (self)	other
+1043	For Testing TriggerSkillByAddAbnormal (self)	other
+1045	For Testing TriggerSkillByKill (self)	other
+1046	For Testing TriggerSkillByKill (target)	other
+1047	For Testing_ForceMissDamage	other
+1048	For Testing_ForceMissDamage_Physic	other
+1049	For Testing_ForceMissDamage_Fire	other
+1050	For Testing_ForceMissDamage_AbnormalGroupID (2001)	other
+1051	For Testing_ForceMissDamage_AbnormalEffectType (SafeHP)	other
+1052	For Testing_ForceMissDamage_Back Attack TRUE	other
+1053	For Testing_ForceCriticalDamage	other
+1054	For Testing_ForceCriticalDamage_Physic	other
+1055	For Testing_ForceCriticalDamage_Fire	other
+1056	For Testing_ForceCriticalDamage_AbnormalGroupID (2001)	other
+1057	For Testing_ForceCriticalDamage_AbnormalEffectType (SafeHP)	other
+1058	For Testing_ForceCriticalDamage_Back Attack TRUE	other
+1059	For Testing_ForceMissDamageToCaster	other
+1060	For Testing_ForceMissDamageToCaster_Physic	other
+1061	For Testing_ForceMissDamageToCaster_Fire	other
+1062	For Testing_ForceMissDamageToCaster_AbnormalGroupID (2001)	other
+1063	For Testing_ForceMissDamageToCaster_AbnormalEffectType (SafeHP)	other
+1064	For Testing_ForceMissDamageToCaster_Back Attack TRUE	other
+1065	For Testing_ForceCriticalDamageByCaster	other
+1066	For Testing_ForceCriticalDamageByCaster_Physic	other
+1067	For Testing_ForceCriticalDamageByCaster_Fire	other
+1068	For Testing_ForceCriticalDamageByCaster_AbnormalGroupID (2001)	other
+1069	For Testing_ForceCriticalDamageByCaster_AbnormalEffectType (SafeHP)	other
+1070	For Testing_ForceCriticalDamageByCaster_Back Attack TRUE	other
+1071	For Testing_ForceMissDamage_need_condition_Sword	other
+1072	For Testing_ForceCriticalDamage_need_condition_Sword	other
+1073	For Testing_StanceMissDamage	other
+1074	For Testing_StanceMissDamage_Cooldown 5s	other
+1075	For Testing_StanceMissDamage_Physic	other
+1076	For Testing_StanceMissDamage_Fire	other
+1077	For Testing_StanceMissDamage_AbnormalGroupID (2001)	other
+1078	For Testing_StanceMissDamage_AbnormalEffectType (SafeHP)	other
+1079	For Testing_StanceMissDamage_Back Attack TRUE	other
+1080	For Testing_StanceMissDamage_need_condition_Sword	other
+1081	For Testing_StanceCriticalDamage	other
+1082	For Testing_StanceCriticalDamage_Cooldown 5s	other
+1083	For Testing_StanceCriticalDamage_Physic	other
+1084	For Testing_StanceCriticalDamage_Fire	other
+1085	For Testing_StanceCriticalDamage_AbnormalGroupId (2001)	other
+1086	For Testing_StanceCriticalDamage_AbnormalEffectType (SafeHP)	other
+1087	For Testing_StanceCriticalDamage_Back Attack TRUE	other
+1088	For Testing_StanceCriticalDamage_need_condition_Sword	other
+1089	For Testing_StanceShieldBlock	other
+1090	For Testing_StanceShieldBlock_Cooldown 5s	other
+1091	For Testing_StanceShieldBlock_Physic	other
+1092	For Testing_StanceShieldBlock_Fire	other
+1093	For Testing_StanceShieldBlock_AbnormalGroupId (2001)	other
+1094	For Testing_StanceShieldBlock_AbnormalEffectType (SafeHP)	other
+1095	For Testing_StanceShieldBlock_need_condition_Sword	other
+1096	For Testing_StanceWeaponBlock	other
+1097	For Testing_StanceWeaponBlock_Cooldown 5s	other
+1098	For Testing_StanceWeaponBlock_Physic	other
+1099	For Testing_StanceWeaponBlock_Fire	other
+1100	For Testing_StanceWeaponBlock_AbnormalGroupID (2001)	other
+1101	For Testing_StanceWeaponBlock_AbnormalEffetType (SafeHP)	other
+1102	For Testing_StanceWeaponBlock_need_condition_Sword	other
+1104	For Testing_GetDamageMultiply (3x, 100 times abnormal)	other
+1105	For Testing_GetDamageMultiply (0.5x, Water Magic, Stun, Back Attack)	other
+1106	For Testing_DamageMultiply (5x, 100 times abnormal)	other
+1107	For Testing_DamageMultiply (0.5x, Water Magic, Stun, Back Attack)	other
+1108	For Testing_Horrify	other
+1109	For Testing_GetDamageMultiply (3x, 1 Time)	other
+1110	For Testing_GetDamageMultiply (0.3x, 1 Time)	other
+1111	For Testing_DamageMultiply (3x, 1 Time)	other
+1112	For Testing_DamageMultiply (0.3x, 1 Time)	other
+1115	For Testing_ChangeRelationshipEntity_Monster	other
+1116	For Testing_ChangeRelationshipEntity_PC_FriendlyToAll	other
+1117	For Testing_ChangeRelationshipEntity_Caster	other
+1118	For Testing_need_subzone (2010)	other
+1119	For Testing_need_subzone (2020)	other
+1120	For Testing_need_subzone (2010, 2020)	other
+1121	For Testing_abnormal_parent	other
+1122	For Testing_adjustsecondarystatminvalue(movespeed)	other
+1123	For Testing_UnLockNpcLanguageType	other
+1124	For Testing_BlockTargetSkill_None	other
+1125	For Testing_BlockTargetSkill_Positive	other
+1126	For Testing_BlockTargetSkill_Negative	other
+1127	Changes 9540 to 9542	other
+1128	Changes 9543 to 9544	other
+1132	abnormal effect type = ForceKill Chance 50%	other
+1133	abnormal effect type = ForceKill skill_type Active	other
+1134	abnormal effect type = ForceKill skill_damage_type = Magic	other
+1135	abnormal effect type = ForceKill skill_attribute_type = Fire	other
+1136	abnormal effect type = ForceKill Abrnoaml Effect Type = Stun	other
+1137	abnormal effect type = ForceKill need_condition	other
+1138	abnormal effect type = ForceKillByGetDamage Chance 50%	other
+1139	abnormal effect type = ForceKillByGetDamage skill_type Active	other
+1140	abnormal effect type = ForceKillByGetDamage skill_damage_type = Magic	other
+1141	abnormal effect type = ForceKillByGetDamage skill_attribute_type = Fire	other
+1142	abnormal effect type = ForceKillByGetDamage Abrnoaml Effect Type = Stun	other
+1143	abnormal effect type = ForceKillByGetDamage need_condition	other
+1145	For Testing CastSkillByCaster	other
+1146	For Testing EndCastSkillByCaster	other
+1147	For Testing_Polymorph_PC_Test_01	other
+1148	For Testing_Polymorph_PC_Test_02	other
+1152	For Testing_Polymorph_Ride_Test_01	other
+1153	For Testing_Polymorph_Ride_Test_02	other
+1154	For Testing_Polymorph_Ride_Test_03	other
+1155	For Testing_Polymorph_Ride_Test_04	other
+1156	For Testing_Polymorph_Ride_Test_05	other
+1157	For Testing_Polymorph_Ride_Test_06	other
+1158	For Testing_Polymorph_Ride_Test_07	other
+1161	For Testing_EndCastSkillByCaster (Circle Decal)	other
+1162	HoT if out of combat and HP below 50%	other
+1163	HoT if out of combat or HP below 50%	other
+1164	For Testing_ChangeRelationshipEntity_PC_Darkness_Common	other
+1165	For Testing_StanceMissDamage_level 20	other
+1166	For Testing_ForceMissDamage_level 20	other
+1167	For Testing_ForceMissDamageToCaster_level 20	other
+1168	For Testing_StanceWeaponBlock_level 20	other
+1169	For Testing_StanceShieldBlock_level 20	other
+1174	For Testing_TriggerSkillByAttackAll_value10	other
+1175	For Testing_TriggerSkillByAddAbnormal_value09	other
+1176	For Testing_TriggerSkillByKill_value07	other
+1177	For Testing_ImmuneSkillEffectGroup	other
+1178	For Testing_ImmuneSkillEffectGroup	other
+1179	For Testing_ImmuneSkillEffectGroup	other
+1180	For Testing_ImmuneSkillEffectGroup	other
+1185	For Testing_AddAbnormalByCondition_If 50 or less and has 2001 abnormal, inflicts 5s Stun 10s cooldown	other
+1186	For Testing_Grade 1 TRUE	other
+1187	For Testing_Grade_Upper 3 TRUE	other
+1188	For Testing_Grade_Lower 3 TRUE	other
+1189	For Testing_Grade 1 FALSE	other
+1190	For Testing_Grade_Upper 3 FALSE	other
+1191	For Testing_Grade_Lower 3 FALSE	other
+1192	For Testing_AddAbnormalByCondition_If 50 or less or has 2001 abnormal, inflicts 5s Stun no cooldown	other
+1196	For Testing_ActivateSkill	other
+1198	For Testing_ReverseMove	other
+1700	Extending_Weapon	other
+1701	IgnorePenaltyLoss_Exp_PvP	other
+1702	IgnorePenaltyLoss_Item_PvP	other
+1703	IgnorePenaltyLoss_Exp_PvE	other
+1704	IgnorePenaltyLoss_Item_PvE	other
+1712	Test_IgnoreBackAttack	other
+1713	Test_pc_light_in_map_dark_abnormal	other
+1714	Test_pc_light_in_map_dark_abnormal	other
+1715	Test_AbnormalClear_SkillLevelChange	other
+1722	Test_activateskillByAttackAll	other
+1723	Test_activateskillByAddAbnormal	other
+2001	Collection Effect: Physical Attack	other
+2002	Collection Effect: Magic Attack	other
+2003	Collection Effect: Defense	other
+2004	For Testing Closet_DoT MP Recovery_1	other
+2005	For Testing Closet_DoT MP Recovery_2	other
+2006	For Testing Closet_DoT MP Recovery_3	other
+2007	Collection Effect: Divine Power Regen	other
+2008	For testing aerial combat_Health (MaxHP) increase	other
+3000	Oxygen Deficiency	other
+9106	M3_Test_Lost HP %_EndDamage_AbnormalOwnerStat	other
+9201	For Testing_AdjustMinAddDamage	other
+9202	For Testing_AdjustMaxAddDamage	other
+9203	For Testing_AdjustMinSkillRate	other
+9204	For Testing_AdjustMaxSkillRate	other
+9281	MP 100 Recovery_Self_Abnormal_100% chance_No Growth	other
+9282	MP 100 Recovery_Self_Abnormal_30% chance_No Growth	other
+9283	For Testing_HpBarrier	other
+9297	Reflection condition None, 100% chance, 50% Reflected, Capped at 100	other
+9298	Reflection condition none, 50% chance, 50% Reflected, Capped at 100	other
+9299	Distance condition 1000, 100% chance, 50% Reflected, Capped at 100	other
+9300	100, 102 condition, 100% chance, 50% Reflected, Capped at 100	other
+9301	Abnormal group ID = 100, 100% chance, 50% Reflected, Capped at 100	other
+9302	If Hold, STUN present, 100% chance, 50% Reflected, Capped at 100	other
+9303	If Physical, 100% chance, 50% Reflected, Capped at 100	other
+9304	If Magic, 100% chance, 50% Reflected, Capped at 100	other
+9305	If Fire Skill, 100% chance, 50% Reflected, Capped at 100	other
+9306	If Water or Fire, 100% chance, 50% Reflected, Capped at 100	other
+9307	Damage Reflection_For checking Abnormal conditions_BlockJump	other
+9308	Damage Reflection_For checking Abnormal conditions_BlockFlight	other
+9314	DP Chain Skill_Abnormal for checking Condition	other
+9324	DP Chain Skill_for checking activation abnormal	other
+9569	Test_Dot_NormalCalc_None_None	other
+9570	Test_Dot_NormalCalc_None_Fire	other
+9571	Test_Dot_NormalCalc_Physic_None	other
+9572	Test_Dot_NormalCalc_Magic_None	other
+9593	Test_Fot_Recovers 100 per second, 100% stat ratio, per tick	other
+9594	Test_Fot_Recovers 100 per second, 100% stat ratio, total amount	other
+9595	Test_Fot_Ratio_Recovers 10% per second, Capped at 300, 100%, per tick	other
+9596	Test_Fot_Ratio_Recovers 10% per second, Capped at 300, 100%, total amount	other
+9597	Test_Fot_Item_Recovers 100 per second, 100% stat ratio, per tick	other
+9598	Test_Fot_Item_Recovers 100 per second, 100% stat ratio, total amount	other
+9599	Test_FotRatio_Item_Recovers 10% per second, Capped at 300, 100%, per tick	other
+9600	Test_FotRatio_Item_Recovers 10% per second, Capped at 300, 100%, total amount	other
+9602	For testing ConvertDamageToHpHeal_no condition	other
+9603	For testing ConvertDamageToHpHeal_range condition_1000 / 500	other
+9604	For testing ConvertDamageToHpHeal_abnormal id condition_9612(BlockJump)	other
+9605	For testing ConvertDamageToHpHeal_abnormal group id condition_9612, 9613	other
+9606	For testing ConvertDamageToHpHeal_abnormal effect type condition_BlockJump, BlockGlide	other
+9607	For testing ConvertDamageToHpHeal_skill damage type condition_Physic	other
+9608	For testing ConvertDamageToHpHeal_skill damage type condition_Magic	other
+9609	For testing ConvertDamageToHpHeal_skill attribute type condition_Fire / Water	other
+9610	For testing ConvertDamageToHpHeal_range+BlockJump+Physic+Fire	other
+9611	For testing ConvertDamageToHpHeal_range+BlockGlide+Magic+Water	other
+9612	For testing ConvertDamageToHpHeal_BlockJump	other
+9613	For testing ConvertDamageToHpHeal_BlockGlide	other
+9614	For Testing NPC_Interaction	other
+9619	Lower Abyss Reshanta	other
+9622	Test_SkillStart_None_3	other
+9623	Test_SkillStart_None_1_Positive	other
+9624	Test_SkillStart_None_1_Item	other
+9625	Test_SkillUse_55100,55200,55300_3	other
+9626	Test_SkillUse_None_1	other
+9627	Test_SkillUse_None_1_Positive	other
+9628	Test_SkillUse_None_1_Item	other
+9630	FXFor Testing Physical Attack increase Replace	other
+9631	FXFor Testing Physical Attack increase Stack	other
+9632	Test_KillZone	other
+9635	Test _BeamPierce	other
+9637	Stealth	other
+9639	Middle Abyss Reshanta	other
+9642	Middle Abyss Reshanta	other
+9643	Lower Abyss Reshanta	other
+9644	Abyss Corridor	other
+9645	Abyss Corridor	other
+9646	Healing Reduction	other
+9695	Rift Updraft	other
+9696	Outer Abyss Reshanta	other
+9721	Outer Abyss Reshanta	other
+10000	Account Security	other
+10001	Rest	other
+10004	PC Cafe Premium Benefits	other
+10011	Tempered Soul	other
+10013	Tempered Soul	other
+10014	Spacetime Guardian Level 1	other
+10015	Spacetime Disruptor Level 1	other
+10016	Spacetime Guardian Level 2	other
+10017	Spacetime Disruptor Level 2	other
+10019	Sprout Daeva Buff	other
+10021	Team Blue Resurrection Base	other
+10022	Team Red Resurrection Base	other
+19001	Mortality Debuff	other
+19002	Item Drop and Obtain Restriction	other
+20001	Ariel's Rage	other
+20002	Ariel's Revenge	other
+20003	Azphel's Rage	other
+20004	Azphel's Revenge	other
+20005	Ariel's Punishment	other
+20006	Azphel's Punishment	other
+20013	Wraith's Curse	other
+20014	Dredgion Shield Wave	other
+20015	Fire Aura	other
+20016	Water Aura	other
+20017	Earth Aura	other
+20018	Wind Aura	other
+20020	Communication Tower Interference	other
+21001	[Lower Abyss] Abyssal Attunement I	other
+21002	[Lower Abyss] Abyssal Attunement II	other
+21003	[Lower Abyss] Abyssal Attunement III	other
+21004	[Lower Abyss] Abyssal Attunement IV	other
+21005	[Lower Abyss] Abyssal Attunement V	other
+21011	[Lower Abyss] Will to Fight I	other
+21012	[Lower Abyss] Will to Fight II	other
+21013	[Lower Abyss] Will to Fight III	other
+22001	[Middle Abyss] Abyssal Attunement I	other
+22002	[Middle Abyss] Abyssal Attunement II	other
+22003	[Middle Abyss] Abyssal Attunement III	other
+22004	[Middle Abyss] Abyssal Attunement IV	other
+22005	[Middle Abyss] Abyssal Attunement V	other
+22011	[Middle Abyss] Will to Fight I	other
+22012	[Middle Abyss] Will to Fight II	other
+22013	[Middle Abyss] Will to Fight III	other
+23001	Truce	other
+23002	Truce	other
+30011	Equip Mushroom Transformation Bomb	other
+30012	Equip Strong Damage Bomb	other
+30013	Equip Invincibility Bomb	other
+30014	Invincible	other
+30015	Fungie Transformation	other
+30016	Attack Increase	other
+30017	Attack Speed Increase	other
+30018	Increases Cooldown Reduction	other
+30019	Defense Increase	other
+30034	Flag Weight	other
+30035	Flag Weight	other
+30041	Reduces Frost and PvP Damage Tolerance	other
+30046	Move Speed Increase	other
+50101	Transform: Guardian Lord I	other
+50201	Transform: Guardian Lord II	other
+50301	Transform: Guardian Lord III	other
+52101	Abyssal Reflection Barrier I	other
+52201	Abyssal Reflection Barrier II	other
+53101	Stun	other
+150020	Stagger	other
+150060	Stiff	other
+150081	Restrain	other
+150083	Restrain	other
+150150	Silence	other
+150160	Fear	other
+160013	Knockdown	other
+160023	Knockdown	other
+160033	Knockdown	other
+160053	Knockdown	other
+170001	Verified Daeva	other
+170002	Unverified Daeva	other
+200000	Damage over Time and Stats reduction (Unused)	other
+200010	Wrath of the Earth (Unused)	other
+200020	Fire Damage over Time (Unused)	other
+200040	Light of Regeneration (Unused)	other
+1003901	Spirit Summon Skill Damage Increase	other
+1004901	Jointstrike Damage Increase	other
+1005001	Earth Chain	other
+1005301	Earth Chain	other
+1006001	Lethargy	other
+1006301	Lethargy	other
+1009001	Magic Backflow	other
+1009201	Magic Backflow	other
+1016001	Spirit Protection: Fire Spirit	other
+1016002	Spirit Protection: Water Spirit	other
+1016003	Spirit Protection: Wind Spirit	other
+1016004	Spirit Protection: Earth Spirit	other
+1016005	Spirit Protection: Ancient Spirit	other
+1016201	Spirit Protection: Fire Spirit	other
+1016202	Spirit Protection: Water Spirit	other
+1016203	Spirit Protection: Wind Spirit	other
+1016204	Spirit Protection: Earth Spirit	other
+1016205	Spirit Protection: Ancient Spirit	other
+1018001	Spirit Momentum	other
+1018002	Spirit Momentum	other
+1018003	Spirit Momentum	other
+1018004	Spirit Momentum	other
+1018005	Spirit Momentum	other
+1018006	Spirit Momentum	other
+1018101	Spirit Momentum	other
+1018102	Spirit Momentum	other
+1018103	Spirit Momentum	other
+1018104	Spirit Momentum	other
+1018105	Spirit Momentum	other
+1018106	Spirit Momentum	other
+1018201	Spirit Momentum	other
+1018202	Spirit Momentum	other
+1018203	Spirit Momentum	other
+1018204	Spirit Momentum	other
+1018205	Spirit Momentum	other
+1018206	Spirit Momentum	other
+1018301	Spirit Momentum	other
+1018302	Spirit Momentum	other
+1018303	Spirit Momentum	other
+1018304	Spirit Momentum	other
+1018305	Spirit Momentum	other
+1018306	Spirit Momentum	other
+1018401	Spirit Momentum	other
+1018402	Spirit Momentum	other
+1018403	Spirit Momentum	other
+1018404	Spirit Momentum	other
+1018405	Spirit Momentum	other
+1018406	Spirit Momentum	other
+1018501	Spirit Momentum	other
+1018502	Spirit Momentum	other
+1018503	Spirit Momentum	other
+1018504	Spirit Momentum	other
+1018505	Spirit Momentum	other
+1018506	Spirit Momentum	other
+1018601	Spirit Momentum	other
+1018602	Spirit Momentum	other
+1018603	Spirit Momentum	other
+1018604	Spirit Momentum	other
+1018605	Spirit Momentum	other
+1018606	Spirit Momentum	other
+1019001	Spirit Armor	other
+1019002	Spirit Armor	other
+1019003	Spirit Armor	other
+1019004	Spirit Armor	other
+1019005	Spirit Armor	other
+1019006	Spirit Armor	other
+1019101	Spirit Armor	other
+1019102	Spirit Armor	other
+1019103	Spirit Armor	other
+1019104	Spirit Armor	other
+1019105	Spirit Armor	other
+1019106	Spirit Armor	other
+1019201	Spirit Armor	other
+1019202	Spirit Armor	other
+1019203	Spirit Armor	other
+1019204	Spirit Armor	other
+1019205	Spirit Armor	other
+1019206	Spirit Armor	other
+1019401	Spirit Armor	other
+1019402	Spirit Armor	other
+1019403	Spirit Armor	other
+1019404	Spirit Armor	other
+1019405	Spirit Armor	other
+1019406	Spirit Armor	other
+9000100	Transform: Guardian Lord I	other
+10000001	Incapacitated Immunity	other
+10000002	Stagger	other
+10000004	Focused Eye	other
+10000008	Frenzy	other
+10000015	Frenzy	other
+10000016	Frenzy	other
+10000052	Stagger	other
+10000054	Lifesteal Resist	other
+10000100	Root	other
+10000101	Protective Shield	other
+10003701	Ensnaring Trap	other
+10010701	Power of the Storm	other
+10011851	Knockdown	other
+10012401	Zikel's Blessing	other
+10012501	Stun	other
+10012801	Combustion	other
+10013001	Light of Regeneration	other
+10013901	Snare	other
+11000201	Defense Reduction	other
+12000001	Stun	other
+12000002	Stun	other
+12000011	Flight Disabled	other
+12000021	Hold	other
+12000041	Sleep	other
+12000051	Paralyze	other
+12000061	Physical Attack Increase	other
+12000062	Magic Attack Increase	other
+12000063	Attack Increase	other
+12000064	Watch	other
+12000101	Poison	other
+12000111	Bleed	other
+12000121	Burn	other
+12000131	Krall Transformation	other
+12000141	Poison	other
+12000151	Bleed	other
+12000161	Burn	other
+12000171	Slow	other
+12000172	Slow	other
+12000173	Slow	other
+12000174	Slow	other
+12000175	Slow	other
+12000181	Poison	other
+12000191	Bleed	other
+12000201	Burn	other
+12000211	Physical Defense Reduction	other
+12000212	Magic Defense reduction	other
+12000221	Silence	other
+12000261	Lower Reshanta Artifact I	other
+12000262	Lower Reshanta Artifact II	other
+12000263	Lower Reshanta Artifact III	other
+12000264	Middle Reshanta Artifact I	other
+12000265	Middle Reshanta Artifact II	other
+12000266	Middle Reshanta Artifact III	other
+12000267	Lower Reshanta Artifact I	other
+12000268	Lower Reshanta Artifact I	other
+12000269	Lower Reshanta Artifact I	other
+12000270	Lower Reshanta Artifact I	other
+12000281	Physical Critical Hit increase	other
+12000282	Magic Critical Hit increase	other
+12000301	Knockdown	other
+12000302	Knockdown	other
+12000311	Knockdown	other
+12000312	Knockdown	other
+12000321	Knockdown	other
+12000322	Knockdown	other
+12000331	Knockdown	other
+12000332	Knockdown	other
+12000341	Knockdown	other
+12000342	Knockdown	other
+12000351	Knockdown	other
+12000352	Knockdown	other
+12000361	Knockdown	other
+12000362	Knockdown	other
+12000401	Invincible	other
+12000402	Invincible	other
+12000403	Invincible	other
+12000431	Damage Reflection	other
+12000432	Damage Reflection	other
+12000433	Damage Reflection	other
+12000441	Damage Reflection	other
+12000442	Damage Reflection	other
+12000443	Damage Reflection	other
+12000461	Fear	other
+12000462	Fear	other
+12000471	Bubble Prison	other
+12000473	Humidity	other
+12000474	Strong Humidity	other
+12000475	Bubble Prison	other
+12000500	Confusion	other
+12000521	Debilitate	other
+12000526	Indomitable	other
+12000527	Indomitable	other
+12000528	Indomitable	other
+12000529	Indomitable	other
+12000530	Indomitable	other
+12000531	Indomitable	other
+12000532	Destroy Armor	other
+12000540	Debilitate	other
+12000550	Bleed	other
+12000551	Bleed	other
+12000561	Allure	other
+12000570	Slow	other
+12000580	Poison	other
+12000600	Watch	other
+12000601	Watch	other
+12000602	Watch	other
+12000603	Watch	other
+12000604	Watch	other
+12000605	Watch	other
+12000606	Watch	other
+12000607	Watch	other
+12154211	Physical Critical Hit increase	other
+12154701	Attack Speed Increase	other
+12155331	Physical Defense Increase	other
+12155801	Physical Defense Increase	other
+12155911	Damage Absorption	other
+12156211	Knock Back	other
+12156511	Physical Defense Increase	other
+12157501	Attack Speed Increase	other
+12159201	Restore HP	other
+12159601	Physical Attack Increase	other
+12160201	Taunt	other
+12160801	Instant Heal	other
+12161301	Polymorph: Fungie	other
+12161302	Restore HP	other
+12162311	Damage Absorption	other
+12163361	HP Recovery Reduction	other
+12163711	Attack Speed Increase	other
+12164901	Attack Speed Increase	other
+12165201	Knockdown	other
+12165801	Attack Speed Increase	other
+12166501	Physical Attack Increase	other
+12167001	Physical Defense Increase	other
+12167401	Physical Attack Increase	other
+12167801	Damage Absorption	other
+12168201	Attack Speed Increase	other
+12169001	Physical Attack Increase	other
+12170501	Damage Absorption	other
+12170901	Physical Attack Increase	other
+12171301	Physical Defense Increase	other
+12171701	Magic Attack Increase	other
+12171901	Attack Speed Increase	other
+12172401	Physical Defense Reduction	other
+12172701	Slow	other
+12172901	Magic Attack Increase	other
+12173501	Damage Absorption	other
+12173701	Instant Heal	other
+12173801	Instant Heal	other
+12173901	Damage Absorption	other
+12174001	Damage Absorption	other
+12176401	Shield Defense	other
+12176402	Restore HP	other
+12179501	Push	other
+12180401	Physical Defense Reduction	other
+12181101	Protective Shield	other
+12182501	Attack Speed Increase	other
+12182901	Attack Speed Increase	other
+12183201	Physical Defense Reduction	other
+12183401	Knockdown	other
+12183601	Damage Absorption	other
+12184501	Physical Attack Increase	other
+12184901	Magic Attack Increase	other
+12186311	Slow	other
+12187051	Saraswati's Grip	other
+12187301	Abyss Affiliate	other
+12187451	Attack Enhancement and Healing	other
+12187601	Lively Energy	other
+12188201	Slow	other
+12188401	Push	other
+12188601	Knockdown	other
+12190401	Lifesteal Buff	other
+12195801	Slow	other
+12196001	Push	other
+12196201	Flight Disabled	other
+12199111	Knockdown	other
+12199701	Push	other
+12199811	Knockdown	other
+12200001	Move Speed and Attack Speed Increase	other
+12200501	Move Speed Reduction	other
+12201301	Heal Block	other
+12202701	Slow	other
+12203801	Push	other
+12204001	Knockdown	other
+12206101	Slow	other
+12206901	Instant Heal	other
+12210401	Rampage	other
+12210801	Wood Vines	other
+12211011	Knockdown	other
+12213901	Damage Absorption	other
+12214101	Hold	other
+12214401	Knockdown	other
+12214800	On the Run!	other
+12227601	Move Speed Reduction	other
+12230701	Damage Absorption	other
+12233601	Knock Back	other
+12235401	Move Speed Increase	other
+12242801	Comrade in Arms	other
+12242901	Push	other
+12243601	Longing	other
+12248901	Attack Speed Increase	other
+12251401	Move Speed and Attack Speed Increase	other
+12251801	Knock Back	other
+12251903	Knockdown	other
+12253901	Slow	other
+12255901	Knockdown	other
+12256401	Wrath	other
+12258401	Hard Shell	other
+12259501	Knockdown	other
+12263102	Knockdown	other
+12265701	Domination Stone	other
+12265901	Knockdown	other
+12267101	Attack Speed and Move Speed Increase	other
+12270501	Damage Reflection	other
+12270502	Damage Reflection	other
+12272201	Knockdown	other
+12272651	Necropolis Mist	other
+12277502	Knockdown	other
+12279101	Attack Speed Increase	other
+12281101	Protective Shield	other
+12282901	Knockdown	other
+12283501	Knockdown	other
+12283801	Comrade in Arms	other
+12285400	Focused Eye	other
+12286602	Move Speed Reduction	other
+12286702	Knockdown	other
+12288501	Restore HP	other
+12288601	Defense Increase	other
+12288701	Attack Increase	other
+12299701	Damage Absorption	other
+12299801	Damage Absorption	other
+12300701	Detect Blood	other
+12301001	Knockdown	other
+12306001	Knockdown	other
+12307701	Move Speed Increase	other
+12314601	Knock Back	other
+12335201	Knockdown	other
+12340101	Knockdown	other
+12340201	Fafnite Fury	other
+12340402	Knockdown	other
+12340902	Knockdown	other
+12353202	Knockdown	other
+12353301	Ice Chain	other
+12357101	Airborne	other
+12367001	Balaur Worship Totem	other
+12374101	Flight Speed Reduction	other
+12381101	Phantasmal Domination	other
+12383801	Wood Vines	other
+12385501	Ancient Enhance Connection Medium	other
+12385601	Ancient Enhance Connection Medium	other
+12385701	Ancient Enhance Connection Medium	other
+12390901	Veil Jewel	other
+12390903	Veil Jewel	other
+12391851	Poison Burst	other
+12396701	Nonsynonymous Unity	other
+12402701	Nonsynonymous Unity	other
+12402802	Slow	other
+12403611	Indomitable	other
+12407401	Damage Reflection	other
+12415201	Fafnite Fury	other
+12424302	Stun	other
+12427652	Combat Speed, Damage Boost, Damage Tolerance Reduction	other
+12427653	Combat Speed, Damage Boost, Damage Tolerance Increase	other
+12428602	Defense Reduction	other
+12430701	Isolation Zone	other
+12433103	Courtship Dance	other
+12434201	Azure Breath	other
+12439101	Hard Shell	other
+12441401	Lepharist Rooting Device	other
+12441501	Lepharist Rooting Device	other
+12461301	Domination Stone	other
+12464602	Petrify	other
+15002001	Contamination	other
+15002602	Knockdown	other
+15003201	Poison	other
+15007903	Poison	other
+15013901	Knockdown	other
+15014601	Ice Chain	other
+15015205	Nornir's Petrification	other
+15015302	Knockdown	other
+15015901	Knockdown	other
+15016301	Move Speed Reduction	other
+15018251	Phernos's Bulwark	other
+15018403	Frost	other
+15024401	Slow	other
+15024701	Knockdown	other
+15043904	Slow	other
+15044001	Knockdown	other
+15044301	Move Speed Reduction	other
+15044311	Final Execution	other
+15044501	Counterstrike Stance	other
+15044522	Fierce Attack Stance	other
+15044711	Knockdown	other
+15044801	Knockdown	other
+15045001	Knock Back	other
+15045051	Knockdown	other
+15045103	Slow	other
+15045201	Knockdown	other
+16000711	Knockdown	other
+16001702	Knockdown	other
+16003001	Odyle Aura	other
+16003311	Knockdown	other
+16003401	Knockdown	other
+16004201	Knockdown	other
+16004901	Skill Immunity	other
+16007351	Knockdown	other
+16008401	Delayed Explosion	other
+16008701	Auldor's Energy	other
+16009201	Airborne	other
+16009603	Knockdown	other
+16010301	Knockdown	other
+16010302	Watch	other
+16011102	Knockdown	other
+16011502	Stun	other
+16012100	Skill Immunity	other
+16012105	Skill Immunity	other
+16013201	Sticky Poison Blood	other
+16013702	Knockdown	other
+16015051	Trace of Sacrifice	other
+16015201	Knockdown	other
+16015401	Magic Overload	other
+16018351	Defense Reduction	other
+16018601	Fafnite's Frenzy	other
+16021201	Bleed	other
+16021921	Airborne	other
+16022101	Knockdown	other
+16022901	Knockdown	other
+16026501	Knockdown	other
+16026801	Airborne	other
+16026901	Knockdown	other
+16031502	Airborne	other
+16031602	Knockdown	other
+16031603	Knockdown	other
+16032001	Push	other
+16032201	Slow	other
+16034101	Debuff	other
+16034201	Slow	other
+16036001	Damage Absorption	other
+16036006	Odyle Aura	other
+16040101	Wood Vines	other
+16040401	Knockdown	other
+16042604	Knockdown	other
+16042606	Devour	other
+16043308	No Gliding Zone	other
+16043352	Fear	other
+16043701	Keen Restraint	other
+16043811	Metastasis Explosion	other
+16043821	Toxic Metastasis Explosion	other
+16044811	Isolation Zone	other
+16046601	Cry of Life	other
+16046701	Mysterious Roar	other
+16047201	Petrification of Death	other
+16049701	Curse of Lightning	other
+16050501	Curse of Lightning	other
+16051102	Wrath	other
+16051103	Contamination	other
+16053712	Burning Rage Energy	other
+16053713	Burning Rage Energy	other
+16053714	Tenebrous Abyssal Energy	other
+16053715	Tenebrous Abyssal Energy	other
+16053771	Burning Rage Energy	other
+16053772	Tenebrous Abyssal Energy	other
+16056701	High Voltage Electric Current Zone	other
+16059101	Damage Reflection	other
+16059301	Phantasmal Domination	other
+16059602	Slow	other
+16059801	Comrade in Arms	other
+16060402	Slow	other
+16060900	Watch	other
+16060902	Chain of Torment	other
+16061151	Watch	other
+16061152	Watch	other
+16063724	Condensed Lightning	other
+16065601	Airborne	other
+16068705	Lightning Steps	other
+16069501	Watch	other
+16069603	Soul Hunter	other
+16070104	Kindred Power	other
+16070701	Illusionary Corrosion	other
+16071701	Decaying Poison	other
+16079101	Green Spores	other
+16079301	Red Spores	other
+16079303	Spore Poison	other
+16079304	Spore Rampage	other
+16081205	Lover's Bond	other
+16081206	Lover's Bond	other
+16081207	Lover's Bond	other
+16081208	Lover's Bond	other
+16081451	Rooted Desire	other
+16081461	Rooted Desire	other
+16081471	Rooted Desire	other
+16081481	Rooted Desire	other
+16081491	Rooted Desire	other
+16089700	Electrocution	other
+16089701	Damage Tolerance Reduction	other
+16094401	Poison	other
+16094403	Poison Explosion	other
+16094406	Airborne	other
+16099101	Damage Tolerance Reduction	other
+16099202	Invincible	other
+16100811	Isolation Zone	other
+18000401	Flight Disabled	other
+18000402	Knock Back	other
+18000403	Stun	other
+18000552	Earth Movement	other
+18001302	Knockdown	other
+18002401	Protective Shield	other
+18004001	Defense Reduction	other
+18006921	Courtship Dance	other
+18011901	Invincible	other
+18014101	No Gliding Zone	other
+18014501	Root	other
+18014621	Nonsynonymous Unity	other
+18015002	Grab	other
+18016900	Surface Refraction	other
+18016960	Surface Refraction	other
+18017003	Mist Orb	other
+18017006	Mist Strength	other
+18017011	Mist Absorption	other
+18017103	Water Orb	other
+18017106	Power of Water	other
+18017805	Crystal Prison	other
+18018601	Breaking Will	other
+18018924	Invincible	other
+18019341	Watch	other
+18019421	Abyss Servant	other
+18020001	Prey	other
+18020003	Ruptured Prey	other
+18020004	Hunt Mark	other
+18021301	Watch	other
+18021302	Watch	other
+18022001	Bleed	other
+18022801	Magic Barrier	other
+18022901	Magic Barrier	other
+18023001	Magic Barrier	other
+18023101	Magic Barrier	other
+18025002	Debilitate	other
+18025401	Debuff	other
+18025501	Slow	other
+18026101	Nonsynonymous Unity	other
+18027101	Abyss Corrosion	other
+18027191	Disassemble Physique	other
+18032001	Ludra's Curse	other
+18032014	Abyss Servant	other
+18034001	Chaos Aura	other
+18034002	Despairing Aura	other
+18034003	Mark of Extinction	other
+18034004	Mark of Extinction	other
+18034006	Chaos Aura	other
+18034008	Chaos Aura	other
+18034010	Chaos Aura	other
+18034012	Chaos Aura	other
+18034104	Invincible	other
+18034105	Invincible	other
+18034505	Eternal Flow	other
+18036008	For Testing Polymorph that transforms into the caster's skin	other
+18036200	Tranquil Soul	other
+18036204	Soul Corrosion	other
+18036604	Burn	other
+18036701	Knockback	other
+18037202	Knockdown	other
+18037901	Knockdown	other
+18040702	Knockdown	other
+18040802	Knockdown	other
+18041001	Watch	other
+18041251	Armor Break	other
+18041252	Armor Break	other
+18041401	Crimson Barrier of Condemnation	other
+18041501	Azure Barrier of Judgment	other
+18042111	Root	other
+18044003	Contamination	other
+18044203	Slime Area	other
+18044204	Slime Remnants	other
+18045104	Deep Wound	other
+18045201	Watch	other
+18045551	Root	other
+18045553	Poison	other
+18045554	Powerful Poison	other
+18045557	Poison	other
+18045558	Root	other
+18045559	Consuming Tentacle	other
+18045905	Saraswati's Grip	other
+18046301	Distorted Wave of Life	other
+18047000	Poison Corrosion	other
+18048901	Damage Tolerance Reduction	other
+18053708	Indomitable	other
+18053709	Illusion Infiltrate	other
+18055010	Indomitable	other
+18055013	Transferred Light	other
+18057011	Slow	other
+18057301	Blind	other
+18058242	Absorb Venom Sphere	other
+18058265	Venom Corrosion	other
+18058305	Slow	other
+18058501	Waste Cover	other
+18058651	Watch	other
+18058660	Damage Tolerance Reduction	other
+18060802	Azure Lightning Wave	other
+18061201	Airborne	other
+18064908	Disappeared Resurrection Aura	other
+18064910	Watch	other
+18064911	Watch	other
+18064951	Fire Aura	other
+18064952	Creeping Hellfire	other
+18064961	Still Air	other
+18065601	Mark of Hellfire	other
+18066101	Watch	other
+18066102	Watch	other
+18066201	Unbearable Heat	other
+18066502	Watch	other
+18066901	Scorching Flames	other
+18067410	Burn	other
+18067411	Burn	other
+18069201	Damage Tolerance Reduction	other
+18070108	Seal	other
+18070113	Watch	other
+18070114	Watch	other
+18071422	Escaping Desire	other
+18071423	Damage Tolerance Reduction	other
+18072006	Lovesick	other
+18082081	Knock Back	other
+18082082	Knock Back	other
+18085001	Scapegoat	other
+18085003	Ruptured Scapegoat	other
+18085004	Hunt Mark	other
+18085013	Hunt Mark	other
+18085014	Damage Tolerance Reduction	other
+18085016	Watch	other
+18086301	Watch	other
+18086302	Watch	other
+18088000	Corrupted Daeva	other
+18088005	Judged Daeva	other
+18088010	Corruption	other
+18088015	Judgment	other
+18088090	Rift	other
+18088551	Airborne	other
+18088601	Knockdown	other
+18088809	Suppressed Sword Aura	other
+18089005	Absorb Judgment	other
+18089151	Knock Back	other
+18091552	Invincible	other
+18091562	Invincible	other
+18091572	Invincible	other
+18092804	No Gliding Zone	other
+18093101	Root	other
+18093321	Nonsynonymous Unity	other
+18093702	Grab	other
+18094801	Nonsynonymous Unity	other
+18097211	Magically Engineered Bomb	other
+18097702	Roar	other
+18098301	Mark of Hellfire	other
+18099701	Keen Restraint	other
+18099811	Metastasis Explosion	other
+18099821	Toxic Metastasis Explosion	other
+19000000	Still Air	other
+19000001	Still Air	other
+19000002	Fall to Death	other
+19000003	Poison	other
+19000008	Burn	other
+19000009	Poison	other
+19000010	Flight Circle	other
+19000011	Odyle Flight Frenzy	other
+19000014	Odyle Drop	other
+19000017	Move Speed Increase	other
+19000018	No Gliding Zone	other
+19000019	50 Points	other
+19000020	80 Points	other
+19000021	200 Points	other
+19000022	50 Points	other
+19000023	80 Points	other
+19000024	200 Points	other
+19000025	50 Points	other
+19000026	80 Points	other
+19000027	200 Points	other
+19000028	Flight Power Regen	other
+19000030	Move Speed Increase	other
+19000031	Slow	other
+19000033	Move Speed Increase	other
+19000034	Invincible Sprint	other
+19000035	Move Speed Increase	other
+19000036	Slow	other
+19000037	Recharge Shugo Trap	other
+19000038	Defective Odyle	other
+19000039	Slow	other
+19000044	Slow	other
+19000053	Fear	other
+19000055	Invincible	other
+19000060	Flight Stamina Full	other
+19000061	Arena's tense atmosphere	other
+19000064	Flight Circle	other
+19000066	Flight Power Regen	other
+19000067	Disappeared Resurrection Aura	other
+19000071	Still Air	other
+19000072	Encircling Tide	other
+19000074	Still Air	other
+19000078	Poison	other
+19000079	Still Air	other
+19000080	Vitality Depletion	other
+19000081	Poison	other
+19000083	Causational Balance	other
+19000087	Burn	other
+19000096	Dissipation of Power	other
+19003001	Slayer	other
+19003011	Guardian	other
+19003021	Targeting Weakness	other
+19003031	Adrenaline	other
+19003041	Footwork	other
+19003051	Poisoned by Mana	other
+19003061	Predator	other
+19003105	Ignoring the Weak	other
+19003115	Worm Carnage	other
+19003125	Fire Moth	other
+19003135	Ignoring the Elite	other
+19003145	Elite Hunter	other
+19003301	Move Speed Increase	other
+19004201	Poison	other
+19004211	Blowback	other
+19004221	Duration	other
+19004261	Curse	other
+19004271	Debilitate	other
+19004281	Weakness	other
+19004291	Distrust	other
+19004401	Tolerance	other
+19004411	Tailwind	other
+19004421	Flux	other
+19004431	Enhance	other
+19004441	Discipline	other
+19004451	Heal	other
+19004461	Blind Faith	other
+19004471	Gust	other
+19004481	Advent	other
+19004482	Advent	other
+19004491	Lifesteal	other
+19004501	Health	other
+19004511	Shield	other
+19004512	Shield	other
+19004521	Wrath	other
+19004531	Barrier	other
+19004541	Enhance I	other
+19004542	Enhance II	other
+19004543	Enhance III	other
+19004551	Discipline I	other
+19004552	Discipline II	other
+19004553	Discipline III	other
+19005000	Root	other
+19005001	Lightning Speed	other
+19005011	Nimble	other
+19005021	Wind	other
+19005031	Artisan	other
+19005041	Hawk Eye	other
+19005051	Battle Joy	other
+19005055	Battle Joy	other
+19005061	Weaken Defense	other
+19005071	Wrath	other
+19005081	Keen	other
+19005091	Double Strike	other
+19005095	Double Strike	other
+19005101	Critical Strike	other
+19005105	Critical Strike	other
+19005111	Fortress	other
+19005121	Reinforce	other
+19005131	Expert Healer	other
+19005141	Recovery Flask	other
+19005151	Protection	other
+19005202	Wrath	other
+19005302	Elevation	other
+19006001	Weaken Attack	other
+19006011	Expose Weakness	other
+19006021	Energy Decay	other
+19006101	Wrath	other
+19007001	Still Air	other
+19007002	Watching State	other
+19007004	Keen Restraint	other
+19007007	Still Air	other
+19008001	Azure Breath Forest Monster Buff (Temp Name)	other
+19010102	Shockwave	other
+19100911	Petrify	other
+19101002	Poison	other
+19101101	Venom	other
+19102702	Wrath	other
+19102802	Elevation	other
+19102902	Balance	other
+19103502	Judgment	other
+19104002	Enhance	other
+19104501	Petrify	other
+19105002	Slow	other
+19105012	Slow	other
+19105021	Protection	other
+19105031	Stolen Power of Rage	other
+19105041	Stolen Power of Patience	other
+19105051	Stolen Power of Knowledge	other
+19105102	Tolerance	other
+19105302	Vitality Depletion	other
+19105312	Vitality Depletion	other
+19105322	Vitality Depletion	other
+19105332	Vitality Depletion	other
+19105342	Vitality Depletion	other
+19105352	Vitality Depletion	other
+19105362	Vitality Depletion	other
+19105372	Vitality Depletion	other
+19105382	Vitality Depletion	other
+19801102	Time Vortex	other
+19802651	Invincible	other
+19804201	Restore HP	other
+19804202	Defense Increase	other
+19804203	Attack Increase	other
+19806011	Phantasmal Domination	other
+19990004	Nornir's Petrification	other
+19990027	Slow	other
+19991102	Betrayal	other
+19991103	Shudder	other
+19991402	Petrify	other
+19992102	Vitality Depletion	other
+19992112	Vitality Depletion	other
+19992122	Vitality Depletion	other
+19992132	Vitality Depletion	other
+19992145	Frenzy	other
+19992146	Frenzy I	other
+19992147	Frenzy II	other
+19992148	Frenzy III	other
+19992152	Afterimage	other
+19992153	Afterimage	other
+19992502	Residual Lightning	other
+19992652	Barrage	other
+19992660	Max HP Increase	other
+19992902	Ascension	other
+19993202	Roar	other
+19993411	Enhanced Boss Level 1	other
+19993511	Enhanced Boss Level 2	other
+19993611	Enhanced Boss Level 3	other
+19993711	Enhanced Boss Level 4	other
+19993802	Snipe Test Subject	other
+19994002	Snipe Test Subject	other
+19994202	Firebomb Rain	other
+20102051	Mana Flask	item	Icon_Item_Usable_Potion_MP_once_001
+20102061	Superior Mana Flask	item	Icon_Item_Usable_Potion_MP_once_002
+20111011	Life Potion	item	Icon_Item_Usable_Potion_HP_Dot_A_001
+20111021	Superior Life Potion	item	Icon_Item_Usable_Potion_HP_Dot_A_002
+20111031	Life Elixir	item	Icon_Item_Usable_Potion_HP_Dot_a_A_001
+20111041	Superior Life Elixir	item	Icon_Item_Usable_Potion_HP_Dot_a_A_002
+20112011	Mana Potion	item	Icon_Item_Usable_Potion_MP_Dot_A_001
+20112021	Superior Mana Potion	item	Icon_Item_Usable_Potion_MP_Dot_A_002
+21101011	Mela Juice	item	Icon_Item_Usable_Drink_Craft_A_r_001
+21101021	Tasty Mela Juice	item	Icon_Item_Usable_Drink_Craft_A_r_001
+21101031	Artisan's Mela Juice	item	Icon_Item_Usable_Drink_Craft_A_r_001
+21101041	Artisan's Tasty Mela Juice	item	Icon_Item_Usable_Drink_Craft_A_r_001
+21101051	Raydam Juice	item	Icon_Item_Usable_Drink_Craft_A_r_001
+21101061	Tasty Raydam Juice	item	Icon_Item_Usable_Drink_Craft_A_r_001
+21101071	Artisan's Raydam Juice	item	Icon_Item_Usable_Drink_Craft_A_r_001
+21101081	Artisan's Tasty Raydam Juice	item	Icon_Item_Usable_Drink_Craft_A_r_001
+21106011	Coriolus Tea	item	Icon_Item_Usable_Drink_Shop_A_c_002
+21106021	Tasty Coriolus Tea	item	Icon_Item_Usable_Drink_Shop_A_c_002
+21106031	Artisan's Coriolus Tea	item	Icon_Item_Usable_Drink_Shop_A_c_002
+21106041	Artisan's Tasty Coriolus Tea	item	Icon_Item_Usable_Drink_Shop_A_c_002
+21106051	Morfa Tea	item	Icon_Item_Usable_Drink_Shop_A_c_002
+21106061	Tasty Morfa Tea	item	Icon_Item_Usable_Drink_Shop_A_c_002
+21106071	Artisan's Morfa Tea	item	Icon_Item_Usable_Drink_Shop_A_c_002
+21106081	Artisan's Tasty Morfa Tea	item	Icon_Item_Usable_Drink_Shop_A_c_002
+21111011	True Dragon's Fruit Juice	item	Icon_Item_Usable_Drink_Craft_A_c_005
+21111021	True Dragon's Tasty Fruit Juice	item	Icon_Item_Usable_Drink_Craft_A_c_005
+21111031	White Dragon's Fruit Juice	item	Icon_Item_Usable_Drink_Craft_A_c_005
+21111041	White Dragon's Tasty Fruit Juice	item	Icon_Item_Usable_Drink_Craft_A_c_005
+21111051	Wise Dragon's Fruit Juice	item	Icon_Item_Usable_Drink_Craft_A_c_005
+21111061	Wise Dragon's Tasty Fruit Juice	item	Icon_Item_Usable_Drink_Craft_A_c_005
+21111071	Star Dragon's Fruit Juice	item	Icon_Item_Usable_Drink_Craft_A_c_005
+21111081	Star Dragon's Tasty Fruit Juice	item	Icon_Item_Usable_Drink_Craft_A_c_005
+21111091	Dark Dragon's Fruit Juice	item	Icon_Item_Usable_Drink_Craft_A_c_005
+21111101	Dark Dragon's Tasty Fruit Juice	item	Icon_Item_Usable_Drink_Craft_A_c_005
+21111111	Ebony Dragon's Fruit Juice	item	Icon_Item_Usable_Drink_Craft_A_c_005
+21111121	Ebony Dragon's Tasty Fruit Juice	item	Icon_Item_Usable_Drink_Craft_A_c_005
+21116011	True Dragon's Herb Tea	item	Icon_Item_Usable_Drink_Craft_A_c_006
+21116021	True Dragon's Tasty Herb Tea	item	Icon_Item_Usable_Drink_Craft_A_c_006
+21116031	White Dragon's Herb Tea	item	Icon_Item_Usable_Drink_Craft_A_c_006
+21116041	White Dragon's Tasty Herb Tea	item	Icon_Item_Usable_Drink_Craft_A_c_006
+21116051	Wise Dragon's Herb Tea	item	Icon_Item_Usable_Drink_Craft_A_c_006
+21116061	Wise Dragon's Tasty Herb Tea	item	Icon_Item_Usable_Drink_Craft_A_c_006
+21116071	Star Dragon's Herb Tea	item	Icon_Item_Usable_Drink_Craft_A_c_006
+21116081	Star Dragon's Tasty Herb Tea	item	Icon_Item_Usable_Drink_Craft_A_c_006
+21116091	Dark Dragon's Herb Tea	item	Icon_Item_Usable_Drink_Craft_A_c_006
+21116101	Dark Dragon's Tasty Herb Tea	item	Icon_Item_Usable_Drink_Craft_A_c_006
+21116111	Ebony Dragon's Herb Tea	item	Icon_Item_Usable_Drink_Craft_A_c_006
+21116121	Ebony Dragon's Tasty Herb Tea	item	Icon_Item_Usable_Drink_Craft_A_c_006
+21601011	Curry Meat Stirfry	item	Icon_Item_Usable_Food_A_002
+21601021	Tasty Mela Stirfry	item	Icon_Item_Usable_Food_A_002
+21601031	Artisan's Curry Meat Stirfry	item	Icon_Item_Usable_Food_A_002
+21601041	Expert's Tasty Mela Stirfry	item	Icon_Item_Usable_Food_A_002
+21601051	Curry Meat Stirfry	item	Icon_Item_Usable_Food_A_002
+21601061	Tasty Raydam Stirfry	item	Icon_Item_Usable_Food_A_002
+21601071	Artisan's Curry Meat Stirfry	item	Icon_Item_Usable_Food_A_002
+21601081	Expert's Tasty Raydam Stirfry	item	Icon_Item_Usable_Food_A_002
+21604011	Fruit Salad	item	Icon_Item_Usable_Food_Craft_A_c_025
+21604021	Tasty Kukuru Salad	item	Icon_Item_Usable_Food_Craft_A_c_025
+21604031	Artisan's Fruit Salad	item	Icon_Item_Usable_Food_Craft_A_c_025
+21604041	Expert's Tasty Kukuru Salad	item	Icon_Item_Usable_Food_Craft_A_c_025
+21604051	Fruit Salad	item	Icon_Item_Usable_Food_Craft_A_c_025
+21604061	Tasty Ohkra Salad	item	Icon_Item_Usable_Food_Craft_A_c_025
+21604071	Artisan's Fruit Salad	item	Icon_Item_Usable_Food_Craft_A_c_025
+21604081	Expert's Tasty Ohkra Salad	item	Icon_Item_Usable_Food_Craft_A_c_025
+21607011	Steamed Cypri	item	Icon_Item_Usable_Food_Craft_A_r_013
+21607021	Tasty Steamed Coriolus	item	Icon_Item_Usable_Food_Craft_A_r_013
+21607031	Artisan's Steamed Cypri	item	Icon_Item_Usable_Food_Craft_A_r_013
+21607041	Expert's Tasty Steamed Coriolus	item	Icon_Item_Usable_Food_Craft_A_r_013
+21607051	Steamed Pujery	item	Icon_Item_Usable_Food_Craft_A_r_013
+21607061	Tasty Steamed Morfa	item	Icon_Item_Usable_Food_Craft_A_r_013
+21607071	Artisan's Steamed Pujery	item	Icon_Item_Usable_Food_Craft_A_r_013
+21607081	Expert's Tasty Steamed Morfa	item	Icon_Item_Usable_Food_Craft_A_r_013
+21610011	Kukuru Fried Meat	item	Icon_Item_Usable_Food_A_003
+21610021	Tasty Fried Cypri	item	Icon_Item_Usable_Food_A_003
+21610031	Artisan's Kukuru Fried Meat	item	Icon_Item_Usable_Food_A_003
+21610041	Expert's Tasty Fried Cypri	item	Icon_Item_Usable_Food_A_003
+21610051	Ohkra Fried Meat	item	Icon_Item_Usable_Food_A_003
+21610061	Tasty Fried Pujery	item	Icon_Item_Usable_Food_A_003
+21610071	Artisan's Ohkra Fried Meat	item	Icon_Item_Usable_Food_A_003
+21610081	Expert's Tasty Fried Pujery	item	Icon_Item_Usable_Food_A_003
+21613011	Grilled Cypri	item	Icon_Item_Usable_Food_A_001
+21613021	Tasty Roasted Inina	item	Icon_Item_Usable_Food_A_001
+21613031	Artisan's Grilled Cypri	item	Icon_Item_Usable_Food_A_001
+21613041	Expert's Tasty Roasted Inina	item	Icon_Item_Usable_Food_A_001
+21613051	Grilled Pujery	item	Icon_Item_Usable_Food_A_001
+21613061	Tasty Grilled Pujery	item	Icon_Item_Usable_Food_A_001
+21613071	Artisan's Grilled Pujery	item	Icon_Item_Usable_Food_A_001
+21613081	Expert's Tasty Grilled Pujery	item	Icon_Item_Usable_Food_A_001
+21616011	Inina Pasta	item	Icon_Item_Usable_Food_A_006
+21616021	Tasty Inina Pasta	item	Icon_Item_Usable_Food_A_006
+21616031	Artisan's Inina Pasta	item	Icon_Item_Usable_Food_A_006
+21616041	Expert's Tasty Inina Pasta	item	Icon_Item_Usable_Food_A_006
+21616051	Conide Pasta	item	Icon_Item_Usable_Food_A_006
+21616061	Tasty Conide Pasta	item	Icon_Item_Usable_Food_A_006
+21616071	Artisan's Conide Pasta	item	Icon_Item_Usable_Food_A_006
+21616081	Expert's Tasty Conide Pasta	item	Icon_Item_Usable_Food_A_006
+21619011	True Dragon's Chopped Steak	item	Icon_Item_Usable_Food_Craft_A_r_005
+21619021	True Dragon's Tasty Chopped Steak	item	Icon_Item_Usable_Food_Craft_A_r_005
+21619031	White Dragon's Chopped Steak	item	Icon_Item_Usable_Food_Craft_A_r_005
+21619041	White Dragon's Tasty Chopped Steak	item	Icon_Item_Usable_Food_Craft_A_r_005
+21619051	Wise Dragon's Chopped Steak	item	Icon_Item_Usable_Food_Craft_A_r_005
+21619061	Wise Dragon's Tasty Chopped Steak	item	Icon_Item_Usable_Food_Craft_A_r_005
+21619071	Star Dragon's Chopped Steak	item	Icon_Item_Usable_Food_Craft_A_r_005
+21619081	Star Dragon's Tasty Chopped Steak	item	Icon_Item_Usable_Food_Craft_A_r_005
+21619091	Dark Dragon's Chopped Steak	item	Icon_Item_Usable_Food_Craft_A_r_005
+21619101	Dark Dragon's Tasty Chopped Steak	item	Icon_Item_Usable_Food_Craft_A_r_005
+21619111	Ebony Dragon's Chopped Steak	item	Icon_Item_Usable_Food_Craft_A_r_005
+21619121	Ebony Dragon's Tasty Chopped Steak	item	Icon_Item_Usable_Food_Craft_A_r_005
+21622011	True Dragon's Salad	item	Icon_Item_Usable_Food_A_008
+21622021	True Dragon's Tasty Salad	item	Icon_Item_Usable_Food_A_008
+21622031	White Dragon's Salad	item	Icon_Item_Usable_Food_A_008
+21622041	White Dragon's Tasty Salad	item	Icon_Item_Usable_Food_A_008
+21622051	Wise Dragon's Salad	item	Icon_Item_Usable_Food_A_008
+21622061	Wise Dragon's Tasty Salad	item	Icon_Item_Usable_Food_A_008
+21622071	Star Dragon's Salad	item	Icon_Item_Usable_Food_A_008
+21622081	Star Dragon's Tasty Salad	item	Icon_Item_Usable_Food_A_008
+21622091	Dark Dragon's Salad	item	Icon_Item_Usable_Food_A_008
+21622101	Dark Dragon's Tasty Salad	item	Icon_Item_Usable_Food_A_008
+21622111	Ebony Dragon's Salad	item	Icon_Item_Usable_Food_A_008
+21622121	Ebony Dragon's Tasty Salad	item	Icon_Item_Usable_Food_A_008
+21625011	True Dragon's Steamed Meat	item	Icon_Item_Usable_Food_Craft_A_c_023
+21625021	True Dragon's Tasty Steamed Meat	item	Icon_Item_Usable_Food_Craft_A_c_023
+21625031	White Dragon's Steamed Meat	item	Icon_Item_Usable_Food_Craft_A_c_023
+21625041	White Dragon's Tasty Steamed Meat	item	Icon_Item_Usable_Food_Craft_A_c_023
+21625051	Wise Dragon's Steamed Meat	item	Icon_Item_Usable_Food_Craft_A_c_023
+21625061	Wise Dragon's Tasty Steamed Meat	item	Icon_Item_Usable_Food_Craft_A_c_023
+21625071	Star Dragon's Steamed Meat	item	Icon_Item_Usable_Food_Craft_A_c_023
+21625081	Star Dragon's Tasty Steamed Meat	item	Icon_Item_Usable_Food_Craft_A_c_023
+21625091	Dark Dragon's Steamed Meat	item	Icon_Item_Usable_Food_Craft_A_c_023
+21625101	Dark Dragon's Tasty Steamed Meat	item	Icon_Item_Usable_Food_Craft_A_c_023
+21625111	Ebony Dragon's Steamed Meat	item	Icon_Item_Usable_Food_Craft_A_c_023
+21625121	Ebony Dragon's Tasty Steamed Meat	item	Icon_Item_Usable_Food_Craft_A_c_023
+21628011	True Dragon's Beef Wellington	item	Icon_Item_Usable_Food_Craft_A_r_011
+21628021	True Dragon's Tasty Beef Wellington	item	Icon_Item_Usable_Food_Craft_A_r_011
+21628031	White Dragon's Beef Wellington	item	Icon_Item_Usable_Food_Craft_A_r_011
+21628041	White Dragon's Tasty Beef Wellington	item	Icon_Item_Usable_Food_Craft_A_r_011
+21628051	Wise Dragon's Beef Wellington	item	Icon_Item_Usable_Food_Craft_A_r_011
+21628061	Wise Dragon's Tasty Beef Wellington	item	Icon_Item_Usable_Food_Craft_A_r_011
+21628071	Star Dragon's Beef Wellington	item	Icon_Item_Usable_Food_Craft_A_r_011
+21628081	Star Dragon's Tasty Beef Wellington	item	Icon_Item_Usable_Food_Craft_A_r_011
+21628091	Dark Dragon's Beef Wellington	item	Icon_Item_Usable_Food_Craft_A_r_011
+21628101	Dark Dragon's Tasty Beef Wellington	item	Icon_Item_Usable_Food_Craft_A_r_011
+21628111	Ebony Dragon's Beef Wellington	item	Icon_Item_Usable_Food_Craft_A_r_011
+21628121	Ebony Dragon's Tasty Beef Wellington	item	Icon_Item_Usable_Food_Craft_A_r_011
+21631011	True Dragon's Roasted Meat	item	Icon_Item_Usable_Food_Craft_A_r_001
+21631021	True Dragon's Tasty Roasted Meat	item	Icon_Item_Usable_Food_Craft_A_r_001
+21631031	White Dragon's Roasted Meat	item	Icon_Item_Usable_Food_Craft_A_r_001
+21631041	White Dragon's Tasty Roasted Meat	item	Icon_Item_Usable_Food_Craft_A_r_001
+21631051	Wise Dragon's Roasted Meat	item	Icon_Item_Usable_Food_Craft_A_r_001
+21631061	Wise Dragon's Tasty Roasted Meat	item	Icon_Item_Usable_Food_Craft_A_r_001
+21631071	Star Dragon's Roasted Meat	item	Icon_Item_Usable_Food_Craft_A_r_001
+21631081	Star Dragon's Tasty Roasted Meat	item	Icon_Item_Usable_Food_Craft_A_r_001
+21631091	Dark Dragon's Roasted Meat	item	Icon_Item_Usable_Food_Craft_A_r_001
+21631101	Dark Dragon's Tasty Roasted Meat	item	Icon_Item_Usable_Food_Craft_A_r_001
+21631111	Ebony Dragon's Roasted Meat	item	Icon_Item_Usable_Food_Craft_A_r_001
+21631121	Ebony Dragon's Tasty Roasted Meat	item	Icon_Item_Usable_Food_Craft_A_r_001
+21634011	True Dragon's Seafood Pasta	item	Icon_Item_Usable_Food_A_009
+21634021	True Dragon's Tasty Seafood Pasta	item	Icon_Item_Usable_Food_A_009
+21634031	White Dragon's Seafood Pasta	item	Icon_Item_Usable_Food_A_009
+21634041	White Dragon's Tasty Seafood Pasta	item	Icon_Item_Usable_Food_A_009
+21634051	Wise Dragon's Seafood Pasta	item	Icon_Item_Usable_Food_A_009
+21634061	Wise Dragon's Tasty Seafood Pasta	item	Icon_Item_Usable_Food_A_009
+21634071	Star Dragon's Seafood Pasta	item	Icon_Item_Usable_Food_A_009
+21634081	Star Dragon's Tasty Seafood Pasta	item	Icon_Item_Usable_Food_A_009
+21634091	Dark Dragon's Seafood Pasta	item	Icon_Item_Usable_Food_A_009
+21634101	Dark Dragon's Tasty Seafood Pasta	item	Icon_Item_Usable_Food_A_009
+21634111	Ebony Dragon's Seafood Pasta	item	Icon_Item_Usable_Food_A_009
+21634121	Ebony Dragon's Tasty Seafood Pasta	item	Icon_Item_Usable_Food_A_009
+22101011	Tailwind Scroll	item	Icon_Item_Usable_Scroll_FlySpeed_A_002
+22101021	Superior Tailwind Scroll	item	Icon_Item_Usable_Scroll_FlySpeed_A_002
+22101031	Speed Scroll	item	Icon_Item_Usable_Scroll_MoveSpeed_A_001
+22101041	Superior Speed Scroll	item	Icon_Item_Usable_Scroll_MoveSpeed_A_002
+22101051	Courage Scroll	item	Icon_Item_Usable_Scroll_AttackSpeed_A_001
+22101061	Superior Courage Scroll	item	Icon_Item_Usable_Scroll_AttackSpeed_A_002
+22101071	Critical Hit Scroll	item	Icon_Item_Usable_Scroll_Critical_A_002
+22101081	Superior Critical Hit Scroll	item	Icon_Item_Usable_Scroll_Critical_A_002
+22101091	Critical Hit Resist Scroll	item	Icon_Item_Usable_Scroll_CriticalResist_A_002
+22101101	Superior Critical Hit Resist Scroll	item	Icon_Item_Usable_Scroll_CriticalResist_A_002
+22101111	Water Defense Scroll	item	Icon_Item_Usable_Scroll_WaterDamageDefense_A_001
+22101121	Superior Water Defense Scroll	item	Icon_Item_Usable_Scroll_WaterDamageDefense_A_002
+22101131	Fire Defense Scroll	item	Icon_Item_Usable_Scroll_FireDamageDefense_A_001
+22101141	Superior Fire Defense Scroll	item	Icon_Item_Usable_Scroll_FireDamageDefense_A_002
+22101151	Wind Defense Scroll	item	Icon_Item_Usable_Scroll_WindDamageDefense_A_001
+22101161	Superior Wind Defense Scroll	item	Icon_Item_Usable_Scroll_WindDamageDefense_A_002
+22101171	Earth Defense Scroll	item	Icon_Item_Usable_Scroll_EarthDamageDefense_A_001
+22101181	Superior Earth Defense Scroll	item	Icon_Item_Usable_Scroll_EarthDamageDefense_A_002
+22101191	Ultimate Tailwind Scroll	item	Icon_Usable_Scroll_FlySpeed_006
+22101201	Ultimate Speed Scroll	item	Icon_Usable_Scroll_MoveSpeed_006
+22101211	Ultimate Courage Scroll	item	Icon_Usable_Scroll_AttackSpeed_006
+22101221	Ultimate Critical Hit Scroll	item	Icon_Usable_Scroll_Critical_005
+22104011	Battle Enhance Scroll	item	Icon_Item_Usable_Scroll_SkillDamage_A_001
+22104021	Benediction Scroll	item	Icon_Item_Usable_Scroll_MaxHPMPRatio_A_001
+22104031	Superior Benediction Scroll	item	Icon_Item_Usable_Scroll_MaxHPMPRatio_A_002
+22104041	Chaos Scroll	item	Icon_Item_Usable_Scroll_Chaos_A_001
+22104051	Superior Chaos Scroll	item	Icon_Item_Usable_Scroll_Chaos_A_002
+22104061	Ultimate Benediction Scroll	item	Icon_Item_Usable_Scroll_MaxHPMPRatio_A_003
+22120011	Absorption Scroll	item	Icon_Item_Usable_Scroll_ProtectShield_A_001
+22120021	Superior Absorption Scroll	item	Icon_Item_Usable_Scroll_ProtectShield_A_002
+22120031	Ultimate Absorption Scroll	item	Icon_Usable_Scroll_ProtectShield_006
+22121011	Status Effect Resist Scroll	item	Icon_Item_Usable_Scroll_ProtectShield_02a_A_002
+22121021	Ultimate Status Effect Resist Scroll	item	Icon_Item_Usable_Scroll_ProtectShield_02a_A_003
+23101011	Seed of Detection	item	Icon_Item_Gather_Seed_A_c_001
+27002011	Wind Breeze Special Juice	item	Icon_Item_Usable_Drink_Shop_A_c_001
+27002021	Wind Breeze Special Juice	item	Icon_Item_Usable_Drink_Shop_A_c_001
+27002031	Wind Breeze Special Tea	item	Icon_Item_Usable_Drink_Craft_A_r_003
+27002041	Artisan's Wind Breeze Special Juice	item	Icon_Item_Usable_Drink_Shop_A_c_001
+27002051	Artisan's Wind Breeze Special Tea	item	Icon_Item_Usable_Drink_Craft_A_r_003
+27002061	Draconic Special Fruit Juice	item	Icon_Item_Usable_Drink_Craft_A_c_001
+27002071	Draconic Special Herbal Tea	item	Icon_Item_Usable_Drink_Craft_A_c_003
+27002081	Sweet Refreshing Coconut Water	item	Icon_Item_Summer_Event_food_02
+27003011	Curry Meat Stirfry	item	Icon_Item_Usable_Food_A_002
+27003021	Curry Meat Stirfry	item	Icon_Item_Usable_Food_A_002
+27003031	Fruit Salad	item	Icon_Item_Usable_Food_Craft_A_c_025
+27003041	Steamed Fish	item	Icon_Item_Usable_Food_A_005
+27003051	Seafood Pasta	item	Icon_Item_Usable_Food_A_007
+27003061	Airon Fried Meat	item	Icon_Item_Usable_Food_Craft_A_c_022
+27003071	Roasted Fogus	item	Icon_Item_Usable_Food_Craft_A_c_001
+27003081	Artisan's Curry Meat Stirfry	item	Icon_Item_Usable_Food_A_002
+27003091	Artisan's Fruit Salad	item	Icon_Item_Usable_Food_Craft_A_c_025
+27003101	Artisan's Steamed Fish	item	Icon_Item_Usable_Food_A_005
+27003111	Artisan's Seafood Pasta	item	Icon_Item_Usable_Food_A_007
+27003121	Artisan's Airon Fried Meat	item	Icon_Item_Usable_Food_Craft_A_c_022
+27003131	Artisan's Roasted Fogus	item	Icon_Item_Usable_Food_Craft_A_c_001
+27003141	Draconic Special Chopped Steak	item	Icon_Item_Usable_Food_Craft_A_c_003
+27003151	Draconic Special Beef Wellington	item	Icon_Item_Usable_Food_A_004
+27003161	Draconic Special Grilled Meat	item	Icon_Item_Usable_Food_Craft_A_c_020
+27003171	Draconic Special Salad	item	Icon_Item_Usable_Food_Craft_A_r_017
+27003181	Draconic Special Seafood Pasta	item	Icon_Item_Usable_Food_A_006
+27003191	Draconic Special Steamed Meat	item	Icon_Item_Usable_Food_Craft_A_c_007
+27003201	Sweet Refreshing Acai Bowl	item	Icon_Item_Summer_Event_food_01
+27004011	Festival Champagne	item	Icon_Item_Usable_Drink_Event_A_r_001
+27004021	Holiday Candy Cane	item	Icon_Item_Usable_Food_Event_A_r_007
+27004031	Holiday Tree Cookie	item	Icon_Item_Usable_Food_Event_A_r_008
+27004041	Sweet Dessert	item	Icon_Item_Usable_Food_Event_A_r_003
+27004051	Pink Tailwind Scroll	item	Icon_Item_Usable_Scroll_Event_A_r_002
+27004061	Pink Speed Scroll	item	Icon_Item_Usable_Scroll_Event_A_r_005
+27004071	Bountiful Rice Cake Soup	item	Icon_Item_Usable_Food_Event_A_r_001
+27004081	Sweet Honey Cookie	item	Icon_Item_SUL_Event_Food_01
+27004091	White Dessert	item	Icon_Item_Usable_Food_Event_A_r_004
+27004101	Lovely Lollipop	item	Icon_Item_Usable_Food_Event_A_r_015
+27004151	Halloween Candy	item	Icon_Item_Usable_Food_Event_A_r_006
+27004161	Halloween Cookie	item	Icon_Item_Usable_Food_Event_A_r_005
+27005011	Day of Deception	other
+28002011	Pamos Farm Juice	item	Icon_Item_Usable_Drink_Craft_A_c_001
+28002021	Tea of Serenity and Passion	item	Icon_Item_Usable_Drink_Craft_A_c_001
+28002031	Archaeologist's Vitality Juice	item	Icon_Item_Usable_Drink_Craft_A_c_001
+28002041	Tea of Resolve and Life	item	Icon_Item_Usable_Drink_Craft_A_c_001
+28003011	Pamos Special Vegetable Stirfry	item	Icon_Item_Usable_Food_Craft_A_c_003
+28003021	Steamed Caprese	item	Icon_Item_Usable_Food_Craft_A_c_007
+28003031	Tog Roasted Tenderloin	item	Icon_Item_Usable_Food_Craft_A_c_001
+28003041	Supply Fried Food	item	Icon_Item_Usable_Food_Craft_A_c_007
+28003051	Supply Salad	item	Icon_Item_Usable_Food_Craft_A_c_007
+28003061	Supply Pasta	item	Icon_Item_Usable_Food_Craft_A_c_007
+28003071	Fang Supply Vegetable Stirfry	item	Icon_Item_Usable_Food_Craft_A_c_003
+28003081	Quai Signature Steamed Dish	item	Icon_Item_Usable_Food_Craft_A_c_007
+28003091	Quai Signature Roast	item	Icon_Item_Usable_Food_Craft_A_c_001
+28003101	Shulak Preserved Fried Food	item	Icon_Item_Usable_Food_Craft_A_c_007
+28003111	Shulak Preserved Salad	item	Icon_Item_Usable_Food_Craft_A_c_007
+28003121	Shulak Preserved Pasta	item	Icon_Item_Usable_Food_Craft_A_c_007
+28080011	Immortal Sacred Tree	other
+29001011	EXP Boost Talisman	item	Icon_Usable_Scroll_Exp_Boost_001
+29001021	Superior EXP Boost Talisman	item	Icon_Usable_Scroll_Exp_Boost_002
+29003011	[Test] Battle Pass_Quick Restoration Ticket	item	Icon_Currency_Extension_inventory_001
+29004011	Resurrection Spiritstone	item	Icon_SpiritStone_Resurrect_other
+30010071	Theostone: Kaisinel's Vestige	item	Icon_Item_Usable_Godstone_WP_r_001
+30010091	Theostone: Perion's Tragedy	item	Icon_Item_Usable_Godstone_WP_r_003
+30010101	Theostone: Heladrir's Chains	item	Icon_Item_Usable_Godstone_WP_r_004
+30010111	Theostone: Aulak's Roar	item	Icon_Item_Usable_Godstone_WP_r_005
+30010121	Theostone: Nua's Scheme	item	Icon_Item_Usable_Godstone_WP_r_006
+30010131	Theostone: Reda's Tenacity	item	Icon_Item_Usable_Godstone_WP_r_007
+30010141	Theostone: Notun's Craft	item	Icon_Item_Usable_Godstone_WP_r_008
+30010151	Theostone: Santras's Secret	item	Icon_Item_Usable_Godstone_WP_r_009
+30010161	Theostone: Feruk's Instinct	item	Icon_Item_Usable_Godstone_WP_r_010
+30010271	Theostone: Edorin's Prayer	item	Icon_Item_Usable_Godstone_AR_r_003
+30010281	Theostone: Peregrine's Smile	item	Icon_Item_Usable_Godstone_AR_r_004
+30010291	Theostone: Karun's Benediction	item	Icon_Item_Usable_Godstone_AR_r_005
+30010301	Theostone: Karemiwen's Escort	item	Icon_Item_Usable_Godstone_AR_r_006
+30010311	Theostone: Mazion's Trust	item	Icon_Item_Usable_Godstone_AR_r_007
+30010321	Theostone: Edorin's Battle Cry	item	Icon_Item_Usable_Godstone_AR_r_008
+30010331	Theostone: Munin's Challenge	item	Icon_Item_Usable_Godstone_AR_r_009
+30010341	Theostone: Mazion's Passion	item	Icon_Item_Usable_Godstone_ACC_r_001
+30010351	Theostone: Edorin's Understanding	item	Icon_Item_Usable_Godstone_ACC_r_002
+30010361	Theostone: Peregrine's Smite	item	Icon_Item_Usable_Godstone_ACC_r_003
+30010371	Theostone: Kijan's Deceit	item	Icon_Item_Usable_Godstone_ACC_r_004
+30011071	Theostone: Bollvig's Tragedy	item	Icon_Item_Usable_Godstone_WP_r_001
+30011091	Theostone: Khrudgelmir's Silence	item	Icon_Item_Usable_Godstone_WP_r_003
+30011101	Theostone: Charna's Root	item	Icon_Item_Usable_Godstone_WP_r_004
+30011111	Theostone: Fasimedes's Dignity	item	Icon_Item_Usable_Godstone_WP_r_005
+30011121	Theostone: Vidar's Dignity	item	Icon_Item_Usable_Godstone_WP_r_006
+30011131	Theostone: Deltras's Loyalty	item	Icon_Item_Usable_Godstone_WP_r_007
+30011141	Theostone: Io's Sadness	item	Icon_Item_Usable_Godstone_WP_r_008
+30011151	Theostone: Orissan's Blood	item	Icon_Item_Usable_Godstone_WP_r_009
+30011161	Theostone: Mahisha's Wrath	item	Icon_Item_Usable_Godstone_WP_r_010
+30011271	Theostone: Thrasymedes's Compromise	item	Icon_Item_Usable_Godstone_AR_r_003
+30011281	Theostone: Boreas's Conviction	item	Icon_Item_Usable_Godstone_AR_r_004
+30011291	Theostone: Jumentis's Meditation	item	Icon_Item_Usable_Godstone_AR_r_005
+30011301	Theostone: Charna's Devotion	item	Icon_Item_Usable_Godstone_AR_r_006
+30011311	Theostone: Ahserion's Glory	item	Icon_Item_Usable_Godstone_AR_r_007
+30011321	Theostone: Vidar's Ritual	item	Icon_Item_Usable_Godstone_AR_r_008
+30011331	Theostone: Io's Pain	item	Icon_Item_Usable_Godstone_AR_r_009
+30011341	Theostone: Freyr's Despair	item	Icon_Item_Usable_Godstone_ACC_r_001
+30011351	Theostone: Khrudgelmir's Stimulation	item	Icon_Item_Usable_Godstone_ACC_r_002
+30011361	Theostone: Orissan's Campaign	item	Icon_Item_Usable_Godstone_ACC_r_003
+30011371	Theostone: Sif's Guile	item	Icon_Item_Usable_Godstone_ACC_r_004
+30012071	Theostone: Fregion's Schemes	item	Icon_Item_Usable_Godstone_WP_r_001
+30012091	Theostone: Beritra's Conspiracy	item	Icon_Item_Usable_Godstone_WP_r_003
+30012101	Theostone: Nezekan's March	item	Icon_Item_Usable_Godstone_WP_r_004
+30012111	Theostone: Meslamtaeda's Greed	item	Icon_Item_Usable_Godstone_WP_r_005
+30012121	Theostone: Ereshkigal's Honor	item	Icon_Item_Usable_Godstone_WP_r_006
+30012131	Theostone: Kaisinel's Reverie	item	Icon_Item_Usable_Godstone_WP_r_007
+30012141	Theostone: Lumiel's Interference	item	Icon_Item_Usable_Godstone_WP_r_008
+30012151	Theostone: Zikel's Arrogance	item	Icon_Item_Usable_Godstone_WP_r_009
+30012161	Theostone: Fregion's Strategy	item	Icon_Item_Usable_Godstone_WP_r_010
+30012271	Theostone: Siel's Freedom	item	Icon_Item_Usable_Godstone_AR_r_003
+30012281	Theostone: Ariel's Protection	item	Icon_Item_Usable_Godstone_AR_r_004
+30012291	Theostone: Tiamat's Benevolence	item	Icon_Item_Usable_Godstone_AR_r_005
+30012301	Theostone: Israphel's Mercy	item	Icon_Item_Usable_Godstone_AR_r_006
+30012311	Theostone: Siel's Faith	item	Icon_Item_Usable_Godstone_AR_r_007
+30012321	Theostone: Kaisinel's Judgment	item	Icon_Item_Usable_Godstone_AR_r_008
+30012331	Theostone: Ereshkigal's Inquiry	item	Icon_Item_Usable_Godstone_AR_r_009
+30012341	Theostone: Zikel's Strategy	item	Icon_Item_Usable_Godstone_ACC_r_001
+30012351	Theostone: Ariel's Focus	item	Icon_Item_Usable_Godstone_ACC_r_002
+30012361	Theostone: Siel's Wrath	item	Icon_Item_Usable_Godstone_ACC_r_003
+30012371	Theostone: Fregion's Insult	item	Icon_Item_Usable_Godstone_ACC_r_004
+40001101	Biruta Herbalist	other
+40001201	Krall Laborer	other
+40001301	Forest Specter	other
+40001401	Potcrab	other
+40001501	Swarm	other
+40001601	Slime	other
+40001701	Aultross's Doppelganger	other
+40001801	Swift Lugi	other
+40001901	Kernon	other
+40002001	Baby Odyle Spider	other
+40002101	Biruta	other
+40002201	Manduri Fighter	other
+40002301	Klaw	other
+40002401	Fungie	other
+40002501	Airon	other
+40002601	Skyray	other
+40002701	Withered Agrint	other
+40003001	Sparkie	other
+40003101	Drakan Explorer	other
+40003201	Cave Bat	other
+40003301	Crestlich	other
+40003401	Wandering Merchant Lugi	other
+40003501	Konutin Worker	other
+40003601	Skama	other
+40003701	Stone Spirit	other
+40003801	Forest Spirit	other
+40003901	Forest Guardian	other
+40004001	Fungen	other
+40004101	Grave Rat	other
+40004201	Gravi	other
+40004301	Magic Gravi	other
+40004401	Large Leaf Gravi	other
+40004501	Kailin	other
+40004601	Kalgolem	other
+40004701	Karnif	other
+40004801	Krall Shaman	other
+40004901	Contaminated Slime	other
+40005001	Lupyllini	other
+40005101	Lesser Wind Spirit	other
+40005201	Intermediate Wind Spirit	other
+40005301	Superior Wind Spirit	other
+40005401	Ultimate Wind Spirit	other
+40005501	King Bee	other
+40005601	Starturtle	other
+40005701	Ultimate Earth Spirit	other
+40005801	Black Smoke Murute	other
+40005901	Krao Test Subject	other
+40006001	Slink	other
+40006101	Armadon	other
+40006201	Superior Fire Spirit	other
+40006301	Ultimate Fire Spirit	other
+40006401	Ultimate Water Spirit	other
+40006501	Tog	other
+40006601	Sylphen	other
+40006701	Krall Warrior	other
+40006801	Kuru Worker	other
+40006901	Papis	other
+40007001	Oculazen	other
+40007101	Varg Berserker	other
+40007201	Krao Seal Guardian	other
+40007301	Manduri Trebuchet Worker	other
+40007401	Krao Mutant	other
+40007501	Harcon	other
+40007601	Mutant Armadon	other
+40007701	Klaw Scout	other
+40007801	Vigilant Oculazen	other
+40007901	Mutant Odyle Spider	other
+40008001	Mutated Mutant Odyle Spider	other
+40008101	Pino Worker	other
+40008201	Mutant Potcrab	other
+40008301	Male Crestlich	other
+40008401	Dried Up Forest Guardian	other
+40008501	Mutated Forest Spirit	other
+40008601	Blue Kalgolem	other
+40008701	Elite Karnif	other
+40008801	Modified Karnif	other
+40008901	Elite Keneire	other
+40009001	Krall Enhanced Combatant	other
+40009101	Krall Enhanced Sentry	other
+40009201	Kuru Tinkerer	other
+40009601	Elite Manduri Fighter	other
+40009701	Mumu Warrior	other
+40009801	Tayga	other
+40009901	Sentinel K'nash	other
+40010001	Pretor Veil Administrator	other
+40010101	Aullaeu Shaman	other
+40010201	Ursus	other
+40010301	Elite Ursus	other
+40010401	Coradon	other
+40010501	Urugugu Brawler	other
+40010601	Dionae	other
+40010701	Cadaver Worm	other
+40010801	Spider	other
+40010901	Nepenthes	other
+40011001	Giant Sparkie	other
+40011101	Scorpion	other
+40011201	Crasaur	other
+40011301	Mutant Skama	other
+40011401	Nagarant Guardian Warrior	other
+40011501	Ashen Spider	other
+40011601	Withered Branch Spider	other
+40011701	Kuru Overseer	other
+40011801	Unstable Spider	other
+40011901	Mutant Bee	other
+40012001	Mutant Coradon	other
+40012101	Young Kailin	other
+40012111	Protected Soul	other
+40012201	Young Slink	other
+40012301	Young Tog	other
+40012401	Young Ursus	other
+40012501	Black Dragon	other
+40012601	White Dragon	other
+40012701	Zaif	other
+40012801	Mutant Zaif	other
+40012901	Mutant Tog	other
+40013001	Odyle Stone Spirit	other
+40013101	Drana Slime	other
+40013201	Drana Swarm Hive	other
+40013301	Mutated Cadaver Worm	other
+40013401	Drana Spore	other
+40013501	Ashen Lupyllini	other
+40013601	Forest Dionae	other
+40013701	Eternal Coradon	other
+40013801	Ashen Dionae	other
+40013901	Rafflesia	other
+40014001	Mumu Worker	other
+40014101	Mumu Overseer	other
+40014111	Indomitable Dedication	other
+40014201	Swamp Monster	other
+40014301	Forest Monster	other
+40014401	Marsh Targon	other
+40014501	Distorted Mutant	other
+40014601	Mutated Ursus	other
+40014701	Mutated Forest Guardian	other
+40014801	Mutated Insectoid Valka	other
+40014901	Gatekeeper Pinopi	other
+40015001	Dratona	other
+40015101	Drakana Kalgolem	other
+40015201	Drana Brute Mutant	other
+40015301	Faded Mutant Brute	other
+40015401	Superior Water Spirit	other
+40015501	Elite Klaw	other
+40015601	Cadaver Cleaner	other
+40015701	Venomous Insect Sram	other
+40015801	Parasite Swarm	other
+40015901	Drana Contaminant	other
+40016001	Faded Floater	other
+40016101	Kerubar	other
+40016201	Basilisk	other
+40016301	Lesser Earth Spirit	other
+40016401	Intermediate Earth Spirit	other
+40016501	Superior Earth Spirit	other
+40016601	Flame Stone Guardian Statue	other
+40016701	Lesser Water Spirit	other
+40016801	Intermediate Water Spirit	other
+40016901	Kerubian	other
+40017001	Kerubiel	other
+40017101	Duduka Worker	other
+40017201	Duduka Trebuchet Worker	other
+40017301	Drana Predator	other
+40017401	Faded Predator	other
+40017501	Mudthorn	other
+40017601	Ancient Spirit	other
+40017701	Spirit King's Bodyguard Warrior	other
+40017801	Drana Mutant	other
+40017901	Faded Mutant	other
+40018001	Brax	other
+40018101	Elite Soulless Corpse Gnat	other
+40018201	Soulless Corpse Gnat	other
+40018301	Drakan Watcher	other
+40018401	Dratona Tinkerer	other
+40018501	Poison Blood	other
+40018601	Intermediate Fire Spirit	other
+40018701	Vivel	other
+40018801	Tamed Zaif	other
+40018901	Elite Poisonous Spore Fungen	other
+40019001	Furious Feruk	other
+40019101	Silver Blade Rotan	other
+40019201	Addicted Shulak Cart Worker	other
+40019301	Guardite	other
+40019401	Dracuni Herbalist	other
+40019501	Elite Dratona	other
+40019601	Watcher Guardite	other
+40019701	Ashen Basilisk	other
+40019801	Flame Barghest	other
+40019901	Naga Elite Priest	other
+40020001	Modified Lupyllini	other
+40020101	Decomposed Lupyllini	other
+40020201	Tamed Karnif	other
+40020301	Elite Guardite	other
+40020401	Agrint	other
+40020501	Ashen Agrint	other
+40020601	Thin Agrint	other
+40020701	Dry Leaf Agrint	other
+40020801	Lesser Fire Spirit	other
+40020901	Black Spirit	other
+40021001	Predator Saraswati	other
+40021101	Dark Spirit	other
+40021201	Congealed Drana	other
+40021301	Faded Drana	other
+40021401	Zelophi	other
+40021501	Ashpile Forester	other
+40021601	Ashen Forester	other
+40021701	Varg Shaman	other
+40021801	Test Subject Hoka	other
+40022101	Ghula	other
+40022201	Gravarax	other
+40022301	Snowfield Torba	other
+40022401	Tuka	other
+40022501	Snowfield Debry	other
+40022601	Snowfield Frugon	other
+40022701	Draconute Shaman	other
+40022801	Lagur	other
+40022901	Icecap Pachyron	other
+40023001	Pokus	other
+40023101	Desert Lamphu	other
+40023201	Debry	other
+40023301	Snowfield Stone Spirit	other
+40023401	Lava Stone Spirit	other
+40023501	Frugon	other
+40023601	Lava Gravarax	other
+40023701	Ice Ghula	other
+40023801	Icecap Kailin	other
+40023901	Lava-Maned Kailin	other
+40024001	Snowfield Kalgolem	other
+40024101	Kurpak Krall Supporter	other
+40024201	Kurpak Krall Scout	other
+40024301	Kurpak Krall Enforcer	other
+40024401	Snowfield Lagur	other
+40024501	Pachyron	other
+40024601	Lava Pokus	other
+40024701	Snowfield Lamphu	other
+40024801	Lava Starturtle	other
+40024901	Torba	other
+40025001	Snowfield Tuka	other
+40025101	Gray Ursus	other
+40025201	Driznak	other
+40025301	Obsidian Driznak	other
+40025401	Desert Swift Latoha	other
+40025501	Iralcig Swift Latoha	other
+40025601	Desert Magic Latoha	other
+40025701	Iralcig Magic Latoha	other
+40025801	Ashpile Durgal	other
+40025901	Durgal	other
+40026001	Red Fur Durgal	other
+40026101	Icecap Durgal	other
+40026201	Floofy	other
+40026301	Snowfield Floofy	other
+40026401	Desert Small Latoha	other
+40026501	Iralcig Small Latoha	other
+40026601	Snowfield Trogas	other
+40026701	Trogas	other
+40026801	Snowfield Zaif	other
+40026901	Young Snowfield Zaif	other
+42000101	Shugo Transformation Candy	item	Icon_Item_Usable_Food_L_04_004
+42000201	Pino Transformation Candy	item	Icon_Item_Usable_Food_L_04_002
+42000301	Fossa Transformation Candy	item	Icon_Item_Usable_Food_L_04_002
+42000401	Phantasmal Lakshmi Transformation Candy	item	Icon_Item_Usable_Food_L_04_004
+42000501	Drakan Vanguard Armed Beast Transformation Candy	item	Icon_Item_Usable_Food_L_04_002
+42000601	Flame Gatekeeper Transformation Candy	item	Icon_Item_Usable_Food_L_04_002
+42000701	Festival Shugo Transformation Candy	item	Icon_Item_Usable_Food_L_04_004
+42000801	Kobold Transformation Candy	item	Icon_Item_Usable_Food_L_04_002
+42000901	Dratona Transformation Candy	item	Icon_Item_Usable_Food_L_04_002
+42001001	Mau Transformation Candy	item	Icon_Item_Usable_Food_L_04_002
+42001101	Aullaeu Transformation Candy	item	Icon_Item_Usable_Food_L_04_002
+42001201	Mumu Transformation Candy	item	Icon_Item_Usable_Food_L_04_002
+42001301	Mau Transformation Candy	item	Icon_Item_Usable_Food_L_04_004
+42001401	Shugo Transformation Candy	item	Icon_Item_Usable_Food_L_04_004
+42001501	Festival Shugo Transformation Candy	item	Icon_Item_Usable_Food_L_04_004
+42001601	Dev PD Shugo Transformation Candy	item	Icon_Item_Usable_Candy_ShugoPD_02
+42001701	Business PD Shugo Transformation Candy	item	Icon_Item_Usable_Candy_ShugoPD_01
+43000101	Pet Transformation	item	Icon_Item_Usable_Candy_Pet_Common_01
+45001001	Transform: Guardian Lord II	item	Icon_Currency_Material_Token_002
+45002001	Transform: Guardian Lord III	item	Icon_Currency_Material_Token_002
+45002201	Abyssal Reflection Barrier I	item	Icon_Currency_Material_Token_002
+45003001	Transform: Guardian Lord IV	item	Icon_Currency_Material_Token_002
+45003201	Abyssal Reflection Barrier II	item	Icon_Currency_Material_Token_002
+45003301	Abyssal Wave I	item	Icon_Currency_Material_Token_002
+45003501	Transform: Guardian Lord I	item	Icon_Currency_Material_Token_002
+45004001	Transform: Guardian Lord II	item	Icon_Currency_Material_Token_002
+45005001	Transform: Guardian Lord III	item	Icon_Currency_Material_Token_002
+45005201	Abyssal Reflection Barrier I	item	Icon_Currency_Material_Token_002
+45006001	Transform: Guardian Lord IV	item	Icon_Currency_Material_Token_002
+45006201	Abyssal Reflection Barrier II	item	Icon_Currency_Material_Token_002
+45006301	Abyssal Wave I	item	Icon_Currency_Material_Token_002
+45006501	Transform: Guardian Lord I	item	Icon_Currency_Material_Token_002
+45009001	Transform: Guardian Lord III	item	Icon_Currency_Material_Token_002
+45009201	Abyssal Reflection Barrier II	item	Icon_Currency_Material_Token_002
+45009301	Abyssal Wave I	item	Icon_Currency_Material_Token_002
+45501001	Transform: Guardian Lord I	item	Icon_Currency_Material_Token_002
+49001021	Wraith's Curse	other
+49002021	Stun	other
+49002211	Watch	other
+49005101	Glue	other
+49005601	Protective Shield	other
+49005701	Mortal Strike	other
+49007021	Speed Pang!	other
+49100003	Kromede's Invitation: Dance	other
+49100004	Kromede's Invitation: Fear	other
+49100005	Kromede's Invitation: Confidence	other
+89000010	Monster Buff	other
+100000011	Slow	skill
+100000012	Slow	skill
+100000021	Slow	skill
+100000022	Slow	skill
+100000031	Slow	skill
+100000032	Slow	skill
+100000041	Slow	skill
+100000042	Slow	skill
+100000051	Slow	skill
+100000052	Slow	skill
+100000061	Slow	skill
+100000062	Slow	skill
+100000071	Slow	skill
+100000072	Slow	skill
+100000081	Slow	skill
+100000082	Slow	skill
+100000091	Slow	skill
+100000092	Slow	skill
+100000111	Lethargy	skill
+100000112	Lethargy	skill
+100000121	Lethargy	skill
+100000122	Lethargy	skill
+100000131	Lethargy	skill
+100000132	Lethargy	skill
+100000141	Lethargy	skill
+100000142	Lethargy	skill
+100000151	Lethargy	skill
+100000152	Lethargy	skill
+100000161	Lethargy	skill
+100000162	Lethargy	skill
+100000171	Lethargy	skill
+100000172	Lethargy	skill
+100000181	Lethargy	skill
+100000182	Lethargy	skill
+100000191	Lethargy	skill
+100000192	Lethargy	skill
+100000201	Root	skill
+100000202	Root	skill
+100000301	Stun	skill
+100000302	Stun	skill
+100000311	Stun	skill
+100000312	Stun	skill
+100000313	Stun	skill
+100000321	Knockdown	skill
+100000322	Knockdown	skill
+100000331	Airborne	skill
+100000332	Airborne	skill
+100000701	Blind	skill
+100000702	Blind	skill
+100000801	Seal	skill
+100000802	Seal	skill
+100000901	Taunt	skill
+100000902	Taunt	skill
+100001301	Exposed	skill
+100001302	Exposed	skill
+100100001	Assault	skill
+100100002	Assault	skill
+100100003	Assault	skill
+100100004	Assault	skill
+100100101	Assault	skill
+100200001	Tenacity	skill
+100200101	Tenacity	skill
+100300001	Invincibility Stacking Blocked	skill
+110100201	Block Increase	skill
+110800001	Blade Toss	skill
+110800101	Blade Toss	skill
+111000071	Prepare for Battle	skill
+111100001	Focused Block	skill
+111100301	Focused Block	skill
+111100381	Focused Block	skill
+111100401	Focused Block	skill
+111200001	Blood Absorption	skill
+111300001	Armor of Balance	skill
+111300101	Armor of Balance	skill
+111300201	Armor of Balance	skill
+111300301	Armor of Balance	skill
+111300401	Armor of Balance	skill
+111300501	Armor of Balance	skill
+111400001	Intimidating Roar	skill
+111900471	Leaping Slam	skill
+112300001	Rush	skill
+112400201	Wrath Wave	skill
+112500001	Zikel's Blessing	skill
+112500101	Zikel's Blessing	skill
+112500201	Zikel's Blessing	skill
+112500301	Zikel's Blessing	skill
+112500401	Zikel's Blessing	skill
+112500501	Zikel's Blessing	skill
+112700001	Survival Stance	skill
+113400271	Predation	skill
+113400571	Predation	skill
+113500071	Wrath	skill
+113800001	Tenaciousness	skill
+113800091	Tenaciousness	skill
+113800101	Tenaciousness	skill
+113800201	Tenaciousness	skill
+113800301	Tenaciousness	skill
+113800401	Tenaciousness	skill
+113800501	Tenaciousness	skill
+113900001	Wounded	skill
+113900081	Rage	skill
+113900201	Wounded	skill
+113900481	Rage	skill
+113900501	Wounded	skill
+114000001	Lunge Stance	skill
+114000101	Lunge Stance	skill
+114000201	Lunge Stance	skill
+114000301	Lunge Stance	skill
+114000401	Lunge Stance	skill
+114000501	Lunge Stance	skill
+114100001	Wave Armor	skill
+114100101	Wave Armor	skill
+114100201	Wave Armor	skill
+114100301	Wave Armor	skill
+114100401	Wave Armor	skill
+114100501	Wave Armor	skill
+117800071	Experienced Counterstrike	skill
+117800072	Experienced Counterstrike	skill
+117900071	Survival Willpower	skill
+117900081	Survival Willpower	skill
+118000071	Murderous Burst	skill
+118000081	Murderous Burst	skill
+118000091	Murderous Burst	skill
+120700071	Doom Shield	skill
+120700271	Doom Shield	skill
+120900001	Executor	skill
+120900201	Punishment	skill
+120900202	Punishment	skill
+120900211	Punishment	skill
+120900212	Punishment	skill
+120900221	Punishment	skill
+120900222	Punishment	skill
+120900231	Punishment	skill
+120900232	Punishment	skill
+121100001	Shield of Protection	skill
+121100371	Shield of Protection	skill
+121100401	Shield of Protection	skill
+121200001	Shrink	skill
+121200101	Shrink	skill
+121200201	Shrink	skill
+121200501	Shrink	skill
+121300202	Reduces Status Effect Resist	skill
+121300402	Protective Shield	skill
+121900001	Second Skin	skill
+121900101	Second Skin	skill
+121900201	Second Skin	skill
+121900301	Second Skin	skill
+121900401	Second Skin	skill
+122000001	Armor of Balance	skill
+122000101	Armor of Balance	skill
+122000201	Armor of Balance	skill
+122000301	Armor of Balance	skill
+122000401	Armor of Balance	skill
+122000501	Armor of Balance	skill
+122200002	Protective Shield	skill
+122200461	Grapple	skill
+122200471	Grapple	skill
+122200481	Grapple	skill
+122200491	Grapple	skill
+122200571	Grapple	skill
+122200581	Grapple	skill
+122300001	Noble Armor	skill
+122300101	Noble Armor	skill
+122300201	Noble Armor	skill
+122300301	Noble Armor	skill
+122300401	Noble Armor	skill
+122300501	Noble Armor	skill
+122500001	Comrade in Arms	skill
+122500002	Comrade in Arms	skill
+122500101	Comrade in Arms	skill
+122500102	Comrade in Arms	skill
+122500202	Comrade in Arms	skill
+122500302	Comrade in Arms	skill
+122500402	Comrade in Arms	skill
+122500501	Comrade in Arms	skill
+122500502	Comrade in Arms	skill
+122700001	Debilitate	skill
+122700002	Debilitate	skill
+122700301	Debilitate	skill
+122700302	Debilitate	skill
+123100371	Empyrean Lord's Punishment	skill
+123200001	Nezekan's Shield	skill
+123200002	Nezekan's Shield	skill
+123200003	Nezekan's Shield	skill
+123200004	Nezekan's Shield	skill
+123200005	Nezekan's Shield	skill
+123500001	Warding	skill
+123500201	Warding	skill
+123500301	Warding	skill
+123500401	Warding	skill
+123500402	Warding	skill
+123500403	Warding	skill
+123500404	Warding	skill
+123500501	Warding	skill
+123502301	Warding	skill
+123502401	Warding	skill
+123502402	Warding	skill
+123502403	Warding	skill
+123502404	Warding	skill
+123503401	Warding	skill
+123503402	Warding	skill
+123503403	Warding	skill
+123503404	Warding	skill
+123523401	Warding	skill
+123523402	Warding	skill
+123523403	Warding	skill
+123523404	Warding	skill
+124100001	Executing Blade	skill
+124500001	Battlefield Banner	skill
+124500101	Battlefield Banner	skill
+124500201	Battlefield Banner	skill
+124500301	Battlefield Banner	skill
+124500501	Battlefield Banner	skill
+127300021	Punishing Benediction	skill
+127500011	Guarding Seal	skill
+127500012	Guarding Seal	skill
+127700071	Insulting Roar	skill
+127700072	Insulting Roar	skill
+127800011	Fury	skill
+127800012	Fury	skill
+127900011	Survival Willpower	skill
+127900021	Survival Willpower	skill
+128000012	Block Pain	skill
+130000011	Insignia	skill
+130700271	Shadowstrike	skill
+130800001	Evasion Stance	skill
+130800371	Evasion Stance	skill
+130800401	Evasion Stance	skill
+131400301	Shadowstep	skill
+131500001	Frenzied Accord	skill
+131500101	Frenzied Accord	skill
+131500201	Frenzied Accord	skill
+131500271	Frenzied Accord	skill
+131500301	Frenzied Accord	skill
+131600001	Apply Poison	skill
+131600071	Poison	skill
+131700001	Surging Bloodlust	skill
+131800001	Stealth	skill
+131800101	Stealth	skill
+131800201	Stealth	skill
+131800501	Stealth	skill
+132300371	Aerial Bind	skill
+132700371	Savage Fang	skill
+132900001	Stealth	skill
+133000571	Triniel's Dagger	skill
+133100001	Illusive Clone	skill
+133100101	Illusive Clone	skill
+133100201	Illusive Clone	skill
+133100301	Illusive Clone	skill
+133100401	Illusive Clone	skill
+133100501	Illusive Clone	skill
+133700001	Evasion Contract	skill
+133700101	Evasion Contract	skill
+133700201	Evasion Contract	skill
+133700301	Evasion Contract	skill
+133700401	Evasion Contract	skill
+133700501	Evasion Contract	skill
+133900001	Swift Contract	skill
+133900101	Swift Contract	skill
+133900201	Swift Contract	skill
+133900301	Swift Contract	skill
+133900401	Swift Contract	skill
+133900501	Swift Contract	skill
+137200101	Exploit Weakness	skill
+137300071	Poison	skill
+137700071	Ambush Stance	skill
+137800071	Defense Break	skill
+137900081	Revitalization Contract	skill
+140500001	Bleed	skill
+140500002	Bleed	skill
+140500201	Bleed	skill
+140500202	Bleed	skill
+140600001	Crimson Flames	skill
+140600201	Crimson Flames	skill
+140600401	Crimson Flames	skill
+140900071	Precision	skill
+140900171	Precision	skill
+141100071	Gale	skill
+141100461	Gale	skill
+141100471	Gale	skill
+141100481	Gale	skill
+141100491	Gale	skill
+141200271	Ambush Kick	skill
+141200571	Ambush Kick	skill
+141600201	Sealing Arrow	skill
+141600202	Sealing Arrow	skill
+141700301	Delayed Damage	skill
+141900001	Stealth	skill
+141900101	Stealth	skill
+141900201	Stealth	skill
+141900501	Stealth	skill
+141900581	On the Hunt	skill
+142100001	Vaizel's Authority	skill
+142200001	Bow of Blessing	skill
+142200101	Bow of Blessing	skill
+142200201	Bow of Blessing	skill
+142200301	Bow of Blessing	skill
+142200401	Bow of Blessing	skill
+142200501	Bow of Blessing	skill
+142400001	Vaizel's Authority	skill
+142500001	Vaizel's Authority	skill
+143100001	Vaizel's Authority	skill
+143100101	Vaizel's Authority	skill
+143100201	Vaizel's Authority	skill
+143100301	Vaizel's Authority	skill
+143100401	Vaizel's Authority	skill
+143100501	Vaizel's Authority	skill
+143500001	Mother Nature's Breath	skill
+143500101	Mother Nature's Breath	skill
+143500201	Mother Nature's Breath	skill
+143500301	Mother Nature's Breath	skill
+143500401	Mother Nature's Breath	skill
+143500501	Mother Nature's Breath	skill
+143800001	Supporting Fire	skill
+143800101	Supporting Fire	skill
+143800401	Supporting Fire	skill
+143800501	Supporting Fire	skill
+147300071	Wind Vigor	skill
+147900081	Revitalization Contract	skill
+150200001	Damage over Time	skill
+150400371	Firestorm	skill
+150500301	Delayed Damage	skill
+150600261	Flames	skill
+150600271	Flames	skill
+150600281	Flames	skill
+150600291	Flames	skill
+150900001	Slow	skill
+150900201	Slow	skill
+151100301	Winter's Shackles	skill
+151300201	Soul Freeze	skill
+151300202	Soul Freeze	skill
+151400001	Curse: Tree	skill
+151400101	Curse: Tree	skill
+151400201	Curse: Tree	skill
+151400271	Curse: Tree	skill
+151400301	Curse: Tree	skill
+151400371	Curse: Tree	skill
+151400401	Curse: Tree	skill
+151500001	Frost status	skill
+151500002	Frost status	skill
+151600001	Steel Barrier	skill
+151600101	Steel Barrier	skill
+151600201	Steel Barrier	skill
+151600202	Restore HP	skill
+151600301	Steel Barrier	skill
+151600401	Steel Barrier	skill
+151600501	Steel Barrier	skill
+151800001	Vaizel's Wisdom	skill
+152000021	Frostbite	skill
+152000121	Enhanced Frostbite	skill
+152000421	Enhanced Frostbite	skill
+152000521	Enhanced Frostbite	skill
+152300001	Arctic Armor	skill
+152300101	Arctic Armor	skill
+152300201	Arctic Armor	skill
+152300301	Arctic Armor	skill
+152300401	Arctic Armor	skill
+152300501	Arctic Armor	skill
+152500471	Pyroclasm	skill
+152800031	Root	skill
+152800431	Root	skill
+152900001	Illusion	skill
+153100001	Wish of Concentration	skill
+153100101	Wish of Concentration	skill
+153100201	Wish of Concentration	skill
+153100301	Wish of Concentration	skill
+153100401	Wish of Concentration	skill
+153100501	Wish of Concentration	skill
+153101201	Wish of Concentration	skill
+153101301	Wish of Concentration	skill
+153101401	Wish of Concentration	skill
+153101501	Wish of Concentration	skill
+153102301	Wish of Concentration	skill
+153102401	Wish of Concentration	skill
+153102501	Wish of Concentration	skill
+153103401	Wish of Concentration	skill
+153103501	Wish of Concentration	skill
+153104501	Wish of Concentration	skill
+153112301	Wish of Concentration	skill
+153112401	Wish of Concentration	skill
+153112501	Wish of Concentration	skill
+153113401	Wish of Concentration	skill
+153113501	Wish of Concentration	skill
+153114501	Wish of Concentration	skill
+153123401	Wish of Concentration	skill
+153123501	Wish of Concentration	skill
+153124501	Wish of Concentration	skill
+153134501	Wish of Concentration	skill
+153200001	Delayed Damage	skill
+153200101	Delayed Damage	skill
+153200201	Delayed Damage	skill
+153200301	Delayed Damage	skill
+153200401	Delayed Damage	skill
+153200501	Delayed Damage	skill
+153400001	Polymorph	skill
+153800001	Lumiel's Authority	skill
+153900001	Embers	skill
+153900101	Enhanced Embers	skill
+153900401	Enhanced Embers	skill
+153900501	Enhanced Embers	skill
+154000001	Element Enhancement	skill
+154000101	Element Enhancement	skill
+154000201	Element Enhancement	skill
+154000301	Element Enhancement	skill
+154000401	Element Enhancement	skill
+154000501	Element Enhancement	skill
+154100001	Hibernation	skill
+154100101	Hibernation	skill
+154100201	Hibernation	skill
+154100301	Hibernation	skill
+154100401	Hibernation	skill
+154100501	Hibernation	skill
+157100071	Fire Mark	skill
+157100072	Fire Mark	skill
+157100081	Burn	skill
+157500071	Robe of Cold	skill
+157500072	Robe of Cold	skill
+157900081	Revitalization Contract	skill
+160011091	Biting Wind	skill
+160011131	Cloud of Dust	skill
+160300401	Element Flow	skill
+160600301	Protective Shield	skill
+160600501	Protective Shield	skill
+160700101	Soul's Cry	skill
+160800001	Cry of Terror	skill
+161200011	Wind Spirit	skill
+161200400	Wind Spirit	skill
+161300011	Earth Spirit	skill
+161400001	Curse	skill
+161400003	Curse	skill
+161400005	Curse	skill
+161400007	Curse	skill
+161500001	Corrode	skill
+161500002	Corrode	skill
+161500004	Corrode	skill
+161500005	Corrode	skill
+161500006	Corrode	skill
+161700001	Command: Proxy	skill
+161700002	Command: Proxy	skill
+161700003	Command: Proxy	skill
+161700004	Command: Proxy	skill
+161700005	Command: Proxy	skill
+161700006	Command: Proxy	skill
+161700011	Command: Proxy	skill
+161700012	Command: Proxy	skill
+161700013	Command: Proxy	skill
+161700014	Command: Proxy	skill
+161700015	Command: Proxy	skill
+161900001	Spirit's Benediction	skill
+161900002	Spirit's Benediction	skill
+161900003	Spirit's Benediction	skill
+161900004	Spirit's Benediction	skill
+162100002	Fear	skill
+162200001	Cursed Cloud	skill
+162200002	Cursed Cloud	skill
+162200003	Cursed Cloud	skill
+162200004	Cursed Cloud	skill
+162200005	Cursed Cloud	skill
+162200006	Cursed Cloud	skill
+162200007	Cursed Cloud	skill
+162200008	Cursed Cloud	skill
+162200009	Cursed Cloud	skill
+162200010	Cursed Cloud	skill
+162600001	Magic Block	skill
+162600002	Magic Block	skill
+163000002	Four Elements	skill
+163000003	Element	skill
+163000004	Element [Water]	skill
+163000005	Element [Wind]	skill
+163000006	Element [Earth]	skill
+163000007	All Element Boost	skill
+163000008	Delayed Damage	skill
+163300201	Delayed Damage	skill
+163600001	Kaisinel's Power	skill
+163600002	Kaisinel's Power	skill
+163600003	Kaisinel's Power	skill
+163600004	Kaisinel's Power	skill
+163600005	Kaisinel's Power	skill
+163700001	Flame Blessing	skill
+163700002	Flame Blessing	skill
+163700003	Flame Blessing	skill
+163700004	Flame Blessing	skill
+163700005	Flame Blessing	skill
+163700006	Flame Blessing	skill
+167300011	Spirit's Descent	skill
+167300012	Spirit's Descent	skill
+167400011	Corrode	skill
+167800011	Element Unification	skill
+167900021	Revitalization Contract	skill
+170700001	Chain of Torment	skill
+170700101	Chain of Torment	skill
+170700201	Chain of Torment	skill
+170700301	Chain of Torment	skill
+170700401	Chain of Torment	skill
+170700501	Chain of Torment	skill
+170701201	Chain of Torment	skill
+170701301	Chain of Torment	skill
+170701401	Chain of Torment	skill
+170701501	Chain of Torment	skill
+170702301	Chain of Torment	skill
+170702401	Chain of Torment	skill
+170702501	Chain of Torment	skill
+170703401	Chain of Torment	skill
+170703501	Chain of Torment	skill
+170704501	Chain of Torment	skill
+170712301	Chain of Torment	skill
+170712401	Chain of Torment	skill
+170712501	Chain of Torment	skill
+170713401	Chain of Torment	skill
+170713501	Chain of Torment	skill
+170714501	Chain of Torment	skill
+170723401	Chain of Torment	skill
+170723501	Chain of Torment	skill
+170724501	Chain of Torment	skill
+170734501	Chain of Torment	skill
+170800001	Debilitating Mark	skill
+170800101	Debilitating Mark	skill
+170800201	Debilitating Mark	skill
+170800301	Debilitating Mark	skill
+170800401	Debilitating Mark	skill
+170800501	Debilitating Mark	skill
+170801201	Debilitating Mark	skill
+170801301	Debilitating Mark	skill
+170801401	Debilitating Mark	skill
+170801501	Debilitating Mark	skill
+170802301	Debilitating Mark	skill
+170802401	Debilitating Mark	skill
+170802501	Debilitating Mark	skill
+170803401	Debilitating Mark	skill
+170803501	Debilitating Mark	skill
+170804501	Debilitating Mark	skill
+170812301	Debilitating Mark	skill
+170812401	Debilitating Mark	skill
+170812501	Debilitating Mark	skill
+170813401	Debilitating Mark	skill
+170813501	Debilitating Mark	skill
+170814501	Debilitating Mark	skill
+170823401	Debilitating Mark	skill
+170823501	Debilitating Mark	skill
+170824501	Debilitating Mark	skill
+170834501	Debilitating Mark	skill
+170900001	Light of Regeneration	skill
+170900101	Light of Regeneration	skill
+170900201	Light of Regeneration	skill
+170900301	Light of Regeneration	skill
+170900401	Light of Regeneration	skill
+170900501	Light of Regeneration	skill
+170901201	Light of Regeneration	skill
+170901301	Light of Regeneration	skill
+170901401	Light of Regeneration	skill
+170901501	Light of Regeneration	skill
+170902301	Light of Regeneration	skill
+170902401	Light of Regeneration	skill
+170902501	Light of Regeneration	skill
+170903401	Light of Regeneration	skill
+170903501	Light of Regeneration	skill
+170904501	Light of Regeneration	skill
+170912301	Light of Regeneration	skill
+170912401	Light of Regeneration	skill
+170912501	Light of Regeneration	skill
+170913401	Light of Regeneration	skill
+170913501	Light of Regeneration	skill
+170914501	Light of Regeneration	skill
+170923401	Light of Regeneration	skill
+170923501	Light of Regeneration	skill
+170924501	Light of Regeneration	skill
+170934501	Light of Regeneration	skill
+171200401	Radiant Recovery	skill
+171600001	Benevolence	skill
+171600061	Benevolence: Recovery	skill
+171600062	Benevolence: Recovery	skill
+171600101	Benevolence	skill
+171600161	Benevolence: Recovery	skill
+171600162	Benevolence: Recovery	skill
+171600201	Benevolence	skill
+171600261	Benevolence: Recovery	skill
+171600262	Benevolence: Recovery	skill
+171600301	Benevolence	skill
+171600361	Benevolence: Recovery	skill
+171600362	Benevolence: Recovery	skill
+171600401	Benevolence	skill
+171600461	Benevolence: Recovery	skill
+171600462	Benevolence: Recovery	skill
+171600501	Benevolence	skill
+171600561	Benevolence: Recovery	skill
+171600562	Benevolence: Recovery	skill
+172700001	Salvation	skill
+172700101	Salvation	skill
+172700201	Salvation	skill
+172700401	Salvation	skill
+172900401	Absolution	skill
+172900501	Absolution	skill
+173000001	Voice of Doom	skill
+173000101	Voice of Doom	skill
+173000201	Voice of Doom	skill
+173000301	Voice of Doom	skill
+173000401	Voice of Doom	skill
+173000501	Voice of Doom	skill
+173900431	Summon Resurrection	skill
+173900501	Blessing of Reincarnation	skill
+174000001	Earth Punishment	skill
+174000101	Earth Punishment	skill
+174000271	Earth's Blessing	skill
+174000281	Earth's Blessing	skill
+174000371	Earth's Blessing	skill
+174000381	Earth's Blessing	skill
+174000401	Earth Punishment	skill
+174000571	Earth's Blessing	skill
+174000591	Earth's Blessing	skill
+174100011	Light of Protection	skill
+174100111	Light of Protection	skill
+174100211	Light of Protection	skill
+174100311	Light of Protection	skill
+174100411	Light of Protection	skill
+174100511	Light of Protection	skill
+174200001	Yustiel's Power	skill
+174200101	Yustiel's Power Protective Shield	skill
+174200201	Yustiel's Power	skill
+174200301	Yustiel's Power	skill
+174200401	Yustiel's Power	skill
+174200501	Yustiel's Power	skill
+174200511	Yustiel's Power Protective Shield	skill
+174300001	Prayer of Amplification	skill
+174300101	Prayer of Amplification	skill
+174300201	Prayer of Amplification	skill
+174300301	Prayer of Amplification	skill
+174300401	Prayer of Amplification	skill
+174300501	Prayer of Amplification	skill
+174400001	Noble Aura	skill
+174400101	Noble Aura	skill
+174400201	Noble Aura	skill
+174400301	Noble Aura	skill
+174400401	Noble Aura	skill
+174400501	Noble Aura	skill
+177600011	Heal Block	skill
+177700011	Prayer of Concentration	skill
+177900011	Survival Willpower	skill
+177900021	Survival Willpower	skill
+180500401	Bursting Blow	skill
+180800401	Wave Blow	skill
+180900102	Rushing Smash	skill
+181200001	Recuperation	skill
+181200101	Recuperation	skill
+181200301	Recuperation	skill
+181201301	Recuperation	skill
+181300002	Fracturing Blow	skill
+181400001	Focused Defense	skill
+181400371	Focused Defense	skill
+181400401	Focused Defense	skill
+181600011	Sprint Mantra	skill
+181600111	Sprint Mantra	skill
+181600211	Sprint Mantra	skill
+181600311	Sprint Mantra	skill
+181600411	Sprint Mantra	skill
+181600511	Sprint Mantra	skill
+181900011	Undefeated Mantra	skill
+181900111	Undefeated Mantra	skill
+181900211	Undefeated Mantra	skill
+181900311	Undefeated Mantra	skill
+181900411	Undefeated Mantra	skill
+181900511	Undefeated Mantra	skill
+182300201	Ensnaring Mark	skill
+182300501	Ensnaring Mark	skill
+182400001	Impeding Authority	skill
+182400101	Impeding Authority	skill
+182400201	Impeding Authority	skill
+182400301	Impeding Authority	skill
+182400401	Impeding Authority	skill
+182400501	Impeding Authority	skill
+182500001	Power of the Storm	skill
+182500011	Power of the Storm	skill
+182500101	Power of the Storm	skill
+182500111	Power of the Storm	skill
+182500201	Power of the Storm	skill
+182500211	Power of the Storm	skill
+182500301	Power of the Storm	skill
+182500311	Power of the Storm	skill
+182500401	Power of the Storm	skill
+182500411	Power of the Storm	skill
+182500501	Power of the Storm	skill
+182500511	Power of the Storm	skill
+182900071	Spinning Strike	skill
+182900081	Spinning Strike	skill
+183300301	Marchutan's Wrath	skill
+183300501	Marchutan's Wrath	skill
+184200001	Guardian Blessing	skill
+184200101	Guardian Blessing	skill
+184200201	Guardian Blessing	skill
+184200301	Guardian Blessing	skill
+184200401	Guardian Blessing	skill
+184200501	Guardian Blessing	skill
+184400001	Barrier Spell	skill
+184400101	Barrier Spell	skill
+184400201	Barrier Spell	skill
+184400271	Barrier Spell [Damage Tolerance]	skill
+184400301	Barrier Spell	skill
+184400401	Barrier Spell	skill
+184400501	Barrier Spell	skill
+187300011	Protection Circle	skill
+187300021	Divine Barrier	skill
+187300031	Noble Protective Shield	skill
+187800011	Earth's Promise	skill
+187900011	Survival Willpower	skill
+187900021	Survival Willpower	skill
+190000004	Continuous Attack	skill
+190100571	Flurry	skill
+190700201	Whirlwind	skill
+190700202	Whirlwind	skill
+191300001	Rampage	skill
+191300002	Rampage	skill
+191300101	Rampage	skill
+191300102	Rampage	skill
+191300201	Rampage	skill
+191300202	Rampage	skill
+191300301	Rampage	skill
+191300302	Rampage	skill
+191300401	Rampage	skill
+191300402	Rampage	skill
+191300501	Rampage	skill
+191300502	Rampage	skill
+191301201	Rampage	skill
+191301202	Rampage	skill
+191301301	Rampage	skill
+191301302	Rampage	skill
+191301401	Rampage	skill
+191301402	Rampage	skill
+191301501	Rampage	skill
+191301502	Rampage	skill
+191302301	Rampage	skill
+191302302	Rampage	skill
+191302401	Rampage	skill
+191302402	Rampage	skill
+191302501	Rampage	skill
+191302502	Rampage	skill
+191303401	Rampage	skill
+191303402	Rampage	skill
+191303501	Rampage	skill
+191303502	Rampage	skill
+191304501	Rampage	skill
+191304502	Rampage	skill
+191312301	Rampage	skill
+191312302	Rampage	skill
+191312401	Rampage	skill
+191312402	Rampage	skill
+191312501	Rampage	skill
+191312502	Rampage	skill
+191313401	Rampage	skill
+191313402	Rampage	skill
+191313501	Rampage	skill
+191313502	Rampage	skill
+191314501	Rampage	skill
+191314502	Rampage	skill
+191323401	Rampage	skill
+191323402	Rampage	skill
+191323501	Rampage	skill
+191323502	Rampage	skill
+191324501	Rampage	skill
+191324502	Rampage	skill
+191334501	Rampage	skill
+191334502	Rampage	skill
+191700001	Chain Fist Available	skill
+191800001	Chain Fist Available	skill
+191900501	Exploding Fist [Delayed Damage]	skill
+191900502	Exploding Fist [Delayed Damage]	skill
+191900511	Exploding Fist [Delayed Damage]	skill
+191900512	Exploding Fist [Delayed Damage]	skill
+191900521	Exploding Fist [Delayed Damage]	skill
+191900522	Exploding Fist [Delayed Damage]	skill
+191900531	Exploding Fist [Delayed Damage]	skill
+191900532	Exploding Fist [Delayed Damage]	skill
+192000271	Exploding Fist	skill
+192800001	Ferocity	skill
+192800002	Restores Rage	skill
+192800101	Ferocity	skill
+192800201	Ferocity	skill
+192800301	Ferocity	skill
+192800401	Ferocity	skill
+192900101	Surging Cleave	skill
+192900301	Dash Chop	skill
+193100001	Pulverize	skill
+193100002	Pulverize	skill
+193100003	Pulverize	skill
+193100201	Pulverize	skill
+193100202	Pulverize	skill
+193100203	Pulverize	skill
+193100301	Pulverize	skill
+193100302	Pulverize	skill
+193100303	Pulverize	skill
+193100401	Pulverize	skill
+193100402	Pulverize	skill
+193100403	Pulverize	skill
+193100501	Pulverize	skill
+193100502	Pulverize	skill
+193100503	Pulverize	skill
+193200001	Sever Bloodstream	skill
+193200003	Sever Bloodstream	skill
+193300001	Phantom	skill
+193300101	Phantom	skill
+193300201	Phantom	skill
+193300301	Phantom	skill
+193300501	Phantom	skill
+193400001	Circulation [Normal]	skill
+193400002	Circulation [Normal]	skill
+193400003	Circulation [Rampage]	skill
+193500001	Focused Block	skill
+193500303	Focused Block	skill
+193600001	Unstoppable	skill
+193600101	Unstoppable	skill
+193600201	Unstoppable	skill
+193600301	Unstoppable	skill
+193600401	Unstoppable	skill
+194000002	Time Bomb	skill
+194000004	Time Bomb	skill
+194000006	Time Bomb	skill
+194000021	Time Bomb	skill
+194000024	Time Bomb	skill
+194000025	Time Bomb	skill

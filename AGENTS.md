@@ -51,7 +51,7 @@ has anti-cheat, and the user cares about account safety: when in doubt, don't.
 
 **Third-party code:** copy none: this repository is MIT, and its code is its own.
 Facts about the protocol from the community's published notes are fine. **Game art** is
-NCSOFT's: the class emblems and skill icons are bundled as data
+NCSOFT's: the class emblems, skill icons and item icons are bundled as data
 (`game_icon_sheet.inc`), taken from aion2.app, outside the MIT licence (README,
 License).
 
@@ -134,7 +134,8 @@ src/protocol/    aion2::proto
     packet_parser
 src/game/        aion2::game   what the game is, for every plugin
     plugin.hpp (game::Plugin: events and ticks in), classes, class_codes,
-    skill_names (data/skills.tsv → skill_table.inc; effect names too),
+    skill_names (data/skills.tsv → skill_table.inc; effect names too, from
+    data/effects.tsv → effect_table.inc first),
     map_names (data/maps.tsv → map_table.inc), npc_names (data/npcs.tsv → npc_table.inc),
     effect_book (the protocol's rules for effects: each plugin that reads them keeps one)
 plugins/combat_meter/  aion2::meter (include prefix meter/; its AGENTS.md and README.md)
@@ -163,7 +164,8 @@ src/app/         aion2::app
     overlay_visibility, app_frame (the app window's contents),
     update_check (release parsing, versions, the update balloon) and updater (check,
     download, stage, swap), both ported from ffxiv-hub,
-    game_icons (class emblems and skill icons from game_icon_sheet.inc, painted into
+    game_icons (class emblems, skill icons and items' effect icons from
+    game_icon_sheet.inc, painted into
     each window's font atlas at the size it draws them, and the app's mark from
     app_mark.inc at the sidebar chip's), timeline_chart (the Timeline tab's
     lines as numbers, no ImGui)
@@ -183,8 +185,11 @@ tools/gen_app_icon.py            the app's mark (wings around a crystal, our own
                                  → app.ico and app_mark.inc
 tools/gen_skill_table.py         skills.tsv → skill_table.inc (`make test` checks they agree);
                                  the TSV's third column names each skill's icon
-tools/gen_icon_sheet.py          aion2.app's class emblems and skill icons → game_icon_sheet.inc
-                                 (`make test` checks its index against skills.tsv)
+tools/gen_icon_sheet.py          aion2.app's class emblems, skill icons and item icons →
+                                 game_icon_sheet.inc (`make test` checks its index against
+                                 skills.tsv and effects.tsv)
+tools/gen_effect_table.py        questlog.gg's status-effect pages → effects.tsv → effect_table.inc
+                                 (the same)
 tools/gen_map_table.py           maps.tsv → map_table.inc (the same)
 tools/gen_npc_table.py           aion2.app's monster and NPC pages → npcs.tsv → npc_table.inc
 tools/gen_cooldown_table.py      aion2.app's skill pages → cooldowns.tsv → cooldown_table.inc
@@ -327,7 +332,8 @@ below).
     the dungeon capture's Dodge 15000101 named the Sorcerer's weapon.
   - A spirit's attacks (1699xxxx) carry its summoner's class digits and have no name.
   - Names come from `src/game/data/skills.tsv`, taken from aion2.app's skill
-    database. Checked against the first capture: every Templar and Elementalist code
+    database; the skills it lists with no English name (33 of the Brawler's,
+    2026-11) take questlog.gg's. Checked against the first capture: every Templar and Elementalist code
     resolved to that class.
 - **Tick `05 38`:** target varint, effect u8, actor varint, a varint of unknown meaning,
   skill u32 (×100), amount varint.
@@ -497,11 +503,22 @@ capture, where all 17,182 records parse):
     (`effect_name`). The rest are monster skills (7-digit codes ×10), items and system
     effects (12011, 80001). A skill's code names the effect better than the id: one
     Gladiator effect's id pointed at Ruinous Blow while its record named Leaping Slam.
-  - **Before the map's 21 36:** entering a map, the local player's effects for their new
-    id came 0.4 s ahead of the map load, so a map load must not drop what just arrived.
-  - **Permanent effects** are mostly passive skills', sent at login and again on each
-    map (twice, under new instance numbers).
-  - A duration of 0 (one of Judgment's) marks something that ends as it starts.
+  - **An effect's own name** comes from `src/game/data/effects.tsv`, before its
+    skill's: questlog.gg's status-effect database lists 2,714 effects by this id, with
+    the icon that tells an item's from a skill's. An item effect's row names that icon
+    (the fourth column), and the icon sheet packs it: a scroll's effect shows the scroll. Checked on the second capture:
+    120,900,001, which Punishment puts on for 20 s, is "Executor"; 22,101,031 and
+    22,101,051, which a player put on themself for 300 s, are "Speed Scroll" and
+    "Courage Scroll"; 20,111,011 (10 s, 31 times) is "Life Potion"; the bosses' 12,000,161
+    and 12,000,173 are "Burn" and "Slow". It named 26 of the capture's 66 unnamed ids.
+    - Item effects are 8 digits from 20,xxx,xxx (potions), 21,xxx,xxx (food) and
+      22,xxx,xxx (scrolls); 30,010,131 is a Theostone's.
+    - The id's own name can differ from the applying skill's: 111,000,071, which a
+      record named Leaping Slam for, is "Prepare for Battle".
+  - **Still with no name** (`aion2meter-replay --unnamed`; 40 ids in the second
+    capture): permanent ones at login (4031 to 4115, 12011, 12031, 80001), short system
+    marks (200 at 0.3 s with every dodge, 231, 10002 for 5 s on entering a map), and
+    some of the bosses' (1604xxxx, from skills 1604xxx).
 - **Effect gone `1a 92`:** target varint, effect u32. It names the effect, not the
   instance: a stack of three is taken off by three.
 - **Skill used `01 38`:** three bytes (00 00 00 in 1,154 of 1,176), the skill u32. Only

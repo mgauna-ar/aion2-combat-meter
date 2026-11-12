@@ -23,8 +23,8 @@ constexpr uint32_t kMantraSkill = 18'190'021;
 /// Dodge's effect on the player who used it.
 constexpr uint32_t kDodge = 3015;
 constexpr uint32_t kDodgeSkill = 12'000'100;
-/// A monster's effect: no name.
-constexpr uint32_t kBossDebuff = 20'111'011;
+/// A boss's effect, as the second capture had it: no name.
+constexpr uint32_t kBossDebuff = 16'044'202;
 
 /// 00 8D with someone's HP and their max HP (stat 7).
 proto::RemainingHp hp_with_max(EntityId id, uint64_t value, uint64_t max) {
@@ -89,7 +89,94 @@ TEST_CASE(Auras, ARenewalEndsWhenTheServerSays) {
     e.on_event(ev(t, buff(kMe, kMe, 8, 127'700'071, 5000, server_ms(t, 3000) + 60'000)));
     const AuraSnapshot a = e.snapshot(t);
     TEST_ASSERT_EQ(a.on_self.size(), size_t{2});
-    TEST_ASSERT_EQ(a.on_self[1].expires_at, t + 5'000'000);
+    const auto roar = std::find_if(a.on_self.begin(), a.on_self.end(),
+                                   [](const AuraEntry& x) { return x.buff_id == 127'700'071; });
+    TEST_ASSERT(roar != a.on_self.end());
+    TEST_ASSERT_EQ(roar->expires_at, t + 5'000'000);
+}
+
+TEST_CASE(Auras, EffectsKeepThePlaceTheyWerePutOnIn) {
+    // By time left, every renewal and every proc reshuffled the list.
+    AuraPlugin e = setup();
+    e.on_event(ev(at_s(1), buff(kMe, kMe, 1, 127'800'011, 20'000, 0, 12'780'001)));  // Fury, 20 s
+    e.on_event(ev(at_s(2), buff(kMe, kMe, 2, kDodge, 3000, 0, kDodgeSkill)));
+    AuraSnapshot a = e.snapshot(at_s(2));
+    TEST_ASSERT_EQ(a.on_self.size(), size_t{2});
+    TEST_ASSERT_EQ(a.on_self[0].label, std::string("Fury"));  // ends last, came first
+    TEST_ASSERT_EQ(a.on_self[1].label, std::string("Dodge"));
+
+    // Renewed until long after Fury's end: Dodge stays second while both run.
+    proto::BuffApplied renewal = buff(kMe, kMe, 2, kDodge, 30'000, 0, kDodgeSkill);
+    renewal.renewed = true;
+    e.on_event(ev(at_s(3), renewal));
+    a = e.snapshot(at_s(3));
+    TEST_ASSERT_EQ(a.on_self[0].label, std::string("Fury"));
+    TEST_ASSERT_EQ(a.on_self[1].applied_at, at_s(2));
+}
+
+TEST_CASE(Auras, AShortEffectKeptUpByRenewalsIsSustained) {
+    // A Chanter's mantra: 2.4 s, renewed each second, all fight.
+    AuraPlugin e = setup();
+    e.on_event(ev(at_s(1), buff(kMe, kChanter, 1, kMantra, 2400, 0, kMantraSkill)));
+    TEST_ASSERT(!e.snapshot(at_s(1)).on_self[0].sustained);
+    proto::BuffApplied renewal = buff(kMe, kChanter, 1, kMantra, 2400, 0, kMantraSkill);
+    renewal.renewed = true;
+    for (int s = 2; s <= 8; ++s) e.on_event(ev(at_s(s), renewal));
+    // Renewed, but not yet for twice its length: still a countdown.
+    TEST_ASSERT(!e.snapshot(at_s(3)).on_self[0].sustained);
+    const AuraSnapshot a = e.snapshot(at_s(8));
+    TEST_ASSERT(a.on_self[0].sustained);
+    TEST_ASSERT_EQ(a.on_self[0].stacks, uint32_t{1});
+
+    // A long effect keeps its countdown however often renewed: it says when to
+    // use the skill again.
+    e.on_event(ev(at_s(1), buff(kMe, kMe, 2, 127'800'011, 20'000, 0, 12'780'001)));
+    proto::BuffApplied fury = buff(kMe, kMe, 2, 127'800'011, 20'000, 0, 12'780'001);
+    fury.renewed = true;
+    e.on_event(ev(at_s(15), fury));
+    e.on_event(ev(at_s(30), fury));
+    e.on_event(ev(at_s(45), fury));
+    const AuraSnapshot late = e.snapshot(at_s(50));
+    TEST_ASSERT_EQ(late.on_self.size(), size_t{1});
+    TEST_ASSERT(!late.on_self[0].sustained);
+}
+
+TEST_CASE(Auras, OneSkillsEffectsAreOneEntry) {
+    // Doom Shield put two effects on in the second capture, 120700271 and
+    // 120700071: two rows with one name.
+    AuraPlugin e = setup();
+    e.on_event(ev(at_s(1), buff(kMe, kMe, 1, 120'700'271, 5000, 0, 12'070'027)));
+    e.on_event(ev(at_s(1), buff(kMe, kMe, 2, 120'700'071, 6000, 0, 12'070'027)));
+    AuraSnapshot a = e.snapshot(at_s(1));
+    TEST_ASSERT_EQ(a.on_self.size(), size_t{1});
+    TEST_ASSERT_EQ(a.on_self[0].stacks, uint32_t{1});  // another effect is no stack
+    TEST_ASSERT_EQ(a.on_self[0].expires_at, at_s(7));
+
+    // The same skill from someone else is theirs.
+    e.on_event(ev(at_s(1), buff(kMe, kChanter, 3, 120'700'071, 6000, 0, 12'070'027)));
+    TEST_ASSERT_EQ(e.snapshot(at_s(1)).on_self.size(), size_t{2});
+}
+
+TEST_CASE(Auras, APassiveSentAgainIsNoStackAndGivesWayToItsProc) {
+    // A map sends each passive up to three times, under new instance numbers.
+    AuraPlugin e = setup();
+    e.on_event(ev(at_s(1), permanent_buff(kMe, 1, 127'300'001)));
+    e.on_event(ev(at_s(1), permanent_buff(kMe, 2, 127'300'001)));
+    e.on_event(ev(at_s(1), permanent_buff(kMe, 3, 127'300'001)));
+    AuraSnapshot a = e.snapshot(at_s(1));
+    TEST_ASSERT_EQ(a.on_self.size(), size_t{1});
+    TEST_ASSERT(a.on_self[0].permanent);
+    TEST_ASSERT_EQ(a.on_self[0].stacks, uint32_t{1});
+
+    // Punishing Benediction going off: the one entry counts it down, then is the
+    // passive again.
+    e.on_event(ev(at_s(2), buff(kMe, kMe, 4, 127'300'021, 10'000, 0, 12'730'002)));
+    a = e.snapshot(at_s(2));
+    TEST_ASSERT_EQ(a.on_self.size(), size_t{1});
+    TEST_ASSERT(!a.on_self[0].permanent);
+    TEST_ASSERT_EQ(a.on_self[0].expires_at, at_s(12));
+    TEST_ASSERT_EQ(a.on_self[0].stacks, uint32_t{1});
+    TEST_ASSERT(e.snapshot(at_s(13)).on_self[0].permanent);
 }
 
 TEST_CASE(Auras, InstancesStackAndARemovalTakesTheSoonest) {
@@ -157,7 +244,7 @@ TEST_CASE(Auras, TheTargetShowsOnlyTheLocalPlayersEffects) {
     e.on_event(ev(at_s(1), hit(kMe, kBoss, 1000)));
     e.on_event(ev(at_s(1), buff(kBoss, kMe, 1, 122'700'011, 8000, 0, 12'270'001)));
     e.on_event(ev(at_s(1), buff(kBoss, kChanter, 2, 182'900'071, 8000, 0, 18'290'007)));
-    e.on_event(ev(at_s(1), buff(kMe, kBoss, 3, kBossDebuff, 10'000, 0, 2'011'101)));
+    e.on_event(ev(at_s(1), buff(kMe, kBoss, 3, kBossDebuff, 10'000, 0, 1'604'420)));
     const AuraSnapshot a = e.snapshot(at_s(1));
     TEST_ASSERT_EQ(a.target, kBoss);
     TEST_ASSERT_EQ(a.on_target.size(), size_t{1});
@@ -165,7 +252,8 @@ TEST_CASE(Auras, TheTargetShowsOnlyTheLocalPlayersEffects) {
     TEST_ASSERT(a.on_target[0].mine);
     TEST_ASSERT_EQ(a.on_self.size(), size_t{1});
     TEST_ASSERT(a.on_self[0].hostile);
-    TEST_ASSERT_EQ(a.on_self[0].label, std::string("Effect 20111011"));
+    // An enemy's effect with no name takes the enemy's.
+    TEST_ASSERT_EQ(a.on_self[0].label, std::string("NPC #777"));
 
     TEST_ASSERT_EQ(a.target_label, std::string("NPC #777"));
 
@@ -186,14 +274,18 @@ TEST_CASE(Auras, EffectsSeenOnTheLocalPlayerAreRemembered) {
     e.on_event(ev(at_s(1), buff(kMe, kChanter, 1, kMantra, 2400, 0, kMantraSkill)));
     e.on_event(ev(at_s(1), buff(kMe, kMe, 2, kDodge, 3000, 0, kDodgeSkill)));
     e.on_event(ev(at_s(1), buff(kChanter, kChanter, 3, 181'600'211, 2400, 0, 18'160'021)));
-    e.on_event(ev(at_s(1), buff(kMe, kBoss, 4, kBossDebuff, 2400)));  // an enemy's: no choice
+    e.on_event(ev(at_s(1), buff(kMe, kBoss, 4, kBossDebuff, 2400)));  // an enemy's: to hide, not to watch
     e.tick(at_s(2));
     e.tick(at_s(10));  // long gone, still seen
     const AuraSnapshot a = e.snapshot(at_s(10));
     TEST_ASSERT(a.on_self.empty());
-    TEST_ASSERT_EQ(a.seen.size(), size_t{2});
+    TEST_ASSERT_EQ(a.seen.size(), size_t{3});
     TEST_ASSERT_EQ(a.seen[0].label, std::string("Dodge"));
-    TEST_ASSERT_EQ(a.seen[1].label, std::string("Undefeated Mantra"));
+    TEST_ASSERT(!a.seen[0].hostile);
+    TEST_ASSERT_EQ(a.seen[1].label, std::string("NPC #777"));
+    TEST_ASSERT(a.seen[1].hostile);
+    TEST_ASSERT_EQ(a.seen[1].key, kBossDebuff);
+    TEST_ASSERT_EQ(a.seen[2].label, std::string("Undefeated Mantra"));
 }
 
 // --- Cooldowns (01 38, 47 38, plugins/auras/data/cooldowns.tsv) ---

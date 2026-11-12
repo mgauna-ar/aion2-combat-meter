@@ -23,18 +23,24 @@ A window of its own, which you place like the meter's (unlock with Ctrl+Alt+L, d
   3 s). The game says when the offer ends, not how long it lasts, so it has no timer.
 
 Then, as bars:
-- **Your effects:** each is a bar, led by the icon of the skill behind it, showing what
+- **Your effects:** each is a bar, led by the icon of the skill behind it (or of the
+  scroll, food or potion), showing what
   share of its time is left, with the seconds on the right. A monster's effect has no
-  icon. Green bars are an ally's buffs, blue ones yours, red ones an
-  enemy's debuffs. Stacks show as "x2".
+  icon, and carries the monster's name when the effect has none. Green bars are an
+  ally's buffs, blue ones yours, red ones an enemy's debuffs. Stacks show as "x2".
+  They stay in the order they were put on: a renewal moves nothing.
+- **Kept-up effects:** a short effect renewed before it runs out, over and over (a
+  Chanter's mantra, 2.4 s renewed each second), is a full bar with no time: it is on
+  until the bar goes.
 - **Your cooldowns:** amber bars under "Cooldowns", each with its skill's icon, and "~"
   on an estimate. A skill coming back shows a green "Ready" bar for a moment. A skill
   with a second use ("+1 consecutive use") shows only once both are spent.
 - **Yours on your target:** under "On <enemy>": the biggest enemy you (or your summons)
   hit in the last 10 seconds, so in a boss fight with adds, the boss.
-- **The watch list:** the page's *Watch list* lists every buff seen on you this session.
-  A buff you switch on there shows as a red "Missing: <name>" line while it is not on
-  you: a Chanter's mantra, say.
+- **Watch and Hide:** the page's *Effects seen on you* lists every effect seen on you
+  this session, each with its number. **Watch** shows a red "Missing: <name>" line
+  while a buff is not on you: a Chanter's mantra, a scroll. **Hide** leaves an effect
+  off the overlay: a proc that comes and goes all fight.
 - **What it leaves out:** effects shorter than a second (a dodge's mark), and passives'
   effects, which never end. Both are settings.
 - **Hiding it:** locked, it can hide while the game is not in front, and outside
@@ -55,8 +61,9 @@ pulsing red frame, and a chain skill on offer its icon in a pulsing gold one.
 ## How exact it is
 
 - **Effects** come with the server's own durations and end times, so their bars are
-  exact. About four in five have a name from the skill table; monster, item and system
-  effects show as "Effect <number>".
+  exact. Names come from the effect table (questlog.gg's database: scrolls, food and potions too), then from the skill
+  behind the effect. One with neither shows as "Effect <number>", or under the name
+  of the monster that put it on you.
 - **Chain skills** and **your HP** are the game's own: it says when an offer starts and
   ends, and what your HP and max HP are.
 - **Cooldowns** are estimates, marked "~": the server sends none when you use a skill.
@@ -95,7 +102,8 @@ and saves as you go.
 | `show_ready` | true | A cooldown coming back shows "Ready" for a moment; as icons, ready skills stay lit. |
 | `low_hp_alert` | true | Flag your HP under `low_hp_percent`. |
 | `low_hp_percent` | 30 | Of your max HP, 5 to 90. |
-| `watch` | `[]` | Effects to flag while they are not on you: the skill codes the *Watch list* stores, at most 64. |
+| `watch` | `[]` | Effects to flag while they are not on you: the codes the page's **Watch** stores, at most 64. |
+| `hidden` | `[]` | Effects the overlay leaves out: the codes the page's **Hide** stores, at most 64. |
 | `hide_when_game_unfocused` | false | Hide it while neither the game nor the meter's window is in front, and while the game is not running. Applies only while locked. |
 | `show_in_dungeons_only` | false | Show it only in a dungeon (as the meter overlay's setting of that name). Applies only while locked. |
 
@@ -104,4 +112,5 @@ and saves as you go.
 How it decides who is who, which enemy is the target, and how the cooldowns are
 estimated is in this plugin's [`AGENTS.md`](AGENTS.md). `aion2meter-replay --auras`
 prints every effect put on and taken off, your skill uses and cooldown changes, and
-your chain skills offered and withdrawn.
+your chain skills offered and withdrawn; `--unnamed` counts the effects and skills no
+table names.

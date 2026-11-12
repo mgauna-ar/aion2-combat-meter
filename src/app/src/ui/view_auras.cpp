@@ -67,35 +67,84 @@ void alerts_card(const AppFrameInput& in, AppActions& out) {
     end_settings_card();
 }
 
+/// One row of the seen card: an effect, and whether it is watched or hidden.
+struct SeenChoice {
+    uint32_t key{0};
+    std::string label;
+    bool hostile{false};
+};
+
+/// Adds or drops `key` in a list capped at kMaxWatchedEffects. False when full.
+bool set_listed(std::vector<uint32_t>& list, uint32_t key, bool on) {
+    const auto it = std::find(list.begin(), list.end(), key);
+    if (!on) {
+        if (it != list.end()) list.erase(it);
+        return true;
+    }
+    if (it != list.end()) return true;
+    if (list.size() >= kMaxWatchedEffects) return false;
+    list.push_back(key);
+    return true;
+}
+
 void watch_card(const AppFrameInput& in, AppActions& out) {
-    begin_settings_card("##auras_watch", ICON_CHECKLIST, "WATCH LIST", colors::Violet);
+    begin_settings_card("##auras_watch", ICON_CHECKLIST, "EFFECTS SEEN ON YOU", colors::Violet);
     AuraSettings& a = in.settings->auras;
     ImGui::PushTextWrapPos(0.0f);
-    text_dim("Flagged on the aura overlay while they are not on you: a Chanter's mantra, a buff you keep up.");
+    text_dim("Watch: flagged on the overlay while it is not on you (a Chanter's mantra, a scroll). "
+             "Hide: left off the overlay (a proc that comes and goes all fight).");
     ImGui::PopTextWrapPos();
 
-    // The effects seen on you this session, then any watched one not seen yet.
-    std::vector<std::pair<uint32_t, std::string>> choices;
+    // The effects seen on you this session, then any watched or hidden one not seen yet.
+    std::vector<SeenChoice> choices;
     if (in.snapshot != nullptr) {
-        for (const auras::SeenEffect& e : in.snapshot->auras.seen) choices.emplace_back(e.key, e.label);
+        for (const auras::SeenEffect& e : in.snapshot->auras.seen) choices.push_back({e.key, e.label, e.hostile});
     }
-    for (const uint32_t key : a.watch) {
-        const bool listed = std::any_of(choices.begin(), choices.end(), [&](const auto& c) { return c.first == key; });
-        if (listed) continue;
-        const std::string_view name = game::skill_name(key);
-        choices.emplace_back(key, name.empty() ? "Effect " + std::to_string(key) : std::string(name));
-    }
+    const auto add_unseen = [&](const std::vector<uint32_t>& keys) {
+        for (const uint32_t key : keys) {
+            const bool listed =
+                std::any_of(choices.begin(), choices.end(), [&](const SeenChoice& c) { return c.key == key; });
+            if (listed) continue;
+            const std::string_view name = game::skill_name(key);
+            choices.push_back({key, name.empty() ? game::effect_label(key) : std::string(name), false});
+        }
+    };
+    add_unseen(a.watch);
+    add_unseen(a.hidden);
     if (choices.empty()) text_dim("Effects show up here once the plugin has seen them on you.");
-    for (const auto& [key, label] : choices) {
-        const auto it = std::find(a.watch.begin(), a.watch.end(), key);
-        bool watched = it != a.watch.end();
-        ImGui::PushID(static_cast<int>(key));
-        if (setting_switch(label.c_str(), nullptr, &watched, out)) {
-            if (!watched) {
-                a.watch.erase(std::find(a.watch.begin(), a.watch.end(), key));
-            } else if (a.watch.size() < kMaxWatchedEffects) {
-                a.watch.push_back(key);
-            }
+
+    const float chips = toggle_chip_width("Watch") + m(6.0f) + toggle_chip_width("Hide");
+    for (const SeenChoice& c : choices) {
+        ImGui::PushID(static_cast<int>(c.key));
+        bool watched = std::find(a.watch.begin(), a.watch.end(), c.key) != a.watch.end();
+        bool hidden = std::find(a.hidden.begin(), a.hidden.end(), c.key) != a.hidden.end();
+        ImGui::AlignTextToFramePadding();
+        if (c.hostile) {
+            text_colored_u32(colors::Danger, "%s", c.label.c_str());
+        } else {
+            ImGui::TextUnformatted(c.label.c_str());
+        }
+        // The key, so an effect with no name can be told from another, and reported.
+        ImGui::SameLine();
+        text_dim("%u", c.key);
+        ImGui::SameLine();
+        right_align(chips);
+        bool changed = false;
+        // An enemy's debuff is nothing to watch for.
+        if (c.hostile && !watched) {
+            ImGui::Dummy(ImVec2(toggle_chip_width("Watch"), 0.0f));
+        } else if (toggle_chip("Watch", &watched)) {
+            if (!set_listed(a.watch, c.key, watched)) watched = false;
+            changed = true;
+        }
+        ImGui::SameLine(0.0f, m(6.0f));
+        if (toggle_chip("Hide", &hidden)) {
+            if (!set_listed(a.hidden, c.key, hidden)) hidden = false;
+            changed = true;
+        }
+        if (changed) {
+            out.settings_changed = true;
+            out.save_settings = true;
         }
         ImGui::PopID();
     }

@@ -101,6 +101,9 @@ struct AuraSettings {
     /// Effects (game::effect_key) to flag while they are not on the local player.
     /// Not in the key table: a list. Read and written by hand in app_settings.cpp.
     std::vector<uint32_t> watch;
+    /// Effects (game::effect_key) the overlay leaves out, on the local player and on
+    /// their target: a proc that comes and goes all fight. A list, as watch is.
+    std::vector<uint32_t> hidden;
     /// As the meter overlay's: while locked, only in a dungeon, and hidden while
     /// neither the game nor one of the meter's windows is in front.
     bool show_in_dungeons_only{false};

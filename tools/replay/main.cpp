@@ -51,6 +51,8 @@ void usage() {
                  "                    per line\n"
                  "  --auras           effects put on and taken off, and the local player's skill\n"
                  "                    uses, cooldown changes and chain skills on offer\n"
+                 "  --unnamed         the effects and skills no table names, counted: what an\n"
+                 "                    import of names should fill in\n"
                  "  --ping            each pong, and per connection how its echo and the\n"
                  "                    heartbeats spread: a capture has no ping, only its spread\n"
                  "  --opcodes         count, body sizes and parse failures per opcode\n"
@@ -112,6 +114,8 @@ bool parse_args(int argc, char** argv, Options& opt) {
             opt.report.events = true;
         } else if (arg == "--auras") {
             opt.report.auras = true;
+        } else if (arg == "--unnamed") {
+            opt.report.unnamed = true;
         } else if (arg == "--ping") {
             opt.report.ping = true;
         } else if (arg == "--opcodes") {
@@ -228,6 +232,7 @@ int main(int argc, char** argv) {
     pipe.end_fight(meter::EndReason::CaptureLost, last_ts);
     drain_fights();
     if (opt.report.ping) report.print_ping();
+    if (opt.report.unnamed) report.print_unnamed();
     if (opt.quiet) return 0;
 
     std::printf("\n%s: %" PRIu64 " packets, %" PRIu64 " TCP segments, %" PRIu64 " frames, %zu opcodes, %.1f s, "

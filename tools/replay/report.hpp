@@ -38,6 +38,8 @@ struct ReportOptions {
     bool casts{false};
     /// Each pong, and per connection how its echo and the heartbeats spread.
     bool ping{false};
+    /// The effects and skills no table names, counted.
+    bool unnamed{false};
     bool unknown{false};
     bool anonymize{false};
     bool dump_all{false};
@@ -67,6 +69,8 @@ public:
     void print_opcodes() const;
     /// Per connection: the pongs' spread and the heartbeats' jitter (--ping).
     void print_ping() const;
+    /// The effects and skills no table names, the most seen first (--unnamed).
+    void print_unnamed() const;
 
     [[nodiscard]] uint64_t frames() const;
     [[nodiscard]] size_t distinct_opcodes() const { return m_stats.size(); }
@@ -97,7 +101,19 @@ private:
         double jitter_max{0.0};
     };
 
+    /// What --unnamed gathers of one effect no table names.
+    struct UnnamedEffect {
+        uint64_t count{0};
+        uint64_t min_ms{0};
+        uint64_t max_ms{0};
+        bool permanent{false};
+        uint32_t source_skill{0};
+        /// Who put it on whom, as the last record said: "self", "player", an npc's name.
+        std::string from;
+    };
+
     void note_ping(const proto::ParsedEvent& event);
+    void note_unnamed(const proto::ParsedEvent& event, const meter::CombatantRegistry& registry);
     [[nodiscard]] double rel(Micros ts) const;
     [[nodiscard]] std::string who(uint32_t id, const meter::CombatantRegistry& registry) const;
     [[nodiscard]] std::string name(const std::string& real, uint32_t id) const;
@@ -112,6 +128,9 @@ private:
     /// The plugin's own sums, for the jitter. It follows the newest connection.
     ping::PingTracker m_ping;
     std::map<uint32_t, PingFlow> m_ping_flows;
+    std::map<uint32_t, UnnamedEffect> m_unnamed_effects;
+    /// Skill codes with no name, and how often they were used, hit or cast.
+    std::map<uint32_t, uint64_t> m_unnamed_skills;
 };
 
 } // namespace aion2::replay

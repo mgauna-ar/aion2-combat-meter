@@ -16,8 +16,9 @@
 
 namespace aion2::auras {
 
-/// One effect on someone, as an overlay shows it. The instances of one effect from
-/// one caster are one entry: a stack.
+/// One effect on someone, as an overlay shows it. Whatever one caster's skill put
+/// there is one entry (one effect_key): its instances, a stack, and its other
+/// effects, which share its name (Doom Shield's two).
 struct AuraEntry {
     /// effect_key: what a watch list names.
     uint32_t key{0};
@@ -30,6 +31,12 @@ struct AuraEntry {
     Micros expires_at{0};
     /// That instance's whole duration, for the length of a bar.
     uint64_t duration_ms{0};
+    /// When the entry's first running instance was put on: its place in the list.
+    Micros applied_at{0};
+    /// Kept up by renewals (AuraTracker::kSustainedSpans): a Chanter's mantra, which
+    /// lasts 2.4 s and is renewed each second. No countdown says anything of it.
+    bool sustained{false};
+    /// Instances of the entry's own effect id that end; a passive sent twice is one.
     uint32_t stacks{1};
     /// Put there by the local player, or by their summons.
     bool mine{false};
@@ -39,25 +46,28 @@ struct AuraEntry {
     bool operator==(const AuraEntry&) const = default;
 };
 
-/// A helpful effect seen on the local player this session: the watch list's choices.
+/// An effect seen on the local player this session: what a watch list or a hide
+/// list can name.
 struct SeenEffect {
     uint32_t key{0};
     std::string label;
+    /// An enemy's: one to hide, never one to watch for.
+    bool hostile{false};
 
     bool operator==(const SeenEffect&) const = default;
 };
 
 /// What the aura overlay draws.
 struct AuraSnapshot {
-    /// On the local player: buffs and debuffs, the soonest to end first and the
-    /// permanent ones last.
+    /// On the local player: buffs and debuffs, in the order they were put on, the
+    /// permanent ones last. A renewal moves nothing.
     std::vector<AuraEntry> on_self;
     /// The enemy the local player is fighting (Entities::target), and the effects
     /// they have on it.
     EntityId target{0};
     std::string target_label;
     std::vector<AuraEntry> on_target;
-    /// Every helpful effect seen on the local player since the plugin started, by label.
+    /// Every effect seen on the local player since the plugin started, by label.
     std::vector<SeenEffect> seen;
     /// The local player's skills used this session that have a cooldown, cooling or
     /// ready again, the soonest ready first.
@@ -88,15 +98,21 @@ public:
     /// How far ahead of its 21 36 a map's first effects can come: 0.4 s in the second
     /// capture. A map load keeps what was put on or renewed this close before it.
     static constexpr Micros kMapLoadLead = game::EffectBook::kMapLoadLead;
+    /// An effect this short or shorter, renewed, and now running for more than
+    /// kSustainedSpans of its own length, is kept up rather than counted down.
+    /// Longer ones keep their countdown however often renewed: Fury's 20 s says
+    /// when to use it again.
+    static constexpr uint64_t kSustainedMaxMs = 5000;
+    static constexpr uint64_t kSustainedSpans = 2;
 
     void on_heartbeat(uint64_t server_ms, Micros ts) noexcept;
     void on_applied(const proto::BuffApplied& b, Micros ts);
     void on_removed(const proto::BuffRemoved& b);
     void on_death(EntityId id);
     void on_map_load(Micros ts);
-    /// Drops what ran out by `now`, and notes the local player's helpful effects as
-    /// seen (their id is named only after their first effects arrive). An enemy's
-    /// debuff is no choice for a watch list.
+    /// Drops what ran out by `now`, and notes the local player's effects as seen
+    /// (their id is named only after their first effects arrive), an enemy's marked
+    /// hostile.
     void prune(Micros now, const Entities& entities);
 
     /// What the overlay draws at `now`: the local player's effects, and the local
@@ -112,8 +128,11 @@ private:
     [[nodiscard]] std::vector<AuraEntry> entries(EntityId id, Micros now, const Entities& entities,
                                                  bool only_mine) const;
 
+    /// An effect's name; one with none that an enemy put there takes the enemy's.
+    [[nodiscard]] static std::string label(const game::EffectInstance& i, const Entities& entities);
+
     game::EffectBook m_book;
-    std::map<uint32_t, std::string> m_seen;
+    std::map<uint32_t, SeenEffect> m_seen;
 };
 
 } // namespace aion2::auras
