@@ -29,23 +29,27 @@ void figures(const AppFrameInput& in) {
     const bool has_target = p.target.id != 0;
     const std::string target_value = has_target ? format_power(p.target.combat_power) : std::string("-");
     const std::string target_note = has_target ? p.target.name : std::string("Use a skill on a player");
+    // The second tile follows the list's order: the strongest, or the nearest.
+    const bool by_distance = in.settings->power.sort_by_distance && p.has_local_position && !p.nearest.empty();
     const bool listed = !p.players.empty();
-    const std::string top_value = listed ? format_power(p.players.front().combat_power) : std::string("-");
-    const std::string top_note =
-        listed ? p.players.front().name : std::string("No players in view yet");
+    const combat_power::PowerRow first = by_distance ? p.nearest.front() : listed ? p.players.front() : combat_power::PowerRow{};
+    const std::string top_value =
+        by_distance ? format_distance(first.distance_m) : listed ? format_power(first.combat_power) : std::string("-");
+    const std::string top_note = listed ? first.name : std::string("No players in view yet");
     const std::string in_view = std::to_string(p.in_view);
 
     const StatTileSpec tiles[] = {
         {"##tile_power_target", ICON_CROSSHAIR, "TARGET", target_value.c_str(),
          has_target ? colors::TextPrimary : colors::TextDim, target_note.c_str(), colors::Danger},
-        {"##tile_power_top", ICON_TRENDING, "STRONGEST", top_value.c_str(),
+        {"##tile_power_top", ICON_TRENDING, by_distance ? "NEAREST" : "STRONGEST", top_value.c_str(),
          listed ? colors::TextPrimary : colors::TextDim, top_note.c_str(), colors::Warning},
         {"##tile_power_view", ICON_EYE, "IN VIEW", in_view.c_str(), colors::TextPrimary, "Other players on this map",
          colors::Accent},
     };
     const char* const tooltips[] = {
         "The last player you used a skill on, for half a minute after it.",
-        "The highest combat power among the players the game has shown you on this map.",
+        by_distance ? "The player closest to where you last used a skill or entered the map."
+                    : "The highest combat power among the players the game has shown you on this map.",
         "Players the game has shown you on this map. The overlay lists the strongest of them.",
     };
     stat_tile_row(tiles, std::size(tiles), tooltips);
@@ -63,6 +67,11 @@ void display_card(const AppFrameInput& in, AppActions& out) {
     setting_slider("List up to", "In a crowd, the strongest this many, and a count of the rest.",
                    &p.list_max_players, kMinPowerList, kMaxPowerList, def.list_max_players, "%d players", out,
                    Applies::Overlay);
+    setting_switch("Sort by distance",
+                   "The nearest players first, each with how far they are. The game does not send you your own "
+                   "steps, so distances are measured from where you last used a skill or entered the map, and dim "
+                   "once that is a few seconds old.",
+                   &p.sort_by_distance, out, Applies::Overlay);
     end_settings_card();
 }
 

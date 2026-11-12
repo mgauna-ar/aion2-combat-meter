@@ -3,6 +3,7 @@
 #include "app/app_settings.hpp"
 #include "app/overlay_view.hpp"
 #include "combat_power/power_tracker.hpp"
+#include "common/micros.hpp"
 #include "pipeline/pipeline.hpp"
 
 #include <cstdint>
@@ -23,6 +24,13 @@ struct PowerFrameInput {
 /// "134,667"; "-" for a player whose record carried none.
 [[nodiscard]] std::string format_power(uint32_t combat_power);
 
+/// "12 m", "1,240 m"; "-" for a distance not known (negative).
+[[nodiscard]] std::string format_distance(float metres);
+
+/// How old the local player's position may be before the distances drawn from it
+/// are dimmed: they have walked on since, and the game has not said where to.
+inline constexpr Micros kDistanceStaleAfter = 5 * kMicrosPerSecond;
+
 /// What the overlay draws, as data: no ImGui here, so the tests check it on the Mac.
 struct PowerLayout {
     /// The target on a line of its own, above the list: only while they are not in
@@ -35,15 +43,21 @@ struct PowerLayout {
     combat_power::EntityId target{0};
     /// The strongest figure drawn, which the bars are measured against; 0 for none.
     uint32_t top{0};
-    /// The map's players the list leaves out: a crowd's weaker ones. 0 with the list
-    /// off.
+    /// The map's players the list leaves out: a crowd's weaker ones, or its farther
+    /// ones. 0 with the list off.
     uint32_t more{0};
+    /// Each row's distance is drawn: sort_by_distance, once the local player's
+    /// position is known. Until then the list stays strongest first.
+    bool distances{false};
+    /// Those distances are from a position older than kDistanceStaleAfter.
+    bool stale{false};
 
     [[nodiscard]] bool empty() const noexcept { return target_line.id == 0 && rows.empty(); }
 };
 
-/// With `show_list`, the map's list_max_players strongest, the target marked among
-/// them or on a line above them; without it, the target alone.
+/// With `show_list`, the map's list_max_players strongest (nearest, with
+/// `sort_by_distance`), the target marked among them or on a line above them;
+/// without it, the target alone.
 [[nodiscard]] PowerLayout power_layout(const combat_power::PowerSnapshot& power, const PowerSettings& settings);
 
 /// Draws the combat power overlay into the frame the caller has begun: a header to

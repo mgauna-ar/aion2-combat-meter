@@ -36,6 +36,16 @@ inline constexpr uint16_t BuffAdd = 0x2A38;
 inline constexpr uint16_t BuffRenew = 0x2B38;
 /// One instance of an effect left its target.
 inline constexpr uint16_t BuffRemove = 0x1A92;
+/// Someone moved: an id and where they are now (packet_parser.cpp, read_position).
+/// Six shapes of it, by what else they carry (a heading, a speed, a destination).
+inline constexpr uint16_t MoveStop = 0x1A37;
+inline constexpr uint16_t MoveStart = 0x1B37;
+inline constexpr uint16_t MoveStep = 0x1C37;
+inline constexpr uint16_t MovePath = 0x2937;
+inline constexpr uint16_t MoveJump = 0x2E37;
+inline constexpr uint16_t MoveAir = 0x2F37;
+/// A skill moved someone: a charge, a pull. The local player's own are sent too.
+inline constexpr uint16_t MoveBySkill = 0x3C37;
 /// Layout not known yet: kept raw for the replay tool's --unknown dump.
 inline constexpr uint16_t RemainingHp = 0x008D;
 inline constexpr uint16_t PartyRoster = 0x0297;
@@ -60,6 +70,13 @@ inline constexpr uint16_t Bundle = 0xFFFF;
         case opcode::CooldownSet: return "cooldown";
         case opcode::ChainOffered: return "chain_offered";
         case opcode::ChainWithdrawn: return "chain_withdrawn";
+        case opcode::MoveStop: return "move_stop";
+        case opcode::MoveStart: return "move_start";
+        case opcode::MoveStep: return "move_step";
+        case opcode::MovePath: return "move_path";
+        case opcode::MoveJump: return "move_jump";
+        case opcode::MoveAir: return "move_air";
+        case opcode::MoveBySkill: return "move_by_skill";
         case opcode::BuffAdd: return "buff_add";
         case opcode::BuffRenew: return "buff_renew";
         case opcode::BuffRemove: return "buff_remove";

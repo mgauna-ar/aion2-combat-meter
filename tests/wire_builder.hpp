@@ -207,6 +207,26 @@ inline Bytes identity_body(uint64_t id, std::string_view name, uint16_t server, 
     return b;
 }
 
+/// Where player_body and own_player_body put a player unless told otherwise: a
+/// spot in the second capture's town.
+inline constexpr float kTownX = -110'250.0f;
+inline constexpr float kTownY = -103'100.0f;
+inline constexpr float kTownZ = 21'912.0f;
+
+/// A movement packet: id, the bytes its opcode puts before the position
+/// (`header`: 00 00 for 1a 37; 05 03 or 04 for 1b 37, 1c 37 and 29 37; six for
+/// 2e 37; one for 2f 37 and 3c 37), x, y, z, then `tail` bytes not read.
+inline Bytes position_body(uint64_t id, const Bytes& header, float x, float y, float z, size_t tail = 4) {
+    Bytes b;
+    put_varint(b, id);
+    put_bytes(b, header);
+    put_f32(b, x);
+    put_f32(b, y);
+    put_f32(b, z);
+    b.resize(b.size() + tail, 0x5A);
+    return b;
+}
+
 /// The shapes the end of a real 45 36 took in the arena capture.
 enum class PlayerTrailer : uint8_t {
     /// The tag, a title, a rank, the combat power, five zeros: 63 of its 77.
@@ -224,12 +244,24 @@ enum class PlayerTrailer : uint8_t {
     NoTag,
 };
 
-/// 45 36 as the game sends it: the identity, some 1,200 bytes of gear and looks
-/// (filler here), then the tag's u32, a title and a rank (u32 each), the combat
-/// power and five zeros, as `trailer` varies them.
+/// 45 36 as the game sends it: the identity, two bytes, where the player stands,
+/// some 1,200 bytes of gear and looks (filler here), then the tag's u32, a title
+/// and a rank (u32 each), the combat power and five zeros, as `trailer` varies them.
 inline Bytes player_body(uint64_t id, std::string_view name, uint16_t server, uint32_t combat_power,
-                         PlayerTrailer trailer = PlayerTrailer::Plain) {
-    Bytes b = identity_body(id, name, server, 0x02010000);
+                         PlayerTrailer trailer = PlayerTrailer::Plain, float x = kTownX, float y = kTownY,
+                         float z = kTownZ) {
+    Bytes b;
+    put_varint(b, id);
+    put_le32(b, 0x00000101);
+    b.push_back(0x01);
+    b.push_back(static_cast<uint8_t>(name.size()));
+    put_bytes(b, bytes_of(name));
+    put_le16(b, server);
+    put_le32(b, 0x02010000);
+    put_le16(b, 0xD288);
+    put_f32(b, x);
+    put_f32(b, y);
+    put_f32(b, z);
     b.resize(b.size() + 1200, 0x64);
     if (trailer != PlayerTrailer::NoTag) put_le32(b, 0x1FCBF421);
     if (trailer != PlayerTrailer::Untitled) {
@@ -257,6 +289,20 @@ inline Bytes own_identity_body(uint64_t id, std::string_view name, uint16_t serv
     put_le16(b, server);
     put_le32(b, class_code);
     put_le32(b, 45);  // level
+    return b;
+}
+
+/// 33 36 as the game sends it, as far as it is read: the identity, 156 bytes on
+/// where the local player stands, then the rest of the record (filler).
+inline Bytes own_player_body(uint64_t id, std::string_view name, uint16_t server, float x = kTownX,
+                             float y = kTownY, float z = kTownZ) {
+    Bytes b = own_identity_body(id, name, server, 0x2D010000);
+    // own_identity_body's level is the first four of the 156.
+    b.resize(b.size() + 152, 0x64);
+    put_f32(b, x);
+    put_f32(b, y);
+    put_f32(b, z);
+    b.resize(b.size() + 400, 0x64);
     return b;
 }
 
@@ -466,6 +512,10 @@ struct BuffSpec {
     /// -1 for a permanent effect: the wire's all-ones duration.
     int64_t duration_ms{0};
     uint64_t expires_server_ms{0};
+    /// Where the caster stands.
+    float x{-111'445.2f};
+    float y{-103'490.4f};
+    float z{22'214.8f};
 };
 
 inline Bytes buff_body(const BuffSpec& s, bool renewed = false) {
@@ -481,9 +531,9 @@ inline Bytes buff_body(const BuffSpec& s, bool renewed = false) {
     b.push_back(s.level);
     if (s.skill != 0) put_le32(b, s.skill);
     b.push_back(renewed ? 0x02 : 0x00);
-    put_f32(b, -111'445.2f);
-    put_f32(b, -103'490.4f);
-    put_f32(b, 22'214.8f);
+    put_f32(b, s.x);
+    put_f32(b, s.y);
+    put_f32(b, s.z);
     return b;
 }
 

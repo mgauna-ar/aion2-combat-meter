@@ -4,6 +4,7 @@
 #include "app/imgui_guard.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
 
 namespace aion2::app {
@@ -18,19 +19,30 @@ std::string format_power(uint32_t combat_power) {
     return digits;
 }
 
+std::string format_distance(float metres) {
+    if (metres < 0.0f) return "-";
+    // Whole metres; in the thousands, grouped as the combat power is.
+    const auto whole = static_cast<uint32_t>(std::min(std::lround(metres), 9'999'999L));
+    return (whole == 0 ? std::string("0") : format_power(whole)) + " m";
+}
+
 PowerLayout power_layout(const combat_power::PowerSnapshot& power, const PowerSettings& settings) {
     PowerLayout layout;
+    layout.distances = settings.sort_by_distance && power.has_local_position;
+    layout.stale = layout.distances && power.local_position_age > kDistanceStaleAfter;
+    const std::vector<combat_power::PowerRow>& source = layout.distances ? power.nearest : power.players;
     if (settings.show_list) {
-        const size_t shown = std::min(power.players.size(), static_cast<size_t>(std::max(settings.list_max_players, 0)));
-        layout.rows.assign(power.players.begin(), power.players.begin() + static_cast<std::ptrdiff_t>(shown));
+        const size_t shown = std::min(source.size(), static_cast<size_t>(std::max(settings.list_max_players, 0)));
+        layout.rows.assign(source.begin(), source.begin() + static_cast<std::ptrdiff_t>(shown));
         layout.more = power.in_view > shown ? power.in_view - static_cast<uint32_t>(shown) : 0;
     }
     const bool listed = std::any_of(layout.rows.begin(), layout.rows.end(),
                                     [&](const combat_power::PowerRow& row) { return row.id == power.target.id; });
     if (listed) layout.target = power.target.id;
     else layout.target_line = power.target;
-    // Strongest first, as the tracker sorts them; the target may be stronger still.
-    layout.top = std::max(layout.rows.empty() ? 0u : layout.rows.front().combat_power, layout.target_line.combat_power);
+    // The bars stay combat power, against the strongest drawn, whatever the order.
+    layout.top = layout.target_line.combat_power;
+    for (const combat_power::PowerRow& row : layout.rows) layout.top = std::max(layout.top, row.combat_power);
     return layout;
 }
 
@@ -50,8 +62,10 @@ using chrome::u32;
 namespace {
 
 /// One player's row across the content width: a bar against the strongest, the
-/// class emblem, the name, and the combat power at the right edge.
-void draw_row(const combat_power::PowerRow& row, uint32_t top, bool target, float scale) {
+/// class emblem, the name, and the combat power at the right edge, with the
+/// distance before it where the layout draws distances.
+void draw_row(const combat_power::PowerRow& row, const PowerLayout& layout, bool target, float scale) {
+    const uint32_t top = layout.top;
     ImDrawList* dl = ImGui::GetWindowDrawList();
     const float line = ImGui::GetTextLineHeight();
     const float row_h = line + 8.0f * scale;
@@ -93,7 +107,17 @@ void draw_row(const combat_power::PowerRow& row, uint32_t top, bool target, floa
         power_w = ImGui::CalcTextSize(power.c_str()).x;
         chrome::text_right(dl, row_max.x - pad, ty, u32(row.combat_power != 0 ? colors::Text : colors::TextDim), power);
     }
-    const float name_w = row_max.x - pad - power_w - pad - name_x;
+    float name_w = row_max.x - pad - power_w - pad - name_x;
+    if (layout.distances) {
+        // A column of its own, as wide as a town's farthest, so the figures line up.
+        const float column = ImGui::CalcTextSize("999 m").x;
+        const float right = row_max.x - pad - power_w - 2.0f * pad;
+        if (right - column > name_x) {
+            chrome::text_right(dl, right, ty, u32(colors::TextDim, layout.stale ? 0.55f : 1.0f),
+                               format_distance(row.distance_m));
+            name_w = right - column - pad - name_x;
+        }
+    }
     if (name_w <= 0.0f) return;
     if (target) {
         const chrome::BoldScope bold;
@@ -129,10 +153,10 @@ OverlayActions draw_power(const PowerFrameInput& in) {
         const PowerLayout layout = power_layout(power, s);
         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(chrome::item_spacing(scale).x, 3.0f * scale));
         if (layout.target_line.id != 0) {
-            draw_row(layout.target_line, layout.top, true, scale);
+            draw_row(layout.target_line, layout, true, scale);
         }
         for (const combat_power::PowerRow& row : layout.rows) {
-            draw_row(row, layout.top, row.id == layout.target, scale);
+            draw_row(row, layout, row.id == layout.target, scale);
         }
         ImGui::PopStyleVar();
         if (layout.more != 0) {

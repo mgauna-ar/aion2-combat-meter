@@ -13,6 +13,10 @@ void PowerPlugin::on_event(const proto::ParsedEvent& event) {
         m_tracker.on_damage(*damage, event.ts);
     } else if (const auto* values = std::get_if<proto::RemainingHp>(&event.event)) {
         m_tracker.on_values(*values, event.connection);
+    } else if (const auto* position = std::get_if<proto::Position>(&event.event)) {
+        m_tracker.on_position(*position, event.connection, event.ts);
+    } else if (const auto* effect = std::get_if<proto::BuffApplied>(&event.event)) {
+        m_tracker.on_effect(*effect, event.connection, event.ts);
     } else if (const auto* map = std::get_if<proto::MapLoad>(&event.event)) {
         m_tracker.on_map_load(*map, event.connection, event.ts);
     }

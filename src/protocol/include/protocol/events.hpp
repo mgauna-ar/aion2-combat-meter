@@ -27,6 +27,24 @@ struct Pong {
     uint64_t server_ms{0};
 };
 
+/// A point in a map's own space, in the game's units: Unreal's centimetres, so two
+/// points 100 apart are a metre apart.
+struct Point {
+    float x{0.0f};
+    float y{0.0f};
+    float z{0.0f};
+
+    bool operator==(const Point&) const = default;
+};
+
+/// Where someone is: a movement packet (1a 37, 1b 37, 1c 37, 29 37, 2e 37, 2f 37) or
+/// a skill that moved them (3c 37). Players', NPCs' and summons' alike. The local
+/// player's own steps are never sent back to them: only 3c 37 names them here.
+struct Position {
+    EntityId id{0};
+    Point at;
+};
+
 /// A player's name and class: the local character (`own`), another player, or one
 /// found inside some other packet by scan_identities.
 struct Identity {
@@ -44,6 +62,11 @@ struct Identity {
     /// from the end of another player's record (read_combat_power); 0 for none. The
     /// local player's own record does not end with it.
     uint32_t combat_power{0};
+    /// Where they stood as the record was sent: coming into view, or, for the local
+    /// player, entering the map. False for a record too short to hold it, and for a
+    /// scanned one.
+    bool has_position{false};
+    Point position;
 };
 
 /// Something appeared: an NPC, a summon, a skill effect.
@@ -206,6 +229,11 @@ struct BuffApplied {
     uint64_t expires_server_ms{0};
     /// 2b 38: an instance already running was renewed.
     bool renewed{false};
+    /// Where the caster stood: the record's last three floats. In the arena capture
+    /// the opponent's effects sat on the opponent's own last position (0 units off),
+    /// the local player's a melee's reach from it. It is the one steady source of
+    /// the local player's own position.
+    Point caster_position;
 };
 
 /// 1a 92: one instance of an effect left its target, as it ran out or was removed.
@@ -258,7 +286,7 @@ struct ChainWithdrawn {
     uint32_t skill{0};
 };
 
-using Event = std::variant<Heartbeat, Identity, Spawn, Death, MapLoad, Damage, Tick, PartyRoster, RemainingHp,
+using Event = std::variant<Heartbeat, Identity, Position, Spawn, Death, MapLoad, Damage, Tick, PartyRoster, RemainingHp,
                            BuffApplied, BuffRemoved, SkillUsed, CooldownSet, SkillCast, ChainOffered, ChainWithdrawn,
                            Pong>;
 

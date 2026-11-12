@@ -253,14 +253,19 @@ void Report::on_event(const proto::ParsedEvent& pe, const meter::CombatantRegist
                 std::printf("%+.3f  cast      %s -> %s  %s (%u) %s\n", t, who(e.caster, reg).c_str(),
                             who(e.target, reg).c_str(), game::skill_label(e.skill).c_str(), e.skill,
                             e.pressed ? "pressed" : "proc");
-            } else if constexpr (std::is_same_v<T, proto::Heartbeat> || std::is_same_v<T, proto::Pong>) {
-                // Twenty heartbeats a second: the flow summary counts them. --ping
-                // prints the pongs.
+            } else if constexpr (std::is_same_v<T, proto::Heartbeat> || std::is_same_v<T, proto::Pong> ||
+                                 std::is_same_v<T, proto::Position>) {
+                // Twenty heartbeats a second, and as many steps in a town: the flow
+                // summary and --opcodes count them. --ping prints the pongs.
             } else if constexpr (std::is_same_v<T, proto::Identity>) {
                 std::printf("%+.3f  identity  %s%s %u \"%s\" server %u class %u", t, e.own ? "own " : "",
                             e.scanned ? "scanned" : "", e.id, name(e.name, e.id).c_str(), unsigned{e.server},
                             e.class_code);
                 if (e.combat_power != 0) std::printf(" cp %u", e.combat_power);
+                if (e.has_position) {
+                    std::printf(" at %.0f %.0f %.0f", static_cast<double>(e.position.x),
+                                static_cast<double>(e.position.y), static_cast<double>(e.position.z));
+                }
                 std::printf("\n");
             } else if constexpr (std::is_same_v<T, proto::Spawn>) {
                 std::printf("%+.3f  spawn     %u kind %02x npc %u%s", t, e.id, unsigned{e.kind}, e.npc_code,

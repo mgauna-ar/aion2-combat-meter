@@ -260,11 +260,30 @@ combat_power::PowerSnapshot power_demo() {
     combat_power::PowerSnapshot p;
     p.map_id = 61;
     p.players = {
-        {227, "Nezekan", 9, game::AionClass::Templar, 134'667},
-        {301, "Triniel", 9, game::AionClass::Assassin, 121'480},
+        {227, "Nezekan", 9, game::AionClass::Templar, 134'667, 3.0f},
+        {301, "Triniel", 9, game::AionClass::Assassin, 121'480, 14.0f},
     };
+    p.nearest = p.players;
+    p.has_local_position = true;
     p.in_view = static_cast<uint32_t>(p.players.size());
     p.target = p.players.front();
+    return p;
+}
+
+/// An open-world skirmish as the list sorted by distance has it: the nearest three
+/// of a dozen, the one being fought not the closest.
+combat_power::PowerSnapshot power_distance_demo() {
+    combat_power::PowerSnapshot p;
+    p.map_id = 1010;
+    p.nearest = {
+        {301, "Triniel", 9, game::AionClass::Assassin, 121'480, 4.0f},
+        {512, "Vaizel", 9, game::AionClass::Ranger, 98'300, 9.0f},
+        {227, "Nezekan", 9, game::AionClass::Templar, 134'667, 22.0f},
+    };
+    p.players = {p.nearest[2], p.nearest[0], p.nearest[1]};
+    p.has_local_position = true;
+    p.in_view = 12;
+    p.target = p.nearest[2];
     return p;
 }
 
@@ -528,6 +547,15 @@ int main(int argc, char** argv) {
     power_snapshot.power = power_demo();
     Scene power_scene{"overlay-combat-power.png", static_cast<float>(power_settings.width), 78.0f, power_snapshot};
     ok = render_power(power_scene, power_settings, out_dir) && ok;
+    // Sorted by distance: the nearest of a dozen, each with how far they are.
+    app::PowerSettings by_distance = power_settings;
+    by_distance.sort_by_distance = true;
+    by_distance.list_max_players = 3;
+    Scene distance_scene = power_scene;
+    distance_scene.file = "overlay-combat-power-distance.png";
+    distance_scene.height = 132.0f;
+    distance_scene.snapshot.power = power_distance_demo();
+    ok = render_power(distance_scene, by_distance, out_dir) && ok;
     if (all) {
         // Unlocked, with its header; and a crowd: the target above its strongest.
         app::PowerSettings unlocked = power_settings;

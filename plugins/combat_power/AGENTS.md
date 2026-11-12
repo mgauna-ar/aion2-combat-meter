@@ -7,9 +7,10 @@ threads, the protocol (the figure is under "Identity", Combat power) and the
 self-update. What a user sees and sets is in this plugin's [`README.md`](README.md).
 
 **What it is:** `PowerPlugin` (a `game::Plugin`) owns one part, `PowerTracker`, fed
-five events on the engine thread and the capture clock: identities (`33 36`,
-`45 36`), casts (`02 38`), damage (`04 38`), own values (`00 8D`) and map loads
-(`21 36`). It keeps its own record of who is on the map: no fight, no side, no NPC.
+on the engine thread and the capture clock: identities (`33 36`, `45 36`), casts
+(`02 38`), damage (`04 38`), own values (`00 8D`), map loads (`21 36`), and for
+distance the movement packets and effects (`2a 38`, `2b 38`). It keeps its own record
+of who is on the map: no fight, no side, no NPC.
 
 The app draws it: the combat power overlay (`src/app/src/power_view.cpp`) and the
 Combat Power page (`src/app/src/ui/view_power.cpp`).
@@ -79,6 +80,35 @@ carried no figure shows "-".
   showed them. A crowd shows its strongest instead.
 - **Why not the arena's map:** an arena's map id is known for one arena (61). A rule
   by id would miss every other, and the strongest few need none.
+
+## 📏 Distance (`sort_by_distance`)
+
+- **A player's position** is their last: their record's (`Identity::position`), a
+  movement packet's (`Position`), or an effect of theirs (`BuffApplied`, which
+  carries its caster's). Only listed players and the local player are placed.
+- **The local player's is never streamed.** The server does not send them their own
+  steps. It is known from their own record on each map, from every effect they
+  cast, and from a skill that moves them (`3c 37`). In the arena capture's fight
+  that was 202 effects in 133 s, a median 0.1 s apart and 10.9 s at worst; walking
+  with no skill, nothing.
+- **So a distance is from where they last acted,** and the snapshot says how long
+  ago that was (`local_position_age`). The view dims distances older than
+  `kDistanceStaleAfter` (5 s). Never extrapolate the local player's position: there
+  is nothing to extrapolate from.
+- **Metres:** the game's units are centimetres. Height counts.
+- **Two lists, one snapshot:** `players` (strongest first) and `nearest` (nearest
+  first, those at no known distance last, then by strength), `kMaxListed` each.
+  The view picks by the user's setting, so no setting crosses to the engine thread.
+- **No local position, no `nearest`:** the view then lists the strongest, as with
+  the sort off, rather than an order it cannot stand behind.
+- **Forgotten with the map:** the local player's position goes with a new
+  connection, a new id of theirs, or another map (but for one said in the
+  `kEarlyArrival` before its load); a player's goes with the player, and when their
+  id passes to someone else.
+- **The pressed cast's position is not used.** A press's tail (`02 38`, mode 2) holds
+  a heading and a point that was often the target's last position to the unit, and
+  at other times some metres off it: an aim point, perhaps. Not read until it is
+  understood.
 
 ---
 

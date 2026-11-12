@@ -54,6 +54,20 @@ proto::Damage hit(EntityId actor, EntityId target, uint32_t skill = kTemplarSkil
     return d;
 }
 
+proto::Position step(EntityId id, float x, float y, float z = 2400.0f) {
+    return proto::Position{id, proto::Point{x, y, z}};
+}
+
+/// An effect cast by `caster` from where they stand.
+proto::BuffApplied effect_from(EntityId caster, float x, float y, float z = 2400.0f) {
+    proto::BuffApplied b;
+    b.target = caster;
+    b.caster = caster;
+    b.buff_id = 120'900'001;
+    b.caster_position = proto::Point{x, y, z};
+    return b;
+}
+
 /// The local player and an arena opponent, on connection 2.
 PowerTracker duel() {
     PowerTracker t;
@@ -225,6 +239,170 @@ TEST_CASE(CombatPower, ThePipelineFeedsItOnlyWhileSwitchedOn) {
     off.combat_power = false;
     live.set_plugins(off, at(2));
     TEST_ASSERT_EQ(live.snapshot(at(2)).power.in_view, 0u);
+}
+
+TEST_CASE(CombatPower, DistanceIsFromWhereTheLocalPlayerLastActed) {
+    PowerTracker t;
+    t.on_map_load(proto::MapLoad{1, 61}, 2, at(0));
+    // Their own record places them on entering the map.
+    proto::Identity me = own(kMe);
+    me.has_position = true;
+    me.position = proto::Point{0.0f, 0.0f, 2400.0f};
+    t.on_identity(me, 2, at(1));
+    proto::Identity foe = player(227, "Nezekan", 134'667);
+    foe.has_position = true;
+    foe.position = proto::Point{3000.0f, 4000.0f, 2400.0f};
+    t.on_identity(foe, 2, at(1.4));
+    PowerSnapshot s = t.snapshot(at(2));
+    TEST_ASSERT(s.has_local_position);
+    TEST_ASSERT_EQ(s.local_position_age, from_seconds(1.0));
+    TEST_ASSERT_NEAR(s.players[0].distance_m, 50.0f, 1e-3f);  // 5,000 units
+    TEST_ASSERT_NEAR(s.nearest[0].distance_m, 50.0f, 1e-3f);
+
+    // The opponent's steps are sent; the local player's are not.
+    t.on_position(step(227, 300.0f, 400.0f), 2, at(10));
+    s = t.snapshot(at(11));
+    TEST_ASSERT_NEAR(s.players[0].distance_m, 5.0f, 1e-3f);
+    TEST_ASSERT_EQ(s.local_position_age, from_seconds(10.0));
+    // An effect they cast says where they stand now; so does a skill moving them.
+    t.on_effect(effect_from(kMe, 300.0f, 100.0f), 2, at(12));
+    s = t.snapshot(at(12));
+    TEST_ASSERT_NEAR(s.players[0].distance_m, 3.0f, 1e-3f);
+    TEST_ASSERT_EQ(s.local_position_age, Micros{0});
+    t.on_position(step(kMe, 300.0f, 400.0f, 2500.0f), 2, at(13));
+    TEST_ASSERT_NEAR(t.snapshot(at(13)).players[0].distance_m, 1.0f, 1e-3f);  // height counts
+    // The opponent's own effect moves the opponent, and the target carries it too.
+    t.on_cast(press(kMe, 227), at(14));
+    t.on_effect(effect_from(227, 300.0f, 1400.0f, 2500.0f), 2, at(14));
+    TEST_ASSERT_NEAR(t.snapshot(at(15)).target.distance_m, 10.0f, 1e-3f);
+
+    // Someone not listed, another connection's packet: no one is placed by them.
+    t.on_position(step(9001, 0.0f, 0.0f), 2, at(16));
+    t.on_position(step(227, 0.0f, 0.0f), 1, at(16));
+    t.on_effect(effect_from(kMe, 9000.0f, 9000.0f), 3, at(16));
+    TEST_ASSERT_NEAR(t.snapshot(at(17)).target.distance_m, 10.0f, 1e-3f);
+}
+
+TEST_CASE(CombatPower, WithNoPositionThereIsNoDistance) {
+    // The meter started mid-map: no record of the local player's own.
+    PowerTracker t = duel();
+    t.on_position(step(227, 300.0f, 400.0f), 2, at(2));
+    PowerSnapshot s = t.snapshot(at(3));
+    TEST_ASSERT_FALSE(s.has_local_position);
+    TEST_ASSERT_FALSE(s.players[0].has_distance());
+    TEST_ASSERT(s.nearest.empty());
+    // Once the local player acts, there is one.
+    t.on_effect(effect_from(kMe, 0.0f, 0.0f), 2, at(4));
+    s = t.snapshot(at(5));
+    TEST_ASSERT_NEAR(s.players[0].distance_m, 5.0f, 1e-3f);
+    // A player never placed has none, and comes last among the nearest.
+    t.on_identity(player(300, "Zikel", 201'900), 2, at(6));
+    s = t.snapshot(at(7));
+    TEST_ASSERT_EQ(s.players[0].name, std::string("Zikel"));
+    TEST_ASSERT_FALSE(s.players[0].has_distance());
+    TEST_ASSERT_EQ(s.nearest.size(), size_t{2});
+    TEST_ASSERT_EQ(s.nearest[0].name, std::string("Nezekan"));
+    TEST_ASSERT_EQ(s.nearest[1].name, std::string("Zikel"));
+}
+
+TEST_CASE(CombatPower, OfACrowdTheNearestAreListedNearestFirst) {
+    PowerTracker t = duel();
+    t.on_effect(effect_from(kMe, 0.0f, 0.0f), 2, at(2));
+    // A town: each one a metre farther than the last, the farthest the strongest.
+    const size_t crowd = PowerTracker::kMaxListed + 8;
+    for (size_t i = 0; i < crowd; ++i) {
+        const auto id = static_cast<EntityId>(1000 + i);
+        proto::Identity someone = player(id, ("Crowd" + std::to_string(i)).c_str(), static_cast<uint32_t>(50'000 + i));
+        someone.has_position = true;
+        someone.position = proto::Point{100.0f * static_cast<float>(i + 1), 0.0f, 2400.0f};
+        t.on_identity(someone, 2, at(3));
+    }
+    PowerSnapshot s = t.snapshot(at(4));
+    TEST_ASSERT_EQ(s.nearest.size(), PowerTracker::kMaxListed);
+    TEST_ASSERT_EQ(s.nearest[0].name, std::string("Crowd0"));
+    TEST_ASSERT_NEAR(s.nearest[0].distance_m, 1.0f, 1e-3f);
+    TEST_ASSERT_NEAR(s.nearest.back().distance_m, static_cast<float>(PowerTracker::kMaxListed), 1e-3f);
+    // The strongest are still the strongest: Nezekan, then the farthest.
+    TEST_ASSERT_EQ(s.players[0].name, std::string("Nezekan"));
+    TEST_ASSERT_EQ(s.players[1].name, "Crowd" + std::to_string(crowd - 1));
+    // One of them walks up.
+    t.on_position(step(static_cast<EntityId>(1000 + crowd - 1), 10.0f, 0.0f), 2, at(5));
+    s = t.snapshot(at(6));
+    TEST_ASSERT_EQ(s.nearest[0].name, "Crowd" + std::to_string(crowd - 1));
+    TEST_ASSERT_NEAR(s.nearest[0].distance_m, 0.1f, 1e-3f);
+}
+
+TEST_CASE(CombatPower, AnotherMapForgetsWhereEveryoneStood) {
+    PowerTracker t = duel();
+    t.on_effect(effect_from(kMe, 0.0f, 0.0f), 2, at(2));
+    t.on_position(step(227, 300.0f, 400.0f), 2, at(2));
+    TEST_ASSERT(t.snapshot(at(3)).has_local_position);
+    // The same connection, another map: the local player's old spot is gone, but
+    // for a record of theirs that came just ahead of the load.
+    t.on_map_load(proto::MapLoad{2, 1010}, 2, at(100));
+    TEST_ASSERT_FALSE(t.snapshot(at(101)).has_local_position);
+    t.on_effect(effect_from(kMe, 50.0f, 50.0f), 2, at(199));
+    t.on_map_load(proto::MapLoad{3, 62}, 2, at(200));
+    TEST_ASSERT(t.snapshot(at(201)).has_local_position);
+    // A newer connection, and a new id on it: nothing carries over.
+    t.on_identity(own(4987), 3, at(300));
+    TEST_ASSERT_FALSE(t.snapshot(at(301)).has_local_position);
+    // An id that passes to someone else does not keep the last holder's spot.
+    t.on_effect(effect_from(4987, 0.0f, 0.0f), 3, at(302));
+    proto::Identity first = player(700, "Lumiel", 90'000);
+    first.has_position = true;
+    first.position = proto::Point{500.0f, 0.0f, 2400.0f};
+    t.on_identity(first, 3, at(303));
+    TEST_ASSERT_NEAR(t.snapshot(at(304)).players[0].distance_m, 5.0f, 1e-3f);
+    t.on_identity(player(700, "Marchutan", 60'000), 3, at(305));
+    TEST_ASSERT_FALSE(t.snapshot(at(306)).players[0].has_distance());
+}
+
+TEST_CASE(PowerView, SortedByDistanceTheNearestAreListedWithTheirDistance) {
+    PowerTracker t = duel();
+    t.on_effect(effect_from(kMe, 0.0f, 0.0f), 2, at(2));
+    t.on_position(step(227, 1200.0f, 0.0f), 2, at(2));
+    proto::Identity strong = player(300, "Zikel", 201'900);
+    strong.has_position = true;
+    strong.position = proto::Point{4000.0f, 0.0f, 2400.0f};
+    t.on_identity(strong, 2, at(2));
+    app::PowerSettings settings;
+
+    // Off: strongest first, and no distances drawn.
+    app::PowerLayout layout = app::power_layout(t.snapshot(at(3)), settings);
+    TEST_ASSERT_FALSE(layout.distances);
+    TEST_ASSERT_EQ(layout.rows[0].name, std::string("Zikel"));
+    // On: nearest first; the bars still measure against the strongest drawn.
+    settings.sort_by_distance = true;
+    layout = app::power_layout(t.snapshot(at(3)), settings);
+    TEST_ASSERT(layout.distances);
+    TEST_ASSERT_FALSE(layout.stale);
+    TEST_ASSERT_EQ(layout.rows[0].name, std::string("Nezekan"));
+    TEST_ASSERT_NEAR(layout.rows[0].distance_m, 12.0f, 1e-3f);
+    TEST_ASSERT_EQ(layout.rows[1].name, std::string("Zikel"));
+    TEST_ASSERT_EQ(layout.top, 201'900u);
+    // Of more than the list holds, the nearest stay and the rest are counted.
+    settings.list_max_players = 1;
+    layout = app::power_layout(t.snapshot(at(3)), settings);
+    TEST_ASSERT_EQ(layout.rows.size(), size_t{1});
+    TEST_ASSERT_EQ(layout.rows[0].name, std::string("Nezekan"));
+    TEST_ASSERT_EQ(layout.more, 1u);
+    // The local player has not acted for a while: the same order, marked stale.
+    settings.list_max_players = 8;
+    layout = app::power_layout(t.snapshot(at(2) + app::kDistanceStaleAfter + 1), settings);
+    TEST_ASSERT(layout.distances && layout.stale);
+    // Their position not known at all: strongest first, as with the sort off.
+    const PowerTracker lost = duel();
+    layout = app::power_layout(lost.snapshot(at(3)), settings);
+    TEST_ASSERT_FALSE(layout.distances);
+    TEST_ASSERT_EQ(layout.rows.size(), size_t{1});
+}
+
+TEST_CASE(PowerView, FormatsADistanceInWholeMetres) {
+    TEST_ASSERT_EQ(app::format_distance(-1.0f), std::string("-"));
+    TEST_ASSERT_EQ(app::format_distance(0.2f), std::string("0 m"));
+    TEST_ASSERT_EQ(app::format_distance(11.6f), std::string("12 m"));
+    TEST_ASSERT_EQ(app::format_distance(1240.0f), std::string("1,240 m"));
 }
 
 TEST_CASE(PowerView, FormatsWithThousandsSeparators) {
