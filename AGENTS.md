@@ -332,7 +332,8 @@ below).
     the dungeon capture's Dodge 15000101 named the Sorcerer's weapon.
   - A spirit's attacks (1699xxxx) carry its summoner's class digits and have no name.
   - Names come from `src/game/data/skills.tsv`, taken from aion2.app's skill
-    database. Checked against the first capture: every Templar and Elementalist code
+    database; the skills it lists with no English name (33 of the Brawler's,
+    2026-11) take questlog.gg's. Checked against the first capture: every Templar and Elementalist code
     resolved to that class.
 - **Tick `05 38`:** target varint, effect u8, actor varint, a varint of unknown meaning,
   skill u32 (×100), amount varint.

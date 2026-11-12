@@ -42,11 +42,16 @@ A patch can add or rename skills. Rows the meter cannot name read "Skill 1234567
    ```bash
    mkdir -p /tmp/skills && for p in $(seq 1 12); do curl -sSL -o /tmp/skills/page$p.html "https://aion2.app/db/skills?page=$p"; sleep 1; done
    ```
-   Stop at the first page that lists no skills.
+   Stop at the first page that lists no skills. aion2.app lists some skills with no
+   English name (the Brawler's, since 2026-11); questlog.gg's list names them, so
+   take its pages into the same folder (`pageCount` in a page says how many):
+   ```bash
+   for p in $(seq 1 10); do curl -sSL -G -o /tmp/skills/questlog$p.json --data-urlencode "input={\"language\":\"en\",\"page\":$p}" "https://questlog.gg/aion-2/api/trpc/database.getSkills"; sleep 1; done
+   ```
 2. **Rebuild the table.** Run `python3 tools/gen_skill_table.py --import-pages /tmp/skills`.
    It rewrites `src/game/data/skills.tsv` (names, and each skill's icon) and
-   `skill_table.inc`. A skill the pages list with no English name keeps the name the
-   TSV had (the Brawler's, since 2026-11).
+   `skill_table.inc`. A skill aion2.app lists with no English name takes
+   questlog.gg's, or failing that keeps the name the TSV had.
 3. **Check the diff.** Renamed rows are expected. A class whose codes stopped starting
    with its two digits (`class_of_skill`) is not, and means the codes were renumbered.
 4. **Rebuild the icons**, when an icon column changed, here or in `effects.tsv` (3b) (`make test`'s `check-icons`

@@ -58,6 +58,8 @@ TEST_CASE(SkillNames, ClassComesFromTheFirstTwoDigits) {
     TEST_ASSERT(class_of_skill(17080000) == AionClass::Cleric);
     TEST_ASSERT(class_of_skill(18710000) == AionClass::Chanter);
     TEST_ASSERT(class_of_skill(19090000) == AionClass::Brawler);
+    // aion2.app lists the Brawler's skills unnamed: these are questlog.gg's.
+    TEST_ASSERT_EQ(std::string(skill_name(19010000)), std::string("Flurry"));
     // Shared skills (items, flight, system) and short codes have no class.
     TEST_ASSERT(class_of_skill(100032) == AionClass::Unknown);
     TEST_ASSERT(class_of_skill(4900202) == AionClass::Unknown);

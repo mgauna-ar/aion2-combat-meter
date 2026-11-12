@@ -6,9 +6,11 @@
 # name. The third column, when there is one, names the skill's icon, which
 # tools/gen_icon_sheet.py packs for the app.
 #
-# Source: aion2.app's skill database (aion2.app/db/skills), retrieved 2026-11-06;
+# Source: aion2.app's skill database (aion2.app/db/skills), retrieved 2026-11-12;
 # the site says its data comes from NCSOFT's official AION 2 API. English
-# names as the site lists them. Regenerate with tools/gen_skill_table.py.
+# names as the site lists them. A skill it lists without a name (the
+# Brawler's) takes questlog.gg's (questlog.gg/aion-2/en/db/skills).
+# Regenerate with tools/gen_skill_table.py.
 1001	Glide	ICON_CO_SKILL_004
 1002	Flight	ICON_CO_SKILL_011
 1003	Scan	ICON_CO_SKILL_009
@@ -28,7 +30,10 @@
 8000	Test_PLATE Equippable	ICON_TE_SKILL_001
 9079	DP Nezekan's Blessing	ICON_TE_SKILL_005
 9865	Vicious Strike	ICON_TE_SKILL_001
+9866	Decisive Strike	ICON_TE_SKILL_002
+9867	Desperate Strike	ICON_TE_SKILL_003
 9868	Pummel	ICON_TE_SKILL_006
+9869	Punishing Strike	ICON_TE_SKILL_014
 9871	Punishing Benediction	ICON_TE_SKILL_Passive_003
 4900202	Capture Lugi!	ICON_FE_Masquerade_Skill_ThrowTrap
 4900220	Fake Detector	ICON_FE_Masquerade_Skill_Search
@@ -443,11 +448,44 @@
 18790000	Survival Willpower	ICON_GL_SKILL_Passive_009
 18800000	Wind's Promise	ICON_CH_SKILL_Passive_008
 19000100	Dodge	ICON_CO_SKILL_001
-19090000	Smite Ground	ICON_GT_SKILL_009
+19010000	Flurry	ICON_GT_SKILL_001
+19020000	Torrent	ICON_GT_SKILL_002
+19030000	Beatdown	ICON_GT_SKILL_003
+19040000	Roundhouse	ICON_GT_SKILL_004
+19050000	Cross Hook	ICON_GT_SKILL_005
+19060000	Haymaker	ICON_GT_SKILL_006
+19070000	Whirlwind	ICON_GT_SKILL_007
+19090000	Ground Smash	ICON_GT_SKILL_009
 19130000	Rampage	ICON_GT_SKILL_013
-19280000	Rage	ICON_GT_SKILL_028
+19160000	Ascending Blow	ICON_GT_SKILL_016
+19170000	Sweeping Kick	ICON_GT_SKILL_017
+19200000	Exploding Fist	ICON_GT_SKILL_020
+19230000	Shoulder Tackle	ICON_GT_SKILL_023
+19250000	Typhoon Flurry	ICON_GT_SKILL_025
+19270000	Hurricane Kick	ICON_GT_SKILL_027
+19280000	Ferocity	ICON_GT_SKILL_028
+19290000	Surging Cleave	ICON_GT_SKILL_029
+19300000	Quake	ICON_GT_SKILL_030
+19310000	Pulverize	ICON_GT_SKILL_031
+19320000	Sever Bloodstream	ICON_GT_SKILL_032
+19330000	Phantom	ICON_GT_SKILL_033
 19350000	Focused Block	ICON_GT_SKILL_035
+19360000	Unstoppable	ICON_GT_SKILL_036
+19370000	Full Force	ICON_GT_SKILL_037
+19380000	Assault Blow	ICON_CO_SKILL_003
+19390000	Discharge Energy	ICON_GT_SKILL_039
+19400000	Time Bomb	ICON_GT_SKILL_040
+19410000	Rewind	ICON_GT_SKILL_041
+19420000	Chain Fist	ICON_GT_SKILL_042
 19450000	Defiance	ICON_CO_SKILL_002
 19460000	Flash Step	ICON_GT_SKILL_046
+19710000	Hold the Line	ICON_GT_SKILL_Passive_001
+19720000	Shatter Frontline	ICON_GT_SKILL_Passive_002
+19730000	Mental Conversion	ICON_GT_SKILL_Passive_003
+19740000	Dominance	ICON_GT_SKILL_Passive_004
+19750000	Rampage Boost	ICON_GT_SKILL_Passive_005
 19760000	Impact Hit	ICON_GT_SKILL_Passive_006
+19770000	Massive Rage	ICON_GT_SKILL_Passive_007
+19780000	Impact Blow	ICON_GT_SKILL_Passive_008
 19790000	Revitalization Contract	ICON_GT_SKILL_Passive_009
+19800000	Lightweight	ICON_GT_SKILL_Passive_010
