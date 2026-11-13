@@ -549,6 +549,21 @@ TEST_CASE(Parser, DeathAndMap) {
     TEST_ASSERT_EQ(map.load_count, 3u);
 }
 
+TEST_CASE(Parser, LeftView) {
+    PacketParser p;
+    const auto& left = only<LeftView>(parse_one(p, opcode::LeftView, left_view_body(7632)));
+    TEST_ASSERT_EQ(left.id, EntityId{7632});
+    TEST_ASSERT_EQ(left.reason, uint8_t{1});
+    TEST_ASSERT_EQ(only<LeftView>(parse_one(p, opcode::LeftView, left_view_body(14254, 10))).reason, uint8_t{10});
+    // A large id folds as everywhere else.
+    TEST_ASSERT_EQ(only<LeftView>(parse_one(p, opcode::LeftView, left_view_body(1'000'123))).id,
+                   normalize_entity_id(1'000'123));
+    // No id, or no reason after it, reads as nothing.
+    TEST_ASSERT(parse_one(p, opcode::LeftView, Bytes{}).empty());
+    TEST_ASSERT(parse_one(p, opcode::LeftView, Bytes{0x90, 0x4a}).empty());
+    TEST_ASSERT_EQ(p.stats().failed, uint64_t{2});
+}
+
 TEST_CASE(Parser, EntityValuesHpAndSelf) {
     PacketParser p;
     const auto& mob = only<RemainingHp>(parse_one(p, opcode::RemainingHp, hp_body(18024, 98'578)));

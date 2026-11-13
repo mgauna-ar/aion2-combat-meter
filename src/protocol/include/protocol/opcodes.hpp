@@ -18,6 +18,9 @@ inline constexpr uint16_t OwnCharacter = 0x3336;
 inline constexpr uint16_t OtherPlayer = 0x4536;
 inline constexpr uint16_t Spawn = 0x4136;
 inline constexpr uint16_t Death = 0x4236;
+/// Someone left the local player's view: walked off, died and was taken away, or
+/// left the map. Coming back sends their record again.
+inline constexpr uint16_t LeftView = 0x4736;
 inline constexpr uint16_t MapLoad = 0x2136;
 inline constexpr uint16_t Cast = 0x0238;
 inline constexpr uint16_t Damage = 0x0438;
@@ -62,6 +65,7 @@ inline constexpr uint16_t Bundle = 0xFFFF;
         case opcode::OtherPlayer: return "other_player";
         case opcode::Spawn: return "spawn";
         case opcode::Death: return "death";
+        case opcode::LeftView: return "left_view";
         case opcode::MapLoad: return "map_load";
         case opcode::Cast: return "cast";
         case opcode::Damage: return "damage";

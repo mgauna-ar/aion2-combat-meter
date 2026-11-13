@@ -108,12 +108,14 @@ void draw_row(const combat_power::PowerRow& row, const PowerLayout& layout, bool
         label = std::string(game::class_short(row.cls)) + " " + label;
     }
 
+    // A dead player's text fades: listed until they leave view, a threat no more.
+    const float fade = row.dead ? 0.45f : 1.0f;
     const std::string power = format_power(row.combat_power);
     float power_w = 0.0f;
     {
         const chrome::BoldScope bold;
         power_w = ImGui::CalcTextSize(power.c_str()).x;
-        chrome::text_right(dl, row_max.x - pad, ty, u32(row.combat_power != 0 ? colors::Text : colors::TextDim), power);
+        chrome::text_right(dl, row_max.x - pad, ty, u32(row.combat_power != 0 ? colors::Text : colors::TextDim, fade), power);
     }
     float name_w = row_max.x - pad - power_w - pad - name_x;
     if (layout.distances) {
@@ -121,7 +123,7 @@ void draw_row(const combat_power::PowerRow& row, const PowerLayout& layout, bool
         const float column = ImGui::CalcTextSize("999 m").x;
         const float right = row_max.x - pad - power_w - 2.0f * pad;
         if (right - column > name_x) {
-            chrome::text_right(dl, right, ty, u32(colors::TextDim, layout.stale ? 0.55f : 1.0f),
+            chrome::text_right(dl, right, ty, u32(colors::TextDim, (layout.stale ? 0.55f : 1.0f) * fade),
                                format_distance(row.distance_m));
             name_w = right - column - pad - name_x;
         }
@@ -131,9 +133,9 @@ void draw_row(const combat_power::PowerRow& row, const PowerLayout& layout, bool
     const Rgb name_color = row.hostile ? chrome::lighten(colors::Live, 0.25f) : colors::Text;
     if (target) {
         const chrome::BoldScope bold;
-        dl->AddText(ImVec2(name_x, ty), u32(name_color), chrome::fit(label, name_w).c_str());
+        dl->AddText(ImVec2(name_x, ty), u32(name_color, fade), chrome::fit(label, name_w).c_str());
     } else {
-        dl->AddText(ImVec2(name_x, ty), u32(name_color, row.hostile ? 1.0f : 0.90f), chrome::fit(label, name_w).c_str());
+        dl->AddText(ImVec2(name_x, ty), u32(name_color, (row.hostile ? 1.0f : 0.90f) * fade), chrome::fit(label, name_w).c_str());
     }
 }
 

@@ -17,12 +17,15 @@ A fourth window you place like the meter's (unlock with Ctrl+Alt+L, drag, resize
   the strongest.
 - **Your target** is the player you last used a skill on, for half a minute after it.
   In the list, their row carries a red stripe and a bold name.
-- **In a crowd** (a town, the open world) the list is the strongest players the game
-  has shown you on this map, as many as **List up to** (8 unless you change it), with
+- **In a crowd** (a town, the open world) the list is the strongest players in your
+  view, as many as **List up to** (8 unless you change it), with
   "+N more" under them. A target who is not among them shows on a line of their own
   above the list.
-- **Players who walk away stay listed** until the next map: nothing the meter reads
-  says a player has left your view.
+- **Players leave the list as they leave your view:** when they walk out of range,
+  or a second or two after they die. The game says so, and sends them again if they
+  come back.
+- **A player who dies** fades in the list until they are gone, and an enemy stops
+  leading it.
 - **Enemies come first, in red.** A player of the other faction has a red name and
   leads the list, ahead of your own faction's, from the moment they come into
   view: before they have done anything. See below for who counts as an enemy.
@@ -66,9 +69,9 @@ A fourth window you place like the meter's (unlock with Ctrl+Alt+L, drag, resize
   no one is marked there, and a member of your party is never marked anywhere.
 - **Not an arena opponent of your own faction.** Only the faction is read: someone
   you duel from your own side shows like anyone else.
-- **Out of reach, they lose their place, not their colour.** The game does not say
-  when a player leaves your view, so an enemy last seen more than 200 m away stops
-  leading the list. Their name stays red.
+- **Out of reach, they lose their place, not their colour.** An enemy more than
+  200 m from where you last used a skill stops leading the list, as does one who is
+  dead. Their name stays red.
 - **Until the game has sent your own record** (the meter started while you were
   already on a map) your faction is not known, and no one is marked. It comes with
   the next map.

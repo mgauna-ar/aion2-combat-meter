@@ -83,6 +83,8 @@ void PowerTracker::on_identity(const proto::Identity& identity, uint32_t connect
     if (!same) {
         // The id has passed to someone else.
         player.row = returned ? carried : PowerRow{};
+        // Back in view: whatever killed them before, they were sent again.
+        player.row.dead = false;
         if (m_target == identity.id) m_target = 0;
     }
     if (was_target) m_target = identity.id;
@@ -113,7 +115,7 @@ bool PowerTracker::hostile(const Player& player) const {
 }
 
 bool PowerTracker::threat(const Player& player) const {
-    if (!hostile(player)) return false;
+    if (player.row.dead || !hostile(player)) return false;
     if (!m_has_local_position || !player.has_position) return true;
     return metres_between(player.at, m_local_at) <= kEnemyRange;
 }
@@ -146,10 +148,24 @@ void PowerTracker::on_effect(const proto::BuffApplied& effect, uint32_t connecti
 }
 
 void PowerTracker::on_values(const proto::RemainingHp& values, uint32_t connection) {
-    if (values.id == 0 || !values.self) return;
+    if (values.id == 0) return;
+    if (!values.self) {
+        // Anyone else's HP: 0 is dead, anything above it up again.
+        if (!values.has_hp || !current(connection)) return;
+        if (const auto player = m_players.find(values.id); player != m_players.end()) {
+            player->second.row.dead = values.hp == 0;
+        }
+        return;
+    }
     if (!follow(connection) || m_players.contains(values.id)) return;
     if (m_local != values.id) m_has_local_position = false;
     m_local = values.id;
+}
+
+void PowerTracker::on_left_view(const proto::LeftView& left, uint32_t connection) {
+    // The local player's own id comes too (once, reason 4): they are never listed.
+    if (!current(connection) || left.id == m_local) return;
+    if (m_players.erase(left.id) != 0 && m_target == left.id) m_target = 0;
 }
 
 void PowerTracker::learn_class(EntityId id, uint32_t skill) {

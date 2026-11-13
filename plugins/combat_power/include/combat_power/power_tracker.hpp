@@ -30,6 +30,9 @@ struct PowerRow {
     /// An enemy (PowerTracker, An enemy): of the other faction, outside a dungeon and
     /// not in the local player's party. False while either's faction is not known.
     bool hostile{false};
+    /// Their HP reached 0 (00 8D) and has not risen since: no threat, whoever they
+    /// are. They leave view (47 36) a second or two later.
+    bool dead{false};
 
     [[nodiscard]] bool has_distance() const noexcept { return distance_m >= 0.0f; }
 
@@ -49,7 +52,7 @@ struct PowerSnapshot {
     /// position is known.
     std::vector<PowerRow> nearest;
     /// How many there are, listed or not, and how many of them are enemies within
-    /// PowerTracker::kEnemyRange: the ones that lead the lists.
+    /// PowerTracker::kEnemyRange and alive: the ones that lead the lists.
     uint32_t in_view{0};
     uint32_t hostile_in_view{0};
     uint32_t map_id{0};
@@ -83,8 +86,12 @@ struct PowerSnapshot {
  *   member of the local player's party (02 97) never is. A player of the local
  *   player's own faction is never one, an arena's opponent included.
  * - **An enemy leads the lists while within kEnemyRange,** or at no known
- *   distance. Nothing says a player has left view, so one last seen far away would
- *   otherwise lead the list for as long as the map lasts. They stay marked.
+ *   distance, and alive. The range stays although players now leave the list: the
+ *   local player's position can be stale, and an enemy at the edge of view is no
+ *   one about to engage. They stay marked either way.
+ * - **Who is in view:** a player leaves the list with their 47 36 (they walked out
+ *   of range, or died and were taken away), and comes back with their next 45 36.
+ *   Dead (their HP, 00 8D, at 0) they stay listed until then, but lead nothing.
  * - **Distance** is between a player's last position and the local player's, in
  *   metres (the game's units are centimetres). Other players' positions come all
  *   the time: their record as they come into view, every step they take. The local
@@ -113,7 +120,8 @@ public:
     static constexpr size_t kMaxPlayers = 2048;
 
     void on_identity(const proto::Identity& identity, uint32_t connection, Micros ts);
-    /// 00 8D: the local player's own values name them when 33 36 was missed.
+    /// 00 8D: the local player's own values name them when 33 36 was missed; anyone
+    /// else's HP says whether they are dead.
     void on_values(const proto::RemainingHp& values, uint32_t connection);
     void on_cast(const proto::SkillCast& cast, Micros ts);
     void on_damage(const proto::Damage& damage, Micros ts);
@@ -122,6 +130,8 @@ public:
     void on_position(const proto::Position& position, uint32_t connection, Micros ts);
     /// An effect put on or renewed: it says where its caster stands.
     void on_effect(const proto::BuffApplied& effect, uint32_t connection, Micros ts);
+    /// 47 36: a listed player left view, and the list.
+    void on_left_view(const proto::LeftView& left, uint32_t connection);
     /// 02 97: who the local player's party is now.
     void on_party(const proto::PartyRoster& roster);
     /// Forgets everything: the plugin was switched off.

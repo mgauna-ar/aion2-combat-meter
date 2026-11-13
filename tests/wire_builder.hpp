@@ -612,6 +612,14 @@ inline Bytes death_body(uint64_t id) {
     return b;
 }
 
+/// 47 36: an id, the reason byte, and the byte after it (00 in most).
+inline Bytes left_view_body(uint64_t id, uint8_t reason = 1) {
+    Bytes b;
+    put_varint(b, id);
+    put_bytes(b, {reason, 0x00});
+    return b;
+}
+
 inline Bytes map_load_body(uint32_t load_count, uint32_t map_id) {
     Bytes b;
     put_le32(b, load_count);

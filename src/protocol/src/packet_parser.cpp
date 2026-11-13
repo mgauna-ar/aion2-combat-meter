@@ -417,6 +417,7 @@ void PacketParser::parse(const Frame& frame, std::vector<ParsedEvent>& out) {
         case opcode::OtherPlayer:
         case opcode::Spawn:
         case opcode::Death:
+        case opcode::LeftView:
         case opcode::MapLoad:
         case opcode::Damage:
         case opcode::Tick:
@@ -500,6 +501,13 @@ bool PacketParser::parse_known(const Frame& frame, std::vector<ParsedEvent>& out
             const EntityId id = normalize_entity_id(r.varint());
             if (!r.ok() || id == 0) return false;
             emit(Death{id});
+            return true;
+        }
+        case opcode::LeftView: {
+            const EntityId id = normalize_entity_id(r.varint());
+            const uint8_t reason = r.u8();
+            if (!r.ok() || id == 0) return false;
+            emit(LeftView{id, reason});
             return true;
         }
         case opcode::MapLoad: {
