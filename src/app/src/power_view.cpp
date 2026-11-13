@@ -47,12 +47,14 @@ std::string format_distance(float metres) {
 PowerLayout power_layout(const combat_power::PowerSnapshot& power, const PowerSettings& settings) {
     PowerLayout layout;
     layout.distances = settings.sort_by_distance && power.has_local_position;
-    layout.stale = layout.distances && power.local_position_age > kDistanceStaleAfter;
-    std::vector<combat_power::PowerRow> source = layout.distances ? power.nearest : power.players;
+    layout.stale = layout.distances && power.local_position_stale;
+    // An order by distance from where the local player stood a while ago is no order.
+    const bool by_distance = layout.distances && !layout.stale;
+    std::vector<combat_power::PowerRow> source = by_distance ? power.nearest : power.players;
     if (!settings.enemies_first) {
         // The snapshot's lists lead with the enemies: back to one order for all.
         std::stable_sort(source.begin(), source.end(), [&](const auto& a, const auto& b) {
-            if (!layout.distances) return a.combat_power > b.combat_power;
+            if (!by_distance) return a.combat_power > b.combat_power;
             if (a.has_distance() != b.has_distance()) return a.has_distance();
             return a.has_distance() && a.distance_m < b.distance_m;
         });
@@ -106,10 +108,11 @@ void draw_row(const combat_power::PowerRow& row, const PowerLayout& layout, bool
     const float fade = row.dead ? 0.45f : 1.0f;
     // The distance has a column of its own, right of the bar, on the window's dark
     // ground where it reads plainly: as wide as a town's farthest, so the rows line
-    // up, and faded only when the position it is from is old.
+    // up. A "?", faded, while the local player's position is too old to measure
+    // from: a number there would be a guess drawn as a fact.
     float bar_width = width;
     if (layout.distances) {
-        const std::string distance = format_distance(row.distance_m);
+        const std::string distance = layout.stale ? std::string("?") : format_distance(row.distance_m);
         const float text_w = ImGui::CalcTextSize(distance.c_str()).x;
         const float inner = 6.0f * scale;
         const float column = std::max(ImGui::CalcTextSize("999 m").x, text_w) + 2.0f * inner;

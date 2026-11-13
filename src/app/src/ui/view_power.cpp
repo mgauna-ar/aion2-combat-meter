@@ -30,7 +30,7 @@ void figures(const AppFrameInput& in) {
     const std::string target_value = has_target ? format_power(p.target.combat_power) : std::string("-");
     const std::string target_note = has_target ? p.target.name : std::string("Use a skill on a player");
     // The second tile follows the list's order: the strongest, or the nearest.
-    const bool by_distance = in.settings->power.sort_by_distance && p.has_local_position && !p.nearest.empty();
+    const bool by_distance = in.settings->power.sort_by_distance && !p.nearest.empty();
     const bool listed = !p.players.empty();
     const combat_power::PowerRow first = by_distance ? p.nearest.front() : listed ? p.players.front() : combat_power::PowerRow{};
     const std::string top_value =
@@ -77,8 +77,8 @@ void display_card(const AppFrameInput& in, AppActions& out) {
                    &p.enemies_first, out, Applies::Overlay);
     setting_switch("Sort by distance",
                    "The nearest players first, each with how far they are. The game does not send you your own "
-                   "steps, so distances are measured from where you last used a skill or entered the map, and dim "
-                   "once that is a few seconds old.",
+                   "steps, so distances are measured from where you last used a skill or entered the map, and show "
+                   "as ? once that is a few seconds old, or a second after flying.",
                    &p.sort_by_distance, out, Applies::Overlay);
     end_settings_card();
 }

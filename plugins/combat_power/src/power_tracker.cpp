@@ -114,10 +114,17 @@ bool PowerTracker::hostile(const Player& player) const {
     return !m_party.contains(player.row.name);
 }
 
-bool PowerTracker::threat(const Player& player) const {
+bool PowerTracker::threat(const Player& player, bool measurable) const {
     if (player.row.dead || !hostile(player)) return false;
-    if (!m_has_local_position || !player.has_position) return true;
+    if (!measurable || !player.has_position) return true;
     return metres_between(player.at, m_local_at) <= kEnemyRange;
+}
+
+bool PowerTracker::local_stale(Micros now) const noexcept {
+    if (!m_has_local_position) return false;
+    const Micros age = now > m_local_at_ts ? now - m_local_at_ts : 0;
+    // Flying, the last position is a hundred metres behind within two seconds.
+    return age > (m_local_speed > kFastSpeed ? kFastPositionStaleAfter : kPositionStaleAfter);
 }
 
 void PowerTracker::on_party(const proto::PartyRoster& roster) {
@@ -128,6 +135,16 @@ void PowerTracker::on_party(const proto::PartyRoster& roster) {
 void PowerTracker::place(EntityId id, const proto::Point& at, Micros ts) {
     if (id == 0) return;
     if (id == m_local) {
+        if (!m_has_local_position) {
+            m_speed_from = at;
+            m_speed_from_ts = ts;
+            m_local_speed = 0.0f;
+        } else if (ts >= m_speed_from_ts + kSpeedWindow) {
+            const float seconds = static_cast<float>(ts - m_speed_from_ts) / static_cast<float>(kMicrosPerSecond);
+            m_local_speed = metres_between(at, m_speed_from) / seconds;
+            m_speed_from = at;
+            m_speed_from_ts = ts;
+        }
         m_has_local_position = true;
         m_local_at = at;
         m_local_at_ts = ts;
@@ -215,12 +232,15 @@ PowerSnapshot PowerTracker::snapshot(Micros now) const {
     s.in_view = static_cast<uint32_t>(m_players.size());
     s.has_local_position = m_local != 0 && m_has_local_position;
     if (s.has_local_position) s.local_position_age = now > m_local_at_ts ? now - m_local_at_ts : 0;
+    s.local_position_stale = s.has_local_position && local_stale(now);
+    // Distances, the range and the nearest only from a position worth measuring from.
+    const bool measurable = s.has_local_position && !s.local_position_stale;
 
     // A row with its distance worked out: only for the few a snapshot carries.
     const auto row_of = [&](const Player& player) {
         PowerRow row = player.row;
         row.hostile = hostile(player);
-        if (s.has_local_position && player.has_position) row.distance_m = metres_between(player.at, m_local_at);
+        if (measurable && player.has_position) row.distance_m = metres_between(player.at, m_local_at);
         return row;
     };
     if (m_target != 0 && now <= m_target_at + kTargetMemory) {
@@ -234,10 +254,10 @@ PowerSnapshot PowerTracker::snapshot(Micros now) const {
                    [](const auto& entry) { return &entry.second; });
     const auto listed = static_cast<std::ptrdiff_t>(std::min(rows.size(), kMaxListed));
     s.hostile_in_view = static_cast<uint32_t>(
-        std::count_if(rows.begin(), rows.end(), [&](const Player* p) { return threat(*p); }));
+        std::count_if(rows.begin(), rows.end(), [&](const Player* p) { return threat(*p, measurable); }));
     // Enemies lead either list: the cut at kMaxListed must not be what hides one.
     const auto stronger = [&](const Player* a, const Player* b) {
-        if (threat(*a) != threat(*b)) return threat(*a);
+        if (threat(*a, measurable) != threat(*b, measurable)) return threat(*a, measurable);
         if (a->row.combat_power != b->row.combat_power) return a->row.combat_power > b->row.combat_power;
         if (a->row.name != b->row.name) return a->row.name < b->row.name;
         return a->row.id < b->row.id;
@@ -245,7 +265,7 @@ PowerSnapshot PowerTracker::snapshot(Micros now) const {
     std::partial_sort(rows.begin(), rows.begin() + listed, rows.end(), stronger);
     s.players.reserve(static_cast<size_t>(listed));
     for (std::ptrdiff_t i = 0; i < listed; ++i) s.players.push_back(row_of(*rows[static_cast<size_t>(i)]));
-    if (!s.has_local_position) return s;
+    if (!measurable) return s;
 
     // The nearest: squared distances order as distances do. One whose position is
     // not known comes after all that are, the strongest of those first.
@@ -256,7 +276,7 @@ PowerSnapshot PowerTracker::snapshot(Micros now) const {
         return dx * dx + dy * dy + dz * dz;
     };
     std::partial_sort(rows.begin(), rows.begin() + listed, rows.end(), [&](const Player* a, const Player* b) {
-        if (threat(*a) != threat(*b)) return threat(*a);
+        if (threat(*a, true) != threat(*b, true)) return threat(*a, true);
         if (a->has_position != b->has_position) return a->has_position;
         if (a->has_position) {
             const float da = squared(a);

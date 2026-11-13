@@ -593,12 +593,23 @@ the three captures read as a point on their map):
   - `1b 37`, `1c 37` (they set off, they turn or go on) and `29 37` (a path, mostly
     monsters'): a flags byte, and one more when its lowest bit is set. 05 03 for a
     player's, 04 for a monster's, 03 03 or 02 on 29 37.
+  - `28 37` and `1e 37`, by the same rule (07 03, 05 03 or 04; 11 03 or 14). `28 37`
+    is players flying, most likely: most of the map-20 capture's 107 came from
+    players following the Abyss's Flight Circles, ten a second. `1e 37` came from
+    the dungeon capture's party (213 of 224); what sets it apart is not known. Of
+    the four captures' 172 and 224, 171 and 213 sat within 20 m of where that entity
+    was last placed, and every one was a point.
   - `2e 37` (a jump): six. `2f 37` (in the air): one.
   - `3c 37` (a skill moved them: a charge, a pull, with the skill's code after the
     point): one.
 - **Everyone's but the local player's.** The server does not send a player their own
   steps: in the arena match the opponent got 240 movement packets and the local
-  player none. Of these only `3c 37` names them (9 times in the match).
+  player none. Of these only `3c 37` names them (9 times in the match), and in the
+  other captures a stray `1a 37`, `1e 37` or `28 37`.
+  - **Nor their flight.** In the map-20 capture the local player flew 100 to 400 m
+    between their effects, and no packet in between carried a point on their path.
+    The four that name only them (`44 37`, `41 37`, `42 37`, `22 37`) are 2 to 4
+    bytes.
 - **A player's record** carries where they stand, after its "class" u32: a byte, a
   flags byte whose low four bits are 2 or 6 (D2, 52, 92, 12, D6), then x, y, z. In
   `45 36` that is straight after the class; in `33 36`, 154 bytes on. So the local
@@ -632,8 +643,13 @@ the three captures read as a point on their map):
   row in `maps.tsv` yet;
 - **the local player's position between their skills.** Nothing found streams it
   (above), so the Combat Power plugin's distances are from where they last cast an
-  effect. Whether some packet does (`1d 37`? a correction when they are pushed?)
-  needs a capture of walking with no skill used, against a player standing still;
+  effect, and none once that is stale. Whether some packet does (`1d 37`? a
+  correction when they are pushed?) needs a capture of walking with no skill used,
+  against a player standing still. Flying sends none (above);
+- the movement packets not read: `1f 37` (118 in the four captures) holds a point,
+  but 46 of them sat 20 to 200 m from where the entity was last placed (a
+  destination, perhaps); `23 37`, `24 37`, `2b 37` and `2a 37` do not read as one
+  rule;
 - what the point in a pressed cast's tail is (above);
 - what `47 36`'s two bytes after the id say (Left view, above): the first looks
   like a reason, 1 in most;
