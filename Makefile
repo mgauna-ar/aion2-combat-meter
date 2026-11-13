@@ -241,6 +241,17 @@ SHOTS_IMGUI_OBJS = $(patsubst %.cpp,$(SHOTS_BUILD)/obj/%.o,$(SHOTS_IMGUI_SRCS))
 screenshots: $(SHOTS_BUILD)/aion2_screenshots
 	TZ=UTC $(SHOTS_BUILD)/aion2_screenshots --font "$(SHOTS_FONT)" --bold "$(SHOTS_BOLD_FONT)" --out docs/images
 
+# The README's animation: the meter's overlay through the whole made-up fight, a
+# frame every half second of it, played at twice the speed. Needs ffmpeg, so it is
+# a target of its own; re-run it with `make screenshots` when the overlay changes.
+GIF_FRAMES = $(SHOTS_BUILD)/frames
+GIF_FILTER = split[a][b];[a]palettegen=stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle
+
+gif: $(SHOTS_BUILD)/aion2_screenshots
+	rm -rf $(GIF_FRAMES)
+	TZ=UTC $(SHOTS_BUILD)/aion2_screenshots --font "$(SHOTS_FONT)" --bold "$(SHOTS_BOLD_FONT)" --frames $(GIF_FRAMES) > /dev/null
+	ffmpeg -y -loglevel error -framerate 4 -i $(GIF_FRAMES)/frame-%03d.png -vf "$(GIF_FILTER)" -loop 0 docs/images/overlay-fight.gif
+
 $(SHOTS_BUILD)/aion2_screenshots: $(SHOTS_OBJS) $(SHOTS_IMGUI_OBJS)
 	$(CXX) $^ -o $@ -lz -pthread
 
@@ -275,4 +286,4 @@ clean:
 
 FORCE:
 
-.PHONY: all test replay tsan asan clean check-ui check-headers check-forbidden check-skills check-icons check-cooldowns check-maps check-npcs check-effects fixtures replay-smoke golden screenshots FORCE
+.PHONY: all test replay tsan asan clean check-ui check-headers check-forbidden check-skills check-icons check-cooldowns check-maps check-npcs check-effects fixtures replay-smoke golden screenshots gif FORCE

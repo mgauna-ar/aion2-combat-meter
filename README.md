@@ -17,9 +17,64 @@ The meter listens to incoming game network traffic on your PC (who hit what, wit
 | [📶 **Ping**](plugins/ping/README.md) | Displays real-time server latency, jitter (RFC 3550), and a rolling 2-minute latency graph. Measured passively off server responses—the meter sends no network pings of its own. | Disabled |
 | [🎯 **Combat Power**](plugins/combat_power/README.md) | Shows the combat power of the player you are fighting, and of the strongest players on the map with you: all of an arena's opponents or a dungeon's party. Can list the nearest players instead, with their distance. Read from what the game already sends as players come into view—nothing is looked up online. | Disabled |
 
-![The overlay during a boss fight: three players ranked by DPS, the boss's HP bar and the fight timer](docs/images/overlay-live.png)
+![The overlay through a whole boss fight, at twice the speed: three players trading places by DPS as the boss's HP bar falls, until the kill](docs/images/overlay-fight.gif)
 
-[Quick start](#-quick-start) · [Account safety](#%EF%B8%8F-account-safety) · [Controls](#-controls) · [Troubleshooting](#-troubleshooting) · [Configuration](#%EF%B8%8F-configuration) · [Building](#-building-from-source)
+[Screenshots](#-screenshots) · [Quick start](#-quick-start) · [Account safety](#%EF%B8%8F-account-safety) · [Controls](#-controls) · [Troubleshooting](#-troubleshooting) · [Configuration](#%EF%B8%8F-configuration) · [Building](#-building-from-source)
+
+---
+
+## 📸 Screenshots
+
+Every picture here is drawn by the app's own code from a made-up boss fight, with invented character names. Click one to see it full size.
+
+### Overlays
+
+The Combat Meter's overlay is the one above, playing a 48-second fight at twice the speed. The other three plugins each draw their own, which you can move, resize and switch on separately.
+
+<table>
+  <tr>
+    <th>✨ Auras, as bars</th>
+    <th>✨ Auras, as icons</th>
+    <th>📶 Ping and 🎯 Combat Power</th>
+  </tr>
+  <tr>
+    <td valign="top"><a href="docs/images/overlay-auras.png"><img src="docs/images/overlay-auras.png" width="246" alt="The aura overlay mid-fight: low HP, a missing watched buff, a chain skill on offer, three buffs with their time left, three cooldowns, and the player's effect on the boss"></a></td>
+    <td valign="top"><a href="docs/images/overlay-auras-icons.png"><img src="docs/images/overlay-auras-icons.png" width="246" alt="The aura overlay as icons: low HP, a missing buff and a chain skill on offer, three buffs, three cooldowns, and the player's effect on the boss"></a></td>
+    <td valign="top">
+      <a href="docs/images/overlay-ping.png"><img src="docs/images/overlay-ping.png" width="194" alt="The ping overlay: the ping in green, the jitter, a graph with one lag spike, and the least, average and most under it"></a><br>
+      <a href="docs/images/overlay-combat-power-distance.png"><img src="docs/images/overlay-combat-power-distance.png" width="231" alt="The combat power overlay sorted by distance: the three nearest players with their distance and combat power, the target third, and nine more counted"></a>
+    </td>
+  </tr>
+</table>
+
+### The app window
+
+Saved fights are grouped by dungeon visit. Pick one to see the party's ranking, then a player to see their skills.
+
+[![The app window's Combat Meter page: saved fights by map visit on the left, each with its boss and how it ended, the selected fight's ranking with the in-game window's hit columns, and one player's skills below](docs/images/app-damage.png)](docs/images/app-damage.png)
+
+Each fight also keeps its timeline, deaths, buff uptimes and casts:
+
+<table>
+  <tr>
+    <th>Timeline</th>
+    <th>Deaths</th>
+  </tr>
+  <tr>
+    <td><a href="docs/images/app-timeline.png"><img src="docs/images/app-timeline.png" width="380" alt="The Timeline tab: three players' DPS over a boss fight, the boss's HP falling, a death marked at 0:25, two bands of a party-wide buff, and the readout at the moment of the death"></a></td>
+    <td><a href="docs/images/app-deaths.png"><img src="docs/images/app-deaths.png" width="380" alt="The Deaths tab: one death with its killing blow, and the hits and heals in the 12 seconds before it"></a></td>
+  </tr>
+  <tr>
+    <th>Buffs &amp; Debuffs</th>
+    <th>Casts</th>
+  </tr>
+  <tr>
+    <td><a href="docs/images/app-buffs.png"><img src="docs/images/app-buffs.png" width="380" alt="The Buffs &amp; Debuffs tab: each buff on the party with who put it on, how often, for how long, and its uptime"></a></td>
+    <td><a href="docs/images/app-casts.png"><img src="docs/images/app-casts.png" width="380" alt="The Casts tab: three players ranked by casts a minute, and one player's skills with their casts, share, casts a minute, average gap and hits per cast"></a></td>
+  </tr>
+</table>
+
+Each plugin's own page has more: [Combat Meter](plugins/combat_meter/README.md), [Auras](plugins/auras/README.md), [Ping](plugins/ping/README.md), [Combat Power](plugins/combat_power/README.md).
 
 ---
 
@@ -184,6 +239,7 @@ make test
 | `make asan` | Runs all tests under AddressSanitizer and UndefinedBehaviorSanitizer. |
 | `make replay` | Builds the standalone `./aion2meter-replay` CLI tool. |
 | `make screenshots` | Re-renders documentation images in `docs/images/`. |
+| `make gif` | Re-renders the animated overlay at the top of this page (`docs/images/overlay-fight.gif`). Needs `ffmpeg`. |
 | `make fixtures` | Replays local captures in `tests/fixtures/local/` against their expected outputs. |
 
 ### Windows (Full Desktop Application)

@@ -2,13 +2,16 @@
 // drawing code.
 //
 //   aion2_screenshots --font FILE --bold FILE --out DIR [--all]
+//   aion2_screenshots --font FILE --bold FILE --frames DIR
 //
 // The made-up boss fight (tests/synthetic_session.hpp) is replayed through the
 // real pipeline, and draw_overlay and draw_app draw each scene into a software
 // rasterizer (canvas.cpp, from ffxiv-hub). Nothing here needs Windows or the game.
 // The fonts stand in for Segoe UI and Segoe UI Bold; `make screenshots` passes
 // Arial from macOS. --all also draws the app's other pages and the overlays
-// unlocked, for a look at them; the README does not use those.
+// unlocked, for a look at them; the README does not use those. --frames draws the
+// meter's overlay through the whole fight instead, a picture every half second of
+// it, which `make gif` joins into the README's animation.
 
 #include "canvas.hpp"
 #include "synthetic_session.hpp"
@@ -148,6 +151,40 @@ bool render(Scene& scene, const app::OverlaySettings& settings, const std::files
     }
     std::printf("wrote %s\n", path.string().c_str());
     return true;
+}
+
+/// The fight as the meter's overlay showed it, a picture every `kFrameStep` of it,
+/// from the first hit until the kill has stood for a few seconds. One pipeline
+/// runs through it, ticked at each picture's time as the engine ticks it live.
+constexpr double kFrameStep = 0.5;
+constexpr double kFramesAfterKill = 4.0;
+
+bool render_frames(const test::synthetic::Session& session, const app::OverlaySettings& settings,
+                   const std::filesystem::path& out_dir) {
+    std::string error;
+    auto reader = capture::CaptureFileReader::from_bytes(session.pcapng, error);
+    if (!reader) return false;
+    pipeline::Pipeline pipe;
+    capture::CapturedPacket pkt;
+    bool pending = reader->next(pkt);
+    const Micros start = test::synthetic::kStartMs * kMicrosPerMilli;
+    double ended_at = -1.0;
+    int count = 0;
+    for (double t = kFrameStep; pending || ended_at >= 0; t += kFrameStep) {
+        const Micros now = start + from_seconds(t);
+        for (; pending && pkt.ts <= now; pending = reader->next(pkt)) pipe.on_packet(pkt.link_type, pkt.data, pkt.ts);
+        pipe.tick(now);
+        if (ended_at < 0 && !pipe.take_finished().empty()) ended_at = t;
+        Scene scene{"", 430.0f, 215.0f, pipe.snapshot(now)};
+        // Nothing to show before the first hit.
+        if (count == 0 && !scene.snapshot.fight.live && ended_at < 0) continue;
+        char name[32];
+        std::snprintf(name, sizeof name, "frame-%03d.png", count++);
+        scene.file = name;
+        if (!render(scene, settings, out_dir)) return false;
+        if (ended_at >= 0 && t >= ended_at + kFramesAfterKill) break;
+    }
+    return count > 0;
 }
 
 /// What the Ping plugin would hold two minutes into a calm evening with one lag
@@ -443,6 +480,7 @@ int main(int argc, char** argv) {
     std::string font;
     std::string bold;
     std::filesystem::path out_dir;
+    std::filesystem::path frames_dir;
     bool all = false;
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
@@ -452,15 +490,16 @@ int main(int argc, char** argv) {
             if (arg == "--font") font = argv[i + 1];
             else if (arg == "--bold") bold = argv[i + 1];
             else if (arg == "--out") out_dir = argv[i + 1];
+            else if (arg == "--frames") frames_dir = argv[i + 1];
             ++i;
         }
     }
-    if (font.empty() || out_dir.empty()) {
-        std::fprintf(stderr, "usage: aion2_screenshots --font FILE [--bold FILE] --out DIR\n");
+    if (font.empty() || (out_dir.empty() && frames_dir.empty())) {
+        std::fprintf(stderr, "usage: aion2_screenshots --font FILE [--bold FILE] (--out DIR [--all] | --frames DIR)\n");
         return 2;
     }
     std::error_code ec;
-    std::filesystem::create_directories(out_dir, ec);
+    std::filesystem::create_directories(frames_dir.empty() ? out_dir : frames_dir, ec);
     if (!setup_imgui(font, bold)) return 1;
 
     const auto session = test::synthetic::boss_session();
@@ -468,6 +507,7 @@ int main(int argc, char** argv) {
     // unlocked overlay draws.
     app::OverlaySettings settings;
     settings.locked = true;
+    if (!frames_dir.empty()) return render_frames(session, settings, frames_dir) ? 0 : 1;
 
     Scene live{"overlay-live.png", 430.0f, 215.0f, replay_until(session, 30.0, nullptr)};
 

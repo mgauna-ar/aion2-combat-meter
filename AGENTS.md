@@ -107,7 +107,8 @@ License).
      plugin's `AGENTS.md` and `README.md`.
    - Each config key is documented once: the app's in README's Configuration, a
      plugin's in its own README.
-   - Anything a README picture shows means re-running `make screenshots`.
+   - Anything a README picture shows means re-running `make screenshots`, and
+     `make gif` when it is the meter's overlay.
 
 ---
 
@@ -179,7 +180,8 @@ tools/replay/    aion2meter-replay (every platform)
 tools/synth/     aion2meter-synth: writes the tests' made-up boss fight as a pcapng
 tools/screenshots/  renders docs/images from overlay_view and app_frame (software rasterizer from
                  ffxiv-hub), in UTC; --all also draws the pages the README does not show
-                 and the overlays unlocked
+                 and the overlays unlocked; --frames draws the meter's overlay through
+                 the whole fight, which `make gif` joins with ffmpeg
 tools/check_forbidden_apis.sh, tools/embed_icon_font.py
 tools/gen_app_icon.py            the app's mark (wings around a crystal, our own drawing)
                                  → app.ico and app_mark.inc
@@ -759,6 +761,7 @@ public: GitHub's API shows a private repository's releases to no anonymous calle
 | `make test` | macOS / Linux | Tests, header check, ImGui syntax check, forbidden-API check, replay smoke test. |
 | `make tsan`, `make asan` | macOS / Linux | The same tests under the sanitizers. |
 | `make screenshots` | macOS (zlib) | Re-renders `docs/images`. |
+| `make gif` | macOS (zlib, ffmpeg) | Re-renders the README's animation, `docs/images/overlay-fight.gif`: the meter's overlay through the made-up fight. |
 | `make fixtures` | anywhere | Your own captures against their `.expected.txt`. |
 | `aion2meter-replay --deaths --active --effects` | anywhere | A capture's fight detail, to check against what happened in game. |
 | `aion2meter-replay --ping` | anywhere | A capture's pongs, and per connection how their echo and the heartbeats spread. |
