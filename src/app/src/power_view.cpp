@@ -89,7 +89,7 @@ namespace {
 
 /// One player's row across the content width: a bar against the strongest, the
 /// class emblem, the name, and the combat power at the right edge, with the
-/// distance before it where the layout draws distances.
+/// distance in a column right of the bar where the layout draws distances.
 void draw_row(const combat_power::PowerRow& row, const PowerLayout& layout, bool target, float scale) {
     const uint32_t top = layout.top;
     ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -102,8 +102,25 @@ void draw_row(const combat_power::PowerRow& row, const PowerLayout& layout, bool
     ImGui::Dummy(ImVec2(width, row_h));
     if (width <= 0.0f) return;
 
+    // A dead player's text fades: listed until they leave view, a threat no more.
+    const float fade = row.dead ? 0.45f : 1.0f;
+    // The distance has a column of its own, right of the bar, on the window's dark
+    // ground where it reads plainly: as wide as a town's farthest, so the rows line
+    // up, and dimmed only when the position it is from is old.
+    float bar_width = width;
+    if (layout.distances) {
+        const std::string distance = format_distance(row.distance_m);
+        const float column = std::max(ImGui::CalcTextSize("999 m").x, ImGui::CalcTextSize(distance.c_str()).x);
+        const float gap = 6.0f * scale;
+        if (width - column - gap > 8.0f * line) {
+            bar_width = width - column - gap;
+            const float dy = origin.y + (row_h - line) * 0.5f - 0.5f * scale;
+            chrome::text_right(dl, origin.x + width, dy, u32(colors::Text, (layout.stale ? 0.55f : 1.0f) * fade),
+                               distance);
+        }
+    }
     const ImVec2 row_min = origin;
-    const ImVec2 row_max(origin.x + width, origin.y + row_h);
+    const ImVec2 row_max(origin.x + bar_width, origin.y + row_h);
     const float fraction =
         top != 0 ? std::clamp(static_cast<float>(row.combat_power) / static_cast<float>(top), 0.0f, 1.0f) : 0.0f;
     chrome::draw_bar(dl, row_min, row_max, fraction, class_color(row.cls), scale);
@@ -126,8 +143,6 @@ void draw_row(const combat_power::PowerRow& row, const PowerLayout& layout, bool
         label = std::string(game::class_short(row.cls)) + " " + label;
     }
 
-    // A dead player's text fades: listed until they leave view, a threat no more.
-    const float fade = row.dead ? 0.45f : 1.0f;
     const std::string power = format_power_short(row.combat_power);
     float power_w = 0.0f;
     {
@@ -135,25 +150,7 @@ void draw_row(const combat_power::PowerRow& row, const PowerLayout& layout, bool
         power_w = ImGui::CalcTextSize(power.c_str()).x;
         chrome::text_right(dl, row_max.x - pad, ty, u32(row.combat_power != 0 ? colors::Text : colors::TextDim, fade), power);
     }
-    float name_w = row_max.x - pad - power_w - pad - name_x;
-    if (layout.distances) {
-        // A column of its own, as wide as a town's farthest, so the figures line up.
-        const float column = ImGui::CalcTextSize("999 m").x;
-        const float right = row_max.x - pad - power_w - 2.0f * pad;
-        if (right - column > name_x) {
-            // On a dark pill of its own, so it reads over any class's bar, and in the
-            // text's own colour: dimmed only when the position it is from is old.
-            const std::string distance = format_distance(row.distance_m);
-            const float text_w = ImGui::CalcTextSize(distance.c_str()).x;
-            const float pill_pad = 4.0f * scale;
-            // The column's width, so the pills line up; a farther one's grows.
-            const ImVec2 pill_min(right - std::max(text_w, column) - pill_pad, origin.y + 3.0f * scale);
-            const ImVec2 pill_max(right + pill_pad, row_max.y - 3.0f * scale);
-            dl->AddRectFilled(pill_min, pill_max, u32(Rgb{0.0f, 0.0f, 0.0f}, 0.45f * fade), 4.0f * scale);
-            chrome::text_right(dl, right, ty, u32(colors::Text, (layout.stale ? 0.55f : 1.0f) * fade), distance);
-            name_w = right - column - 2.0f * pad - name_x;
-        }
-    }
+    const float name_w = row_max.x - pad - power_w - pad - name_x;
     if (name_w <= 0.0f) return;
     // An enemy's name is red, lightened to read over a class's bar.
     const Rgb name_color = row.hostile ? chrome::lighten(colors::Live, 0.25f) : colors::Text;

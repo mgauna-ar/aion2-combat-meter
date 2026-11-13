@@ -31,9 +31,8 @@ A fourth window you place like the meter's (unlock with Ctrl+Alt+L, drag, resize
   leads the list, ahead of your own faction's, from the moment they come into
   view: before they have done anything. See below for who counts as an enemy.
 - **Sorted by distance** (a switch on the page, off unless you turn it on) the list
-  is the nearest players instead, each with how far they are in metres, on a dark
-  pill of its own so it reads over any bar; it fades when it is more than 5 s old
-  (see below). The bars
+  is the nearest players instead, each with how far they are in metres, in a column
+  right of the bars; it fades when it is more than 5 s old (see below). The bars
   still compare combat power. See below for what the distance is measured from.
 
 ![The combat power overlay sorted by distance: an enemy 38 metres away in red at the top, then the two nearest players of your own faction, and nine more counted](../../docs/images/overlay-combat-power-distance.png)

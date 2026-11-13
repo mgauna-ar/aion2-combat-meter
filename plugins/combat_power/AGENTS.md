@@ -90,8 +90,9 @@ carried no figure shows "-".
 - **Figures in the overlay are short** (`format_power_short`: three figures, 135k,
   98.3k, 1.23M): the row's room goes to the name and the distance. The page's tiles
   keep `format_power`'s whole figure. The bars compare the whole figures.
-- **The distance sits on a dark pill,** one column wide so the rows line up, in
-  the text's colour: in the view's muted grey on a class's bar it was hard to read.
+- **The distance has a column right of the bar,** on the window's dark ground, in
+  the text's colour, one width for every row so they line up. Drawn in muted grey
+  on a class's bar it was hard to read. A window too narrow for it drops it.
 - **Never empty in a crowd.** The list once went away above `list_max_players`, and
   in a town that read as the overlay losing its players a few seconds after it
   showed them. A crowd shows its strongest instead.
