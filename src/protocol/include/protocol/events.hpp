@@ -37,7 +37,7 @@ struct Point {
     bool operator==(const Point&) const = default;
 };
 
-/// Where someone is: a movement packet (1a 37, 1b 37, 1c 37, 29 37, 2e 37, 2f 37) or
+/// Where someone is: a movement packet (1a 37, 1b 37, 1c 37, 1e 37, 28 37, 29 37, 2e 37, 2f 37) or
 /// a skill that moved them (3c 37). Players', NPCs' and summons' alike. The local
 /// player's own steps are never sent back to them: only 3c 37 names them here.
 struct Position {

@@ -129,6 +129,10 @@ TEST_CASE(Parser, MovementPacketsSayWhereSomeoneIs) {
              at(opcode::MovePath, {0x02}, 16'430, 15),
              at(opcode::MoveJump, {0x73, 0x25, 0xD9, 0xA7, 0x00, 0x01}, 227, 33),
              at(opcode::MoveAir, {0x02}, 227, 17),
+             at(opcode::MoveFlight, {0x07, 0x03}, 227, 14),
+             at(opcode::MoveFlight, {0x04}, 16'430, 15),
+             at(opcode::MoveOther, {0x11, 0x03}),
+             at(opcode::MoveOther, {0x14}, 227, 15),
              at(opcode::MoveBySkill, {0x03}, 227, 16),
          }) {
         TEST_ASSERT(pos.id == EntityId{227} || pos.id == EntityId{16'430});

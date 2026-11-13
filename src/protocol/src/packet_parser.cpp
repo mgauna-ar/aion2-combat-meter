@@ -163,16 +163,20 @@ bool read_tick(ByteReader& r, std::optional<Tick>& out) {
 
 /// How many bytes sit between a movement packet's id and its position.
 /// - 1a 37: two (00 00 in the captures).
-/// - 1b 37, 1c 37, 29 37: a flags byte, and one more when its lowest bit is set (05
-///   03 for a player's, 04 for a monster's).
+/// - 1b 37, 1c 37, 29 37, 28 37, 1e 37: a flags byte, and one more when its lowest
+///   bit is set (05 03 for a player's, 04 for a monster's).
 /// - 2e 37: six. 2f 37 and 3c 37: one.
 /// One rule read all 12,300 of them in the three captures as a point on their map.
+/// Of 28 37's 172 and 1e 37's 224 in the four, 171 and 213 sat within 20 m of where
+/// that entity was last placed, and every one was a point.
 [[nodiscard]] size_t position_header(uint16_t op, uint8_t first) noexcept {
     switch (op) {
         case opcode::MoveStop: return 2;
         case opcode::MoveStart:
         case opcode::MoveStep:
-        case opcode::MovePath: return (first & 0x01) != 0 ? 2 : 1;
+        case opcode::MovePath:
+        case opcode::MoveFlight:
+        case opcode::MoveOther: return (first & 0x01) != 0 ? 2 : 1;
         case opcode::MoveJump: return 6;
         default: return 1;
     }
@@ -437,6 +441,8 @@ void PacketParser::parse(const Frame& frame, std::vector<ParsedEvent>& out) {
         case opcode::MovePath:
         case opcode::MoveJump:
         case opcode::MoveAir:
+        case opcode::MoveFlight:
+        case opcode::MoveOther:
         case opcode::MoveBySkill:
             if (parse_known(frame, out)) {
                 ++m_stats.decoded;
@@ -599,6 +605,8 @@ bool PacketParser::parse_known(const Frame& frame, std::vector<ParsedEvent>& out
         case opcode::MovePath:
         case opcode::MoveJump:
         case opcode::MoveAir:
+        case opcode::MoveFlight:
+        case opcode::MoveOther:
         case opcode::MoveBySkill: {
             const auto position = read_position(r, frame.opcode);
             if (!position) return false;

@@ -24,7 +24,8 @@ struct PowerRow {
     /// 0 when their record carried none.
     uint32_t combat_power{0};
     /// How far they are from the local player, in metres; negative while either's
-    /// position is not known. As fresh as PowerSnapshot::local_position_age says.
+    /// position is not known. As fresh as PowerSnapshot::local_position_age says, and
+    /// no distance at all once PowerSnapshot::local_position_stale.
     float distance_m{-1.0f};
 
     /// An enemy (PowerTracker, An enemy): of the other faction, outside a dungeon and
@@ -48,8 +49,8 @@ struct PowerSnapshot {
     /// crowd the first PowerTracker::kMaxListed, so no crowd of allies hides an enemy.
     std::vector<PowerRow> players;
     /// The same players, the enemies within reach first, each group nearest first,
-    /// those at no known distance last: of a crowd, the first PowerTracker::kMaxListed. Empty until the local player's
-    /// position is known.
+    /// those at no known distance last: of a crowd, the first PowerTracker::kMaxListed.
+    /// Empty while the local player's position is not known, or stale.
     std::vector<PowerRow> nearest;
     /// How many there are, listed or not, and how many of them are enemies within
     /// PowerTracker::kEnemyRange and alive: the ones that lead the lists.
@@ -61,6 +62,10 @@ struct PowerSnapshot {
     /// where they last acted (PowerTracker, Distance).
     bool has_local_position{false};
     Micros local_position_age{0};
+    /// That position is too old to measure from (PowerTracker::kPositionStaleAfter,
+    /// sooner after moving fast): the rows' distances are not worked out, and an
+    /// enemy leads the lists at any distance, as when it is not known.
+    bool local_position_stale{false};
 
     bool operator==(const PowerSnapshot&) const = default;
 };
@@ -99,6 +104,9 @@ struct PowerSnapshot {
  *   is known from their record on entering the map, from each effect they cast
  *   (which carries the caster's position) and from a skill that moves them. So it
  *   is exact while they fight, and where they last acted while they only walk.
+ * - **A stale position measures nothing.** Older than kPositionStaleAfter, or than
+ *   kFastPositionStaleAfter once their last two positions put them above
+ *   kFastSpeed (flying), it gives no distances and no range.
  * - **Ids belong to a map.** A newer connection (entering or leaving a dungeon or an
  *   arena opens one) forgets everyone; so does another map over the same connection,
  *   but for those named in the kEarlyArrival before it, since a map's players can
@@ -118,6 +126,20 @@ public:
     static constexpr float kEnemyRange = 200.0f;
     /// Most players remembered; a misread flood stops here.
     static constexpr size_t kMaxPlayers = 2048;
+    /// How old the local player's position may be and still be measured from: on
+    /// foot (under 8 m/s between their positions in the captures) it is a few dozen
+    /// metres out by then.
+    static constexpr Micros kPositionStaleAfter = 5 * kMicrosPerSecond;
+    /// Faster than a run, in metres a second: the fourth capture's local player flew
+    /// the Abyss's Flight Circles at about 50, 100 to 400 m between their positions.
+    /// A dodge or a charge (10 to 25 on foot) passes it too, but comes amid skills.
+    static constexpr float kFastSpeed = 12.0f;
+    /// How old the position may be after moving faster than kFastSpeed.
+    static constexpr Micros kFastPositionStaleAfter = 1 * kMicrosPerSecond;
+    /// The least time between two positions of the local player that their speed is
+    /// worked out over: two effects of one skill land a few metres and milliseconds
+    /// apart.
+    static constexpr Micros kSpeedWindow = 300'000;
 
     void on_identity(const proto::Identity& identity, uint32_t connection, Micros ts);
     /// 00 8D: the local player's own values name them when 33 36 was missed; anyone
@@ -158,8 +180,11 @@ private:
     void learn_class(EntityId id, uint32_t skill);
     void aim(EntityId target, Micros ts);
     [[nodiscard]] bool hostile(const Player& player) const;
-    /// A hostile player near enough to lead the lists.
-    [[nodiscard]] bool threat(const Player& player) const;
+    /// A hostile player near enough to lead the lists; at any distance while the
+    /// local player's position cannot be measured from (`measurable` false).
+    [[nodiscard]] bool threat(const Player& player, bool measurable) const;
+    /// Whether the local player's position is too old to measure from at `now`.
+    [[nodiscard]] bool local_stale(Micros now) const noexcept;
     /// `id` stands at `at`: the local player, a listed player, or no one kept.
     void place(EntityId id, const proto::Point& at, Micros ts);
     /// Whether `connection` is the one being followed: ids from any other are
@@ -184,6 +209,11 @@ private:
     bool m_has_local_position{false};
     proto::Point m_local_at;
     Micros m_local_at_ts{0};
+    /// The position their speed is measured from, at least kSpeedWindow before the
+    /// next, and that speed (metres a second; 0 until two are known).
+    proto::Point m_speed_from;
+    Micros m_speed_from_ts{0};
+    float m_local_speed{0.0f};
 };
 
 } // namespace aion2::combat_power

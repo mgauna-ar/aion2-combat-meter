@@ -273,10 +273,17 @@ TEST_CASE(CombatPower, DistanceIsFromWhereTheLocalPlayerLastActed) {
     TEST_ASSERT_NEAR(s.nearest[0].distance_m, 50.0f, 1e-3f);
 
     // The opponent's steps are sent; the local player's are not.
-    t.on_position(step(227, 300.0f, 400.0f), 2, at(10));
-    s = t.snapshot(at(11));
+    t.on_position(step(227, 300.0f, 400.0f), 2, at(3));
+    s = t.snapshot(at(4));
     TEST_ASSERT_NEAR(s.players[0].distance_m, 5.0f, 1e-3f);
+    TEST_ASSERT_EQ(s.local_position_age, from_seconds(3.0));
+    TEST_ASSERT_FALSE(s.local_position_stale);
+    // Ten seconds on, where they stood says nothing of where they are.
+    s = t.snapshot(at(11));
+    TEST_ASSERT(s.has_local_position && s.local_position_stale);
     TEST_ASSERT_EQ(s.local_position_age, from_seconds(10.0));
+    TEST_ASSERT_FALSE(s.players[0].has_distance());
+    TEST_ASSERT(s.nearest.empty());
     // An effect they cast says where they stand now; so does a skill moving them.
     t.on_effect(effect_from(kMe, 300.0f, 100.0f), 2, at(12));
     s = t.snapshot(at(12));
@@ -294,6 +301,53 @@ TEST_CASE(CombatPower, DistanceIsFromWhereTheLocalPlayerLastActed) {
     t.on_position(step(227, 0.0f, 0.0f), 1, at(16));
     t.on_effect(effect_from(kMe, 9000.0f, 9000.0f), 3, at(16));
     TEST_ASSERT_NEAR(t.snapshot(at(17)).target.distance_m, 10.0f, 1e-3f);
+}
+
+TEST_CASE(CombatPower, AfterFlyingThePositionIsStaleInASecond) {
+    PowerTracker t = duel();
+    t.on_position(step(227, 300.0f, 400.0f), 2, at(2));
+    // On foot: four metres in a second, measured from for five.
+    t.on_effect(effect_from(kMe, 0.0f, 0.0f), 2, at(2));
+    t.on_effect(effect_from(kMe, 400.0f, 0.0f), 2, at(3));
+    TEST_ASSERT_FALSE(t.snapshot(at(7.5)).local_position_stale);
+    TEST_ASSERT(t.snapshot(at(8.5)).local_position_stale);
+    // Standing, then a hundred metres in two seconds: flying a Flight Circle.
+    t.on_effect(effect_from(kMe, 400.0f, 0.0f), 2, at(10));
+    t.on_effect(effect_from(kMe, 10'400.0f, 0.0f), 2, at(12));
+    TEST_ASSERT_FALSE(t.snapshot(at(12.5)).local_position_stale);
+    PowerSnapshot s = t.snapshot(at(13.5));
+    TEST_ASSERT(s.local_position_stale);
+    TEST_ASSERT_FALSE(s.players[0].has_distance());
+    // Two effects of one skill a tenth of a second apart measure no speed: still
+    // flying.
+    t.on_effect(effect_from(kMe, 10'450.0f, 0.0f), 2, at(12.1));
+    TEST_ASSERT(t.snapshot(at(13.5)).local_position_stale);
+    // Landed and fighting: a few metres in eight seconds is on foot again.
+    t.on_effect(effect_from(kMe, 10'500.0f, 0.0f), 2, at(20));
+    TEST_ASSERT_FALSE(t.snapshot(at(23)).local_position_stale);
+    // A new map starts the measure over: one position is no speed.
+    t.on_map_load(proto::MapLoad{2, 1010}, 2, at(100));
+    t.on_effect(effect_from(kMe, 90'000.0f, 0.0f), 2, at(101));
+    TEST_ASSERT_FALSE(t.snapshot(at(103)).local_position_stale);
+}
+
+TEST_CASE(CombatPower, AnEnemyLeadsAtAnyDistanceFromAStalePosition) {
+    PowerTracker t;
+    t.on_map_load(proto::MapLoad{1, 20}, 2, at(0));
+    proto::Identity me = own(kMe);
+    me.has_position = true;
+    me.position = proto::Point{0.0f, 0.0f, 2400.0f};
+    t.on_identity(me, 2, at(1));
+    // They flew 300 m with no skill used: the enemy beside them reads 300 m off.
+    t.on_identity(placed(300, "Zikel", 90'000, 2, 300.0f), 2, at(1));
+    t.on_identity(placed(301, "Lumiel", 204'221, 1, 5.0f), 2, at(1));
+    PowerSnapshot s = t.snapshot(at(2));
+    TEST_ASSERT_EQ(s.hostile_in_view, 0u);
+    TEST_ASSERT_EQ(s.players[0].name, std::string("Lumiel"));
+    // Once that position is stale, the range says nothing: the enemy leads.
+    s = t.snapshot(at(1) + PowerTracker::kPositionStaleAfter + 1);
+    TEST_ASSERT_EQ(s.hostile_in_view, 1u);
+    TEST_ASSERT_EQ(s.players[0].name, std::string("Zikel"));
 }
 
 TEST_CASE(CombatPower, WithNoPositionThereIsNoDistance) {
@@ -400,10 +454,17 @@ TEST_CASE(PowerView, SortedByDistanceTheNearestAreListedWithTheirDistance) {
     TEST_ASSERT_EQ(layout.rows.size(), size_t{1});
     TEST_ASSERT_EQ(layout.rows[0].name, std::string("Nezekan"));
     TEST_ASSERT_EQ(layout.more, 1u);
-    // The local player has not acted for a while: the same order, marked stale.
+    // The local player has not acted for a while: the column stays, with no
+    // distances in it, and the list is strongest first until they act.
     settings.list_max_players = 8;
-    layout = app::power_layout(t.snapshot(at(2) + app::kDistanceStaleAfter + 1), settings);
+    layout = app::power_layout(t.snapshot(at(2) + PowerTracker::kPositionStaleAfter + 1), settings);
     TEST_ASSERT(layout.distances && layout.stale);
+    TEST_ASSERT_EQ(layout.rows[0].name, std::string("Zikel"));
+    TEST_ASSERT_FALSE(layout.rows[0].has_distance());
+    settings.enemies_first = false;
+    layout = app::power_layout(t.snapshot(at(2) + PowerTracker::kPositionStaleAfter + 1), settings);
+    TEST_ASSERT_EQ(layout.rows[0].name, std::string("Zikel"));
+    settings.enemies_first = true;
     // Their position not known at all: strongest first, as with the sort off.
     const PowerTracker lost = duel();
     layout = app::power_layout(lost.snapshot(at(3)), settings);

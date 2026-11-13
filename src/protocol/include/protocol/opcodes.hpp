@@ -47,6 +47,13 @@ inline constexpr uint16_t MoveStep = 0x1C37;
 inline constexpr uint16_t MovePath = 0x2937;
 inline constexpr uint16_t MoveJump = 0x2E37;
 inline constexpr uint16_t MoveAir = 0x2F37;
+/// Players flying, by the map-20 capture: most of its 107 came from players
+/// following the Flight Circles there, a point every tenth of a second. What it
+/// says beyond the point is not known; the name is a guess.
+inline constexpr uint16_t MoveFlight = 0x2837;
+/// Players' movement of yet another shape (213 of the dungeon capture's 224); what
+/// sets it apart from 1b 37 and 1c 37 is not known.
+inline constexpr uint16_t MoveOther = 0x1E37;
 /// A skill moved someone: a charge, a pull. The local player's own are sent too.
 inline constexpr uint16_t MoveBySkill = 0x3C37;
 /// Layout not known yet: kept raw for the replay tool's --unknown dump.
@@ -80,6 +87,8 @@ inline constexpr uint16_t Bundle = 0xFFFF;
         case opcode::MovePath: return "move_path";
         case opcode::MoveJump: return "move_jump";
         case opcode::MoveAir: return "move_air";
+        case opcode::MoveFlight: return "move_flight";
+        case opcode::MoveOther: return "move_other";
         case opcode::MoveBySkill: return "move_by_skill";
         case opcode::BuffAdd: return "buff_add";
         case opcode::BuffRenew: return "buff_renew";

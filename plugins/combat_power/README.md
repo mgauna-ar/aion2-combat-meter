@@ -82,18 +82,23 @@ A fourth window you place like the meter's (unlock with Ctrl+Alt+L, drag, resize
 ## How distance is measured, and where it falls short
 
 - **Other players:** the game sends where each one is as they come into view and
-  with every step they take, so their side is current.
+  with every step they take, flying included, so their side is current.
 - **You:** the game never sends you your own steps. The plugin knows where you are
   from your own record as you enter a map, from every effect you cast (it carries
   where you stood), and from a skill that moves you, such as a charge.
 - **So it is exact while you fight** (in one arena match your position came several
-  times a second) **and stale while you only walk:** distances are then measured
-  from where you last used a skill. They dim once that is 5 seconds old; use any
-  skill and they are right again.
+  times a second) **and stale while you only walk or fly:** distances are then
+  measured from where you last used a skill.
+- **A stale position shows "?"** in each distance's badge, and the list goes back to
+  strongest first: 5 seconds after your last skill on foot, and 1 second after it
+  when you were moving faster than a run. Flying the Abyss's Flight Circles you
+  cover 100 metres in two seconds, and a number from where you were would put an
+  enemy beside you that far away. Use any skill and the distances are back.
+- **An enemy leads the list at any distance** while your position is stale, as
+  when it is not known: the 200-metre range needs to know where you are.
 - **Until your position is known** (the meter started while you stood somewhere, and
   you have not used a skill since) the list stays strongest first, with no
   distances.
-- **A player who has left your view** keeps the last place the game gave for them.
 - A metre is 100 of the game's units; height counts.
 
 ## Configuration

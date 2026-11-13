@@ -30,10 +30,6 @@ struct PowerFrameInput {
 /// "12 m", "1,240 m"; "-" for a distance not known (negative).
 [[nodiscard]] std::string format_distance(float metres);
 
-/// How old the local player's position may be before the distances drawn from it
-/// are dimmed: they have walked on since, and the game has not said where to.
-inline constexpr Micros kDistanceStaleAfter = 5 * kMicrosPerSecond;
-
 /// What the overlay draws, as data: no ImGui here, so the tests check it on the Mac.
 struct PowerLayout {
     /// The target on a line of its own, above the list: only while they are not in
@@ -52,7 +48,8 @@ struct PowerLayout {
     /// Each row's distance is drawn: sort_by_distance, once the local player's
     /// position is known. Until then the list stays strongest first.
     bool distances{false};
-    /// Those distances are from a position older than kDistanceStaleAfter.
+    /// That position is too old to measure from (PowerSnapshot::local_position_stale):
+    /// each distance is drawn as "?", and the list is strongest first until they act.
     bool stale{false};
 
     [[nodiscard]] bool empty() const noexcept { return target_line.id == 0 && rows.empty(); }

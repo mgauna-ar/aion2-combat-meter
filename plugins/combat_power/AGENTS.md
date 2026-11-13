@@ -133,17 +133,35 @@ carried no figure shows "-".
 ## 📏 Distance (`sort_by_distance`)
 
 - **A player's position** is their last: their record's (`Identity::position`), a
-  movement packet's (`Position`), or an effect of theirs (`BuffApplied`, which
-  carries its caster's). Only listed players and the local player are placed.
+  movement packet's (`Position`, flying included: `28 37`), or an effect of theirs
+  (`BuffApplied`, which carries its caster's). Only listed players and the local player are placed.
 - **The local player's is never streamed.** The server does not send them their own
   steps. It is known from their own record on each map, from every effect they
   cast, and from a skill that moves them (`3c 37`). In the arena capture's fight
   that was 202 effects in 133 s, a median 0.1 s apart and 10.9 s at worst; walking
   with no skill, nothing.
 - **So a distance is from where they last acted,** and the snapshot says how long
-  ago that was (`local_position_age`). The view dims distances older than
-  `kDistanceStaleAfter` (5 s). Never extrapolate the local player's position: there
-  is nothing to extrapolate from.
+  ago that was (`local_position_age`). Never extrapolate the local player's
+  position: there is nothing to extrapolate from.
+- **A stale position measures nothing** (`local_position_stale`): older than
+  `kPositionStaleAfter` (5 s), or than `kFastPositionStaleAfter` (1 s) once their
+  last two positions put them above `kFastSpeed` (12 m/s).
+  - **Why the speed:** in the map-20 capture the local player flew the Abyss's
+    Flight Circles at about 50 m/s, their positions (the circles' effects) 100 to
+    400 m apart. An enemy who came into view as they arrived read 360 m off, from a
+    position 15 s old, and 1.9 m at their first skill. On foot, the captures' speeds
+    between positions were under 8 m/s but for dodges and charges (10 to 25), which
+    come amid other skills.
+  - **The speed is measured** between two positions at least `kSpeedWindow` (0.3
+    s) apart, since one skill's effects land a few milliseconds apart; a new map or
+    connection starts it over.
+  - **Stale, the snapshot gives no distances** (rows at -1), **no `nearest`,** and
+    **no range:** an enemy leads at any distance, as with no position. An enemy
+    beside a player who flew in would otherwise read as out of range.
+  - **The view** keeps the distance column and draws "?" in it, faded, and lists
+    the strongest first: an order by distance from a stale point is no order. The
+    page's tile goes back to the strongest. A number there was a guess drawn as a
+    fact, and dimming it did not say so.
 - **Metres:** the game's units are centimetres. Height counts.
 - **Two lists, one snapshot:** `players` (strongest first) and `nearest` (nearest
   first, those at no known distance last, then by strength), `kMaxListed` each.
