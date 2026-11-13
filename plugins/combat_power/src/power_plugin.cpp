@@ -19,6 +19,8 @@ void PowerPlugin::on_event(const proto::ParsedEvent& event) {
         m_tracker.on_effect(*effect, event.connection, event.ts);
     } else if (const auto* roster = std::get_if<proto::PartyRoster>(&event.event)) {
         m_tracker.on_party(*roster);
+    } else if (const auto* left = std::get_if<proto::LeftView>(&event.event)) {
+        m_tracker.on_left_view(*left, event.connection);
     } else if (const auto* map = std::get_if<proto::MapLoad>(&event.event)) {
         m_tracker.on_map_load(*map, event.connection, event.ts);
     }

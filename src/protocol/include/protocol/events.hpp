@@ -124,6 +124,16 @@ struct Death {
     EntityId id{0};
 };
 
+/// 47 36: an entity left the local player's view. A player gets one as they walk
+/// out of range, and a second or two after their HP reaches 0. Whoever comes back
+/// into view is sent again (45 36, 41 36).
+struct LeftView {
+    EntityId id{0};
+    /// The byte after the id: 1 in most, 2, 4 and 10 in a few. What it says is not
+    /// known; every one of them means gone.
+    uint8_t reason{0};
+};
+
 struct MapLoad {
     uint32_t load_count{0};
     /// Whether it is a dungeon is game::is_dungeon's to say.
@@ -291,7 +301,7 @@ struct ChainWithdrawn {
     uint32_t skill{0};
 };
 
-using Event = std::variant<Heartbeat, Identity, Position, Spawn, Death, MapLoad, Damage, Tick, PartyRoster, RemainingHp,
+using Event = std::variant<Heartbeat, Identity, Position, Spawn, Death, LeftView, MapLoad, Damage, Tick, PartyRoster, RemainingHp,
                            BuffApplied, BuffRemoved, SkillUsed, CooldownSet, SkillCast, ChainOffered, ChainWithdrawn,
                            Pong>;
 

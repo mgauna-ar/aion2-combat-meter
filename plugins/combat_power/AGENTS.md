@@ -53,8 +53,20 @@ carried no figure shows "-".
     `kEarlyArrival` (2 s) before its `21 36`, since a map's records can come ahead of
     it.
   - The same map over the same connection is a reload, and keeps them.
-- **No one leaves.** No packet read says a player went out of view, so a map's list
-  only grows until the next map; `kMaxPlayers` (2,048) bounds it.
+- **Leaving view** (`on_left_view`): a player's `47 36` (`LeftView`) takes them off
+  the list, and the target with them. They walked out of range, or died and were
+  taken away a second or two later, or left the map. Back in view, the game sends
+  their record again, and that lists them again.
+  - On the current connection only. The local player's own id gets one too (once,
+    as they were moved 1.1 km): they are never listed, and stay the local player.
+  - **No silence timeout.** A player standing still sends nothing and is still
+    there: a town's idle crowd would empty out. A `47 36` lost to a capture gap
+    leaves that player listed until the next map, as every player was before.
+  - `kMaxPlayers` (2,048) still bounds the map's record.
+- **Dead** (`PowerRow::dead`): another player's HP (`00 8D`, not the local
+  player's own) at 0 marks them, above 0 clears it. A dead player stays listed
+  until their `47 36`, but is no threat (below). A new holder of their id starts
+  alive.
 
 ## 🎯 The target
 
@@ -75,6 +87,13 @@ carried no figure shows "-".
   the user's, and what the list leaves out is counted under it ("+N more"). A
   target in the list is marked in its row; one outside it, or with the list off,
   has a line of its own above.
+- **Figures in the overlay are short** (`format_power_short`: three figures, 135k,
+  98.3k, 1.23M): the row's room goes to the name and the distance. The page's tiles
+  keep `format_power`'s whole figure. The bars compare the whole figures.
+- **The distance has a column right of the bar,** on the window's dark ground, in
+  a yellow badge (a border and a faint fill, as tall as the bar) so it stands apart
+  from names and figures, one width for every row so they line up. Drawn in muted grey
+  on a class's bar it was hard to read. A window too narrow for it drops it.
 - **Never empty in a crowd.** The list once went away above `list_max_players`, and
   in a town that read as the overlay losing its players a few seconds after it
   showed them. A crowd shows its strongest instead.
@@ -96,10 +115,12 @@ carried no figure shows "-".
 - **A threat** is a hostile player within `kEnemyRange` (200 m), or at no known
   distance. Threats lead both lists, ahead of the cut at `kMaxListed`, so a crowd
   of stronger or nearer allies never hides one; `hostile_in_view` counts them.
-  - Why a range: nothing says a player has left view (above), so without it an
-    enemy passed ten minutes ago would lead the list for as long as the map lasts.
-    In the PvP capture one read 88 m as their record came, then 1,068 m as the
-    local player moved on.
+  - **A dead enemy is no threat:** marked still, they lead nothing, and the view
+    dims their row until they leave.
+  - Why a range, now that players leave the list: the local player's position can
+    be well out of date (below), and an enemy at the edge of view is not about to
+    engage. Before `47 36` was read it was what kept an enemy passed ten minutes
+    ago off the top.
   - It leans on the local player's position, stale as that can be (below): an
     enemy may keep or lose the lead a little late. The red name does not depend
     on it.

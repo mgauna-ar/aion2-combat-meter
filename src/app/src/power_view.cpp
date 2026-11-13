@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <cstdio>
 
 namespace aion2::app {
 
@@ -17,6 +18,23 @@ std::string format_power(uint32_t combat_power) {
         digits.insert(at, ",");
     }
     return digits;
+}
+
+std::string format_power_short(uint32_t combat_power) {
+    if (combat_power == 0) return "-";
+    if (combat_power < 1000) return std::to_string(combat_power);
+    // Three figures, the decimals chosen by how the value rounds: 9,996 reads 10.0k,
+    // and 999,600 reads 1.00M, never 10.00k or 1000k.
+    const auto three = [](double v, const char* unit) -> std::string {
+        char buf[16];
+        if (std::round(v * 100.0) < 1000.0) std::snprintf(buf, sizeof(buf), "%.2f%s", v, unit);
+        else if (std::round(v * 10.0) < 1000.0) std::snprintf(buf, sizeof(buf), "%.1f%s", v, unit);
+        else std::snprintf(buf, sizeof(buf), "%.0f%s", v, unit);
+        return buf;
+    };
+    const double thousands = static_cast<double>(combat_power) / 1e3;
+    if (std::round(thousands) < 1000.0) return three(thousands, "k");
+    return three(static_cast<double>(combat_power) / 1e6, "M");
 }
 
 std::string format_distance(float metres) {
@@ -71,7 +89,7 @@ namespace {
 
 /// One player's row across the content width: a bar against the strongest, the
 /// class emblem, the name, and the combat power at the right edge, with the
-/// distance before it where the layout draws distances.
+/// distance in a column right of the bar where the layout draws distances.
 void draw_row(const combat_power::PowerRow& row, const PowerLayout& layout, bool target, float scale) {
     const uint32_t top = layout.top;
     ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -84,8 +102,35 @@ void draw_row(const combat_power::PowerRow& row, const PowerLayout& layout, bool
     ImGui::Dummy(ImVec2(width, row_h));
     if (width <= 0.0f) return;
 
+    // A dead player's text fades: listed until they leave view, a threat no more.
+    const float fade = row.dead ? 0.45f : 1.0f;
+    // The distance has a column of its own, right of the bar, on the window's dark
+    // ground where it reads plainly: as wide as a town's farthest, so the rows line
+    // up, and faded only when the position it is from is old.
+    float bar_width = width;
+    if (layout.distances) {
+        const std::string distance = format_distance(row.distance_m);
+        const float text_w = ImGui::CalcTextSize(distance.c_str()).x;
+        const float inner = 6.0f * scale;
+        const float column = std::max(ImGui::CalcTextSize("999 m").x, text_w) + 2.0f * inner;
+        const float gap = 6.0f * scale;
+        if (width - column - gap > 8.0f * line) {
+            bar_width = width - column - gap;
+            // A yellow badge as tall as the bar: a colour of its own, apart from the
+            // names (white, an enemy's red) and the figures.
+            const float alpha = (layout.stale ? 0.55f : 1.0f) * fade;
+            const ImVec2 box_min(origin.x + width - column, origin.y);
+            const ImVec2 box_max(origin.x + width, origin.y + row_h);
+            const float rounding = 4.0f * scale;
+            dl->AddRectFilled(box_min, box_max, u32(colors::Warn, 0.10f * alpha), rounding);
+            dl->AddRect(box_min, box_max, u32(colors::Warn, 0.80f * alpha), rounding, 0, 1.25f * scale);
+            const float dy = origin.y + (row_h - line) * 0.5f - 0.5f * scale;
+            dl->AddText(ImVec2(box_min.x + (column - text_w) * 0.5f, dy), u32(chrome::lighten(colors::Warn, 0.15f), alpha),
+                        distance.c_str());
+        }
+    }
     const ImVec2 row_min = origin;
-    const ImVec2 row_max(origin.x + width, origin.y + row_h);
+    const ImVec2 row_max(origin.x + bar_width, origin.y + row_h);
     const float fraction =
         top != 0 ? std::clamp(static_cast<float>(row.combat_power) / static_cast<float>(top), 0.0f, 1.0f) : 0.0f;
     chrome::draw_bar(dl, row_min, row_max, fraction, class_color(row.cls), scale);
@@ -108,32 +153,22 @@ void draw_row(const combat_power::PowerRow& row, const PowerLayout& layout, bool
         label = std::string(game::class_short(row.cls)) + " " + label;
     }
 
-    const std::string power = format_power(row.combat_power);
+    const std::string power = format_power_short(row.combat_power);
     float power_w = 0.0f;
     {
         const chrome::BoldScope bold;
         power_w = ImGui::CalcTextSize(power.c_str()).x;
-        chrome::text_right(dl, row_max.x - pad, ty, u32(row.combat_power != 0 ? colors::Text : colors::TextDim), power);
+        chrome::text_right(dl, row_max.x - pad, ty, u32(row.combat_power != 0 ? colors::Text : colors::TextDim, fade), power);
     }
-    float name_w = row_max.x - pad - power_w - pad - name_x;
-    if (layout.distances) {
-        // A column of its own, as wide as a town's farthest, so the figures line up.
-        const float column = ImGui::CalcTextSize("999 m").x;
-        const float right = row_max.x - pad - power_w - 2.0f * pad;
-        if (right - column > name_x) {
-            chrome::text_right(dl, right, ty, u32(colors::TextDim, layout.stale ? 0.55f : 1.0f),
-                               format_distance(row.distance_m));
-            name_w = right - column - pad - name_x;
-        }
-    }
+    const float name_w = row_max.x - pad - power_w - pad - name_x;
     if (name_w <= 0.0f) return;
     // An enemy's name is red, lightened to read over a class's bar.
     const Rgb name_color = row.hostile ? chrome::lighten(colors::Live, 0.25f) : colors::Text;
     if (target) {
         const chrome::BoldScope bold;
-        dl->AddText(ImVec2(name_x, ty), u32(name_color), chrome::fit(label, name_w).c_str());
+        dl->AddText(ImVec2(name_x, ty), u32(name_color, fade), chrome::fit(label, name_w).c_str());
     } else {
-        dl->AddText(ImVec2(name_x, ty), u32(name_color, row.hostile ? 1.0f : 0.90f), chrome::fit(label, name_w).c_str());
+        dl->AddText(ImVec2(name_x, ty), u32(name_color, (row.hostile ? 1.0f : 0.90f) * fade), chrome::fit(label, name_w).c_str());
     }
 }
 

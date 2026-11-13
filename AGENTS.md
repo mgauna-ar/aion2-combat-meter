@@ -462,6 +462,18 @@ It gave the faction (Identity, below).
       fight 19 deaths came that way, each back up 3 to 17 s later, at full HP.
     - A killing hit can carry 0: the local player's did there (a heavy hit by the boss),
       though the same skill hit others for 77,635 and more.
+  - **Left view `47 36`:** id varint, a byte, a byte (00 in most; 4F or 46 in a
+    few). Someone left the local player's view; whoever comes back is sent again.
+    - In the PvP capture 62 of its 68 named players (53 of the 58 there). Of the 15
+      seen again later, 11 came with a new `45 36`; the rest were a hit landing in
+      the same instant, and one player acting again with no new record. In the
+      dungeon capture all 31 seen again came with a new `45 36`.
+    - **A player's death goes through it:** the two players whose HP reached 0 in
+      the PvP capture got theirs 1.4 s and 3.4 s later.
+    - The first byte reads like a reason: 1 in most, 10, 2 and 4 in a few (the 4
+      once, for the local player's own id, as their position jumped 1.1 km: a
+      death and a return, perhaps). Some name NPCs. Not
+      needed: any of them means gone.
   - Map load `21 36`: load count u32, map id u32.
     - **An id of 600000 or more is a dungeon** (`game::is_dungeon`, the one place
       that says so). It goes by the id alone, never by the table of names, so a
@@ -623,9 +635,8 @@ the three captures read as a point on their map):
   effect. Whether some packet does (`1d 37`? a correction when they are pushed?)
   needs a capture of walking with no skill used, against a player standing still;
 - what the point in a pressed cast's tail is (above);
-- whether anything says a player has gone out of view: the Combat Power plugin's list
-  of a map's players only grows until the next map, so a town's strongest are the
-  strongest seen there, gone or not;
+- what `47 36`'s two bytes after the id say (Left view, above): the first looks
+  like a reason, 1 in most;
 - tick effects 08 and 38;
 - in `02 38`, the byte before the skill (8, 12 or 32 on a few records), and why two
   self-buffs come back in mode 0;
@@ -707,7 +718,7 @@ capture, one tray and one updater, around them.
 | Combat Meter | `plugins/combat_meter` | fights: damage, healing, damage taken, the boss, the history; the meter overlay | on |
 | Auras | `plugins/auras` | effects on the local player and theirs on their target, their cooldowns; the aura overlay | off |
 | Ping | `plugins/ping` | the latency to the game server off the game's own pong, the heartbeats' jitter, a graph; the ping overlay | off |
-| Combat Power | `plugins/combat_power` | other players' combat power as the game sends it: the target's, and the strongest on the map's (all of an arena's or a dungeon's), or the nearest, the other faction's first and in red; the combat power overlay | off |
+| Combat Power | `plugins/combat_power` | other players' combat power as the game sends it: the target's, and the strongest in view (all of an arena's or a dungeon's), or the nearest, the other faction's first and in red; the combat power overlay | off |
 
 - **One table names them.** `include/aion2/plugin_registry.hpp` holds each plugin's id,
   name, description, config section and default switch; the sidebar, the dashboard,

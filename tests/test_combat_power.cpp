@@ -239,6 +239,9 @@ TEST_CASE(CombatPower, ThePipelineFeedsItOnlyWhileSwitchedOn) {
     e.event = press(kMe, 227);
     plugin.on_event(e);
     TEST_ASSERT_EQ(plugin.snapshot(at(1)).target.combat_power, 134'667u);
+    e.event = proto::LeftView{227, 1};
+    plugin.on_event(e);
+    TEST_ASSERT_EQ(plugin.snapshot(at(1)).in_view, 0u);
     plugin.clear();
     TEST_ASSERT_EQ(plugin.snapshot(at(1)).in_view, 0u);
 
@@ -509,6 +512,72 @@ TEST_CASE(CombatPower, EnemiesLeadBothListsAndNoCrowdHidesOne) {
     TEST_ASSERT_EQ(layout.rows[0].name, std::string("Zikel"));
 }
 
+TEST_CASE(CombatPower, APlayerWhoLeavesViewLeavesTheList) {
+    PowerTracker t = duel();
+    t.on_identity(player(300, "Zikel", 90'000), 2, at(2));
+    t.on_cast(press(kMe, 227), at(3));
+    TEST_ASSERT_EQ(t.snapshot(at(4)).in_view, 2u);
+
+    // Another connection's, and the local player's own, say nothing of this list.
+    t.on_left_view(proto::LeftView{300, 1}, 1);
+    t.on_left_view(proto::LeftView{kMe, 4}, 2);
+    TEST_ASSERT_EQ(t.snapshot(at(4)).in_view, 2u);
+    TEST_ASSERT_EQ(t.local(), kMe);
+
+    t.on_left_view(proto::LeftView{300, 1}, 2);
+    PowerSnapshot s = t.snapshot(at(5));
+    TEST_ASSERT_EQ(s.in_view, 1u);
+    TEST_ASSERT_EQ(s.players.size(), size_t{1});
+    TEST_ASSERT_EQ(s.players[0].name, std::string("Nezekan"));
+    // The target leaving takes the target with them.
+    t.on_left_view(proto::LeftView{227, 10}, 2);
+    s = t.snapshot(at(6));
+    TEST_ASSERT_EQ(s.in_view, 0u);
+    TEST_ASSERT_EQ(s.target.id, EntityId{0});
+    // Back in view, their record comes again, and so do they.
+    t.on_identity(player(300, "Zikel", 90'000), 2, at(20));
+    TEST_ASSERT_EQ(t.snapshot(at(21)).players[0].name, std::string("Zikel"));
+}
+
+TEST_CASE(CombatPower, ADeadEnemyLeadsNothing) {
+    PowerTracker t;
+    t.on_map_load(proto::MapLoad{1, 20}, 2, at(0));
+    proto::Identity me = own(kMe);
+    me.has_position = true;
+    me.position = proto::Point{0.0f, 0.0f, 2400.0f};
+    t.on_identity(me, 2, at(1));
+    t.on_identity(placed(300, "Zikel", 60'000, 2, 10.0f), 2, at(2));
+    t.on_identity(placed(301, "Lumiel", 200'000, 1, 5.0f), 2, at(2));
+    TEST_ASSERT_EQ(t.snapshot(at(3)).players[0].name, std::string("Zikel"));
+
+    // HP 0: still listed, still marked, but no threat.
+    t.on_values(proto::RemainingHp{300, false, true, 0, false, 0}, 2);
+    PowerSnapshot s = t.snapshot(at(4));
+    TEST_ASSERT_EQ(s.in_view, 2u);
+    TEST_ASSERT_EQ(s.hostile_in_view, 0u);
+    TEST_ASSERT_EQ(s.players[0].name, std::string("Lumiel"));
+    TEST_ASSERT(s.players[1].dead);
+    TEST_ASSERT(s.players[1].hostile);
+    TEST_ASSERT_EQ(s.nearest[0].name, std::string("Lumiel"));
+    // Another connection's HP is someone else's.
+    t.on_values(proto::RemainingHp{300, false, true, 18'000, false, 0}, 1);
+    TEST_ASSERT(t.snapshot(at(5)).players[1].dead);
+    // Up again, they lead again.
+    t.on_values(proto::RemainingHp{300, false, true, 18'000, false, 0}, 2);
+    s = t.snapshot(at(6));
+    TEST_ASSERT_EQ(s.hostile_in_view, 1u);
+    TEST_ASSERT_EQ(s.players[0].name, std::string("Zikel"));
+    TEST_ASSERT_FALSE(s.players[0].dead);
+    // HP of someone not listed changes nothing, and names no local player.
+    t.on_values(proto::RemainingHp{999, false, true, 0, false, 0}, 2);
+    TEST_ASSERT_EQ(t.snapshot(at(7)).in_view, 2u);
+    TEST_ASSERT_EQ(t.local(), kMe);
+    // An id that passes to someone else starts alive.
+    t.on_values(proto::RemainingHp{300, false, true, 0, false, 0}, 2);
+    t.on_identity(placed(300, "Triniel", 70'000, 2, 10.0f), 2, at(8));
+    TEST_ASSERT_FALSE(t.snapshot(at(9)).players[0].dead);
+}
+
 TEST_CASE(PowerView, FormatsADistanceInWholeMetres) {
     TEST_ASSERT_EQ(app::format_distance(-1.0f), std::string("-"));
     TEST_ASSERT_EQ(app::format_distance(0.2f), std::string("0 m"));
@@ -522,6 +591,19 @@ TEST_CASE(PowerView, FormatsWithThousandsSeparators) {
     TEST_ASSERT_EQ(app::format_power(4'756), std::string("4,756"));
     TEST_ASSERT_EQ(app::format_power(134'667), std::string("134,667"));
     TEST_ASSERT_EQ(app::format_power(1'234'567), std::string("1,234,567"));
+}
+
+TEST_CASE(PowerView, ShortensTheOverlaysFiguresToThreeDigits) {
+    TEST_ASSERT_EQ(app::format_power_short(0), std::string("-"));
+    TEST_ASSERT_EQ(app::format_power_short(999), std::string("999"));
+    TEST_ASSERT_EQ(app::format_power_short(4'756), std::string("4.76k"));
+    TEST_ASSERT_EQ(app::format_power_short(9'996), std::string("10.0k"));
+    TEST_ASSERT_EQ(app::format_power_short(98'300), std::string("98.3k"));
+    TEST_ASSERT_EQ(app::format_power_short(99'960), std::string("100k"));
+    TEST_ASSERT_EQ(app::format_power_short(100'000), std::string("100k"));
+    TEST_ASSERT_EQ(app::format_power_short(134'667), std::string("135k"));
+    TEST_ASSERT_EQ(app::format_power_short(999'600), std::string("1.00M"));
+    TEST_ASSERT_EQ(app::format_power_short(1'234'567), std::string("1.23M"));
 }
 
 TEST_CASE(PowerView, TheListMarksTheTargetOrShowsItAboveTheStrongest) {
