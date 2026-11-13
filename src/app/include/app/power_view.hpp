@@ -56,8 +56,8 @@ struct PowerLayout {
 };
 
 /// With `show_list`, the map's list_max_players strongest (nearest, with
-/// `sort_by_distance`), the target marked among them or on a line above them;
-/// without it, the target alone.
+/// `sort_by_distance`), the enemies among them first (with `enemies_first`), the
+/// target marked among them or on a line above them; without it, the target alone.
 [[nodiscard]] PowerLayout power_layout(const combat_power::PowerSnapshot& power, const PowerSettings& settings);
 
 /// Draws the combat power overlay into the frame the caller has begun: a header to

@@ -82,6 +82,8 @@ std::optional<Identity> read_identity_record(ByteReader& r, bool own) {
     id.server = r.u16le();
     id.class_code = r.u32le();
     if (!r.ok()) return std::nullopt;
+    const auto faction = static_cast<uint8_t>((id.class_code >> 16) & 0xFF);
+    if (faction == 1 || faction == 2) id.faction = faction;
     return id;
 }
 

@@ -17,6 +17,8 @@ void PowerPlugin::on_event(const proto::ParsedEvent& event) {
         m_tracker.on_position(*position, event.connection, event.ts);
     } else if (const auto* effect = std::get_if<proto::BuffApplied>(&event.event)) {
         m_tracker.on_effect(*effect, event.connection, event.ts);
+    } else if (const auto* roster = std::get_if<proto::PartyRoster>(&event.event)) {
+        m_tracker.on_party(*roster);
     } else if (const auto* map = std::get_if<proto::MapLoad>(&event.event)) {
         m_tracker.on_map_load(*map, event.connection, event.ts);
     }

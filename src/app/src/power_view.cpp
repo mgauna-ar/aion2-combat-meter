@@ -30,7 +30,15 @@ PowerLayout power_layout(const combat_power::PowerSnapshot& power, const PowerSe
     PowerLayout layout;
     layout.distances = settings.sort_by_distance && power.has_local_position;
     layout.stale = layout.distances && power.local_position_age > kDistanceStaleAfter;
-    const std::vector<combat_power::PowerRow>& source = layout.distances ? power.nearest : power.players;
+    std::vector<combat_power::PowerRow> source = layout.distances ? power.nearest : power.players;
+    if (!settings.enemies_first) {
+        // The snapshot's lists lead with the enemies: back to one order for all.
+        std::stable_sort(source.begin(), source.end(), [&](const auto& a, const auto& b) {
+            if (!layout.distances) return a.combat_power > b.combat_power;
+            if (a.has_distance() != b.has_distance()) return a.has_distance();
+            return a.has_distance() && a.distance_m < b.distance_m;
+        });
+    }
     if (settings.show_list) {
         const size_t shown = std::min(source.size(), static_cast<size_t>(std::max(settings.list_max_players, 0)));
         layout.rows.assign(source.begin(), source.begin() + static_cast<std::ptrdiff_t>(shown));
@@ -119,11 +127,13 @@ void draw_row(const combat_power::PowerRow& row, const PowerLayout& layout, bool
         }
     }
     if (name_w <= 0.0f) return;
+    // An enemy's name is red, lightened to read over a class's bar.
+    const Rgb name_color = row.hostile ? chrome::lighten(colors::Live, 0.25f) : colors::Text;
     if (target) {
         const chrome::BoldScope bold;
-        dl->AddText(ImVec2(name_x, ty), u32(colors::Text), chrome::fit(label, name_w).c_str());
+        dl->AddText(ImVec2(name_x, ty), u32(name_color), chrome::fit(label, name_w).c_str());
     } else {
-        dl->AddText(ImVec2(name_x, ty), u32(colors::Text, 0.90f), chrome::fit(label, name_w).c_str());
+        dl->AddText(ImVec2(name_x, ty), u32(name_color, row.hostile ? 1.0f : 0.90f), chrome::fit(label, name_w).c_str());
     }
 }
 

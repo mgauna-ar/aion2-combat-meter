@@ -1,5 +1,6 @@
 #include "combat_power/power_tracker.hpp"
 
+#include "game/map_names.hpp"
 #include "game/skill_names.hpp"
 
 #include <algorithm>
@@ -52,6 +53,7 @@ void PowerTracker::on_identity(const proto::Identity& identity, uint32_t connect
         // Another id is another map's: where they stood there says nothing here.
         if (m_local != identity.id) m_has_local_position = false;
         m_local = identity.id;
+        if (identity.faction != 0) m_local_faction = identity.faction;
         // The id was someone else's on the map before.
         if (m_players.erase(identity.id) != 0 && m_target == identity.id) m_target = 0;
         if (identity.has_position) place(identity.id, identity.position, ts);
@@ -90,12 +92,35 @@ void PowerTracker::on_identity(const proto::Identity& identity, uint32_t connect
     // A record whose end did not read leaves the figure it gave before.
     if (identity.combat_power != 0) player.row.combat_power = identity.combat_power;
     player.seen = ts;
-    // Where the last holder of the id stood is not where this one does.
-    if (!same) player.has_position = false;
+    // Where the last holder of the id stood is not where this one does, nor is
+    // their faction this one's.
+    if (!same) {
+        player.has_position = false;
+        player.faction = 0;
+    }
+    if (identity.faction != 0) player.faction = identity.faction;
     if (identity.has_position) {
         player.has_position = true;
         player.at = identity.position;
     }
+}
+
+bool PowerTracker::hostile(const Player& player) const {
+    if (m_local_faction == 0 || player.faction == 0 || player.faction == m_local_faction) return false;
+    // A dungeon's party mixes both factions, and no one else is in there.
+    if (game::is_dungeon(m_map_id)) return false;
+    return !m_party.contains(player.row.name);
+}
+
+bool PowerTracker::threat(const Player& player) const {
+    if (!hostile(player)) return false;
+    if (!m_has_local_position || !player.has_position) return true;
+    return metres_between(player.at, m_local_at) <= kEnemyRange;
+}
+
+void PowerTracker::on_party(const proto::PartyRoster& roster) {
+    m_party.clear();
+    for (const proto::PartyMember& member : roster.members) m_party.insert(member.name);
 }
 
 void PowerTracker::place(EntityId id, const proto::Point& at, Micros ts) {
@@ -178,6 +203,7 @@ PowerSnapshot PowerTracker::snapshot(Micros now) const {
     // A row with its distance worked out: only for the few a snapshot carries.
     const auto row_of = [&](const Player& player) {
         PowerRow row = player.row;
+        row.hostile = hostile(player);
         if (s.has_local_position && player.has_position) row.distance_m = metres_between(player.at, m_local_at);
         return row;
     };
@@ -191,7 +217,11 @@ PowerSnapshot PowerTracker::snapshot(Micros now) const {
     std::transform(m_players.begin(), m_players.end(), std::back_inserter(rows),
                    [](const auto& entry) { return &entry.second; });
     const auto listed = static_cast<std::ptrdiff_t>(std::min(rows.size(), kMaxListed));
-    const auto stronger = [](const Player* a, const Player* b) {
+    s.hostile_in_view = static_cast<uint32_t>(
+        std::count_if(rows.begin(), rows.end(), [&](const Player* p) { return threat(*p); }));
+    // Enemies lead either list: the cut at kMaxListed must not be what hides one.
+    const auto stronger = [&](const Player* a, const Player* b) {
+        if (threat(*a) != threat(*b)) return threat(*a);
         if (a->row.combat_power != b->row.combat_power) return a->row.combat_power > b->row.combat_power;
         if (a->row.name != b->row.name) return a->row.name < b->row.name;
         return a->row.id < b->row.id;
@@ -210,6 +240,7 @@ PowerSnapshot PowerTracker::snapshot(Micros now) const {
         return dx * dx + dy * dy + dz * dz;
     };
     std::partial_sort(rows.begin(), rows.begin() + listed, rows.end(), [&](const Player* a, const Player* b) {
+        if (threat(*a) != threat(*b)) return threat(*a);
         if (a->has_position != b->has_position) return a->has_position;
         if (a->has_position) {
             const float da = squared(a);

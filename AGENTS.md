@@ -222,7 +222,7 @@ threads with a FileSource.
 
 ---
 
-## 📡 Protocol (Global client; from the community's notes, checked against three captures)
+## 📡 Protocol (Global client; from the community's notes, checked against four captures)
 
 All of it lives in `src/protocol`. `opcodes.hpp` is the one place opcodes are spelled.
 
@@ -235,6 +235,10 @@ BACK, FRNT, MULT and BLOC share matched it exactly.
 A third, the arena capture: three minutes of a town, a one-on-one arena match (map
 61) and the town again, 79 player records in all. It gave the combat power (Identity,
 below).
+
+A fourth, the PvP capture: five minutes on map 20 with both factions in view, 71
+player records, and a fight between the local player and one of the other faction.
+It gave the faction (Identity, below).
 
 **Transport**
 - TCP, server port 13328.
@@ -374,10 +378,23 @@ below).
     all three of the second capture's, whose server was 9 where the same name turned
     up in other packets. Read as the server, it made the local player a character of
     server 1406. Its flags were 0x37, where 45 36's are 0x07.
-  - The "class" u32 is not the class. In 45 36 it was 0x01010000, 0x02010000 or
-    0x02020000: a Gladiator and a Ranger shared one value, a Sorcerer and a Chanter
-    another. Its two high bytes may be faction and gender; unconfirmed.
-    `class_codes.cpp` stays empty, and skill codes give the class.
+  - The "class" u32 is not the class. In 45 36 it was 0x01010000, 0x02010000,
+    0x01020000 or 0x02020000: a Gladiator and a Ranger shared one value, a Sorcerer
+    and a Chanter another. `class_codes.cpp` stays empty, and skill codes give the
+    class.
+  - **Its third byte is the faction** (`Identity::faction`: 1 or 2), in 33 36 too,
+    whose fourth is the level (0x2D010000: faction 1, level 45).
+    - In the PvP capture 66 records read 1, as the local player's own did, and 3
+      read 2. Every fight between players there was a 1 against a 2: the local
+      player's (22 skills pressed on a 2, 42 taken from them) and two others'. No 1
+      pressed a skill on a 1 but themself.
+    - The arena opponent, of the local player's faction by their public page, read
+      1 as they did.
+    - **A dungeon's party mixes both:** two of the dungeon capture's party read 2
+      (16 records). The faction alone makes no one an enemy there.
+    - The fourth byte of 45 36's (1 or 2, either with either faction) is their
+      gender, most likely; unconfirmed.
+    - Which of 1 and 2 is the Elyos is not settled by one page; nothing needs it.
   - `scan_identities` finds record look-alikes in packets the parser does not read.
     The meter names no one by them: in the second capture 16 of its 38 carried a real
     character's name, none with that character's id. They came in bursts with the
@@ -570,9 +587,15 @@ the three captures read as a point on their map):
 - **Everyone's but the local player's.** The server does not send a player their own
   steps: in the arena match the opponent got 240 movement packets and the local
   player none. Of these only `3c 37` names them (9 times in the match).
-- **A player's record** carries where they stand: `45 36` two bytes after its
-  "class" u32, `33 36` 156 bytes after its own (the same in all five). So the local
+- **A player's record** carries where they stand, after its "class" u32: a byte, a
+  flags byte whose low four bits are 2 or 6 (D2, 52, 92, 12, D6), then x, y, z. In
+  `45 36` that is straight after the class; in `33 36`, 154 bytes on. So the local
   player's position is known on entering each map.
+  - **On map 20 one byte more comes before the flags byte,** in both records (the
+    faction again, in 45 36). The reader finds the flags byte in either place
+    (`read_identity_position`); read two bytes after the class as on other maps,
+    that capture's records put their players at or near the origin.
+  - A position within a unit of the origin on every axis is not believed.
 - **A pressed cast's tail** (`02 38`, mode 2) is a heading (f32, degrees) and a point:
   the target's last position to the unit in many records, some metres from it in
   others. An aim point, perhaps; not read.
@@ -653,9 +676,15 @@ the three captures read as a point on their map):
   over a new connection for a new run, since entering a dungeon opened one in the
   second capture. A run still split in two, or two runs in one, would prove it
   wrong;
-- how a player of the other faction is told apart, for PvP: perhaps 45 36's mask.
-  Until then they are players like the party, so a PvP fight starts nothing and a
-  hit on them counts for nothing (plugins/combat_meter/AGENTS.md, Party and Healing).
+- **what the faction does not say.** A player of the other faction is told apart
+  (Identity, above), and the Combat Power plugin marks them. Still open: who is an
+  enemy where the faction is not the line (an arena's opponent of the local
+  player's own, a battlefield's teams), and whether any map but a dungeon mixes
+  the factions as allies. The Combat Meter does not use the faction yet: to it
+  they are players like the party, so a PvP fight starts nothing and a hit on them
+  counts for nothing (plugins/combat_meter/AGENTS.md, Party and Healing);
+- what the extra byte in a player's record on map 20 marks (a PvP zone, perhaps),
+  and what map 20 is: it has no row in `maps.tsv`;
 
 **The client's own files cannot fill in names.** They were checked on the Steam install
 in 2026-10.
@@ -678,7 +707,7 @@ capture, one tray and one updater, around them.
 | Combat Meter | `plugins/combat_meter` | fights: damage, healing, damage taken, the boss, the history; the meter overlay | on |
 | Auras | `plugins/auras` | effects on the local player and theirs on their target, their cooldowns; the aura overlay | off |
 | Ping | `plugins/ping` | the latency to the game server off the game's own pong, the heartbeats' jitter, a graph; the ping overlay | off |
-| Combat Power | `plugins/combat_power` | other players' combat power as the game sends it: the target's, and the strongest on the map's (all of an arena's or a dungeon's), or the nearest; the combat power overlay | off |
+| Combat Power | `plugins/combat_power` | other players' combat power as the game sends it: the target's, and the strongest on the map's (all of an arena's or a dungeon's), or the nearest, the other faction's first and in red; the combat power overlay | off |
 
 - **One table names them.** `include/aion2/plugin_registry.hpp` holds each plugin's id,
   name, description, config section and default switch; the sidebar, the dashboard,

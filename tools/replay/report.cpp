@@ -261,6 +261,7 @@ void Report::on_event(const proto::ParsedEvent& pe, const meter::CombatantRegist
                 std::printf("%+.3f  identity  %s%s %u \"%s\" server %u class %u", t, e.own ? "own " : "",
                             e.scanned ? "scanned" : "", e.id, name(e.name, e.id).c_str(), unsigned{e.server},
                             e.class_code);
+                if (e.faction != 0) std::printf(" faction %u", unsigned{e.faction});
                 if (e.combat_power != 0) std::printf(" cp %u", e.combat_power);
                 if (e.has_position) {
                     std::printf(" at %.0f %.0f %.0f", static_cast<double>(e.position.x),

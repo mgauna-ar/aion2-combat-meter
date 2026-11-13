@@ -169,6 +169,23 @@ TEST_CASE(Parser, APlayersRecordAndAnEffectCarryAPosition) {
     TEST_ASSERT_FALSE(only<Identity>(parse_one(p, opcode::OtherPlayer, identity_body(502, "Israphel", kServer, 3)))
                           .has_position);
 
+    // The fourth capture's map: one byte more before the flags, in both records.
+    const Identity zoned = only<Identity>(parse_one(
+        p, opcode::OtherPlayer,
+        player_body(228, "Zikel", kServer, 204'221, PlayerTrailer::Plain, 58'224.0f, 18'775.0f, 36'512.0f, 2, true)));
+    TEST_ASSERT(zoned.has_position);
+    TEST_ASSERT_NEAR(zoned.position.x, 58'224.0f, 1e-2f);
+    TEST_ASSERT_EQ(zoned.combat_power, 204'221u);
+    const Identity own_zoned = only<Identity>(parse_one(
+        p, opcode::OwnCharacter, own_player_body(501, "Ariel", kServer, -47'736.0f, 49'824.0f, 20'335.0f, 1, true)));
+    TEST_ASSERT(own_zoned.has_position);
+    TEST_ASSERT_NEAR(own_zoned.position.y, 49'824.0f, 1e-2f);
+    // Zeros where a position should be are no one's position.
+    TEST_ASSERT_FALSE(only<Identity>(parse_one(p, opcode::OtherPlayer,
+                                               player_body(229, "Vaizel", kServer, 90'000, PlayerTrailer::Plain,
+                                                           0.0f, 0.0f, 0.0f)))
+                          .has_position);
+
     // An effect: its last three floats are its caster's position.
     BuffSpec spec;
     spec.target = 227;
@@ -183,6 +200,26 @@ TEST_CASE(Parser, APlayersRecordAndAnEffectCarryAPosition) {
     TEST_ASSERT_NEAR(effect.caster_position.x, 232.25f, 1e-3f);
     TEST_ASSERT_NEAR(effect.caster_position.z, 2426.0f, 1e-3f);
     TEST_ASSERT_EQ(p.stats().failed, uint64_t{0});
+}
+
+TEST_CASE(Parser, APlayersRecordSaysTheirFaction) {
+    PacketParser p;
+    const auto faction_of = [&](uint16_t op, const Bytes& body) { return only<Identity>(parse_one(p, op, body)).faction; };
+    const auto other = [&](uint8_t faction, bool zone_byte) {
+        return player_body(227, "Nezekan", kServer, 134'667, PlayerTrailer::Plain, kTownX, kTownY, kTownZ, faction,
+                           zone_byte);
+    };
+    TEST_ASSERT_EQ(faction_of(opcode::OtherPlayer, other(1, false)), uint8_t{1});
+    TEST_ASSERT_EQ(faction_of(opcode::OtherPlayer, other(2, false)), uint8_t{2});
+    TEST_ASSERT_EQ(faction_of(opcode::OtherPlayer, other(2, true)), uint8_t{2});
+    // The local player's own record says theirs in the same byte.
+    TEST_ASSERT_EQ(faction_of(opcode::OwnCharacter, own_player_body(501, "Ariel", kServer)), uint8_t{1});
+    TEST_ASSERT_EQ(faction_of(opcode::OwnCharacter,
+                              own_player_body(501, "Ariel", kServer, kTownX, kTownY, kTownZ, 2, true)),
+                   uint8_t{2});
+    // Neither of the two: not known, rather than a third side.
+    TEST_ASSERT_EQ(faction_of(opcode::OtherPlayer, other(7, false)), uint8_t{0});
+    TEST_ASSERT_EQ(faction_of(opcode::OtherPlayer, identity_body(502, "Israphel", kServer, 3)), uint8_t{0});
 }
 
 TEST_CASE(Parser, ARecordThatDoesNotEndThatWayCarriesNoCombatPower) {
