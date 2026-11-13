@@ -110,16 +110,23 @@ void draw_row(const combat_power::PowerRow& row, const PowerLayout& layout, bool
     float bar_width = width;
     if (layout.distances) {
         const std::string distance = format_distance(row.distance_m);
-        const float column = std::max(ImGui::CalcTextSize("999 m").x, ImGui::CalcTextSize(distance.c_str()).x);
+        const float text_w = ImGui::CalcTextSize(distance.c_str()).x;
+        const float inner = 6.0f * scale;
+        const float column = std::max(ImGui::CalcTextSize("999 m").x, text_w) + 2.0f * inner;
         const float gap = 6.0f * scale;
         if (width - column - gap > 8.0f * line) {
             bar_width = width - column - gap;
+            // A yellow badge as tall as the bar: a colour of its own, apart from the
+            // names (white, an enemy's red) and the figures.
+            const float alpha = (layout.stale ? 0.55f : 1.0f) * fade;
+            const ImVec2 box_min(origin.x + width - column, origin.y);
+            const ImVec2 box_max(origin.x + width, origin.y + row_h);
+            const float rounding = 4.0f * scale;
+            dl->AddRectFilled(box_min, box_max, u32(colors::Warn, 0.10f * alpha), rounding);
+            dl->AddRect(box_min, box_max, u32(colors::Warn, 0.80f * alpha), rounding, 0, 1.25f * scale);
             const float dy = origin.y + (row_h - line) * 0.5f - 0.5f * scale;
-            // The accent's blue, lightened: a colour of its own, apart from the
-            // names and the figures.
-            chrome::text_right(dl, origin.x + width, dy,
-                               u32(chrome::lighten(colors::Accent, 0.35f), (layout.stale ? 0.55f : 1.0f) * fade),
-                               distance);
+            dl->AddText(ImVec2(box_min.x + (column - text_w) * 0.5f, dy), u32(chrome::lighten(colors::Warn, 0.15f), alpha),
+                        distance.c_str());
         }
     }
     const ImVec2 row_min = origin;

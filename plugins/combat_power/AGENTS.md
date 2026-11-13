@@ -91,7 +91,8 @@ carried no figure shows "-".
   98.3k, 1.23M): the row's room goes to the name and the distance. The page's tiles
   keep `format_power`'s whole figure. The bars compare the whole figures.
 - **The distance has a column right of the bar,** on the window's dark ground, in
-  the accent's blue (lightened) so it stands apart from names and figures, one width for every row so they line up. Drawn in muted grey
+  a yellow badge (a border and a faint fill, as tall as the bar) so it stands apart
+  from names and figures, one width for every row so they line up. Drawn in muted grey
   on a class's bar it was hard to read. A window too narrow for it drops it.
 - **Never empty in a crowd.** The list once went away above `list_max_players`, and
   in a town that read as the overlay losing its players a few seconds after it
