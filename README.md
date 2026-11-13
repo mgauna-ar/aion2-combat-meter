@@ -25,8 +25,6 @@ The meter listens to incoming game network traffic on your PC (who hit what, wit
 
 ## 📸 Screenshots
 
-Every picture here is drawn by the app's own code from a made-up boss fight, with invented character names. Click one to see it full size.
-
 ### Overlays
 
 The Combat Meter's overlay is the one above, playing a 48-second fight at twice the speed. The other three plugins each draw their own, which you can move, resize and switch on separately.
