@@ -106,7 +106,7 @@ void draw_row(const combat_power::PowerRow& row, const PowerLayout& layout, bool
     const float fade = row.dead ? 0.45f : 1.0f;
     // The distance has a column of its own, right of the bar, on the window's dark
     // ground where it reads plainly: as wide as a town's farthest, so the rows line
-    // up, and dimmed only when the position it is from is old.
+    // up, and faded only when the position it is from is old.
     float bar_width = width;
     if (layout.distances) {
         const std::string distance = format_distance(row.distance_m);
@@ -115,7 +115,10 @@ void draw_row(const combat_power::PowerRow& row, const PowerLayout& layout, bool
         if (width - column - gap > 8.0f * line) {
             bar_width = width - column - gap;
             const float dy = origin.y + (row_h - line) * 0.5f - 0.5f * scale;
-            chrome::text_right(dl, origin.x + width, dy, u32(colors::Text, (layout.stale ? 0.55f : 1.0f) * fade),
+            // The accent's blue, lightened: a colour of its own, apart from the
+            // names and the figures.
+            chrome::text_right(dl, origin.x + width, dy,
+                               u32(chrome::lighten(colors::Accent, 0.35f), (layout.stale ? 0.55f : 1.0f) * fade),
                                distance);
         }
     }
