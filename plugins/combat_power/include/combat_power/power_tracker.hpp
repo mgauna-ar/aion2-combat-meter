@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace aion2::combat_power {
@@ -26,6 +27,10 @@ struct PowerRow {
     /// position is not known. As fresh as PowerSnapshot::local_position_age says.
     float distance_m{-1.0f};
 
+    /// An enemy (PowerTracker, An enemy): of the other faction, outside a dungeon and
+    /// not in the local player's party. False while either's faction is not known.
+    bool hostile{false};
+
     [[nodiscard]] bool has_distance() const noexcept { return distance_m >= 0.0f; }
 
     bool operator==(const PowerRow&) const = default;
@@ -35,15 +40,18 @@ struct PowerRow {
 struct PowerSnapshot {
     /// The player the local player last used a skill on; `target.id` 0 for none.
     PowerRow target;
-    /// The other players on the map, strongest first: all of an arena's opponents or
-    /// a dungeon's party, and of a crowd the PowerTracker::kMaxListed strongest.
+    /// The other players on the map, the enemies within reach first, each group
+    /// strongest first: all of an arena's opponents or a dungeon's party, and of a
+    /// crowd the first PowerTracker::kMaxListed, so no crowd of allies hides an enemy.
     std::vector<PowerRow> players;
-    /// The same players, nearest first, those at no known distance last: of a
-    /// crowd, the PowerTracker::kMaxListed nearest. Empty until the local player's
+    /// The same players, the enemies within reach first, each group nearest first,
+    /// those at no known distance last: of a crowd, the first PowerTracker::kMaxListed. Empty until the local player's
     /// position is known.
     std::vector<PowerRow> nearest;
-    /// How many there are, listed or not.
+    /// How many there are, listed or not, and how many of them are enemies within
+    /// PowerTracker::kEnemyRange: the ones that lead the lists.
     uint32_t in_view{0};
+    uint32_t hostile_in_view{0};
     uint32_t map_id{0};
     /// Whether the local player's position is known, and how long ago it was last
     /// said: the game does not send them their own steps, so every distance is from
@@ -68,6 +76,15 @@ struct PowerSnapshot {
  * - **The target** is the last other player a skill the local player pressed named
  *   (02 38, mode 2), or one they hit (04 38), for kTargetMemory. A skill pressed on
  *   anything else, a monster, lets go of it. An ally they heal is a target too.
+ * - **An enemy** is a player of the other faction than the local player's
+ *   (Identity::faction, sent with their record as they come into view, so before
+ *   they do anything), but for two cases where the factions play together: no one
+ *   is an enemy in a dungeon (game::is_dungeon), whose parties mix both, and a
+ *   member of the local player's party (02 97) never is. A player of the local
+ *   player's own faction is never one, an arena's opponent included.
+ * - **An enemy leads the lists while within kEnemyRange,** or at no known
+ *   distance. Nothing says a player has left view, so one last seen far away would
+ *   otherwise lead the list for as long as the map lasts. They stay marked.
  * - **Distance** is between a player's last position and the local player's, in
  *   metres (the game's units are centimetres). Other players' positions come all
  *   the time: their record as they come into view, every step they take. The local
@@ -89,6 +106,9 @@ public:
     static constexpr Micros kEarlyArrival = 2 * kMicrosPerSecond;
     /// Most players a snapshot lists: of a crowd, the strongest.
     static constexpr size_t kMaxListed = 12;
+    /// How far an enemy may be and still lead the lists, in metres: about twice as
+    /// far as the farthest a player's record first came in the fourth capture.
+    static constexpr float kEnemyRange = 200.0f;
     /// Most players remembered; a misread flood stops here.
     static constexpr size_t kMaxPlayers = 2048;
 
@@ -102,6 +122,8 @@ public:
     void on_position(const proto::Position& position, uint32_t connection, Micros ts);
     /// An effect put on or renewed: it says where its caster stands.
     void on_effect(const proto::BuffApplied& effect, uint32_t connection, Micros ts);
+    /// 02 97: who the local player's party is now.
+    void on_party(const proto::PartyRoster& roster);
     /// Forgets everything: the plugin was switched off.
     void clear();
 
@@ -116,6 +138,8 @@ private:
         Micros seen{0};
         bool has_position{false};
         proto::Point at;
+        /// Identity::faction; 0 for unknown.
+        uint8_t faction{0};
     };
 
     /// A newer connection forgets the map before; false for an event from an older
@@ -123,6 +147,9 @@ private:
     [[nodiscard]] bool follow(uint32_t connection);
     void learn_class(EntityId id, uint32_t skill);
     void aim(EntityId target, Micros ts);
+    [[nodiscard]] bool hostile(const Player& player) const;
+    /// A hostile player near enough to lead the lists.
+    [[nodiscard]] bool threat(const Player& player) const;
     /// `id` stands at `at`: the local player, a listed player, or no one kept.
     void place(EntityId id, const proto::Point& at, Micros ts);
     /// Whether `connection` is the one being followed: ids from any other are
@@ -138,6 +165,11 @@ private:
     bool m_has_connection{false};
     uint32_t m_connection{0};
     uint32_t m_map_id{0};
+    /// The names of the local player's party, as the last roster gave them.
+    std::unordered_set<std::string> m_party;
+    /// The local player's faction, from their own record. It is the character's, so
+    /// it outlasts the map; 0 until a record of theirs is seen.
+    uint8_t m_local_faction{0};
     /// The local player's position on this map, and when it was last said.
     bool m_has_local_position{false};
     proto::Point m_local_at;

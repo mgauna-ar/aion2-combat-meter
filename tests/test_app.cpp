@@ -451,6 +451,8 @@ TEST_CASE(AppSettings, CombatPowerSettingsRoundTripAndAreSanitized) {
     s.power.list_max_players = 4;
     TEST_ASSERT_FALSE(s.power.sort_by_distance);  // strongest first until asked
     s.power.sort_by_distance = true;
+    TEST_ASSERT(s.power.enemies_first);  // on until switched off
+    s.power.enemies_first = false;
     s.power.hide_when_game_unfocused = true;
     const config::JsonValue json = settings_to_json(s);
     TEST_ASSERT(json["combat_power"]["plugin_enabled"].as_bool(false));
@@ -462,6 +464,7 @@ TEST_CASE(AppSettings, CombatPowerSettingsRoundTripAndAreSanitized) {
     TEST_ASSERT_FALSE(back.power.show_list);
     TEST_ASSERT_EQ(back.power.list_max_players, 4);
     TEST_ASSERT(back.power.sort_by_distance);
+    TEST_ASSERT_FALSE(back.power.enemies_first);
     TEST_ASSERT(back.power.hide_when_game_unfocused);
     TEST_ASSERT_FALSE(back.power.show_in_dungeons_only);
     // The other plugins' switches are their own.

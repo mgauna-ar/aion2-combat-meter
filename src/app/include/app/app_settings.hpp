@@ -162,6 +162,9 @@ struct PowerSettings {
     /// Distances are from where the local player last acted
     /// (combat_power::PowerTracker, Distance).
     bool sort_by_distance{false};
+    /// Players of the other faction lead the list, whatever its order. Their names
+    /// are red either way.
+    bool enemies_first{true};
     /// As the meter overlay's: while locked, only in a dungeon, and hidden while
     /// neither the game nor one of the meter's windows is in front.
     bool show_in_dungeons_only{false};
@@ -288,7 +291,7 @@ inline constexpr std::array<config::ConfigKey<PingSettings>, 13> kPingKeys{{
     config::field<PingSettings, &PingSettings::hide_when_game_unfocused>("hide_when_game_unfocused"),
 }};
 
-inline constexpr std::array<config::ConfigKey<PowerSettings>, 12> kPowerKeys{{
+inline constexpr std::array<config::ConfigKey<PowerSettings>, 13> kPowerKeys{{
     config::field<PowerSettings, &PowerSettings::locked>("locked"),
     config::field<PowerSettings, &PowerSettings::opacity>("opacity"),
     config::field<PowerSettings, &PowerSettings::scale>("scale"),
@@ -299,6 +302,7 @@ inline constexpr std::array<config::ConfigKey<PowerSettings>, 12> kPowerKeys{{
     config::field<PowerSettings, &PowerSettings::show_list>("show_list"),
     config::field<PowerSettings, &PowerSettings::list_max_players>("list_max_players"),
     config::field<PowerSettings, &PowerSettings::sort_by_distance>("sort_by_distance"),
+    config::field<PowerSettings, &PowerSettings::enemies_first>("enemies_first"),
     config::field<PowerSettings, &PowerSettings::show_in_dungeons_only>("show_in_dungeons_only"),
     config::field<PowerSettings, &PowerSettings::hide_when_game_unfocused>("hide_when_game_unfocused"),
 }};

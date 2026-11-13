@@ -23,11 +23,14 @@ A fourth window you place like the meter's (unlock with Ctrl+Alt+L, drag, resize
   above the list.
 - **Players who walk away stay listed** until the next map: nothing the meter reads
   says a player has left your view.
+- **Enemies come first, in red.** A player of the other faction has a red name and
+  leads the list, ahead of your own faction's, from the moment they come into
+  view: before they have done anything. See below for who counts as an enemy.
 - **Sorted by distance** (a switch on the page, off unless you turn it on) the list
   is the nearest players instead, each with how far they are in metres. The bars
   still compare combat power. See below for what the distance is measured from.
 
-![The combat power overlay sorted by distance: the three nearest players with their distance and combat power, the target third, and nine more counted](../../docs/images/overlay-combat-power-distance.png)
+![The combat power overlay sorted by distance: an enemy 38 metres away in red at the top, then the two nearest players of your own faction, and nine more counted](../../docs/images/overlay-combat-power-distance.png)
 - **A class emblem** appears once that player has used a skill: the game does not say
   the class, their skills do.
 - **"-"** means that player's record carried no figure the plugin could read.
@@ -54,6 +57,22 @@ A fourth window you place like the meter's (unlock with Ctrl+Alt+L, drag, resize
 - **Players already beside you when the meter starts** are not known until the game
   sends them again: start the meter before you log in or queue.
 - **Switched off**, it forgets what it knew.
+
+## Who counts as an enemy
+
+- **The other faction.** Every player's record says which of the two factions they
+  are, and so does yours. A player whose faction is not yours is an enemy.
+- **Not in a dungeon, and never your party.** Dungeon parties mix both factions, so
+  no one is marked there, and a member of your party is never marked anywhere.
+- **Not an arena opponent of your own faction.** Only the faction is read: someone
+  you duel from your own side shows like anyone else.
+- **Out of reach, they lose their place, not their colour.** The game does not say
+  when a player leaves your view, so an enemy last seen more than 200 m away stops
+  leading the list. Their name stays red.
+- **Until the game has sent your own record** (the meter started while you were
+  already on a map) your faction is not known, and no one is marked. It comes with
+  the next map.
+- "Enemies first" on the page turns the ordering off; the red names stay.
 
 ## How distance is measured, and where it falls short
 
@@ -88,6 +107,7 @@ and saves as you go.
 | `scale` | 1.0 | Size, 0.6 to 2.5, on top of the monitor's DPI scaling. |
 | `x`, `y`, `width`, `height` | -1, -1, 260, 190 | Position and size in screen pixels. -1, -1 places it right of the ping overlay's default spot. |
 | `show_list` | true | List the map's players, strongest first. Off, only your target shows. |
+| `enemies_first` | true | Players of the other faction lead the list while within 200 m. Their names are red either way. |
 | `sort_by_distance` | false | List the nearest players first, each with its distance, instead of the strongest. |
 | `list_max_players` | 8 | The most players listed, 1 to 12. With more on the map, these are the strongest (the nearest, with `sort_by_distance`), and a count of the rest follows. |
 | `hide_when_game_unfocused` | false | Hide it while neither the game nor the meter's window is in front, and while the game is not running. Applies only while locked. |

@@ -33,6 +33,16 @@ proto::Identity player(EntityId id, const char* name, uint32_t power, uint16_t s
 proto::Identity own(EntityId id) {
     proto::Identity i = player(id, "Ariel", 0);
     i.own = true;
+    i.faction = 1;
+    return i;
+}
+
+/// A player of `faction`, standing `metres` east of the origin.
+proto::Identity placed(EntityId id, const char* name, uint32_t power, uint8_t faction, float metres) {
+    proto::Identity i = player(id, name, power);
+    i.faction = faction;
+    i.has_position = true;
+    i.position = proto::Point{metres * 100.0f, 0.0f, 2400.0f};
     return i;
 }
 
@@ -396,6 +406,107 @@ TEST_CASE(PowerView, SortedByDistanceTheNearestAreListedWithTheirDistance) {
     layout = app::power_layout(lost.snapshot(at(3)), settings);
     TEST_ASSERT_FALSE(layout.distances);
     TEST_ASSERT_EQ(layout.rows.size(), size_t{1});
+}
+
+TEST_CASE(CombatPower, APlayerOfTheOtherFactionIsHostile) {
+    PowerTracker t;
+    t.on_map_load(proto::MapLoad{1, 20}, 2, at(0));
+    // Before the local player's own record: no one can be called an enemy.
+    t.on_identity(placed(300, "Zikel", 204'221, 2, 30.0f), 2, at(1));
+    TEST_ASSERT_FALSE(t.snapshot(at(1)).players[0].hostile);
+    TEST_ASSERT_EQ(t.snapshot(at(1)).hostile_in_view, 0u);
+    t.on_identity(own(kMe), 2, at(2));
+    t.on_identity(placed(301, "Lumiel", 90'000, 1, 5.0f), 2, at(2));
+    t.on_identity(player(302, "Vaizel", 120'000), 2, at(2));  // faction not read
+    const PowerSnapshot s = t.snapshot(at(3));
+    TEST_ASSERT_EQ(s.hostile_in_view, 1u);
+    TEST_ASSERT_EQ(s.players[0].name, std::string("Zikel"));
+    TEST_ASSERT(s.players[0].hostile);
+    TEST_ASSERT_FALSE(s.players[1].hostile);
+    TEST_ASSERT_FALSE(s.players[2].hostile);
+    // The target says so too.
+    PowerTracker fight = t;
+    fight.on_cast(press(kMe, 300), at(4));
+    TEST_ASSERT(fight.snapshot(at(5)).target.hostile);
+
+    // A member of the party is no enemy, whatever their faction; nor is anyone in
+    // a dungeon, whose parties mix both.
+    PowerTracker grouped = t;
+    proto::PartyRoster roster;
+    roster.members = {proto::PartyMember{"Ariel"}, proto::PartyMember{"Zikel"}};
+    grouped.on_party(roster);
+    TEST_ASSERT_FALSE(grouped.snapshot(at(4)).players[0].hostile);
+    TEST_ASSERT_EQ(grouped.snapshot(at(4)).hostile_in_view, 0u);
+    grouped.on_party(proto::PartyRoster{});
+    TEST_ASSERT_EQ(grouped.snapshot(at(4)).hostile_in_view, 1u);
+    PowerTracker instanced = t;
+    instanced.on_map_load(proto::MapLoad{1, 600072}, 2, at(4));
+    instanced.on_identity(placed(300, "Zikel", 204'221, 2, 30.0f), 2, at(5));
+    TEST_ASSERT_FALSE(instanced.snapshot(at(6)).players[0].hostile);
+
+    // The faction is the character's: it outlasts the map and its ids.
+    t.on_values(proto::RemainingHp{4987, true, false, 0, false, 0}, 3);
+    t.on_identity(placed(700, "Triniel", 50'000, 2, 10.0f), 3, at(60));
+    TEST_ASSERT(t.snapshot(at(61)).players[0].hostile);
+    // An id that passes to an ally is no enemy's any more.
+    t.on_identity(placed(700, "Marchutan", 60'000, 1, 10.0f), 3, at(62));
+    TEST_ASSERT_FALSE(t.snapshot(at(63)).players[0].hostile);
+}
+
+TEST_CASE(CombatPower, EnemiesLeadBothListsAndNoCrowdHidesOne) {
+    PowerTracker t;
+    t.on_map_load(proto::MapLoad{1, 20}, 2, at(0));
+    proto::Identity me = own(kMe);
+    me.has_position = true;
+    me.position = proto::Point{0.0f, 0.0f, 2400.0f};
+    t.on_identity(me, 2, at(1));
+    // A crowd of allies, every one stronger and nearer than the two enemies.
+    for (size_t i = 0; i < PowerTracker::kMaxListed + 6; ++i) {
+        t.on_identity(placed(static_cast<EntityId>(1000 + i), ("Ally" + std::to_string(i)).c_str(),
+                             static_cast<uint32_t>(200'000 + i), 1, static_cast<float>(i + 1)),
+                      2, at(2));
+    }
+    t.on_identity(placed(300, "Zikel", 60'000, 2, 90.0f), 2, at(3));
+    t.on_identity(placed(301, "Triniel", 80'000, 2, 120.0f), 2, at(3));
+    const PowerSnapshot s = t.snapshot(at(4));
+    TEST_ASSERT_EQ(s.hostile_in_view, 2u);
+    TEST_ASSERT_EQ(s.players.size(), PowerTracker::kMaxListed);
+    // Strongest first within each group.
+    TEST_ASSERT_EQ(s.players[0].name, std::string("Triniel"));
+    TEST_ASSERT_EQ(s.players[1].name, std::string("Zikel"));
+    TEST_ASSERT_EQ(s.players[2].name, "Ally" + std::to_string(PowerTracker::kMaxListed + 5));
+    // Nearest first within each group.
+    TEST_ASSERT_EQ(s.nearest[0].name, std::string("Zikel"));
+    TEST_ASSERT_NEAR(s.nearest[0].distance_m, 90.0f, 1e-3f);
+    TEST_ASSERT_EQ(s.nearest[1].name, std::string("Triniel"));
+    TEST_ASSERT_EQ(s.nearest[2].name, std::string("Ally0"));
+
+    // One who has fallen out of reach keeps their mark and loses their lead.
+    PowerTracker later = t;
+    later.on_position(step(301, 100.0f * (PowerTracker::kEnemyRange + 50.0f), 0.0f), 2, at(5));
+    const PowerSnapshot far = later.snapshot(at(6));
+    TEST_ASSERT_EQ(far.hostile_in_view, 1u);
+    TEST_ASSERT_EQ(far.nearest[0].name, std::string("Zikel"));
+    TEST_ASSERT_EQ(far.nearest[1].name, std::string("Ally0"));
+    TEST_ASSERT_EQ(far.players[0].name, std::string("Zikel"));
+    TEST_ASSERT_FALSE(far.players[1].hostile);
+
+    // The view keeps them first, or with the switch off puts all in one order.
+    app::PowerSettings settings;
+    settings.list_max_players = 3;
+    app::PowerLayout layout = app::power_layout(s, settings);
+    TEST_ASSERT_EQ(layout.rows[0].name, std::string("Triniel"));
+    TEST_ASSERT(layout.rows[0].hostile && layout.rows[1].hostile && !layout.rows[2].hostile);
+    settings.enemies_first = false;
+    layout = app::power_layout(s, settings);
+    TEST_ASSERT_FALSE(layout.rows[0].hostile);
+    TEST_ASSERT_EQ(layout.rows[0].name, "Ally" + std::to_string(PowerTracker::kMaxListed + 5));
+    settings.sort_by_distance = true;
+    layout = app::power_layout(s, settings);
+    TEST_ASSERT_EQ(layout.rows[0].name, std::string("Ally0"));
+    settings.enemies_first = true;
+    layout = app::power_layout(s, settings);
+    TEST_ASSERT_EQ(layout.rows[0].name, std::string("Zikel"));
 }
 
 TEST_CASE(PowerView, FormatsADistanceInWholeMetres) {

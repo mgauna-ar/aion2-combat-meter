@@ -8,7 +8,7 @@ self-update. What a user sees and sets is in this plugin's [`README.md`](README.
 
 **What it is:** `PowerPlugin` (a `game::Plugin`) owns one part, `PowerTracker`, fed
 on the engine thread and the capture clock: identities (`33 36`, `45 36`), casts
-(`02 38`), damage (`04 38`), own values (`00 8D`), map loads (`21 36`), and for
+(`02 38`), damage (`04 38`), own values (`00 8D`), map loads (`21 36`), the party's roster (`02 97`), and for
 distance the movement packets and effects (`2a 38`, `2b 38`). It keeps its own record
 of who is on the map: no fight, no side, no NPC.
 
@@ -64,8 +64,8 @@ carried no figure shows "-".
 - **A press on anything else lets go:** a monster, an object. A hit on a monster
   does not, since an area skill hits whatever stands beside a player.
 - **Not a press:** someone else's skill, a self-cast, a passive going off (mode 0).
-- **An ally is a target too:** a heal pressed on a party member names them. Other
-  factions are not told apart yet (the repository's Unknowns), so neither are these.
+- **An ally is a target too:** a heal pressed on a party member names them. The
+  target is whoever was aimed at, enemy or not.
 
 ## 📋 The list
 
@@ -80,6 +80,34 @@ carried no figure shows "-".
   showed them. A crowd shows its strongest instead.
 - **Why not the arena's map:** an arena's map id is known for one arena (61). A rule
   by id would miss every other, and the strongest few need none.
+
+## ⚔️ Enemies (`enemies_first`)
+
+- **Hostile** (`PowerRow::hostile`) is a player whose faction (`Identity::faction`)
+  is known and is not the local player's, outside a dungeon (`game::is_dungeon`)
+  and outside the local player's party (the last `02 97`, by name).
+  - The dungeon rule is not caution: two of the dungeon capture's party were of the
+    other faction. The roster rule covers a mixed party anywhere else.
+  - The local player's faction is their own record's, kept across maps and ids: it
+    is the character's. Unknown until one is seen, and then no one is hostile.
+- **Known on sight.** The faction comes with the record that brings a player into
+  view, so they are marked before they act. That is the feature: do not make it
+  wait on a hit or a cast.
+- **A threat** is a hostile player within `kEnemyRange` (200 m), or at no known
+  distance. Threats lead both lists, ahead of the cut at `kMaxListed`, so a crowd
+  of stronger or nearer allies never hides one; `hostile_in_view` counts them.
+  - Why a range: nothing says a player has left view (above), so without it an
+    enemy passed ten minutes ago would lead the list for as long as the map lasts.
+    In the PvP capture one read 88 m as their record came, then 1,068 m as the
+    local player moved on.
+  - It leans on the local player's position, stale as that can be (below): an
+    enemy may keep or lose the lead a little late. The red name does not depend
+    on it.
+- **Only the faction.** An arena's opponent of the local player's own faction is
+  not hostile, nor a battlefield's team: no rule for them yet (the repository's
+  Unknowns).
+- **The view** (`power_layout`) keeps the snapshot's order, or with `enemies_first`
+  off sorts the rows back into one order; the red name is drawn either way.
 
 ## 📏 Distance (`sort_by_distance`)
 

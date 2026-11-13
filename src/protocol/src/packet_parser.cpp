@@ -195,14 +195,26 @@ std::optional<Position> read_position(ByteReader& r, uint16_t op) {
     return p;
 }
 
-/// Where a player's record (33 36, 45 36) says they stand, read after its class:
-/// two bytes on in another player's, 156 on in the local player's own (the same in
-/// all five of the captures'). Nothing for a record too short to hold it, or whose
-/// floats are no point: the name it gave stands either way.
+/// Whether `b` is the flags byte a player's record has right before its position:
+/// its low four bits were 2 or 6 in every record of the four captures.
+[[nodiscard]] bool position_flags(uint8_t b) noexcept { return (b & 0x0F) == 0x02 || (b & 0x0F) == 0x06; }
+
+/// Where a player's record (33 36, 45 36) says they stand, read after its class.
+/// - A byte, a flags byte (position_flags), then x, y, z: straight after the class
+///   in another player's record, 154 bytes on in the local player's own.
+/// - On the fourth capture's map (20, both factions in view) one byte more comes
+///   before the flags byte, in both records: read as the position there, it put
+///   everyone at the origin.
+/// Nothing for a record too short to hold it, whose flags byte is not where either
+/// shape puts it, or whose floats are no point or the origin: the name it gave
+/// stands either way.
 void read_identity_position(ByteReader r, Identity& id) {
-    r.skip(id.own ? 156 : 2);
+    r.skip(id.own ? 155 : 1);
+    if (!position_flags(r.u8()) && !position_flags(r.u8())) return;
     const Point at{r.f32le(), r.f32le(), r.f32le()};
     if (!r.ok() || !plausible_coordinate(at.x) || !plausible_coordinate(at.y) || !plausible_coordinate(at.z)) return;
+    // No map has anyone within a unit of its origin on every axis: misread zeros.
+    if (std::fabs(at.x) < 1.0f && std::fabs(at.y) < 1.0f && std::fabs(at.z) < 1.0f) return;
     id.has_position = true;
     id.position = at;
 }

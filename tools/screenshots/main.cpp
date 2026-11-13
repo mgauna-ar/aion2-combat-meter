@@ -307,20 +307,20 @@ combat_power::PowerSnapshot power_demo() {
     return p;
 }
 
-/// An open-world skirmish as the list sorted by distance has it: the nearest three
-/// of a dozen, the one being fought not the closest.
+/// An open-world skirmish as the list sorted by distance has it: an enemy coming
+/// up, ahead of the two nearest of a dozen allies.
 combat_power::PowerSnapshot power_distance_demo() {
     combat_power::PowerSnapshot p;
-    p.map_id = 1010;
+    p.map_id = 20;
     p.nearest = {
+        {227, "Nezekan", 23, game::AionClass::Templar, 134'667, 38.0f, true},
         {301, "Triniel", 9, game::AionClass::Assassin, 121'480, 4.0f},
         {512, "Vaizel", 9, game::AionClass::Ranger, 98'300, 9.0f},
-        {227, "Nezekan", 9, game::AionClass::Templar, 134'667, 22.0f},
     };
-    p.players = {p.nearest[2], p.nearest[0], p.nearest[1]};
+    p.players = p.nearest;
     p.has_local_position = true;
     p.in_view = 12;
-    p.target = p.nearest[2];
+    p.hostile_in_view = 1;
     return p;
 }
 

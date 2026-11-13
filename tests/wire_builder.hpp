@@ -244,12 +244,14 @@ enum class PlayerTrailer : uint8_t {
     NoTag,
 };
 
-/// 45 36 as the game sends it: the identity, two bytes, where the player stands,
-/// some 1,200 bytes of gear and looks (filler here), then the tag's u32, a title
-/// and a rank (u32 each), the combat power and five zeros, as `trailer` varies them.
+/// 45 36 as the game sends it: the identity (its class's third byte the faction), a
+/// byte, a flags byte, where the player stands, some 1,200 bytes of gear and looks
+/// (filler here), then the tag's u32, a title and a rank (u32 each), the combat
+/// power and five zeros, as `trailer` varies them. `zone_byte` puts one byte more
+/// (the faction again) after the class, as the fourth capture's map does.
 inline Bytes player_body(uint64_t id, std::string_view name, uint16_t server, uint32_t combat_power,
                          PlayerTrailer trailer = PlayerTrailer::Plain, float x = kTownX, float y = kTownY,
-                         float z = kTownZ) {
+                         float z = kTownZ, uint8_t faction = 1, bool zone_byte = false) {
     Bytes b;
     put_varint(b, id);
     put_le32(b, 0x00000101);
@@ -257,7 +259,8 @@ inline Bytes player_body(uint64_t id, std::string_view name, uint16_t server, ui
     b.push_back(static_cast<uint8_t>(name.size()));
     put_bytes(b, bytes_of(name));
     put_le16(b, server);
-    put_le32(b, 0x02010000);
+    put_le32(b, 0x02000000u | (uint32_t{faction} << 16));
+    if (zone_byte) b.push_back(faction);
     put_le16(b, 0xD288);
     put_f32(b, x);
     put_f32(b, y);
@@ -292,13 +295,17 @@ inline Bytes own_identity_body(uint64_t id, std::string_view name, uint16_t serv
     return b;
 }
 
-/// 33 36 as the game sends it, as far as it is read: the identity, 156 bytes on
-/// where the local player stands, then the rest of the record (filler).
+/// 33 36 as the game sends it, as far as it is read: the identity (its class's
+/// third byte the faction), 155 bytes of filler, a flags byte and where the local
+/// player stands, then the rest of the record (filler). `zone_byte` puts one byte
+/// more before the flags, as the fourth capture's map does.
 inline Bytes own_player_body(uint64_t id, std::string_view name, uint16_t server, float x = kTownX,
-                             float y = kTownY, float z = kTownZ) {
-    Bytes b = own_identity_body(id, name, server, 0x2D010000);
-    // own_identity_body's level is the first four of the 156.
-    b.resize(b.size() + 152, 0x64);
+                             float y = kTownY, float z = kTownZ, uint8_t faction = 1, bool zone_byte = false) {
+    Bytes b = own_identity_body(id, name, server, 0x2D000000u | (uint32_t{faction} << 16));
+    // own_identity_body's level is the first four of the 155.
+    b.resize(b.size() + 151, 0x64);
+    if (zone_byte) b.push_back(faction);
+    b.push_back(0xD2);
     put_f32(b, x);
     put_f32(b, y);
     put_f32(b, z);

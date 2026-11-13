@@ -53,6 +53,11 @@ struct Identity {
     uint16_t server{0};
     /// The wire's class code; game::class_from_code names it.
     uint32_t class_code{0};
+    /// Which of the game's two factions they are: 1 or 2, the third byte of that
+    /// code, in the local player's own record too. 0 where it reads as neither, and
+    /// for a scanned record. Every fight between players in the fourth capture was
+    /// between a 1 and a 2 (AGENTS.md, Identity).
+    uint8_t faction{0};
     bool own{false};
     /// Found by scanning an unknown packet rather than read from 33 36 / 45 36. The
     /// meter does not name anyone by it: in the second capture none of 38 had the

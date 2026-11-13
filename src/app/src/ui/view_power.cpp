@@ -37,14 +37,18 @@ void figures(const AppFrameInput& in) {
         by_distance ? format_distance(first.distance_m) : listed ? format_power(first.combat_power) : std::string("-");
     const std::string top_note = listed ? first.name : std::string("No players in view yet");
     const std::string in_view = std::to_string(p.in_view);
+    const std::string in_view_note =
+        p.hostile_in_view == 0 ? std::string("Other players on this map")
+                               : std::to_string(p.hostile_in_view) + (p.hostile_in_view == 1 ? " enemy" : " enemies") +
+                                     " among them";
 
     const StatTileSpec tiles[] = {
         {"##tile_power_target", ICON_CROSSHAIR, "TARGET", target_value.c_str(),
          has_target ? colors::TextPrimary : colors::TextDim, target_note.c_str(), colors::Danger},
         {"##tile_power_top", ICON_TRENDING, by_distance ? "NEAREST" : "STRONGEST", top_value.c_str(),
          listed ? colors::TextPrimary : colors::TextDim, top_note.c_str(), colors::Warning},
-        {"##tile_power_view", ICON_EYE, "IN VIEW", in_view.c_str(), colors::TextPrimary, "Other players on this map",
-         colors::Accent},
+        {"##tile_power_view", ICON_EYE, "IN VIEW", in_view.c_str(), colors::TextPrimary, in_view_note.c_str(),
+         p.hostile_in_view == 0 ? colors::Accent : colors::Danger},
     };
     const char* const tooltips[] = {
         "The last player you used a skill on, for half a minute after it.",
@@ -67,6 +71,10 @@ void display_card(const AppFrameInput& in, AppActions& out) {
     setting_slider("List up to", "In a crowd, the strongest this many, and a count of the rest.",
                    &p.list_max_players, kMinPowerList, kMaxPowerList, def.list_max_players, "%d players", out,
                    Applies::Overlay);
+    setting_switch("Enemies first",
+                   "Players of the other faction lead the list, so one coming into view is not lost among your "
+                   "own. Their names are red either way.",
+                   &p.enemies_first, out, Applies::Overlay);
     setting_switch("Sort by distance",
                    "The nearest players first, each with how far they are. The game does not send you your own "
                    "steps, so distances are measured from where you last used a skill or entered the map, and dim "
