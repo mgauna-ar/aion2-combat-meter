@@ -593,6 +593,19 @@ TEST_CASE(PowerView, FormatsWithThousandsSeparators) {
     TEST_ASSERT_EQ(app::format_power(1'234'567), std::string("1,234,567"));
 }
 
+TEST_CASE(PowerView, ShortensTheOverlaysFiguresToThreeDigits) {
+    TEST_ASSERT_EQ(app::format_power_short(0), std::string("-"));
+    TEST_ASSERT_EQ(app::format_power_short(999), std::string("999"));
+    TEST_ASSERT_EQ(app::format_power_short(4'756), std::string("4.76k"));
+    TEST_ASSERT_EQ(app::format_power_short(9'996), std::string("10.0k"));
+    TEST_ASSERT_EQ(app::format_power_short(98'300), std::string("98.3k"));
+    TEST_ASSERT_EQ(app::format_power_short(99'960), std::string("100k"));
+    TEST_ASSERT_EQ(app::format_power_short(100'000), std::string("100k"));
+    TEST_ASSERT_EQ(app::format_power_short(134'667), std::string("135k"));
+    TEST_ASSERT_EQ(app::format_power_short(999'600), std::string("1.00M"));
+    TEST_ASSERT_EQ(app::format_power_short(1'234'567), std::string("1.23M"));
+}
+
 TEST_CASE(PowerView, TheListMarksTheTargetOrShowsItAboveTheStrongest) {
     PowerTracker t = duel();
     t.on_identity(player(300, "Zikel", 201'900), 2, at(2));

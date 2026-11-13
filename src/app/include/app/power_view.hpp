@@ -24,6 +24,9 @@ struct PowerFrameInput {
 /// "134,667"; "-" for a player whose record carried none.
 [[nodiscard]] std::string format_power(uint32_t combat_power);
 
+/// "135k", "98.3k", "4.76k", "1.23M": the overlay's, where the room is. "-" for none.
+[[nodiscard]] std::string format_power_short(uint32_t combat_power);
+
 /// "12 m", "1,240 m"; "-" for a distance not known (negative).
 [[nodiscard]] std::string format_distance(float metres);
 

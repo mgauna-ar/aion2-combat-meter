@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <cstdio>
 
 namespace aion2::app {
 
@@ -17,6 +18,23 @@ std::string format_power(uint32_t combat_power) {
         digits.insert(at, ",");
     }
     return digits;
+}
+
+std::string format_power_short(uint32_t combat_power) {
+    if (combat_power == 0) return "-";
+    if (combat_power < 1000) return std::to_string(combat_power);
+    // Three figures, the decimals chosen by how the value rounds: 9,996 reads 10.0k,
+    // and 999,600 reads 1.00M, never 10.00k or 1000k.
+    const auto three = [](double v, const char* unit) -> std::string {
+        char buf[16];
+        if (std::round(v * 100.0) < 1000.0) std::snprintf(buf, sizeof(buf), "%.2f%s", v, unit);
+        else if (std::round(v * 10.0) < 1000.0) std::snprintf(buf, sizeof(buf), "%.1f%s", v, unit);
+        else std::snprintf(buf, sizeof(buf), "%.0f%s", v, unit);
+        return buf;
+    };
+    const double thousands = static_cast<double>(combat_power) / 1e3;
+    if (std::round(thousands) < 1000.0) return three(thousands, "k");
+    return three(static_cast<double>(combat_power) / 1e6, "M");
 }
 
 std::string format_distance(float metres) {
@@ -110,7 +128,7 @@ void draw_row(const combat_power::PowerRow& row, const PowerLayout& layout, bool
 
     // A dead player's text fades: listed until they leave view, a threat no more.
     const float fade = row.dead ? 0.45f : 1.0f;
-    const std::string power = format_power(row.combat_power);
+    const std::string power = format_power_short(row.combat_power);
     float power_w = 0.0f;
     {
         const chrome::BoldScope bold;
@@ -123,9 +141,17 @@ void draw_row(const combat_power::PowerRow& row, const PowerLayout& layout, bool
         const float column = ImGui::CalcTextSize("999 m").x;
         const float right = row_max.x - pad - power_w - 2.0f * pad;
         if (right - column > name_x) {
-            chrome::text_right(dl, right, ty, u32(colors::TextDim, (layout.stale ? 0.55f : 1.0f) * fade),
-                               format_distance(row.distance_m));
-            name_w = right - column - pad - name_x;
+            // On a dark pill of its own, so it reads over any class's bar, and in the
+            // text's own colour: dimmed only when the position it is from is old.
+            const std::string distance = format_distance(row.distance_m);
+            const float text_w = ImGui::CalcTextSize(distance.c_str()).x;
+            const float pill_pad = 4.0f * scale;
+            // The column's width, so the pills line up; a farther one's grows.
+            const ImVec2 pill_min(right - std::max(text_w, column) - pill_pad, origin.y + 3.0f * scale);
+            const ImVec2 pill_max(right + pill_pad, row_max.y - 3.0f * scale);
+            dl->AddRectFilled(pill_min, pill_max, u32(Rgb{0.0f, 0.0f, 0.0f}, 0.45f * fade), 4.0f * scale);
+            chrome::text_right(dl, right, ty, u32(colors::Text, (layout.stale ? 0.55f : 1.0f) * fade), distance);
+            name_w = right - column - 2.0f * pad - name_x;
         }
     }
     if (name_w <= 0.0f) return;
