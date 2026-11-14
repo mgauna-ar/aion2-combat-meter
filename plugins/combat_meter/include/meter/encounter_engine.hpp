@@ -140,6 +140,13 @@ private:
         }
     };
 
+    /// An entity's HP as the meter has it: the server's figure (`exact`), else its
+    /// spawn HP less the damage seen since.
+    struct HpNow {
+        uint64_t hp{0};
+        bool exact{false};
+    };
+
     struct Fight {
         uint64_t id{0};
         uint32_t map_id{0};
@@ -161,6 +168,11 @@ private:
             uint64_t hp{0};
         };
         std::unordered_map<EntityId, std::vector<HpSample>> enemy_hp;
+        /// Each enemy's HP as the party last hit it: its HP then, and the server's
+        /// figures up to kHpSettle after. A boss the party wiped on resets to full
+        /// once no one is left, seconds before the fight times out; the fight ends
+        /// with what they left it at, not with that.
+        std::unordered_map<EntityId, HpNow> hp_when_hit;
         /// What landed on each party member, for the recap of a death.
         std::unordered_map<EntityId, RecapRing> recaps;
         struct Death {
@@ -206,6 +218,11 @@ private:
     void sample_hp(EntityId id, uint64_t hp, std::optional<uint64_t> before, Micros ts);
     /// The exact HP figure the meter has for `id`: its last 00 8D, else its spawn's.
     [[nodiscard]] std::optional<uint64_t> exact_hp(EntityId id) const;
+    /// `id`'s HP now, exact or estimated; nothing when the meter has no HP for it.
+    [[nodiscard]] std::optional<HpNow> hp_now(EntityId id) const;
+    /// A new HP figure for `id` at `ts`: the fight keeps it as the HP the party left
+    /// it at when they hit it no more than kHpSettle before.
+    void note_hp_when_hit(EntityId id, Micros ts);
     /// A party member's HP reached 0 during a fight: a death, with its recap.
     void record_death(EntityId id, Micros ts);
     /// HP above 0, or their own hit (`by_hit`) more than kInFlight after it: a death

@@ -60,6 +60,8 @@ always be found and dragged back. Switching the plugin off hides it too.
   take the last one, with your rank.
 - Healing between two players counts only when it lands on the party, since a PvP hit
   looks the same.
+- A boss left standing keeps the HP you left it at in the saved fight ("Wipe 23%",
+  "23% left"), though it resets to full once the party is gone.
 
 ![The app window's Combat Meter page: saved fights by map visit on the left, each with its boss and how it ended, the selected fight's ranking with the in-game window's hit columns, and one player's skills below](../../docs/images/app-damage.png)
 
