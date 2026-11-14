@@ -325,6 +325,38 @@ TEST_CASE(Engine, WipeDetectionWhenEnabled) {
     TEST_ASSERT(e.take_finished().at(0).end_reason == EndReason::Wipe);
 }
 
+TEST_CASE(Engine, AWipeKeepsTheBossHpThePartyLeftIt) {
+    EncounterEngine e = setup();
+    e.on_event(ev(at_s(1), hit(kMe, kBoss, 1'000'000)));
+    e.on_event(ev(at_s(1), hp(kBoss, 3'000'000)));
+    e.on_event(ev(at_s(8), hit(kAlly, kBoss, 500'000)));
+    e.on_event(ev(at_s(8.1), hp(kBoss, 2'000'000)));
+    e.on_event(ev(at_s(10), hp(kMe, 0)));
+    // No one left: the boss resets to full while the fight waits out its idle.
+    e.on_event(ev(at_s(15), hp(kBoss, kBossHp)));
+    TEST_ASSERT_EQ(e.current().boss.hp, kBossHp);
+    e.tick(at_s(39));
+    TEST_ASSERT_FALSE(e.in_fight());
+    const FightSummary s = e.take_finished().at(0);
+    TEST_ASSERT_FALSE(s.boss.killed);
+    TEST_ASSERT(s.boss.hp_exact);
+    TEST_ASSERT_EQ(s.boss.hp, uint64_t{2'000'000});
+    TEST_ASSERT_NEAR(s.boss.hp_fraction(), 0.4, 1e-9);
+}
+
+TEST_CASE(Engine, AWipeKeepsTheEstimateOverABossSpawnedAgain) {
+    EncounterEngine e = setup();
+    e.on_event(ev(at_s(1), hit(kMe, kBoss, 1'000'000)));
+    e.on_event(ev(at_s(2), hit(kAlly, kBoss, 1'500'000)));
+    // It comes back at full HP, as a reset after a wipe might send it.
+    e.on_event(ev(at_s(12), npc(kBoss, kBossHp, 777, kBossHp)));
+    e.tick(at_s(40));
+    const FightSummary s = e.take_finished().at(0);
+    TEST_ASSERT(s.boss.hp_known);
+    TEST_ASSERT_FALSE(s.boss.hp_exact);
+    TEST_ASSERT_EQ(s.boss.hp, kBossHp - 2'500'000);
+}
+
 TEST_CASE(Engine, SummonOfAnUnseenOwnerCountsOnAnyTarget) {
     // Mid-session: no names, and a target that spawned before the meter started.
     EncounterEngine e;

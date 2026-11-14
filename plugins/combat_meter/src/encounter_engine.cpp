@@ -18,6 +18,9 @@ namespace {
 
 /// DPS divides by at least this, so a one-hit fight does not read as millions.
 constexpr double kMinDurationSeconds = 1.0;
+/// How long after a hit the server's HP figure for it may come and still be the HP
+/// the hit left. A boss resetting after a wipe does so seconds after the last hit.
+constexpr Micros kHpSettle = 500'000;
 
 [[nodiscard]] uint64_t grew(uint64_t now, uint64_t then) noexcept { return now >= then ? now - then : 0; }
 
@@ -184,6 +187,7 @@ void EncounterEngine::on_spawn(const proto::Spawn& s, Micros ts) {
     if (!s.has_hp) return;
     sample_hp(s.id, s.cur_hp, before, ts);
     m_damage_since_spawn.erase(s.id);
+    note_hp_when_hit(s.id, ts);
     // Coming back into view, a boss keeps the HP loss counted so far, and its HP
     // now is one more figure. A new id, or one last seen at 0, starts afresh.
     const auto loss = m_hp_loss.find(s.id);
@@ -332,6 +336,7 @@ void EncounterEngine::credit(EntityId actor, EntityId target, uint64_t amount, u
     }
     fight.enemies[enemy] += amount;
     if (ts > fight.last_hit_ts) fight.last_hit_ts = ts;
+    if (const std::optional<HpNow> now = hp_now(enemy)) fight.hp_when_hit[enemy] = *now;
     if (TimelineBin* bin = timeline_bin(acc.bins, fight.start_ts, ts)) add_capped(bin->damage, amount);
     // Only the player's own hand proves them alive, and only it counts as time spent
     // hitting: their DoTs and summons keep going after they die.
@@ -394,6 +399,7 @@ void EncounterEngine::on_values(const proto::RemainingHp& v, Micros ts) {
     m_registry.on_hp(v.id, v.hp);
     m_hp_loss[v.id].observe(v.hp);
     sample_hp(v.id, v.hp, before, ts);
+    note_hp_when_hit(v.id, ts);
     // HP reaching 0 is the death; 42 36 follows seconds later, with the corpse. A
     // player gets no 42 36: HP 0 is all the server says, and HP above 0 that they
     // are up.
@@ -525,15 +531,10 @@ BossSummary EncounterEngine::boss_of(const Fight& fight) const {
     if (const Actor* a = m_registry.find(best)) {
         b.npc_code = a->npc_code;
         b.killed = a->dead;
-        if (a->has_live_hp) {
-            b.hp = a->live_hp;
+        if (const std::optional<HpNow> now = hp_now(best)) {
+            b.hp = now->hp;
             b.hp_known = true;
-            b.hp_exact = true;
-        } else if (a->has_hp) {
-            const auto seen = m_damage_since_spawn.find(best);
-            const uint64_t taken = seen == m_damage_since_spawn.end() ? 0 : seen->second;
-            b.hp = taken >= a->spawn_hp ? 0 : a->spawn_hp - taken;
-            b.hp_known = true;
+            b.hp_exact = now->exact;
         }
         if (b.killed) b.hp = 0;
     }
@@ -553,6 +554,15 @@ FightSummary EncounterEngine::summarize(const Fight& fight, bool live, EndReason
     const double span = to_seconds(fight.last_hit_ts > fight.start_ts ? fight.last_hit_ts - fight.start_ts : 0);
     s.duration_s = std::max(span, kMinDurationSeconds);
     s.boss = boss_of(fight);
+    // Over, a boss left standing is at the HP the party left it at, not at the full
+    // HP it reset to once they were gone.
+    if (!live && s.boss.present() && !s.boss.killed) {
+        if (const auto it = fight.hp_when_hit.find(s.boss.id); it != fight.hp_when_hit.end()) {
+            s.boss.hp = it->second.hp;
+            s.boss.hp_known = true;
+            s.boss.hp_exact = it->second.exact;
+        }
+    }
     s.has_casts = true;
 
     // One row per character, whatever ids it had; an id named after it hit joins
@@ -662,6 +672,25 @@ std::optional<uint64_t> EncounterEngine::exact_hp(EntityId id) const {
     if (a->has_live_hp) return a->live_hp;
     if (a->has_hp) return a->spawn_hp;
     return std::nullopt;
+}
+
+std::optional<EncounterEngine::HpNow> EncounterEngine::hp_now(EntityId id) const {
+    const Actor* a = m_registry.find(id);
+    if (a == nullptr) return std::nullopt;
+    if (a->has_live_hp) return HpNow{a->live_hp, true};
+    if (!a->has_hp) return std::nullopt;
+    const auto seen = m_damage_since_spawn.find(id);
+    const uint64_t taken = seen == m_damage_since_spawn.end() ? 0 : seen->second;
+    return HpNow{taken >= a->spawn_hp ? 0 : a->spawn_hp - taken, false};
+}
+
+void EncounterEngine::note_hp_when_hit(EntityId id, Micros ts) {
+    if (!m_fight) return;
+    const auto it = m_fight->hp_when_hit.find(id);
+    // Only an enemy the party hit, and only while the figure can still be the
+    // last hit's: once they stop, its HP coming back up is no work of theirs.
+    if (it == m_fight->hp_when_hit.end() || ts > m_fight->last_hit_ts + kHpSettle) return;
+    if (const std::optional<HpNow> now = hp_now(id)) it->second = *now;
 }
 
 void EncounterEngine::sample_hp(EntityId id, uint64_t hp, std::optional<uint64_t> before, Micros ts) {
