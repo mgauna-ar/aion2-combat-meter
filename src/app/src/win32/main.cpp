@@ -484,6 +484,10 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
         }
         conditions.game_in_front = game_in_front(game_pids);
         conditions.in_dungeon = snapshot != nullptr && game::is_dungeon(snapshot->map_id);
+        conditions.power_empty = settings.plugins.combat_power && settings.power.hide_when_empty &&
+                                 app::power_layout(snapshot != nullptr ? snapshot->power : combat_power::PowerSnapshot{},
+                                                   settings.power)
+                                     .empty();
         if (const bool shown = app::overlay_shown(settings, conditions); shown != window.visible()) {
             window.set_visible(shown);
         }

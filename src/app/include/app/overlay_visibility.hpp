@@ -21,6 +21,9 @@ struct OverlayConditions {
     /// The map is a dungeon (game::is_dungeon: by its id, named or not). False before
     /// any map load.
     bool in_dungeon{false};
+    /// The combat power overlay has no one to draw (PowerLayout::empty), for its
+    /// hide_when_empty.
+    bool power_empty{false};
 };
 
 /// Whether the game counts as in front, for hide_when_game_unfocused, from process
@@ -51,8 +54,9 @@ struct OverlayConditions {
 [[nodiscard]] bool ping_shown(const AppSettings& settings, const OverlayConditions& now) noexcept;
 
 /// Whether the combat power overlay shows now: the Combat Power plugin's master
-/// switch first, then, while it is locked, its own hide_when_game_unfocused and
-/// show_in_dungeons_only. An arena is no dungeon, so the second is off by default.
+/// switch first, then, while it is locked, its own hide_when_game_unfocused,
+/// show_in_dungeons_only and hide_when_empty. An arena is no dungeon, so the second
+/// is off by default.
 [[nodiscard]] bool power_shown(const AppSettings& settings, const OverlayConditions& now) noexcept;
 
 } // namespace aion2::app

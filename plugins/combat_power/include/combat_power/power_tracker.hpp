@@ -31,6 +31,9 @@ struct PowerRow {
     /// An enemy (PowerTracker, An enemy): of the other faction, outside a dungeon and
     /// not in the local player's party. False while either's faction is not known.
     bool hostile{false};
+    /// Hostile, alive and within PowerTracker::kEnemyRange, or at no distance that
+    /// can be measured: one who leads the lists. Their place, not their colour.
+    bool threat{false};
     /// Their HP reached 0 (00 8D) and has not risen since: no threat, whoever they
     /// are. They leave view (47 36) a second or two later.
     bool dead{false};
@@ -52,10 +55,16 @@ struct PowerSnapshot {
     /// those at no known distance last: of a crowd, the first PowerTracker::kMaxListed.
     /// Empty while the local player's position is not known, or stale.
     std::vector<PowerRow> nearest;
-    /// How many there are, listed or not, and how many of them are enemies within
-    /// PowerTracker::kEnemyRange and alive: the ones that lead the lists.
+    /// The hostile players alone, near or far, alive or dead, in `players`' order:
+    /// the first PowerTracker::kMaxListed. A crowd's cut of `players` can leave out
+    /// an enemy out of range or dead, and a list of enemies only must not.
+    std::vector<PowerRow> enemies;
+    /// How many there are, listed or not; how many of them are enemies within
+    /// PowerTracker::kEnemyRange and alive, the ones that lead the lists; and how
+    /// many are hostile at all, as `enemies` lists them.
     uint32_t in_view{0};
     uint32_t hostile_in_view{0};
+    uint32_t enemies_in_view{0};
     uint32_t map_id{0};
     /// Whether the local player's position is known, and how long ago it was last
     /// said: the game does not send them their own steps, so every distance is from

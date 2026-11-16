@@ -43,7 +43,7 @@ struct PowerLayout {
     /// The strongest figure drawn, which the bars are measured against; 0 for none.
     uint32_t top{0};
     /// The map's players the list leaves out: a crowd's weaker ones, or its farther
-    /// ones. 0 with the list off.
+    /// ones; with `only_enemies`, the enemies it leaves out. 0 with the list off.
     uint32_t more{0};
     /// Each row's distance is drawn: sort_by_distance, once the local player's
     /// position is known. Until then the list stays strongest first.
@@ -56,8 +56,11 @@ struct PowerLayout {
 };
 
 /// With `show_list`, the map's list_max_players strongest (nearest, with
-/// `sort_by_distance`), the enemies among them first (with `enemies_first`), the
-/// target marked among them or on a line above them; without it, the target alone.
+/// `sort_by_distance`), the enemies among them first (with `enemies_first`), or the
+/// enemies alone (with `only_enemies`), the target marked among them or on a line
+/// above them; without it, the target alone. The target shows with `only_enemies`
+/// too: an arena's opponent of the local player's own faction is no enemy by
+/// faction, and is shown that way.
 [[nodiscard]] PowerLayout power_layout(const combat_power::PowerSnapshot& power, const PowerSettings& settings);
 
 /// Draws the combat power overlay into the frame the caller has begun: a header to

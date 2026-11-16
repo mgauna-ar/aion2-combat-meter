@@ -94,6 +94,16 @@ carried no figure shows "-".
   a yellow badge (a border and a faint fill, as tall as the bar) so it stands apart
   from names and figures, one width for every row so they line up. Drawn in muted grey
   on a class's bar it was hard to read. A window too narrow for it drops it.
+- **Only enemies** (`only_enemies`): the view lists `enemies` instead, the
+  snapshot's hostile players, near or far, alive or dead, in the same order (by
+  distance: threats first, then nearest, as `nearest`). "+N more" counts
+  `enemies_in_view`. **The target stays, whoever they are.** The plugin reads only
+  the faction, so an arena's opponent of the local player's own is no enemy to it
+  (Only the faction, below), and being the target is the one way they show. A
+  healed ally shows too; the user chose that over losing the opponent.
+- **Hide when empty** (`hide_when_empty`): while locked, `power_shown` hides the
+  overlay when `power_layout(...).empty()` (no target, no rows), which the UI thread
+  works out each frame into `OverlayConditions::power_empty`.
 - **Never empty in a crowd.** The list once went away above `list_max_players`, and
   in a town that read as the overlay losing its players a few seconds after it
   showed them. A crowd shows its strongest instead.
@@ -112,9 +122,15 @@ carried no figure shows "-".
 - **Known on sight.** The faction comes with the record that brings a player into
   view, so they are marked before they act. That is the feature: do not make it
   wait on a hit or a cast.
-- **A threat** is a hostile player within `kEnemyRange` (200 m), or at no known
-  distance. Threats lead both lists, ahead of the cut at `kMaxListed`, so a crowd
-  of stronger or nearer allies never hides one; `hostile_in_view` counts them.
+- **A threat** (`PowerRow::threat`) is a hostile player within `kEnemyRange`
+  (200 m), or at no known distance. Threats lead both lists, ahead of the cut at
+  `kMaxListed`, so a crowd of stronger or nearer allies never hides one;
+  `hostile_in_view` counts them.
+  - **The other hostile players can be cut.** Out of range or dead, they sort among
+    the allies, and a crowd's cut drops them. So the snapshot carries `enemies`:
+    every hostile player, threats first, then strongest, `kMaxListed` of them, and
+    `enemies_in_view` counting them all. The view's `only_enemies` reads it, never a
+    filter of `players`.
   - **A dead enemy is no threat:** marked still, they lead nothing, and the view
     dims their row until they leave.
   - Why a range, now that players leave the list: the local player's position can
