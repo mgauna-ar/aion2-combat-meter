@@ -573,6 +573,93 @@ TEST_CASE(CombatPower, EnemiesLeadBothListsAndNoCrowdHidesOne) {
     TEST_ASSERT_EQ(layout.rows[0].name, std::string("Zikel"));
 }
 
+TEST_CASE(PowerView, OnlyEnemiesListsEveryEnemyAndKeepsTheTarget) {
+    PowerTracker t;
+    t.on_map_load(proto::MapLoad{1, 20}, 2, at(0));
+    proto::Identity me = own(kMe);
+    me.has_position = true;
+    me.position = proto::Point{0.0f, 0.0f, 2400.0f};
+    t.on_identity(me, 2, at(1));
+    // A crowd of allies, every one stronger and nearer than the enemies.
+    for (size_t i = 0; i < PowerTracker::kMaxListed + 6; ++i) {
+        t.on_identity(placed(static_cast<EntityId>(1000 + i), ("Ally" + std::to_string(i)).c_str(),
+                             static_cast<uint32_t>(200'000 + i), 1, static_cast<float>(i + 1)),
+                      2, at(2));
+    }
+    // One enemy in reach, one out of it, one dead.
+    t.on_identity(placed(300, "Zikel", 60'000, 2, 90.0f), 2, at(3));
+    t.on_identity(placed(301, "Triniel", 80'000, 2, PowerTracker::kEnemyRange + 50.0f), 2, at(3));
+    t.on_identity(placed(302, "Hadis", 70'000, 2, 30.0f), 2, at(3));
+    t.on_values(proto::RemainingHp{302, false, true, 0, false, 0}, 2);
+    // A heal pressed on an ally: the target, though no enemy.
+    t.on_cast(press(kMe, 1000), at(4));
+    const PowerSnapshot s = t.snapshot(at(4));
+
+    // The crowd's cut keeps the one that leads and loses the other two...
+    TEST_ASSERT_EQ(s.players.size(), PowerTracker::kMaxListed);
+    TEST_ASSERT_EQ(s.players[0].name, std::string("Zikel"));
+    TEST_ASSERT_FALSE(s.players[1].hostile);
+    // ...which the enemies' own list keeps, the one in reach first.
+    TEST_ASSERT_EQ(s.enemies_in_view, 3u);
+    TEST_ASSERT_EQ(s.hostile_in_view, 1u);
+    TEST_ASSERT_EQ(s.enemies.size(), size_t{3});
+    TEST_ASSERT_EQ(s.enemies[0].name, std::string("Zikel"));
+    TEST_ASSERT(s.enemies[0].threat);
+    TEST_ASSERT_EQ(s.enemies[1].name, std::string("Triniel"));
+    TEST_ASSERT_FALSE(s.enemies[1].threat);
+    TEST_ASSERT_EQ(s.enemies[2].name, std::string("Hadis"));
+    TEST_ASSERT(s.enemies[2].dead);
+
+    app::PowerSettings settings;
+    settings.only_enemies = true;
+    app::PowerLayout layout = app::power_layout(s, settings);
+    TEST_ASSERT_EQ(layout.rows.size(), size_t{3});
+    TEST_ASSERT_EQ(layout.rows[0].name, std::string("Zikel"));
+    TEST_ASSERT_EQ(layout.rows[1].name, std::string("Triniel"));
+    TEST_ASSERT_EQ(layout.rows[2].name, std::string("Hadis"));
+    TEST_ASSERT_EQ(layout.more, 0u);
+    // The ally they aimed at still shows, on a line of their own.
+    TEST_ASSERT_EQ(layout.target_line.name, std::string("Ally0"));
+    TEST_ASSERT_EQ(layout.target, EntityId{0});
+    // The rest counted are enemies, not the crowd.
+    settings.list_max_players = 2;
+    layout = app::power_layout(s, settings);
+    TEST_ASSERT_EQ(layout.rows.size(), size_t{2});
+    TEST_ASSERT_EQ(layout.more, 1u);
+
+    // By distance: the one in reach still leads, then the nearest.
+    settings.list_max_players = 8;
+    settings.sort_by_distance = true;
+    layout = app::power_layout(s, settings);
+    TEST_ASSERT(layout.distances);
+    TEST_ASSERT_EQ(layout.rows[0].name, std::string("Zikel"));
+    TEST_ASSERT_EQ(layout.rows[1].name, std::string("Hadis"));
+    TEST_ASSERT_EQ(layout.rows[2].name, std::string("Triniel"));
+    // Enemies first off: one order for them all.
+    settings.enemies_first = false;
+    layout = app::power_layout(s, settings);
+    TEST_ASSERT_EQ(layout.rows[0].name, std::string("Hadis"));
+    TEST_ASSERT_EQ(layout.rows[1].name, std::string("Zikel"));
+    settings.sort_by_distance = false;
+    layout = app::power_layout(s, settings);
+    TEST_ASSERT_EQ(layout.rows[0].name, std::string("Triniel"));
+    TEST_ASSERT_EQ(layout.rows[2].name, std::string("Zikel"));
+
+    // An enemy aimed at is marked in their row.
+    t.on_cast(press(kMe, 301), at(5));
+    layout = app::power_layout(t.snapshot(at(5)), settings);
+    TEST_ASSERT_EQ(layout.target, EntityId{301});
+    TEST_ASSERT_EQ(layout.target_line.id, EntityId{0});
+
+    // No enemies and no target: nothing to draw, though the map is full.
+    PowerSnapshot allies = s;
+    allies.enemies.clear();
+    allies.enemies_in_view = 0;
+    allies.target = PowerRow{};
+    TEST_ASSERT(app::power_layout(allies, settings).empty());
+    TEST_ASSERT_FALSE(app::power_layout(allies, app::PowerSettings{}).empty());
+}
+
 TEST_CASE(CombatPower, APlayerWhoLeavesViewLeavesTheList) {
     PowerTracker t = duel();
     t.on_identity(player(300, "Zikel", 90'000), 2, at(2));

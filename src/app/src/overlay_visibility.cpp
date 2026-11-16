@@ -45,6 +45,7 @@ bool power_shown(const AppSettings& settings, const OverlayConditions& now) noex
     if (!p.locked) return true;
     if (p.hide_when_game_unfocused && !now.game_in_front) return false;
     if (p.show_in_dungeons_only && !now.in_dungeon) return false;
+    if (p.hide_when_empty && now.power_empty) return false;
     return true;
 }
 

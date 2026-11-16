@@ -75,6 +75,10 @@ void display_card(const AppFrameInput& in, AppActions& out) {
                    "Players of the other faction lead the list, so one coming into view is not lost among your "
                    "own. Their names are red either way.",
                    &p.enemies_first, out, Applies::Overlay);
+    setting_switch("Only enemies",
+                   "List players of the other faction alone, near or far. Your target still shows, whoever they "
+                   "are: an arena opponent of your own faction is not an enemy by faction.",
+                   &p.only_enemies, out, Applies::Overlay);
     setting_switch("Sort by distance",
                    "The nearest players first, each with how far they are. The game does not send you your own "
                    "steps, so distances are measured from where you last used a skill or entered the map, and show "
@@ -107,6 +111,10 @@ void overlay_card(const AppFrameInput& in, AppActions& out) {
     c.show_in_dungeons_only = &p.show_in_dungeons_only;
     c.reset_position = &out.reset_power_position;
     c.position_help = "Back to its spot beside the ping overlay's.";
+    c.conditions = [&] {
+        setting_switch("Hide when empty", "Hidden while there is no target and no one to list.", &p.hide_when_empty,
+                       out);
+    };
     overlay_settings_card(c, out);
 }
 

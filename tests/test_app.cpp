@@ -453,7 +453,11 @@ TEST_CASE(AppSettings, CombatPowerSettingsRoundTripAndAreSanitized) {
     s.power.sort_by_distance = true;
     TEST_ASSERT(s.power.enemies_first);  // on until switched off
     s.power.enemies_first = false;
+    TEST_ASSERT_FALSE(s.power.only_enemies);  // everyone until asked
+    s.power.only_enemies = true;
     s.power.hide_when_game_unfocused = true;
+    TEST_ASSERT_FALSE(s.power.hide_when_empty);
+    s.power.hide_when_empty = true;
     const config::JsonValue json = settings_to_json(s);
     TEST_ASSERT(json["combat_power"]["plugin_enabled"].as_bool(false));
     const AppSettings back = settings_from_json(json);
@@ -465,7 +469,9 @@ TEST_CASE(AppSettings, CombatPowerSettingsRoundTripAndAreSanitized) {
     TEST_ASSERT_EQ(back.power.list_max_players, 4);
     TEST_ASSERT(back.power.sort_by_distance);
     TEST_ASSERT_FALSE(back.power.enemies_first);
+    TEST_ASSERT(back.power.only_enemies);
     TEST_ASSERT(back.power.hide_when_game_unfocused);
+    TEST_ASSERT(back.power.hide_when_empty);
     TEST_ASSERT_FALSE(back.power.show_in_dungeons_only);
     // The other plugins' switches are their own.
     TEST_ASSERT_FALSE(back.plugins.ping);
@@ -499,6 +505,16 @@ TEST_CASE(OverlayVisibility, CombatPowerFollowsItsPluginAndItsOwnConditions) {
     s.power.show_in_dungeons_only = true;
     TEST_ASSERT_FALSE(power_shown(s, now));
     now.in_dungeon = true;
+    TEST_ASSERT(power_shown(s, now));
+    // No one to show: hidden only when asked, and only while locked.
+    now.power_empty = true;
+    TEST_ASSERT(power_shown(s, now));
+    s.power.hide_when_empty = true;
+    TEST_ASSERT_FALSE(power_shown(s, now));
+    s.power.locked = false;
+    TEST_ASSERT(power_shown(s, now));
+    s.power.locked = true;
+    now.power_empty = false;
     TEST_ASSERT(power_shown(s, now));
     // The meter switched off leaves it alone.
     s.plugins.combat_meter = false;

@@ -165,10 +165,16 @@ struct PowerSettings {
     /// Players of the other faction lead the list, whatever its order. Their names
     /// are red either way.
     bool enemies_first{true};
+    /// The list holds players of the other faction alone, near or far, alive or
+    /// dead, in the list's own order. The target still shows, whoever they are: an
+    /// arena's opponent of the local player's own faction is no enemy by faction.
+    bool only_enemies{false};
     /// As the meter overlay's: while locked, only in a dungeon, and hidden while
     /// neither the game nor one of the meter's windows is in front.
     bool show_in_dungeons_only{false};
     bool hide_when_game_unfocused{false};
+    /// While locked, hidden while it has no one to show: no target and an empty list.
+    bool hide_when_empty{false};
 };
 
 /// The list's range: one other player (a duel) to the most a snapshot lists
@@ -291,7 +297,7 @@ inline constexpr std::array<config::ConfigKey<PingSettings>, 13> kPingKeys{{
     config::field<PingSettings, &PingSettings::hide_when_game_unfocused>("hide_when_game_unfocused"),
 }};
 
-inline constexpr std::array<config::ConfigKey<PowerSettings>, 13> kPowerKeys{{
+inline constexpr std::array<config::ConfigKey<PowerSettings>, 15> kPowerKeys{{
     config::field<PowerSettings, &PowerSettings::locked>("locked"),
     config::field<PowerSettings, &PowerSettings::opacity>("opacity"),
     config::field<PowerSettings, &PowerSettings::scale>("scale"),
@@ -303,8 +309,10 @@ inline constexpr std::array<config::ConfigKey<PowerSettings>, 13> kPowerKeys{{
     config::field<PowerSettings, &PowerSettings::list_max_players>("list_max_players"),
     config::field<PowerSettings, &PowerSettings::sort_by_distance>("sort_by_distance"),
     config::field<PowerSettings, &PowerSettings::enemies_first>("enemies_first"),
+    config::field<PowerSettings, &PowerSettings::only_enemies>("only_enemies"),
     config::field<PowerSettings, &PowerSettings::show_in_dungeons_only>("show_in_dungeons_only"),
     config::field<PowerSettings, &PowerSettings::hide_when_game_unfocused>("hide_when_game_unfocused"),
+    config::field<PowerSettings, &PowerSettings::hide_when_empty>("hide_when_empty"),
 }};
 
 /// The ping thresholds' range, in ms. The red one is never under the amber one.

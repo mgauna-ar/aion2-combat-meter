@@ -36,6 +36,14 @@ A fourth window you place like the meter's (unlock with Ctrl+Alt+L, drag, resize
   still compare combat power. See below for what the distance is measured from.
 
 ![The combat power overlay sorted by distance: an enemy 38 metres away in red at the top, then the two nearest players of your own faction, and nine more counted](../../docs/images/overlay-combat-power-distance.png)
+- **Only enemies** (a switch on the page, off unless you turn it on) lists players
+  of the other faction alone: every one in view, near or far, the ones within 200 m
+  first, a dead one dimmed until they leave. Your target still shows, whoever they
+  are, on a line of their own when they are not an enemy: that is how an arena
+  opponent of your own faction shows (see below). "+N more" then counts enemies.
+- **Hide when empty** (with the overlay's other conditions) hides it, while locked,
+  when it has no one to show: no target, and no one in the list. With "Only
+  enemies", it stays out of the way until an enemy comes into view.
 - **A class emblem** appears once that player has used a skill: the game does not say
   the class, their skills do.
 - **"-"** means that player's record carried no figure the plugin could read.
@@ -70,7 +78,8 @@ A fourth window you place like the meter's (unlock with Ctrl+Alt+L, drag, resize
 - **Not in a dungeon, and never your party.** Dungeon parties mix both factions, so
   no one is marked there, and a member of your party is never marked anywhere.
 - **Not an arena opponent of your own faction.** Only the faction is read: someone
-  you duel from your own side shows like anyone else.
+  you duel from your own side shows like anyone else. With "Only enemies" on, they
+  show as your target once you use a skill on them, for half a minute after it.
 - **Out of reach, they lose their place, not their colour.** An enemy more than
   200 m from where you last used a skill stops leading the list, as does one who is
   dead. Their name stays red.
@@ -118,10 +127,12 @@ and saves as you go.
 | `x`, `y`, `width`, `height` | -1, -1, 260, 190 | Position and size in screen pixels. -1, -1 places it right of the ping overlay's default spot. |
 | `show_list` | true | List the map's players, strongest first. Off, only your target shows. |
 | `enemies_first` | true | Players of the other faction lead the list while within 200 m. Their names are red either way. |
+| `only_enemies` | false | List only players of the other faction, near or far, alive or dead. Your target shows whoever they are. |
 | `sort_by_distance` | false | List the nearest players first, each with its distance, instead of the strongest. |
 | `list_max_players` | 8 | The most players listed, 1 to 12. With more on the map, these are the strongest (the nearest, with `sort_by_distance`), and a count of the rest follows. |
 | `hide_when_game_unfocused` | false | Hide it while neither the game nor the meter's window is in front, and while the game is not running. Applies only while locked. |
 | `show_in_dungeons_only` | false | Show it only in a dungeon (as the meter overlay's setting of that name). An arena is not one. Applies only while locked. |
+| `hide_when_empty` | false | Hide it while it has no one to show: no target and an empty list. Applies only while locked. |
 
 ## For developers
 

@@ -240,6 +240,7 @@ PowerSnapshot PowerTracker::snapshot(Micros now) const {
     const auto row_of = [&](const Player& player) {
         PowerRow row = player.row;
         row.hostile = hostile(player);
+        row.threat = threat(player, measurable);
         if (measurable && player.has_position) row.distance_m = metres_between(player.at, m_local_at);
         return row;
     };
@@ -265,6 +266,16 @@ PowerSnapshot PowerTracker::snapshot(Micros now) const {
     std::partial_sort(rows.begin(), rows.begin() + listed, rows.end(), stronger);
     s.players.reserve(static_cast<size_t>(listed));
     for (std::ptrdiff_t i = 0; i < listed; ++i) s.players.push_back(row_of(*rows[static_cast<size_t>(i)]));
+
+    // The enemies on their own: the cut above keeps those that lead, not those out
+    // of range or dead, who still have their red name.
+    std::vector<const Player*> enemies;
+    std::copy_if(rows.begin(), rows.end(), std::back_inserter(enemies), [&](const Player* p) { return hostile(*p); });
+    s.enemies_in_view = static_cast<uint32_t>(enemies.size());
+    const auto enemies_listed = static_cast<std::ptrdiff_t>(std::min(enemies.size(), kMaxListed));
+    std::partial_sort(enemies.begin(), enemies.begin() + enemies_listed, enemies.end(), stronger);
+    s.enemies.reserve(static_cast<size_t>(enemies_listed));
+    for (std::ptrdiff_t i = 0; i < enemies_listed; ++i) s.enemies.push_back(row_of(*enemies[static_cast<size_t>(i)]));
     if (!measurable) return s;
 
     // The nearest: squared distances order as distances do. One whose position is
