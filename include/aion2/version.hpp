@@ -6,9 +6,9 @@
 // executable's version resource, so everything above the RC_INVOKED guard must stay
 // plain preprocessor that rc.exe understands: no #pragma once, no C++.
 #define AION2_VERSION_MAJOR 1
-#define AION2_VERSION_MINOR 5
-#define AION2_VERSION_PATCH 2
-#define AION2_VERSION_STRING "1.5.2"
+#define AION2_VERSION_MINOR 6
+#define AION2_VERSION_PATCH 0
+#define AION2_VERSION_STRING "1.6.0"
 
 #ifndef RC_INVOKED
 
