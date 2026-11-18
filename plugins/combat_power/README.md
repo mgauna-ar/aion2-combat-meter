@@ -17,7 +17,9 @@ A fourth window you place like the meter's (unlock with Ctrl+Alt+L, drag, resize
   show as the match loads, before the first hit. The bars compare each player with
   the strongest.
 - **Your target** is the player you last used a skill on, for half a minute after it.
-  In the list, their row carries a red stripe and a bold name.
+  In the list, their row carries a red stripe and a bold name. Hitting an enemy makes
+  them your target too; a heal that lands on an ally on its own (a passive's, a
+  spirit's) does not move it, and one you cast on them does.
 - **In a crowd** (a town, the open world) the list is the strongest players in your
   view, as many as **List up to** (8 unless you change it), with
   "+N more" under them. A target who is not among them shows on a line of their own
@@ -126,7 +128,7 @@ and saves as you go.
 | `scale` | 1.0 | Size, 0.6 to 2.5, on top of the monitor's DPI scaling. |
 | `x`, `y`, `width`, `height` | -1, -1, 260, 190 | Position and size in screen pixels. -1, -1 places it right of the ping overlay's default spot. |
 | `show_list` | true | List the map's players, strongest first. Off, only your target shows. |
-| `enemies_first` | true | Players of the other faction lead the list while within 200 m. Their names are red either way. |
+| `enemies_first` | true | Players of the other faction lead the list while within 200 m. Off, the list is the strongest (or the nearest) of everyone. Their names are red either way. |
 | `only_enemies` | false | List only players of the other faction, near or far, alive or dead. Your target shows whoever they are. |
 | `sort_by_distance` | false | List the nearest players first, each with its distance, instead of the strongest. |
 | `list_max_players` | 8 | The most players listed, 1 to 12. With more on the map, these are the strongest (the nearest, with `sort_by_distance`), and a count of the rest follows. |

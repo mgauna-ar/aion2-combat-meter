@@ -105,7 +105,8 @@ public:
     void set_counter_offset(std::optional<Micros> offset) noexcept { m_ping.set_counter_offset(offset); }
     /// Switches plugins on and off at capture time `now`. The meter switched off ends
     /// its live fight first; the auras, the ping and the combat power switched off
-    /// forget what they knew, since they will miss what happens meanwhile.
+    /// forget what they knew, since they will miss what happens meanwhile. The meter
+    /// switched back on is handed where it is (keep_for_meter).
     void set_plugins(const aion2::plugins::PluginSwitches& on, Micros now);
     [[nodiscard]] const aion2::plugins::PluginSwitches& plugin_switches() const noexcept { return m_plugins; }
 
@@ -128,10 +129,15 @@ public:
 
 private:
     void on_frame(const proto::Frame& frame) override;
+    /// A game connection closed: the Ping plugin's heartbeats on it have stopped.
+    void on_connection_closed(uint32_t connection, Micros ts) override;
     /// Keeps the map and the local player's name whatever plugins are on: the
     /// overlays' "only in dungeons" and the dashboard read them, and no plugin may
     /// depend on another being switched on.
     void note_where(const proto::ParsedEvent& e);
+    /// While the meter is off: keeps `e` if it says where the meter is, for when
+    /// it comes back on.
+    void keep_for_meter(const proto::ParsedEvent& e);
     [[nodiscard]] meter::CaptureQuality capture_totals() const;
 
     StreamDemux m_demux;
@@ -147,6 +153,11 @@ private:
     /// The last 21 36's map, and the last 33 36's name.
     uint32_t m_map_id{0};
     std::string m_local_name;
+    /// What the meter missed while off that says where it is: the last map load,
+    /// the last 33 36 and the last party roster, in the order they came. Switched
+    /// back on, it gets them, so it does not take the open world for the dungeon
+    /// it was switched off in, or count strangers there as its party.
+    std::vector<proto::ParsedEvent> m_kept_for_meter;
     std::function<void(const proto::Frame&, FrameOutcome)> m_frame_observer;
     std::function<void(const proto::ParsedEvent&)> m_event_observer;
 };

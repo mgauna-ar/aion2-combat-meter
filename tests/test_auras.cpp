@@ -288,6 +288,32 @@ TEST_CASE(Auras, EffectsSeenOnTheLocalPlayerAreRemembered) {
     TEST_ASSERT_EQ(a.seen[2].label, std::string("Undefeated Mantra"));
 }
 
+TEST_CASE(Auras, TheSeenListLearnsAnEffectsCasterOnceTheySpawn) {
+    // Switched on mid-fight: the boss's debuff lands before its spawn is known. It was
+    // listed for good as "Effect 16044202", an ally's, which the page offered to watch.
+    AuraPlugin e;
+    e.on_event(ev(at_s(0), proto::MapLoad{1, kDungeon}));
+    e.on_event(ev(at_s(0), player(kMe, "Ariel", true)));
+    e.on_event(ev(at_s(1), buff(kMe, kBoss, 4, kBossDebuff, 30'000)));
+    e.tick(at_s(1.1));
+    TEST_ASSERT(!e.snapshot(at_s(1.1)).seen[0].hostile);
+    e.on_event(ev(at_s(2), npc(kBoss, 5'000'000, 777)));  // comes into view again
+    e.tick(at_s(2.1));
+    AuraSnapshot a = e.snapshot(at_s(2.1));
+    TEST_ASSERT(a.on_self[0].hostile);
+    TEST_ASSERT_EQ(a.seen.size(), size_t{1});
+    TEST_ASSERT(a.seen[0].hostile);
+    TEST_ASSERT_EQ(a.seen[0].label, std::string("NPC #777"));
+    // A new map forgets the boss; its debuff again there takes nothing back.
+    e.on_event(ev(at_s(40), proto::MapLoad{2, kDungeon + 1}));
+    e.on_event(ev(at_s(41), buff(kMe, kBoss, 5, kBossDebuff, 30'000)));
+    e.tick(at_s(41.1));
+    a = e.snapshot(at_s(41.1));
+    TEST_ASSERT(!a.on_self[0].hostile);
+    TEST_ASSERT(a.seen[0].hostile);
+    TEST_ASSERT_EQ(a.seen[0].label, std::string("NPC #777"));
+}
+
 // --- Cooldowns (01 38, 47 38, plugins/auras/data/cooldowns.tsv) ---
 
 namespace {
@@ -378,6 +404,19 @@ TEST_CASE(Cooldowns, ThePluginShowsTheLocalPlayersAndForgetsAnotherCharacters) {
     TEST_ASSERT_EQ(e.snapshot(at_s(21)).cooldowns[0].ready_at, at_s(31));
 }
 
+TEST_CASE(Cooldowns, AnotherCharacterLoggingInDropsTheCooldownsAtOnce) {
+    // Not at their first skill: until then the old character's showed, and as icons
+    // their ready skills stayed lit.
+    AuraPlugin e = setup();
+    e.on_event(ev(at_s(1), proto::SkillUsed{12'350'130}));  // Warding Strike, 25 s
+    e.on_event(ev(at_s(10), proto::MapLoad{2, 1010}));
+    e.on_event(ev(at_s(10), player(kMe, "Ariel", true)));  // the same character: kept
+    TEST_ASSERT_EQ(e.snapshot(at_s(10)).cooldowns.size(), size_t{1});
+    e.on_event(ev(at_s(20), proto::MapLoad{3, 1010}));
+    e.on_event(ev(at_s(20), player(kMe + 1, "Zikel", true)));
+    TEST_ASSERT(e.snapshot(at_s(21)).cooldowns.empty());
+}
+
 TEST_CASE(Cooldowns, ASecondUseShowsOnlyOnceBothAreSpent) {
     // Shield of Protection, a stigma: its first specialty is "+1 consecutive use".
     // Cast as 12110010 it has unlocked that one.
@@ -393,6 +432,25 @@ TEST_CASE(Cooldowns, ASecondUseShowsOnlyOnceBothAreSpent) {
     TEST_ASSERT_EQ(shown[0].ready_at, at_s(20));  // the first use's, ready soonest
     // The quick second use taught nothing.
     TEST_ASSERT_EQ(c.estimate_ms(12'110'010), uint64_t{20'000});
+}
+
+TEST_CASE(Cooldowns, ACutOnASkillWithAUseLeftLeavesThatUseReady) {
+    // Shield of Protection, one of its two uses spent: a 47 38 is what is left of the
+    // one cooling. Set on the ready one, it hid the use still there.
+    CooldownTracker c;
+    c.on_used(12'110'010, at_s(0));
+    c.on_set(12'110'000, 15'000, at_s(3));
+    auto shown = c.snapshot(at_s(3));
+    TEST_ASSERT_EQ(shown.size(), size_t{1});
+    TEST_ASSERT_EQ(cooling(shown, at_s(3)), size_t{0});
+    // The use left goes next; the cut one is back at 18 s, before the new one's 24 s.
+    c.on_used(12'110'010, at_s(4));
+    TEST_ASSERT_EQ(c.snapshot(at_s(4))[0].ready_at, at_s(18));
+    // Both cooling: a cut takes the one back soonest.
+    c.on_set(12'110'000, 10'000, at_s(5));
+    TEST_ASSERT_EQ(c.snapshot(at_s(5))[0].ready_at, at_s(15));
+    c.on_used(12'110'010, at_s(15));
+    TEST_ASSERT_EQ(c.snapshot(at_s(15))[0].ready_at, at_s(24));
 }
 
 // --- Who is who (Entities): the plugin's own record, not the meter's registry ---

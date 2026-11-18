@@ -21,10 +21,12 @@ constexpr Micros kTs = kServerMs * kMicrosPerMilli;
 struct OpcodeSink final : proto::FrameSink {
     std::vector<uint16_t> opcodes;
     std::vector<uint32_t> connections;
+    std::vector<uint32_t> closed;
     void on_frame(const proto::Frame& f) override {
         opcodes.push_back(f.opcode);
         connections.push_back(f.connection);
     }
+    void on_connection_closed(uint32_t connection, Micros) override { closed.push_back(connection); }
 };
 
 /// Sends `stream` as segments of `chunk` bytes from `spec`, starting at spec.seq.
@@ -141,6 +143,49 @@ TEST_CASE(StreamDemux, AFourTupleOpenedAgainIsANewConnection) {
     send(demux, sink, again, heartbeat(kServerMs + 150), 64, kTs);
     TEST_ASSERT_EQ(sink.connections.size(), size_t{4});
     TEST_ASSERT_EQ(sink.connections[3], sink.connections[2]);
+}
+
+// A game connection's FIN or RST, once its bytes are through, tells the sink which
+// connection ended: the Ping plugin's silence on it is then no stall.
+TEST_CASE(StreamDemux, AGameConnectionsEndReachesTheSink) {
+    StreamDemux demux;
+    OpcodeSink sink;
+    TcpSpec town;
+    town.seq = 999;
+    town.flags = capture::tcp_flag::Syn | capture::tcp_flag::Ack;
+    demux.on_packet(capture::link_type::Ethernet, ethernet_tcp(town, Bytes{}), kTs, sink);
+    town.seq = 1000;
+    town.flags = capture::tcp_flag::Ack | capture::tcp_flag::Psh;
+    const Bytes hb = heartbeat(kServerMs);
+    // The FIN comes before the last bytes do: the end waits for them.
+    TcpSpec fin = town;
+    fin.seq = 1000 + static_cast<uint32_t>(hb.size());
+    fin.flags = capture::tcp_flag::Fin | capture::tcp_flag::Ack;
+    demux.on_packet(capture::link_type::Ethernet, ethernet_tcp(fin, Bytes{}), kTs, sink);
+    TEST_ASSERT(sink.closed.empty());
+    send(demux, sink, town, hb, 64, kTs);
+    TEST_ASSERT_EQ(sink.connections.size(), size_t{1});
+    TEST_ASSERT((sink.closed == std::vector<uint32_t>{sink.connections[0]}));
+
+    // An RST ends the dungeon's.
+    TcpSpec dungeon;
+    dungeon.src_ip = ip4(10, 0, 0, 9);
+    dungeon.dst_port = static_cast<uint16_t>(kClientPort + 1);
+    send(demux, sink, dungeon, heartbeat(kServerMs + 50), 64, kTs);
+    dungeon.flags = capture::tcp_flag::Rst;
+    demux.on_packet(capture::link_type::Ethernet, ethernet_tcp(dungeon, Bytes{}), kTs, sink);
+    TEST_ASSERT_EQ(sink.closed.size(), size_t{2});
+    TEST_ASSERT_EQ(sink.closed[1], sink.connections[1]);
+
+    // A flow that is not the game's says nothing as it ends.
+    TcpSpec web;
+    web.src_port = 443;
+    web.dst_port = 50123;
+    send(demux, sink, web, Bytes(100, 0x17), 100, kTs);
+    web.seq += 100;
+    web.flags = capture::tcp_flag::Fin | capture::tcp_flag::Ack;
+    demux.on_packet(capture::link_type::Ethernet, ethernet_tcp(web, Bytes{}), kTs, sink);
+    TEST_ASSERT_EQ(sink.closed.size(), size_t{2});
 }
 
 TEST_CASE(StreamDemux, NoisyFlowIsRejected) {

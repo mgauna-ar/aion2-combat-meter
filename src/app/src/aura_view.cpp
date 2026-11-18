@@ -120,17 +120,11 @@ std::vector<MissingEffect> missing_effects(const auras::AuraSnapshot& auras, con
         const bool on = std::any_of(auras.on_self.begin(), auras.on_self.end(),
                                     [&](const auras::AuraEntry& e) { return e.key == key && running(e, now); });
         if (on) continue;
-        MissingEffect m{key, {}};
         const auto seen = std::find_if(auras.seen.begin(), auras.seen.end(),
                                        [&](const auras::SeenEffect& s) { return s.key == key; });
-        if (seen != auras.seen.end()) {
-            m.label = seen->label;
-        } else if (const std::string_view name = game::skill_name(key); !name.empty()) {
-            m.label = std::string(name);
-        } else {
-            m.label = "Effect " + std::to_string(key);
-        }
-        out.push_back(std::move(m));
+        // Not seen yet this session (a scroll after a restart): named by its key alone.
+        out.push_back(MissingEffect{key, seen != auras.seen.end() ? seen->label : game::effect_key_label(key),
+                                    effect_key_icon(key)});
     }
     return out;
 }
@@ -518,7 +512,7 @@ OverlayActions draw_auras(const AuraFrameInput& in) {
             ImGui::TextColored(rgba(colors::TextDim), "AURAS");
             chrome::HeaderButtons buttons;
             buttons.scale = scale;
-            buttons.app_tooltip = "Open the app: the aura settings are under Settings.";
+            buttons.app_tooltip = "Open the app: the aura settings are on the Auras page.";
             buttons.lock_tooltip = "Click-through and fixed in place. Unlock it in the app.";
             chrome::finish_header(buttons, out);
         }
@@ -537,7 +531,7 @@ OverlayActions draw_auras(const AuraFrameInput& in) {
             // Missing watched effects: in icons, a tile for each that has an icon.
             std::vector<Tile> alert_tiles;
             for (const MissingEffect& m : missing_effects(*auras, s.watch, in.now)) {
-                const int icon = s.icons ? skill_icon(m.key) : kNoIcon;
+                const int icon = s.icons ? m.icon : kNoIcon;
                 if (icon != kNoIcon) {
                     alert_tiles.push_back(missing_tile(m, icon, pulse));
                 } else {

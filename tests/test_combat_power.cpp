@@ -6,7 +6,9 @@
 #include "combat_power/power_tracker.hpp"
 #include "pipeline/pipeline.hpp"
 
+#include <algorithm>
 #include <string>
+#include <vector>
 
 using namespace aion2;
 using namespace aion2::combat_power;
@@ -87,6 +89,24 @@ PowerTracker duel() {
     return t;
 }
 
+/// Map 20, both factions in view, the local player (faction 1) at the origin.
+PowerTracker open_world() {
+    PowerTracker t;
+    t.on_map_load(proto::MapLoad{1, 20}, 2, at(0));
+    proto::Identity me = own(kMe);
+    me.has_position = true;
+    me.position = proto::Point{0.0f, 0.0f, 2400.0f};
+    t.on_identity(me, 2, at(1));
+    return t;
+}
+
+/// The snapshot's list nearest first, threats leading, as the overlay sorted by
+/// distance shows it: empty while no distance is known.
+std::vector<PowerRow> nearest(const PowerSnapshot& s) {
+    if (!s.has_local_position || s.local_position_stale) return {};
+    return s.list(false, ListOrder{true, true}, PowerTracker::kMaxListed);
+}
+
 } // namespace
 
 TEST_CASE(CombatPower, AnArenaOpponentIsListedAsTheMatchLoads) {
@@ -105,13 +125,13 @@ TEST_CASE(CombatPower, AnArenaOpponentIsListedAsTheMatchLoads) {
 
 TEST_CASE(CombatPower, TheTargetIsThePlayerASkillWasPressedOn) {
     PowerTracker t = duel();
-    t.on_cast(press(kMe, 227), at(5));
+    t.on_cast(press(kMe, 227), 2, at(5));
     TEST_ASSERT_EQ(t.snapshot(at(6)).target.id, EntityId{227});
     TEST_ASSERT_EQ(t.snapshot(at(6)).target.combat_power, 134'667u);
     // It lasts kTargetMemory after the last skill, and a hit renews it.
     TEST_ASSERT_EQ(t.snapshot(at(5) + PowerTracker::kTargetMemory).target.id, EntityId{227});
     TEST_ASSERT_EQ(t.snapshot(at(5.1) + PowerTracker::kTargetMemory).target.id, EntityId{0});
-    t.on_damage(hit(kMe, 227), at(40));
+    t.on_damage(hit(kMe, 227), 2, at(40));
     TEST_ASSERT_EQ(t.snapshot(at(41)).target.id, EntityId{227});
 }
 
@@ -119,21 +139,42 @@ TEST_CASE(CombatPower, OnlyTheLocalPlayersPressesAim) {
     PowerTracker t = duel();
     t.on_identity(player(300, "Zikel", 90'000), 2, at(2));
     // Someone else's skill, a self-cast and a passive going off say nothing.
-    t.on_cast(press(227, 300), at(3));
-    t.on_cast(press(kMe, kMe), at(3));
+    t.on_cast(press(227, 300), 2, at(3));
+    t.on_cast(press(kMe, kMe), 2, at(3));
     proto::SkillCast proc = press(kMe, 300);
     proc.pressed = false;
-    t.on_cast(proc, at(3));
+    t.on_cast(proc, 2, at(3));
     TEST_ASSERT_EQ(t.snapshot(at(4)).target.id, EntityId{0});
 
-    t.on_cast(press(kMe, 300), at(5));
+    t.on_cast(press(kMe, 300), 2, at(5));
     TEST_ASSERT_EQ(t.snapshot(at(6)).target.id, EntityId{300});
     // An area skill's hit on a monster beside them keeps the target.
-    t.on_damage(hit(kMe, 9001), at(7));
+    t.on_damage(hit(kMe, 9001), 2, at(7));
     TEST_ASSERT_EQ(t.snapshot(at(8)).target.id, EntityId{300});
     // A skill pressed on the monster lets go of it.
-    t.on_cast(press(kMe, 9001), at(9));
+    t.on_cast(press(kMe, 9001), 2, at(9));
     TEST_ASSERT_EQ(t.snapshot(at(10)).target.id, EntityId{0});
+}
+
+TEST_CASE(CombatPower, AHitNamesAnEnemyAndAHealOnAnAllyNoOne) {
+    PowerTracker t = open_world();
+    t.on_identity(placed(227, "Nezekan", 134'667, 2, 10.0f), 2, at(2));  // an enemy
+    t.on_identity(placed(300, "Lumiel", 90'000, 1, 5.0f), 2, at(2));     // an ally
+    t.on_cast(press(kMe, 227), 2, at(3));
+    // 04 38 carries heals: a passive's or a spirit's on the ally, no press behind
+    // it, keeps the enemy being fought.
+    proto::Damage heal = hit(kMe, 300, 16110000);
+    heal.amount = 2'000;
+    t.on_damage(heal, 2, at(4));
+    TEST_ASSERT_EQ(t.snapshot(at(5)).target.id, EntityId{227});
+    // A hit on another enemy names them, as a press would.
+    t.on_identity(placed(228, "Zikel", 120'000, 2, 12.0f), 2, at(5));
+    t.on_damage(hit(kMe, 228), 2, at(6));
+    TEST_ASSERT_EQ(t.snapshot(at(7)).target.id, EntityId{228});
+    // A heal pressed on the ally names them, and a heal on them renews it.
+    t.on_cast(press(kMe, 300), 2, at(8));
+    t.on_damage(heal, 2, at(30));
+    TEST_ASSERT_EQ(t.snapshot(at(8) + PowerTracker::kTargetMemory + from_seconds(1.0)).target.id, EntityId{300});
 }
 
 TEST_CASE(CombatPower, PlayersAreListedStrongestFirstAndOfACrowdTheStrongest) {
@@ -150,7 +191,7 @@ TEST_CASE(CombatPower, PlayersAreListedStrongestFirstAndOfACrowdTheStrongest) {
     for (EntityId id = 1000; id < 1000 + PowerTracker::kMaxListed; ++id) {
         t.on_identity(player(id, ("Crowd" + std::to_string(id)).c_str(), 50'000 + id), 2, at(4));
     }
-    t.on_cast(press(kMe, 301), at(5));
+    t.on_cast(press(kMe, 301), 2, at(5));
     s = t.snapshot(at(6));
     TEST_ASSERT_EQ(s.players.size(), PowerTracker::kMaxListed);
     TEST_ASSERT_EQ(s.in_view, static_cast<uint32_t>(3 + PowerTracker::kMaxListed));
@@ -164,16 +205,16 @@ TEST_CASE(CombatPower, PlayersAreListedStrongestFirstAndOfACrowdTheStrongest) {
 TEST_CASE(CombatPower, TheClassComesFromTheSkillsTheyUse) {
     PowerTracker t = duel();
     TEST_ASSERT(t.snapshot(at(2)).players[0].cls == game::AionClass::Unknown);
-    t.on_damage(hit(227, kMe, kSorcererSkill), at(3));
+    t.on_damage(hit(227, kMe, kSorcererSkill), 2, at(3));
     TEST_ASSERT(t.snapshot(at(4)).players[0].cls == game::AionClass::Sorcerer);
     // A code that names no class leaves the one known.
-    t.on_cast(press(227, kMe, 3000019), at(5));
+    t.on_cast(press(227, kMe, 3000019), 2, at(5));
     TEST_ASSERT(t.snapshot(at(6)).players[0].cls == game::AionClass::Sorcerer);
 }
 
 TEST_CASE(CombatPower, ANewConnectionForgetsTheMapBefore) {
     PowerTracker t = duel();
-    t.on_cast(press(kMe, 227), at(5));
+    t.on_cast(press(kMe, 227), 2, at(5));
     // Back to town: another connection, where every id is someone else's.
     t.on_values(proto::RemainingHp{4987, true, false, 0, false, 0}, 3);
     TEST_ASSERT_EQ(t.players(), size_t{0});
@@ -187,6 +228,48 @@ TEST_CASE(CombatPower, ANewConnectionForgetsTheMapBefore) {
     // A straggler from the connection before is ignored.
     t.on_identity(player(227, "Nezekan", 134'667), 2, at(62));
     TEST_ASSERT_EQ(t.players(), size_t{1});
+}
+
+TEST_CASE(CombatPower, AnOlderConnectionsCastsAndHitsSayNothing) {
+    PowerPlugin plugin;
+    proto::ParsedEvent e;
+    e.connection = 2;  // the town
+    e.ts = at(0);
+    e.event = proto::MapLoad{1, 1010};
+    plugin.on_event(e);
+    // A dungeon: a new connection, its ids another map's.
+    e.connection = 3;
+    e.ts = at(10);
+    e.event = proto::MapLoad{1, 600072};
+    plugin.on_event(e);
+    e.event = own(kMe);
+    plugin.on_event(e);
+    e.event = player(300, "Zikel", 120'000);
+    plugin.on_event(e);
+    e.event = press(kMe, 300);
+    plugin.on_event(e);
+    // The town's last packets, from whoever held those ids there: no class for
+    // Zikel, and the local player's id there pressing on a monster lets go of nothing.
+    e.connection = 2;
+    e.ts = at(11);
+    e.event = press(300, 301, kSorcererSkill);
+    plugin.on_event(e);
+    e.event = hit(300, 301, kSorcererSkill);
+    plugin.on_event(e);
+    e.event = press(kMe, 9001);
+    plugin.on_event(e);
+    PowerSnapshot s = plugin.snapshot(at(12));
+    TEST_ASSERT(s.players[0].cls == game::AionClass::Unknown);
+    TEST_ASSERT_EQ(s.target.id, EntityId{300});
+    // Over the dungeon's own, the same say what they should.
+    e.connection = 3;
+    e.event = hit(300, kMe, kSorcererSkill);
+    plugin.on_event(e);
+    e.event = press(kMe, 9001);
+    plugin.on_event(e);
+    s = plugin.snapshot(at(12));
+    TEST_ASSERT(s.players[0].cls == game::AionClass::Sorcerer);
+    TEST_ASSERT_EQ(s.target.id, EntityId{0});
 }
 
 TEST_CASE(CombatPower, AnotherMapOverTheSameConnectionKeepsOnlyEarlyArrivals) {
@@ -204,7 +287,7 @@ TEST_CASE(CombatPower, AnotherMapOverTheSameConnectionKeepsOnlyEarlyArrivals) {
 
 TEST_CASE(CombatPower, ACharacterSeenAgainKeepsOneRow) {
     PowerTracker t = duel();
-    t.on_cast(press(kMe, 227), at(2));
+    t.on_cast(press(kMe, 227), 2, at(2));
     // Sent again, its end unread this time: the figure stays.
     t.on_identity(player(227, "Nezekan", 0), 2, at(3));
     TEST_ASSERT_EQ(t.snapshot(at(4)).players[0].combat_power, 134'667u);
@@ -270,7 +353,7 @@ TEST_CASE(CombatPower, DistanceIsFromWhereTheLocalPlayerLastActed) {
     TEST_ASSERT(s.has_local_position);
     TEST_ASSERT_EQ(s.local_position_age, from_seconds(1.0));
     TEST_ASSERT_NEAR(s.players[0].distance_m, 50.0f, 1e-3f);  // 5,000 units
-    TEST_ASSERT_NEAR(s.nearest[0].distance_m, 50.0f, 1e-3f);
+    TEST_ASSERT_NEAR(nearest(s)[0].distance_m, 50.0f, 1e-3f);
 
     // The opponent's steps are sent; the local player's are not.
     t.on_position(step(227, 300.0f, 400.0f), 2, at(3));
@@ -283,7 +366,7 @@ TEST_CASE(CombatPower, DistanceIsFromWhereTheLocalPlayerLastActed) {
     TEST_ASSERT(s.has_local_position && s.local_position_stale);
     TEST_ASSERT_EQ(s.local_position_age, from_seconds(10.0));
     TEST_ASSERT_FALSE(s.players[0].has_distance());
-    TEST_ASSERT(s.nearest.empty());
+    TEST_ASSERT(nearest(s).empty());
     // An effect they cast says where they stand now; so does a skill moving them.
     t.on_effect(effect_from(kMe, 300.0f, 100.0f), 2, at(12));
     s = t.snapshot(at(12));
@@ -292,7 +375,7 @@ TEST_CASE(CombatPower, DistanceIsFromWhereTheLocalPlayerLastActed) {
     t.on_position(step(kMe, 300.0f, 400.0f, 2500.0f), 2, at(13));
     TEST_ASSERT_NEAR(t.snapshot(at(13)).players[0].distance_m, 1.0f, 1e-3f);  // height counts
     // The opponent's own effect moves the opponent, and the target carries it too.
-    t.on_cast(press(kMe, 227), at(14));
+    t.on_cast(press(kMe, 227), 2, at(14));
     t.on_effect(effect_from(227, 300.0f, 1400.0f, 2500.0f), 2, at(14));
     TEST_ASSERT_NEAR(t.snapshot(at(15)).target.distance_m, 10.0f, 1e-3f);
 
@@ -357,7 +440,7 @@ TEST_CASE(CombatPower, WithNoPositionThereIsNoDistance) {
     PowerSnapshot s = t.snapshot(at(3));
     TEST_ASSERT_FALSE(s.has_local_position);
     TEST_ASSERT_FALSE(s.players[0].has_distance());
-    TEST_ASSERT(s.nearest.empty());
+    TEST_ASSERT(nearest(s).empty());
     // Once the local player acts, there is one.
     t.on_effect(effect_from(kMe, 0.0f, 0.0f), 2, at(4));
     s = t.snapshot(at(5));
@@ -367,9 +450,9 @@ TEST_CASE(CombatPower, WithNoPositionThereIsNoDistance) {
     s = t.snapshot(at(7));
     TEST_ASSERT_EQ(s.players[0].name, std::string("Zikel"));
     TEST_ASSERT_FALSE(s.players[0].has_distance());
-    TEST_ASSERT_EQ(s.nearest.size(), size_t{2});
-    TEST_ASSERT_EQ(s.nearest[0].name, std::string("Nezekan"));
-    TEST_ASSERT_EQ(s.nearest[1].name, std::string("Zikel"));
+    TEST_ASSERT_EQ(nearest(s).size(), size_t{2});
+    TEST_ASSERT_EQ(nearest(s)[0].name, std::string("Nezekan"));
+    TEST_ASSERT_EQ(nearest(s)[1].name, std::string("Zikel"));
 }
 
 TEST_CASE(CombatPower, OfACrowdTheNearestAreListedNearestFirst) {
@@ -385,18 +468,18 @@ TEST_CASE(CombatPower, OfACrowdTheNearestAreListedNearestFirst) {
         t.on_identity(someone, 2, at(3));
     }
     PowerSnapshot s = t.snapshot(at(4));
-    TEST_ASSERT_EQ(s.nearest.size(), PowerTracker::kMaxListed);
-    TEST_ASSERT_EQ(s.nearest[0].name, std::string("Crowd0"));
-    TEST_ASSERT_NEAR(s.nearest[0].distance_m, 1.0f, 1e-3f);
-    TEST_ASSERT_NEAR(s.nearest.back().distance_m, static_cast<float>(PowerTracker::kMaxListed), 1e-3f);
+    TEST_ASSERT_EQ(nearest(s).size(), PowerTracker::kMaxListed);
+    TEST_ASSERT_EQ(nearest(s)[0].name, std::string("Crowd0"));
+    TEST_ASSERT_NEAR(nearest(s)[0].distance_m, 1.0f, 1e-3f);
+    TEST_ASSERT_NEAR(nearest(s).back().distance_m, static_cast<float>(PowerTracker::kMaxListed), 1e-3f);
     // The strongest are still the strongest: Nezekan, then the farthest.
     TEST_ASSERT_EQ(s.players[0].name, std::string("Nezekan"));
     TEST_ASSERT_EQ(s.players[1].name, "Crowd" + std::to_string(crowd - 1));
     // One of them walks up.
     t.on_position(step(static_cast<EntityId>(1000 + crowd - 1), 10.0f, 0.0f), 2, at(5));
     s = t.snapshot(at(6));
-    TEST_ASSERT_EQ(s.nearest[0].name, "Crowd" + std::to_string(crowd - 1));
-    TEST_ASSERT_NEAR(s.nearest[0].distance_m, 0.1f, 1e-3f);
+    TEST_ASSERT_EQ(nearest(s)[0].name, "Crowd" + std::to_string(crowd - 1));
+    TEST_ASSERT_NEAR(nearest(s)[0].distance_m, 0.1f, 1e-3f);
 }
 
 TEST_CASE(CombatPower, AnotherMapForgetsWhereEveryoneStood) {
@@ -490,7 +573,7 @@ TEST_CASE(CombatPower, APlayerOfTheOtherFactionIsHostile) {
     TEST_ASSERT_FALSE(s.players[2].hostile);
     // The target says so too.
     PowerTracker fight = t;
-    fight.on_cast(press(kMe, 300), at(4));
+    fight.on_cast(press(kMe, 300), 2, at(4));
     TEST_ASSERT(fight.snapshot(at(5)).target.hostile);
 
     // A member of the party is no enemy, whatever their faction; nor is anyone in
@@ -534,24 +617,24 @@ TEST_CASE(CombatPower, EnemiesLeadBothListsAndNoCrowdHidesOne) {
     t.on_identity(placed(301, "Triniel", 80'000, 2, 120.0f), 2, at(3));
     const PowerSnapshot s = t.snapshot(at(4));
     TEST_ASSERT_EQ(s.hostile_in_view, 2u);
-    TEST_ASSERT_EQ(s.players.size(), PowerTracker::kMaxListed);
+    TEST_ASSERT_EQ(s.list(false, ListOrder{}, PowerTracker::kMaxListed + 5).size(), PowerTracker::kMaxListed);
     // Strongest first within each group.
     TEST_ASSERT_EQ(s.players[0].name, std::string("Triniel"));
     TEST_ASSERT_EQ(s.players[1].name, std::string("Zikel"));
     TEST_ASSERT_EQ(s.players[2].name, "Ally" + std::to_string(PowerTracker::kMaxListed + 5));
     // Nearest first within each group.
-    TEST_ASSERT_EQ(s.nearest[0].name, std::string("Zikel"));
-    TEST_ASSERT_NEAR(s.nearest[0].distance_m, 90.0f, 1e-3f);
-    TEST_ASSERT_EQ(s.nearest[1].name, std::string("Triniel"));
-    TEST_ASSERT_EQ(s.nearest[2].name, std::string("Ally0"));
+    TEST_ASSERT_EQ(nearest(s)[0].name, std::string("Zikel"));
+    TEST_ASSERT_NEAR(nearest(s)[0].distance_m, 90.0f, 1e-3f);
+    TEST_ASSERT_EQ(nearest(s)[1].name, std::string("Triniel"));
+    TEST_ASSERT_EQ(nearest(s)[2].name, std::string("Ally0"));
 
     // One who has fallen out of reach keeps their mark and loses their lead.
     PowerTracker later = t;
     later.on_position(step(301, 100.0f * (PowerTracker::kEnemyRange + 50.0f), 0.0f), 2, at(5));
     const PowerSnapshot far = later.snapshot(at(6));
     TEST_ASSERT_EQ(far.hostile_in_view, 1u);
-    TEST_ASSERT_EQ(far.nearest[0].name, std::string("Zikel"));
-    TEST_ASSERT_EQ(far.nearest[1].name, std::string("Ally0"));
+    TEST_ASSERT_EQ(nearest(far)[0].name, std::string("Zikel"));
+    TEST_ASSERT_EQ(nearest(far)[1].name, std::string("Ally0"));
     TEST_ASSERT_EQ(far.players[0].name, std::string("Zikel"));
     TEST_ASSERT_FALSE(far.players[1].hostile);
 
@@ -573,6 +656,69 @@ TEST_CASE(CombatPower, EnemiesLeadBothListsAndNoCrowdHidesOne) {
     TEST_ASSERT_EQ(layout.rows[0].name, std::string("Zikel"));
 }
 
+TEST_CASE(PowerView, EnemiesFirstOffListsTheStrongestOrTheNearestOfAll) {
+    PowerTracker t = open_world();
+    // A crowd of allies a metre apart, stronger than six enemies in reach.
+    for (size_t i = 0; i < 20; ++i) {
+        t.on_identity(placed(static_cast<EntityId>(1000 + i), ("Ally" + std::to_string(i)).c_str(),
+                             static_cast<uint32_t>(200'000 + i), 1, static_cast<float>(i + 1)),
+                      2, at(2));
+    }
+    for (size_t i = 0; i < 6; ++i) {
+        t.on_identity(placed(static_cast<EntityId>(300 + i), ("Enemy" + std::to_string(i)).c_str(),
+                             static_cast<uint32_t>(40'000 + i), 2, 100.0f),
+                      2, at(2));
+    }
+    const PowerSnapshot s = t.snapshot(at(3));
+    app::PowerSettings settings;  // eight rows
+    // Enemies first: the six, then the strongest allies.
+    app::PowerLayout layout = app::power_layout(s, settings);
+    TEST_ASSERT_EQ(layout.rows.size(), size_t{8});
+    TEST_ASSERT_EQ(layout.rows[0].name, std::string("Enemy5"));
+    TEST_ASSERT_EQ(layout.rows[6].name, std::string("Ally19"));
+    // Off: the strongest eight of all. A cut that put the enemies first left two of
+    // them in rows 7 and 8.
+    settings.enemies_first = false;
+    layout = app::power_layout(s, settings);
+    TEST_ASSERT_EQ(layout.rows.size(), size_t{8});
+    for (const PowerRow& row : layout.rows) TEST_ASSERT_FALSE(row.hostile);
+    TEST_ASSERT_EQ(layout.rows[0].name, std::string("Ally19"));
+    TEST_ASSERT_EQ(layout.rows[7].name, std::string("Ally12"));
+    // By distance, the nearest eight of all.
+    settings.sort_by_distance = true;
+    layout = app::power_layout(s, settings);
+    TEST_ASSERT_EQ(layout.rows[0].name, std::string("Ally0"));
+    TEST_ASSERT_EQ(layout.rows[7].name, std::string("Ally7"));
+    TEST_ASSERT_EQ(layout.more, 18u);
+}
+
+TEST_CASE(PowerView, OnlyEnemiesByDistanceListsTheNearestOfACrowdOfThem) {
+    PowerTracker t = open_world();
+    // More enemies in reach than a list holds, the nearer the weaker.
+    for (size_t i = 0; i < PowerTracker::kMaxListed + 2; ++i) {
+        t.on_identity(placed(static_cast<EntityId>(300 + i), ("Enemy" + std::to_string(i)).c_str(),
+                             static_cast<uint32_t>(50'000 + 1000 * i), 2, 10.0f + 5.0f * static_cast<float>(i)),
+                      2, at(2));
+    }
+    const PowerSnapshot s = t.snapshot(at(3));
+    app::PowerSettings settings;
+    settings.only_enemies = true;
+    settings.sort_by_distance = true;
+    app::PowerLayout layout = app::power_layout(s, settings);
+    TEST_ASSERT(layout.distances && !layout.stale);
+    // The nearest first: cut to the strongest twelve before the sort, the two
+    // nearest were gone.
+    TEST_ASSERT_EQ(layout.rows.size(), size_t{8});
+    TEST_ASSERT_EQ(layout.rows[0].name, std::string("Enemy0"));
+    TEST_ASSERT_NEAR(layout.rows[0].distance_m, 10.0f, 1e-3f);
+    TEST_ASSERT_EQ(layout.rows[7].name, std::string("Enemy7"));
+    TEST_ASSERT_EQ(layout.more, 6u);
+    // By strength, the strongest.
+    settings.sort_by_distance = false;
+    layout = app::power_layout(s, settings);
+    TEST_ASSERT_EQ(layout.rows[0].name, "Enemy" + std::to_string(PowerTracker::kMaxListed + 1));
+}
+
 TEST_CASE(PowerView, OnlyEnemiesListsEveryEnemyAndKeepsTheTarget) {
     PowerTracker t;
     t.on_map_load(proto::MapLoad{1, 20}, 2, at(0));
@@ -592,11 +738,15 @@ TEST_CASE(PowerView, OnlyEnemiesListsEveryEnemyAndKeepsTheTarget) {
     t.on_identity(placed(302, "Hadis", 70'000, 2, 30.0f), 2, at(3));
     t.on_values(proto::RemainingHp{302, false, true, 0, false, 0}, 2);
     // A heal pressed on an ally: the target, though no enemy.
-    t.on_cast(press(kMe, 1000), at(4));
+    t.on_cast(press(kMe, 1000), 2, at(4));
     const PowerSnapshot s = t.snapshot(at(4));
 
     // The crowd's cut keeps the one that leads and loses the other two...
-    TEST_ASSERT_EQ(s.players.size(), PowerTracker::kMaxListed);
+    const auto among_players = [&](const char* name) {
+        return std::any_of(s.players.begin(), s.players.end(), [&](const PowerRow& row) { return row.name == name; });
+    };
+    TEST_ASSERT_FALSE(among_players("Triniel"));
+    TEST_ASSERT_FALSE(among_players("Hadis"));
     TEST_ASSERT_EQ(s.players[0].name, std::string("Zikel"));
     TEST_ASSERT_FALSE(s.players[1].hostile);
     // ...which the enemies' own list keeps, the one in reach first.
@@ -646,7 +796,7 @@ TEST_CASE(PowerView, OnlyEnemiesListsEveryEnemyAndKeepsTheTarget) {
     TEST_ASSERT_EQ(layout.rows[2].name, std::string("Zikel"));
 
     // An enemy aimed at is marked in their row.
-    t.on_cast(press(kMe, 301), at(5));
+    t.on_cast(press(kMe, 301), 2, at(5));
     layout = app::power_layout(t.snapshot(at(5)), settings);
     TEST_ASSERT_EQ(layout.target, EntityId{301});
     TEST_ASSERT_EQ(layout.target_line.id, EntityId{0});
@@ -663,7 +813,7 @@ TEST_CASE(PowerView, OnlyEnemiesListsEveryEnemyAndKeepsTheTarget) {
 TEST_CASE(CombatPower, APlayerWhoLeavesViewLeavesTheList) {
     PowerTracker t = duel();
     t.on_identity(player(300, "Zikel", 90'000), 2, at(2));
-    t.on_cast(press(kMe, 227), at(3));
+    t.on_cast(press(kMe, 227), 2, at(3));
     TEST_ASSERT_EQ(t.snapshot(at(4)).in_view, 2u);
 
     // Another connection's, and the local player's own, say nothing of this list.
@@ -706,7 +856,7 @@ TEST_CASE(CombatPower, ADeadEnemyLeadsNothing) {
     TEST_ASSERT_EQ(s.players[0].name, std::string("Lumiel"));
     TEST_ASSERT(s.players[1].dead);
     TEST_ASSERT(s.players[1].hostile);
-    TEST_ASSERT_EQ(s.nearest[0].name, std::string("Lumiel"));
+    TEST_ASSERT_EQ(nearest(s)[0].name, std::string("Lumiel"));
     // Another connection's HP is someone else's.
     t.on_values(proto::RemainingHp{300, false, true, 18'000, false, 0}, 1);
     TEST_ASSERT(t.snapshot(at(5)).players[1].dead);
@@ -757,7 +907,7 @@ TEST_CASE(PowerView, ShortensTheOverlaysFiguresToThreeDigits) {
 TEST_CASE(PowerView, TheListMarksTheTargetOrShowsItAboveTheStrongest) {
     PowerTracker t = duel();
     t.on_identity(player(300, "Zikel", 201'900), 2, at(2));
-    t.on_cast(press(kMe, 227), at(3));
+    t.on_cast(press(kMe, 227), 2, at(3));
     const PowerSnapshot s = t.snapshot(at(4));
     app::PowerSettings settings;
 

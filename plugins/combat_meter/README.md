@@ -27,7 +27,8 @@ each skill is listed with its icon.
 - Drag the empty part of the header to move the overlay.
 - Drag the corner grip to resize it.
 - Use the header buttons: the gear (open the app window) and the padlock (lock it).
-- Hover a row for that player's hit rates, healing and max hit.
+- Hover a row for that player's hit rates, healing and max hit (their own biggest direct
+  hit: not a DoT tick, nor their summon's).
 
 **Hotkeys:** Ctrl+Alt+H hides or shows it; Ctrl+Alt+R ends the current fight now.
 
@@ -43,7 +44,8 @@ always be found and dragged back. Switching the plugin off hides it too.
 - **End:** it ends 2 s after the boss dies (so the last DoT ticks count), on a loading
   screen (entering the same dungeon again too), or after 10 s without a party hit.
   While a boss is still standing, the wait is 30 s instead, to cover phases where it
-  can't be hit. Switching the plugin off ends it too.
+  can't be hit. Switching the plugin off ends it too, and so does quitting the app or
+  restarting it into an update: the fight is saved like any other.
 - **Duration:** a fight's time runs from the first hit to the last, so the wait before
   a fight is called never lowers its DPS.
 - **Saving:** boss fights and fights longer than 20 s are saved, and listed on the
@@ -60,8 +62,8 @@ always be found and dragged back. Switching the plugin off hides it too.
   and one dying is not the boss's kill.
 - Out of a party, only you are listed in the open world, so a crowd at a world boss
   stays out. In a dungeon only your group can be there, so every player is listed.
-- Your own row always shows on the overlay: when you rank below the rows it shows, you
-  take the last one, with your rank.
+- Your own row always shows on the overlay, before you deal any damage too: when you
+  rank below the rows it shows, you take the last one, with your rank.
 - Healing between two players counts only when it lands on the party, since a PvP hit
   looks the same.
 - A boss left standing keeps the HP you left it at in the saved fight ("Wipe 23%",
@@ -118,7 +120,7 @@ and saves as you go.
 
 | Key | Default | Meaning |
 |---|---|---|
-| `plugin_enabled` | true | The plugin's switch. Off, it reads nothing, saves nothing and hides its overlay; its saved fights stay. |
+| `plugin_enabled` | true | The plugin's switch. Off, it reads nothing, saves nothing and hides its overlay; its saved fights stay. Back on, it knows the map it is on. |
 | `idle_timeout_s` | 10 | No party hit for this long ends a fight. |
 | `boss_idle_timeout_s` | 30 | The same while a boss is still standing. |
 | `capture_lost_s` | 15 | No game traffic for this long ends a fight. |
@@ -139,7 +141,7 @@ and saves as you go.
 | `opacity` | 0.80 | Background opacity, 0 to 1. Text stays opaque. |
 | `scale` | 1.0 | Size, 0.6 to 2.5, on top of the monitor's DPI scaling. |
 | `x`, `y`, `width`, `height` | -1, -1, 430, 250 | Position and size in screen pixels. -1, -1 places it near the top-left; other negative values are on a monitor left of or above the main one. |
-| `show_share`, `show_crit`, `show_back`, `show_max_hit` | true, true, true, false | Optional columns: share of the damage, crit, back-attack rate, biggest hit. |
+| `show_share`, `show_crit`, `show_back`, `show_max_hit` | true, true, true, false | Optional columns: share of the damage, crit, back-attack rate, biggest hit (their own, direct). |
 | `show_hits`, `show_perfect`, `show_double`, `show_front`, `show_multi`, `show_block`, `show_heal` | false | More optional columns: hits, perfect and double rates, front-attack rate, multi-hit and blocked rates, healing. |
 | `class_bars` | true | Bars in each player's class colour, the game's own (its party emblems'); off, all in one colour. |
 | `max_rows` | 8 | Players shown, best first, 1 to 24. Your own row is always one of them. |

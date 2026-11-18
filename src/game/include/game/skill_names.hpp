@@ -62,4 +62,14 @@ enum class EffectKind : uint8_t {
 /// effect id. A watch list holds these.
 [[nodiscard]] uint32_t effect_key(uint32_t buff_id, uint32_t source_skill = 0) noexcept;
 
+/// The key is a skill's, not an effect id: the skill table lists that very code, as
+/// every skill effect_key gives does. An effect id read as a skill by its ten
+/// thousands names the wrong one: the monsters' Burn, 12000121, is no Dodge.
+[[nodiscard]] bool is_skill_key(uint32_t key) noexcept;
+
+/// What an effect_key is called with no effect of it at hand (a watch list's, before
+/// the plugin has seen it): its skill's name, or the effect's own as effect_label
+/// reads its id (an item's or a monster's: Speed Scroll, Burn).
+[[nodiscard]] std::string effect_key_label(uint32_t key);
+
 } // namespace aion2::game

@@ -34,13 +34,17 @@ Then, as bars:
   until the bar goes.
 - **Your cooldowns:** amber bars under "Cooldowns", each with its skill's icon, and "~"
   on an estimate. A skill coming back shows a green "Ready" bar for a moment. A skill
-  with a second use ("+1 consecutive use") shows only once both are spent.
+  with a second use ("+1 consecutive use") shows only once both are spent. Logging in
+  as another character clears the last one's.
 - **Yours on your target:** under "On <enemy>": the biggest enemy you (or your summons)
   hit in the last 10 seconds, so in a boss fight with adds, the boss.
 - **Watch and Hide:** the page's *Effects seen on you* lists every effect seen on you
   this session, each with its number. **Watch** shows a red "Missing: <name>" line
-  while a buff is not on you: a Chanter's mantra, a scroll. **Hide** leaves an effect
-  off the overlay: a proc that comes and goes all fight.
+  while a buff is not on you: a Chanter's mantra, a scroll. It knows the buff's name
+  and icon even before it has been on you this session. **Hide** leaves an effect
+  off the overlay: a proc that comes and goes all fight. An enemy's debuff that came
+  before the enemy was in view turns red there (nothing to watch) once they come into
+  view.
 - **What it leaves out:** effects shorter than a second (a dodge's mark), and passives'
   effects, which never end. Both are settings.
 - **Hiding it:** locked, it can hide while the game is not in front, and outside

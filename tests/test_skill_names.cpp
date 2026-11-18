@@ -92,6 +92,19 @@ TEST_CASE(SkillNames, EffectsTakeTheirSkillsName) {
     TEST_ASSERT_EQ(effect_label(200), std::string("Effect 200"));
 }
 
+TEST_CASE(SkillNames, AKeyIsNamedAsEffectKeyMadeIt) {
+    // A watch list's key, with no effect of it at hand: a skill's when the skill table
+    // lists that very code, else an effect id.
+    TEST_ASSERT(is_skill_key(effect_key(181'900'211, 18'190'021)));
+    TEST_ASSERT_EQ(effect_key_label(effect_key(181'900'211, 18'190'021)), std::string("Undefeated Mantra"));
+    TEST_ASSERT_EQ(effect_key_label(effect_key(22'101'031)), std::string("Speed Scroll"));
+    // By its ten thousands the monsters' Burn reads as Dodge: no skill's key.
+    TEST_ASSERT_EQ(effect_key(12'000'121), uint32_t{12'000'121});
+    TEST_ASSERT(!is_skill_key(12'000'121));
+    TEST_ASSERT_EQ(effect_key_label(12'000'121), std::string("Burn"));
+    TEST_ASSERT_EQ(effect_key_label(200), std::string("Effect 200"));
+}
+
 TEST_CASE(SkillNames, AnEffectsOwnNameComesBeforeItsSkills) {
     // src/game/data/effects.tsv: what Punishment puts on is Executor, as the game
     // shows it.

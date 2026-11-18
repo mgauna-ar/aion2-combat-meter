@@ -12,6 +12,7 @@
 #ifdef HAVE_IMGUI
 #include <iterator>
 #include <string>
+#include <vector>
 #endif
 
 namespace aion2::app::ui {
@@ -30,9 +31,11 @@ void figures(const AppFrameInput& in) {
     const std::string target_value = has_target ? format_power(p.target.combat_power) : std::string("-");
     const std::string target_note = has_target ? p.target.name : std::string("Use a skill on a player");
     // The second tile follows the list's order: the strongest, or the nearest.
-    const bool by_distance = in.settings->power.sort_by_distance && !p.nearest.empty();
     const bool listed = !p.players.empty();
-    const combat_power::PowerRow first = by_distance ? p.nearest.front() : listed ? p.players.front() : combat_power::PowerRow{};
+    const bool by_distance =
+        in.settings->power.sort_by_distance && listed && p.has_local_position && !p.local_position_stale;
+    const std::vector<combat_power::PowerRow> leading = p.list(false, combat_power::ListOrder{by_distance, true}, 1);
+    const combat_power::PowerRow first = leading.empty() ? combat_power::PowerRow{} : leading.front();
     const std::string top_value =
         by_distance ? format_distance(first.distance_m) : listed ? format_power(first.combat_power) : std::string("-");
     const std::string top_note = listed ? first.name : std::string("No players in view yet");

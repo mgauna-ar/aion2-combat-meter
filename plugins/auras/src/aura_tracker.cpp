@@ -33,7 +33,12 @@ void AuraTracker::prune(Micros now, const Entities& entities) {
     for (const auto& [instance, i] : *on) {
         if (m_seen.size() >= kMaxSeen) break;
         const uint32_t key = game::effect_key(i.buff_id, i.source_skill);
-        m_seen.try_emplace(key, SeenEffect{key, label(i, entities), entities.is_enemy(i.caster)});
+        const bool hostile = entities.is_enemy(i.caster);
+        const auto [seen, added] = m_seen.try_emplace(key, SeenEffect{key, label(i, entities), hostile});
+        // Seen before its caster spawned (the plugin switched on mid-fight): now it is
+        // known for an enemy's, and named after them. Never the other way: a caster
+        // forgotten on a map load says nothing new.
+        if (!added && hostile && !seen->second.hostile) seen->second = SeenEffect{key, label(i, entities), true};
     }
 }
 

@@ -105,8 +105,7 @@ void watch_card(const AppFrameInput& in, AppActions& out) {
             const bool listed =
                 std::any_of(choices.begin(), choices.end(), [&](const SeenChoice& c) { return c.key == key; });
             if (listed) continue;
-            const std::string_view name = game::skill_name(key);
-            choices.push_back({key, name.empty() ? game::effect_label(key) : std::string(name), false});
+            choices.push_back({key, game::effect_key_label(key), false});
         }
     };
     add_unseen(a.watch);

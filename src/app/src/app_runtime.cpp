@@ -59,27 +59,58 @@ void AppRuntime::stop() {
 void AppRuntime::run() {
     Micros last_tick = 0;
     Micros last_publish = 0;
+    // Capture time from the first packet on; it never goes back.
+    Micros last_now = 0;
+    // The latest packet's capture time, and the source's clock as the engine took it
+    // off the queue: what quiet time runs on from.
     Micros last_packet = 0;
+    Micros source_at_packet = 0;
     while (!m_stop.load()) {
         auto pkt = m_queue.pop_for(kPopTimeout);
-        // While packets are queued, time is the packet's: the source's clock runs
-        // ahead of a backlog, and ticking on it would end fights whose hits are
-        // still waiting in the queue. Only an empty queue lets time move on.
-        const Micros now = pkt ? std::max(last_packet, pkt->ts) : std::max(last_packet, m_source->now());
+        const Micros source_now = m_source->now();
+        Micros now = source_now;
+        if (pkt) {
+            // While packets are queued, time is the packet's: the source's clock runs
+            // ahead of a backlog, and ticking on it would end fights whose hits are
+            // still waiting in the queue.
+            now = std::max(last_now, pkt->ts);
+            if (pkt->ts >= last_packet) {
+                last_packet = pkt->ts;
+                source_at_packet = source_now;
+            }
+        } else if (last_packet != 0) {
+            // Only an empty queue lets time move on: from the latest packet, by as
+            // much as the source's clock has run since the engine took it. Never to
+            // the source's clock itself: live it is the wall clock, while Npcap stamps
+            // packets on the performance counter, and the gap between the two would
+            // read as quiet time (a stall, to the Ping plugin). Taken at dequeue, a
+            // backlog makes it trail, never lead; a step back of the source's clock
+            // holds it still.
+            const Micros elapsed = source_now > source_at_packet ? source_now - source_at_packet : 0;
+            now = std::max(last_now, last_packet + elapsed);
+        }
+        // Before the first packet there is no capture time: the source's clock only
+        // names a recording and dates the empty snapshots.
+        const bool captured = last_packet != 0;
+        if (captured) last_now = now;
 
         // Before the packet, so a recording started now includes it.
         handle_recording(now);
         if (pkt) {
             if (m_recorder.is_open()) m_recorder.write(pkt->link_type, pkt->ts, pkt->data);
+            // The counter offset before the packet, not only at the tick: a pong in
+            // the first packets would otherwise read as a replay's, with no counter.
+            m_pipeline.set_counter_offset(m_source->counter_offset());
             m_pipeline.on_packet(pkt->link_type, pkt->data, pkt->ts);
-            last_packet = now;
         }
 
         apply_requests(now);
         const bool ended = m_end_fight_requested.exchange(false);
         if (ended) m_pipeline.end_fight(meter::EndReason::Manual, now);
 
-        if (now >= last_tick + pipeline::Pipeline::kTickEvery) {
+        // Nothing to tick before a packet; ticked on the source's clock, the
+        // pipeline would wait for capture time to catch up with it.
+        if (captured && now >= last_tick + pipeline::Pipeline::kTickEvery) {
             m_pipeline.set_dropped_packets(m_queue.dropped() + m_source->dropped());
             m_pipeline.set_counter_offset(m_source->counter_offset());
             m_pipeline.tick(now);
@@ -95,6 +126,17 @@ void AppRuntime::run() {
             last_publish = now;
         }
     }
+    // Quitting, or restarting into an update, ends the fight under way as switching
+    // the meter off does, and saves it: a boss fight is still live for kill_grace_s
+    // after the kill, and any fight for its idle wait. What is still queued goes in
+    // first; the queue is closed, so that is all there is.
+    while (auto pkt = m_queue.pop_for(std::chrono::milliseconds(0))) {
+        if (m_recorder.is_open()) m_recorder.write(pkt->link_type, pkt->ts, pkt->data);
+        m_pipeline.on_packet(pkt->link_type, pkt->data, pkt->ts);
+        last_packet = std::max(last_packet, pkt->ts);
+    }
+    m_pipeline.end_fight(meter::EndReason::Manual, last_packet);
+    save_finished();
     if (m_recorder.is_open()) m_recorder.close();
 }
 

@@ -11,8 +11,11 @@
 #include "capture/capture_file.hpp"
 #include "capture/file_source.hpp"
 #include "capture/os/npcap_source.hpp"
+#include "capture/tcp_reassembler.hpp"
 #include "common/time_format.hpp"
+#include "protocol/entity_id.hpp"
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cmath>
@@ -235,6 +238,24 @@ TEST_CASE(AuraView, FiltersAndTheMissingWatchList) {
     TEST_ASSERT_EQ(format_time_left(125 * kMicrosPerSecond), std::string("2m05"));
     TEST_ASSERT_EQ(format_time_left(12'700'000), std::string("12"));
     TEST_ASSERT_EQ(format_time_left(4'560'000), std::string("4.5"));
+}
+
+TEST_CASE(AuraView, AWatchedEffectNotSeenYetIsNamedAndDrawnByItsKey) {
+    // After a restart, before the scroll is on: it read "Effect 22101031", with no
+    // tile as icons, though effects.tsv names it and the sheet has the scroll. A
+    // monster's Burn read as the skill its ten thousands point to, Dodge.
+    const auras::AuraSnapshot none;
+    const auto missing = missing_effects(none, {22'101'031, 12'000'121, 12'350'000, 777}, 1'000'000);
+    TEST_ASSERT_EQ(missing.size(), size_t{4});
+    TEST_ASSERT_EQ(missing[0].label, std::string("Speed Scroll"));
+    TEST_ASSERT(missing[0].icon != kNoIcon);
+    TEST_ASSERT_EQ(missing[0].icon, effect_icon(22'101'031));
+    TEST_ASSERT_EQ(missing[1].label, std::string("Burn"));
+    TEST_ASSERT_EQ(missing[2].label, std::string("Warding Strike"));
+    TEST_ASSERT(missing[2].icon != kNoIcon);
+    TEST_ASSERT_EQ(missing[2].icon, skill_icon(12'350'000));
+    TEST_ASSERT_EQ(missing[3].label, std::string("Effect 777"));
+    TEST_ASSERT_EQ(missing[3].icon, kNoIcon);
 }
 
 TEST_CASE(AuraView, CooldownsLongEnoughAndRunning) {
@@ -806,9 +827,27 @@ TEST_CASE(DisplayFormat, TheLocalPlayerAlwaysShows) {
     TEST_ASSERT(ranks(shown_rows(rows, 3, true)) == (Ranks{{0, 1}, {1, 2}, {5, 6}}));
     TEST_ASSERT(ranks(shown_rows(rows, 1, false)) == (Ranks{{5, 5}}));
     TEST_ASSERT(ranks(shown_rows(rows, 8, false)).size() == 5);
-    // A local player who dealt no damage is ranked with the healers.
+    // A local player who dealt no damage still shows, ranked below everyone who did,
+    // with the Heal column off too.
     rows[5].damage = 0;
-    TEST_ASSERT(ranks(shown_rows(rows, 3, false)) == (Ranks{{0, 1}, {1, 2}, {3, 3}}));
+    TEST_ASSERT(ranks(shown_rows(rows, 3, false)) == (Ranks{{0, 1}, {1, 2}, {5, 5}}));
+    TEST_ASSERT(ranks(shown_rows(rows, 8, false)) == (Ranks{{0, 1}, {1, 2}, {3, 3}, {4, 4}, {5, 5}}));
+    TEST_ASSERT(ranks(shown_rows(rows, 8, true)).size() == 6);
+}
+
+// README: "Your own row always shows on the overlay". A healer who only healed,
+// with the Heal column off, still has theirs.
+TEST_CASE(DisplayFormat, ALocalPlayerWhoOnlyHealedShows) {
+    std::vector<meter::CombatantTotals> rows(2);
+    rows[0].id = 1;
+    rows[0].damage = 1000;
+    rows[1].id = 2;
+    rows[1].is_local = true;
+    rows[1].healing = 500;
+    const auto shown = shown_rows(rows, 8, false);
+    TEST_ASSERT_EQ(shown.size(), size_t{2});
+    TEST_ASSERT_EQ(shown[1].index, size_t{1});
+    TEST_ASSERT_EQ(shown[1].rank, 2);
 }
 
 TEST_CASE(AppRuntime, MissingCaptureFileFailsToStart) {
@@ -875,6 +914,264 @@ TEST_CASE(AppRuntime, NewSettingsReachTheEngine) {
     }));
     runtime.stop();
     TEST_ASSERT(runtime.history().empty());
+}
+
+TEST_CASE(AppRuntime, QuittingSavesTheFightUnderWay) {
+    // Exit and Update & restart stop the runtime with the fight still live: a boss
+    // fight is, for kill_grace_s after the kill, and any for its idle wait. It ends
+    // and is saved, as switching the meter off would.
+    using namespace test::synthetic;
+    ScratchDir dir("aion2_test_runtime_quit");
+    std::vector<std::pair<double, Bytes>> script;
+    for (int i = 0; i <= 30 * 20; ++i) script.emplace_back(i * 0.05, heartbeat(kStartMs + static_cast<uint64_t>(i) * 50));
+    script.emplace_back(0.001, opcode_frame(proto::opcode::OwnCharacter, own_identity_body(kMe, "Ariel", 0x0123, 7)));
+    script.emplace_back(0.002, opcode_frame(proto::opcode::MapLoad, map_load_body(1, kDungeon)));
+    SpawnSpec boss;
+    boss.raw_id = kBossRaw;
+    boss.npc_code = kBossNpc;
+    boss.cur_hp = boss.max_hp = kBossHp;
+    script.emplace_back(0.006, opcode_frame(proto::opcode::Spawn, spawn_body(boss)));
+    // 25 s of hits on a boss left standing, the capture ending 5 s later.
+    for (int t = 1; t <= 25; ++t) {
+        DamageSpec d;
+        d.target = static_cast<uint64_t>(proto::normalize_entity_id(kBossRaw));
+        d.actor = kMe;
+        d.skill = 15210000;
+        d.amount = 1000;
+        script.emplace_back(static_cast<double>(t), opcode_frame(proto::opcode::Damage, damage_body({d})));
+    }
+    std::stable_sort(script.begin(), script.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
+    SessionWriter w;
+    for (const auto& [t, frame] : script) w.at(t, frame);
+    const Bytes capture = w.finish();
+    const auto file = dir.path / "fight.pcapng";
+    {
+        std::ofstream out(file, std::ios::binary);
+        out.write(reinterpret_cast<const char*>(capture.data()), static_cast<std::streamsize>(capture.size()));
+    }
+
+    AppRuntime runtime(AppSettings{}, dir.path / "data");
+    std::string error;
+    TEST_ASSERT(runtime.start(std::make_unique<capture::FileSource>(file, 0.0), error));
+    TEST_ASSERT(wait_for([&] {
+        const auto snap = runtime.snapshot();
+        return runtime.source_finished() && snap != nullptr && snap->fight.live && snap->fight.duration_s >= 24.0;
+    }));
+    TEST_ASSERT(runtime.history().empty());
+    runtime.stop();
+    const auto saved = meter::HistoryStore(runtime.history_dir()).load_index();
+    TEST_ASSERT_EQ(saved.size(), size_t{1});
+    TEST_ASSERT_EQ(saved[0].total_damage, uint64_t{25'000});
+    TEST_ASSERT(saved[0].end_reason == meter::EndReason::Manual);
+    TEST_ASSERT_EQ(runtime.history().size(), size_t{1});
+}
+
+namespace {
+
+/// A live source as Npcap is: every packet queued as start() returns, and the
+/// counter's offset known from the first, since a capture thread samples it before
+/// it pushes. It joins mid-stream, as when the meter starts in game.
+class LiveLikeSource final : public capture::PacketSource {
+public:
+    LiveLikeSource(test::wire::Bytes file, Micros offset) : m_file(std::move(file)), m_offset(offset) {}
+    bool start(Push push, std::string& error) override {
+        auto reader = capture::CaptureFileReader::from_bytes(m_file, error);
+        if (!reader) return false;
+        capture::CapturedPacket pkt;
+        bool first = true;
+        while (reader->next(pkt)) {
+            if (std::exchange(first, false)) continue;  // the SYN
+            capture::OwnedPacket o;
+            o.link_type = pkt.link_type;
+            o.ts = pkt.ts;
+            o.data.assign(pkt.data.begin(), pkt.data.end());
+            m_last = pkt.ts;
+            push(std::move(o));
+        }
+        return true;
+    }
+    void stop() override {}
+    [[nodiscard]] Micros now() const override { return m_last; }
+    [[nodiscard]] uint64_t dropped() const override { return 0; }
+    [[nodiscard]] std::optional<Micros> counter_offset() const override { return m_offset; }
+    [[nodiscard]] std::string status() const override { return "live-like"; }
+
+private:
+    test::wire::Bytes m_file;
+    Micros m_offset;
+    std::atomic<Micros> m_last{0};
+};
+
+} // namespace
+
+// The counter offset reaches the pipeline before the packet: a pong in the first
+// packets the engine handles is measured, not taken for a replay's.
+TEST_CASE(AppRuntime, ALivePongBeforeTheFirstTickIsMeasured) {
+    using namespace aion2::test::synthetic;
+    ScratchDir dir("aion2_test_runtime_ping");
+    const Micros at = kStartMs * kMicrosPerMilli;
+    const Micros offset = at - 3'600 * kMicrosPerSecond;
+    // One packet: a heartbeat, which the decoder aligns on, and the pong, 70 ms.
+    test::wire::Bytes first = heartbeat(kStartMs - 200);
+    test::wire::put_bytes(first, pong(ping::kClientClockBaseMs + (at - offset) / kMicrosPerMilli - 70, kStartMs - 35));
+    SessionWriter w;
+    w.at(0.0, first);
+    for (int i = 1; i <= 20; ++i) w.at(i * 0.05, heartbeat(kStartMs + static_cast<uint64_t>(i) * 50 - 200));
+    AppSettings settings;
+    settings.plugins.ping = true;
+    AppRuntime runtime(settings, dir.path / "data");
+    std::string error;
+    TEST_ASSERT(runtime.start(std::make_unique<LiveLikeSource>(w.finish(), offset), error));
+    std::shared_ptr<const pipeline::LiveSnapshot> snap;
+    TEST_ASSERT(wait_for([&] {
+        snap = runtime.snapshot();
+        return snap != nullptr && snap->ping.pongs > 0;
+    }));
+    runtime.stop();
+    TEST_ASSERT_EQ(snap->ping.pongs, uint64_t{1});
+    TEST_ASSERT(snap->ping.state == ping::PingState::Measured);
+    TEST_ASSERT_NEAR(snap->ping.ping_ms, 70.0f, 1e-3f);
+}
+
+namespace {
+
+/// A live source whose clock the test sets, `skew` away from the stamps it gives its
+/// packets, as Npcap's wall-clock now() sits apart from its counter-based stamps.
+class SkewedSource final : public capture::PacketSource {
+public:
+    explicit SkewedSource(int64_t skew) : m_skew(skew) {}
+    bool start(Push push, std::string&) override {
+        m_push = std::move(push);
+        return true;
+    }
+    void stop() override {}
+    /// A packet stamped `ts`, handed over as the capture's clock reads `ts`.
+    void deliver(const test::wire::Bytes& packet, Micros ts) {
+        m_clock = ts;
+        capture::OwnedPacket o;
+        o.link_type = capture::link_type::Ethernet;
+        o.ts = ts;
+        o.data = packet;
+        m_push(std::move(o));
+    }
+    /// The capture's clock now: the source's own reads `skew` from it.
+    void set_clock(Micros stamp_now) { m_clock = stamp_now; }
+    [[nodiscard]] Micros now() const override {
+        const Micros clock = m_clock.load();
+        return clock == 0 ? 0 : static_cast<Micros>(static_cast<int64_t>(clock) + m_skew);
+    }
+    [[nodiscard]] uint64_t dropped() const override { return 0; }
+    [[nodiscard]] std::string status() const override { return "skewed"; }
+
+private:
+    int64_t m_skew;
+    Push m_push;
+    std::atomic<Micros> m_clock{0};
+};
+
+/// The source's clock an hour ahead of its stamps, and 2 s behind them.
+constexpr int64_t kSkews[] = {3'600 * static_cast<int64_t>(kMicrosPerSecond), -2 * static_cast<int64_t>(kMicrosPerSecond)};
+
+/// Waits for the snapshot published at `now`.
+std::shared_ptr<const pipeline::LiveSnapshot> snapshot_at(AppRuntime& runtime, Micros now) {
+    std::shared_ptr<const pipeline::LiveSnapshot> snap;
+    if (!wait_for([&] {
+            snap = runtime.snapshot();
+            return snap != nullptr && snap->now == now;
+        })) {
+        return nullptr;
+    }
+    return snap;
+}
+
+} // namespace
+
+// With the queue empty, time runs on from the latest packet by what the source's
+// clock has run since, never to that clock itself: an hour off, or 2 s, it shows no
+// stall between two heartbeats, and a real one as long as it is.
+TEST_CASE(AppRuntime, QuietTimeRunsOnFromTheLatestPacket) {
+    using namespace aion2::test::synthetic;
+    for (const int64_t skew : kSkews) {
+        ScratchDir dir("aion2_test_runtime_quiet");
+        AppSettings settings;
+        settings.plugins.ping = true;
+        AppRuntime runtime(settings, dir.path / "data");
+        auto owned = std::make_unique<SkewedSource>(skew);
+        SkewedSource& source = *owned;
+        std::string error;
+        TEST_ASSERT(runtime.start(std::move(owned), error));
+
+        const Micros t0 = kStartMs * kMicrosPerMilli;
+        TcpSpec spec;
+        spec.flags = capture::tcp_flag::Syn | capture::tcp_flag::Ack;
+        source.deliver(ethernet_tcp(spec, Bytes{}), t0);
+        spec.seq += 1;
+        spec.flags = capture::tcp_flag::Ack | capture::tcp_flag::Psh;
+        Micros last = t0;
+        for (int i = 1; i <= 20; ++i) {
+            last = t0 + static_cast<Micros>(i) * 50 * kMicrosPerMilli;
+            const Bytes hb = heartbeat(last / kMicrosPerMilli - 200);
+            source.deliver(ethernet_tcp(spec, hb), last);
+            spec.seq += static_cast<uint32_t>(hb.size());
+        }
+        TEST_ASSERT(snapshot_at(runtime, last) != nullptr);
+
+        // Between two heartbeats: no stall, and the jitter shows.
+        source.set_clock(last + 40 * kMicrosPerMilli);
+        auto snap = snapshot_at(runtime, last + 40 * kMicrosPerMilli);
+        TEST_ASSERT(snap != nullptr);
+        TEST_ASSERT(snap->ping.has_jitter);
+        TEST_ASSERT_FALSE(snap->ping.seconds.empty());
+        for (const ping::PingSecond& second : snap->ping.seconds) TEST_ASSERT(second.late_ms < 250.0f);
+
+        // A second and a half with nothing: the next heartbeat is 1,450 ms late.
+        source.set_clock(last + 1'500 * kMicrosPerMilli);
+        snap = snapshot_at(runtime, last + 1'500 * kMicrosPerMilli);
+        TEST_ASSERT(snap != nullptr);
+        TEST_ASSERT_NEAR(snap->ping.seconds.back().late_ms, 1'450.0f, 1e-2f);
+        runtime.stop();
+    }
+}
+
+// A reassembly hole still expires TcpReassembler::kHoleTimeout of the source's
+// elapsed time after the packet held behind it, however far its clock is off.
+TEST_CASE(AppRuntime, AHoleExpiresOnTheSourcesElapsedTime) {
+    using namespace aion2::test::synthetic;
+    for (const int64_t skew : kSkews) {
+        ScratchDir dir("aion2_test_runtime_hole");
+        AppRuntime runtime(AppSettings{}, dir.path / "data");
+        auto owned = std::make_unique<SkewedSource>(skew);
+        SkewedSource& source = *owned;
+        std::string error;
+        TEST_ASSERT(runtime.start(std::move(owned), error));
+
+        const Micros t0 = kStartMs * kMicrosPerMilli;
+        TcpSpec spec;
+        spec.flags = capture::tcp_flag::Syn | capture::tcp_flag::Ack;
+        source.deliver(ethernet_tcp(spec, Bytes{}), t0);
+        spec.seq += 1;
+        spec.flags = capture::tcp_flag::Ack | capture::tcp_flag::Psh;
+        const Bytes first = heartbeat(kStartMs + 50);
+        source.deliver(ethernet_tcp(spec, first), t0 + 50 * kMicrosPerMilli);
+        // The next segment is lost; the one after it waits behind the hole.
+        spec.seq += static_cast<uint32_t>(first.size() * 2);
+        const Micros held = t0 + 100 * kMicrosPerMilli;
+        source.deliver(ethernet_tcp(spec, heartbeat(kStartMs + 150)), held);
+        auto snap = snapshot_at(runtime, held);
+        TEST_ASSERT(snap != nullptr);
+        TEST_ASSERT_EQ(snap->capture_totals.gap_bytes, uint64_t{0});
+
+        source.set_clock(held + capture::TcpReassembler::kHoleTimeout - 50 * kMicrosPerMilli);
+        snap = snapshot_at(runtime, held + capture::TcpReassembler::kHoleTimeout - 50 * kMicrosPerMilli);
+        TEST_ASSERT(snap != nullptr);
+        TEST_ASSERT_EQ(snap->capture_totals.gap_bytes, uint64_t{0});
+
+        source.set_clock(held + capture::TcpReassembler::kHoleTimeout + 50 * kMicrosPerMilli);
+        snap = snapshot_at(runtime, held + capture::TcpReassembler::kHoleTimeout + 50 * kMicrosPerMilli);
+        TEST_ASSERT(snap != nullptr);
+        TEST_ASSERT_EQ(snap->capture_totals.gap_bytes, static_cast<uint64_t>(first.size()));
+        runtime.stop();
+    }
 }
 
 TEST_CASE(OverlayVisibility, CombatOnlyKeepsItUpAfterAFight) {

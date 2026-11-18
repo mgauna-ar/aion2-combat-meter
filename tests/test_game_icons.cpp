@@ -127,3 +127,12 @@ TEST_CASE(GameIcons, AnItemsEffectHasTheItemsIcon) {
     TEST_ASSERT_EQ(effect_icon(181'900'211, 18'190'021), skill_icon(18'190'021));
     TEST_ASSERT_EQ(effect_icon(16'044'202, 1'604'420), kNoIcon);
 }
+
+TEST_CASE(GameIcons, AKeyHasItsSkillsIconOrItsItemsOwn) {
+    // A watch list's key: skill_icon alone had none for a scroll's.
+    TEST_ASSERT_EQ(skill_icon(22'101'031), kNoIcon);
+    TEST_ASSERT_EQ(effect_key_icon(22'101'031), effect_icon(22'101'031));
+    TEST_ASSERT_EQ(effect_key_icon(18'190'000), skill_icon(18'190'021));
+    TEST_ASSERT(effect_key_icon(18'190'000) != kNoIcon);
+    TEST_ASSERT_EQ(effect_key_icon(200), kNoIcon);
+}

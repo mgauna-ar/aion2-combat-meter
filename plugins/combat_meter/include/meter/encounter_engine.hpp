@@ -91,6 +91,9 @@ public:
 
 private:
     struct Accum {
+        /// The order rows came into the fight (Fight::next_row): when the server
+        /// handed an id on within it, the first to hold it keeps it as its row's id.
+        uint64_t seq{0};
         uint64_t damage{0};
         uint64_t dot_damage{0};
         uint64_t max_hit{0};
@@ -155,6 +158,8 @@ private:
         Micros last_hit_ts{0};
         /// By the player a hit resolves to, and their character then.
         std::unordered_map<RowKey, Accum, RowKeyHash> players;
+        /// The next row's Accum::seq.
+        uint64_t next_row{0};
         /// Damage each enemy took from the player side.
         std::unordered_map<EntityId, uint64_t> enemies;
         CaptureQuality counters_at_start;
@@ -173,8 +178,13 @@ private:
         /// once no one is left, seconds before the fight times out; the fight ends
         /// with what they left it at, not with that.
         std::unordered_map<EntityId, HpNow> hp_when_hit;
-        /// What landed on each party member, for the recap of a death.
-        std::unordered_map<EntityId, RecapRing> recaps;
+        /// What landed on each party member, for the recap of a death, and the
+        /// character it landed on: an id the server hands on starts a new one.
+        struct Recap {
+            CharacterId who{0};
+            RecapRing ring;
+        };
+        std::unordered_map<EntityId, Recap> recaps;
         struct Death {
             RowKey key;
             Micros ts{0};
@@ -253,6 +263,16 @@ private:
     /// so strangers healing each other nearby stay out.
     [[nodiscard]] bool counts_in_fight(EntityId player) const;
     [[nodiscard]] RowKey row_key(EntityId player) const { return RowKey{player, m_registry.character_of(player)}; }
+    /// The live fight's row for `player` as the id is now, made on first use
+    /// (`added`, when given, says it was).
+    Accum& fight_row(EntityId player, bool* added = nullptr);
+    /// A death still open, or one being recorded, is `id`'s, who is character `who`
+    /// now: the same character, else (one unnamed) the same id. An id the server
+    /// handed on within the fight is someone else's.
+    [[nodiscard]] static bool same_player(const RowKey& key, EntityId id, CharacterId who) noexcept {
+        if (key.who != 0 && who != 0) return key.who == who;
+        return key.id == id;
+    }
     /// Ends the fight if its time is up at `now`.
     void check_end(Micros now);
     void finish(EndReason reason, Micros now);

@@ -47,6 +47,9 @@ public:
     /// Starts `source` and the engine thread. False, with `error`, when the source
     /// cannot start; the runtime then still answers the UI (history, status).
     bool start(std::unique_ptr<capture::PacketSource> source, std::string& error);
+    /// Stops the engine thread, then the source. The engine first takes what is
+    /// still queued, ends the live fight and saves it, as switching the meter off
+    /// would: Exit and Update & restart come here.
     void stop();
 
     /// The latest snapshot; nullptr before the first one.

@@ -48,7 +48,9 @@ carried no figure shows "-".
 - **Ids belong to a map** (`follow`, `on_map_load`):
   - A newer connection forgets everyone and the local player's id: entering or
     leaving a dungeon or an arena opens one. An event from an older connection is
-    ignored.
+    ignored, casts and hits too: their ids are another map's, so a town's last
+    cast could teach a class to whoever holds that id in the dungeon, or let go of
+    the target.
   - Another map over the same connection forgets everyone but those named in the
     `kEarlyArrival` (2 s) before its `21 36`, since a map's records can come ahead of
     it.
@@ -70,9 +72,13 @@ carried no figure shows "-".
 
 ## 🎯 The target
 
-- **A press or a hit names it:** the last other player a skill the local player
-  pressed named (`SkillCast`, mode 2), or one they hit (`Damage`), for
-  `kTargetMemory` (30 s) after the last of either.
+- **A press names it, and so does a hit on an enemy:** the last other player a
+  skill the local player pressed named (`SkillCast`, mode 2), or a hostile player
+  they hit (`Damage`), for `kTargetMemory` (30 s) after the last of either.
+- **A hit on anyone else only renews the target it lands on.** `04 38` carries heals
+  too (the repository's Protocol, Damage), and a passive's or a spirit's heal on an
+  ally, with no press behind it, took the target off the enemy being fought. A
+  same-faction arena opponent is named by the presses on them, and kept by the hits.
 - **A press on anything else lets go:** a monster, an object. A hit on a monster
   does not, since an area skill hits whatever stands beside a player.
 - **Not a press:** someone else's skill, a self-cast, a passive going off (mode 0).
@@ -81,8 +87,20 @@ carried no figure shows "-".
 
 ## 📋 The list
 
-- **A snapshot lists** the map's players strongest first (then by name), the
-  `kMaxListed` (12) strongest of a crowd; `in_view` counts them all.
+- **One order, two places** (`ListOrder`, `listed_before`): the threats first or
+  not (`enemies_first`), then strongest or nearest first (`sort_by_distance`; those
+  at no known distance after all who are), then the stronger, by name, by id. The
+  engine cuts by it and the view sorts by it.
+- **A snapshot holds every row a list can show:** `players` (and `enemies`, below)
+  is the union of the first `kMaxListed` (12) in each of the four orders, a few
+  dozen rows at most, in the first (threats, then strongest). `list()` sorts and
+  cuts it for one order. `in_view` counts them all.
+  - **Why the union:** cut in one order and sorted in another, a list loses the
+    rows that lead the second. Twelve enemies cut by strength, then sorted by
+    distance, left out the two nearest; a cut that put the enemies first, sorted
+    back into one order with `enemies_first` off, listed weak enemies in place of
+    strong allies. No setting crosses to the engine thread, so the snapshot holds
+    each order's first rows.
 - **The view narrows it** (`power_layout`): `show_list` and `list_max_players` are
   the user's, and what the list leaves out is counted under it ("+N more"). A
   target in the list is marked in its row; one outside it, or with the list off,
@@ -95,8 +113,8 @@ carried no figure shows "-".
   from names and figures, one width for every row so they line up. Drawn in muted grey
   on a class's bar it was hard to read. A window too narrow for it drops it.
 - **Only enemies** (`only_enemies`): the view lists `enemies` instead, the
-  snapshot's hostile players, near or far, alive or dead, in the same order (by
-  distance: threats first, then nearest, as `nearest`). "+N more" counts
+  snapshot's hostile players, near or far, alive or dead, in the same orders (by
+  distance: the threats first, then nearest). "+N more" counts
   `enemies_in_view`. **The target stays, whoever they are.** The plugin reads only
   the faction, so an arena's opponent of the local player's own is no enemy to it
   (Only the faction, below), and being the target is the one way they show. A
@@ -123,14 +141,14 @@ carried no figure shows "-".
   view, so they are marked before they act. That is the feature: do not make it
   wait on a hit or a cast.
 - **A threat** (`PowerRow::threat`) is a hostile player within `kEnemyRange`
-  (200 m), or at no known distance. Threats lead both lists, ahead of the cut at
-  `kMaxListed`, so a crowd of stronger or nearer allies never hides one;
-  `hostile_in_view` counts them.
+  (200 m), or at no known distance. Threats lead the orders with `enemies_first`,
+  ahead of the cut at `kMaxListed`, so a crowd of stronger or nearer allies never
+  hides one; `hostile_in_view` counts them.
   - **The other hostile players can be cut.** Out of range or dead, they sort among
     the allies, and a crowd's cut drops them. So the snapshot carries `enemies`:
-    every hostile player, threats first, then strongest, `kMaxListed` of them, and
-    `enemies_in_view` counting them all. The view's `only_enemies` reads it, never a
-    filter of `players`.
+    the hostile players alone, cut the same way (the first `kMaxListed` of them in
+    each order), and `enemies_in_view` counting them all. The view's
+    `only_enemies` reads it, never a filter of `players`.
   - **A dead enemy is no threat:** marked still, they lead nothing, and the view
     dims their row until they leave.
   - Why a range, now that players leave the list: the local player's position can
@@ -143,8 +161,9 @@ carried no figure shows "-".
 - **Only the faction.** An arena's opponent of the local player's own faction is
   not hostile, nor a battlefield's team: no rule for them yet (the repository's
   Unknowns).
-- **The view** (`power_layout`) keeps the snapshot's order, or with `enemies_first`
-  off sorts the rows back into one order; the red name is drawn either way.
+- **The view** (`power_layout`) lists the threats first, or with `enemies_first`
+  off everyone in one order: the strongest or the nearest of all, whatever their
+  faction. The red name is drawn either way.
 
 ## 📏 Distance (`sort_by_distance`)
 
@@ -171,19 +190,16 @@ carried no figure shows "-".
   - **The speed is measured** between two positions at least `kSpeedWindow` (0.3
     s) apart, since one skill's effects land a few milliseconds apart; a new map or
     connection starts it over.
-  - **Stale, the snapshot gives no distances** (rows at -1), **no `nearest`,** and
-    **no range:** an enemy leads at any distance, as with no position. An enemy
+  - **Stale, the snapshot gives no distances** (rows at -1), so **by distance is
+    strongest first,** and **no range:** an enemy leads at any distance, as with no position. An enemy
     beside a player who flew in would otherwise read as out of range.
   - **The view** keeps the distance column and draws "?" in it, faded, and lists
     the strongest first: an order by distance from a stale point is no order. The
     page's tile goes back to the strongest. A number there was a guess drawn as a
     fact, and dimming it did not say so.
 - **Metres:** the game's units are centimetres. Height counts.
-- **Two lists, one snapshot:** `players` (strongest first) and `nearest` (nearest
-  first, those at no known distance last, then by strength), `kMaxListed` each.
-  The view picks by the user's setting, so no setting crosses to the engine thread.
-- **No local position, no `nearest`:** the view then lists the strongest, as with
-  the sort off, rather than an order it cannot stand behind.
+- **No local position, no distances:** the rows carry none, so the view lists the
+  strongest, as with the sort off, rather than an order it cannot stand behind.
 - **Forgotten with the map:** the local player's position goes with a new
   connection, a new id of theirs, or another map (but for one said in the
   `kEarlyArrival` before its load); a player's goes with the player, and when their

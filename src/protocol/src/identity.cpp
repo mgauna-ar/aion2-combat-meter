@@ -96,6 +96,9 @@ constexpr uint8_t kPowerTag[] = {0xF4, 0xCB, 0x1F};
 constexpr size_t kPowerTagWindow = 40;
 /// The 00 bytes after the combat power.
 constexpr size_t kPowerZeros = 5;
+/// The most the byte some records have between the rank and the figure is taken to
+/// be: of the six such records in the three captures, four had 01 and two 03.
+constexpr uint8_t kMaxInsertedByte = 3;
 
 /// The combat power at `at`: a u32 no player's is above, then kPowerZeros 00 bytes.
 [[nodiscard]] uint32_t combat_power_at(std::span<const uint8_t> body, size_t at) noexcept {
@@ -119,9 +122,19 @@ uint32_t read_combat_power(std::span<const uint8_t> body) noexcept {
     if (tag != window.end()) {
         const size_t after_tag = body.size() - static_cast<size_t>(window.end() - tag) + std::size(kPowerTag);
         constexpr size_t kTitleAndRank = 2 * sizeof(uint32_t);
-        if (const uint32_t power = combat_power_at(body, after_tag + kTitleAndRank)) return power;
-        // Two had one byte more (01) between the rank and the figure.
-        if (const uint32_t power = combat_power_at(body, after_tag + kTitleAndRank + 1)) return power;
+        const uint32_t plain = combat_power_at(body, after_tag + kTitleAndRank);
+        // Six had one byte more (01 or 03) between the rank and the figure.
+        const uint32_t inserted = combat_power_at(body, after_tag + kTitleAndRank + 1);
+        if (plain != 0 && inserted != 0) {
+            // Both read when the record ends in a 00 more after the zeros, and when
+            // that byte comes before a figure under 39,063: read from the byte, the
+            // figure comes out 256 times itself plus the byte (4,756 read 1,217,537).
+            // The bytes look alike then. A figure's low byte is anything, so one of 1
+            // to 3 there is the byte far more often than a figure ending in it.
+            return body[after_tag + kTitleAndRank] <= kMaxInsertedByte ? inserted : plain;
+        }
+        if (plain != 0) return plain;
+        if (inserted != 0) return inserted;
         // A level-11 character's had neither title nor rank, and ended there.
         if (after_tag + sizeof(uint32_t) + kPowerZeros == body.size()) return combat_power_at(body, after_tag);
         return 0;

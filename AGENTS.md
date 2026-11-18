@@ -78,6 +78,20 @@ License).
      `AppRuntime` is the only place that turns wall time into ticks. While packets are
      queued, it uses their time, never the source's clock, which runs ahead of a
      backlog.
+   - **Quiet time runs on from the latest packet.** With the queue empty, time moves
+     on from that packet's stamp by as much as the source's clock has run since the
+     engine took it off the queue, never to the source's clock itself: live,
+     `NpcapSource::now()` is the wall clock, while Npcap stamps packets on the
+     performance counter, and the gap between the two read as quiet time (a stall to
+     the Ping plugin, a reassembly hole expiring early). Taken at dequeue, a backlog
+     makes it trail, never lead. It never goes back: a step back of the source's
+     clock holds it still. Before the first packet there is no capture time; the
+     source's clock only names a recording, and the pipeline is not ticked.
+   - **What is left of the two clocks:** a forward step of the wall clock (a time
+     sync) while the queue is empty still shows live as that much quiet time, and
+     time then holds there until the packets' stamps catch up. A Windows-only
+     `NpcapSource::now()` on the capture's own clock (the performance counter plus
+     the counter offset) would close it.
 3. **Nothing throws on wire data.**
    - `ByteReader` fails sticky and returns zeros.
    - Every length is bounded: frames 1 MiB, LZ4 output 4 MiB, pcap blocks 64 MiB.
@@ -211,9 +225,9 @@ plugin; capture + the plugins ← pipeline ← app. No plugin depends on another
 
 | Thread | Owns | Talks through |
 |---|---|---|
-| Capture (one per Npcap adapter, or the FileSource thread) | its pcap handle | `BoundedQueue<OwnedPacket>` (8192), `try_push` only. A full queue drops and counts, and the drop shows up as a TCP gap. Each Npcap thread also samples the capture clock against the performance counter (`ClockOffsetEstimator`, under its own mutex), which the engine reads each tick. |
+| Capture (one per Npcap adapter, or the FileSource thread) | its pcap handle | `BoundedQueue<OwnedPacket>` (8192), `try_push` only. A full queue drops and counts, and the drop shows up as a TCP gap. Each Npcap thread also samples the capture clock against the performance counter (`ClockOffsetEstimator`, under its own mutex), which the engine reads before each packet and each tick. |
 | Npcap watcher | the loopback filter text | a mutex plus an atomic generation counter. Each capture thread applies a new filter itself between `pcap_next_ex` calls, because a pcap handle is not shared. |
-| Engine (`AppRuntime::run`) | `Pipeline`, `HistoryStore` writes, the recorder | publishes `LiveSnapshot` into a `SnapshotSlot` every 200 ms of capture time, and whenever the queue runs dry. A fight's `FightDetail` is shared, never copied: a snapshot holds a pointer to it. |
+| Engine (`AppRuntime::run`) | `Pipeline`, `HistoryStore` writes, the recorder | publishes `LiveSnapshot` into a `SnapshotSlot` every 200 ms of capture time, and whenever the queue runs dry. Its clock is the packets' time; with the queue empty, the latest packet's plus the source's clock elapsed since it was dequeued (One clock). A fight's `FightDetail` is shared, never copied: a snapshot holds a pointer to it. Stopped (Exit, Update & restart), it drains the closed queue, ends the live fight (`Manual`, at the last packet's time) and saves it before it returns. |
 | UI (`wWinMain`) | the five windows (the app window and the meter, aura, ping and combat power overlays, each with its own ImGui context), the tray, `AppSettings`, the `Updater` | reads snapshots and the history index (copied under a mutex). Requests go to the engine as atomics: end fight, recording on/off, clear history. New meter and history settings and the plugin switches go through `AppRuntime::update_settings`, under the mutex; the engine applies them on its next pass. |
 | Updater worker (one at a time) | the check or the download | `Updater::status()`, copied under its mutex, which the UI reads each frame. Staged files are moved into place on the UI thread (`apply_staged`). `stop()` cancels a download and joins, before the engine stops. |
 
@@ -256,6 +270,16 @@ It gave the faction (Identity, below).
     the next number, as the reassembler starts a new stream there. Kept by address
     pair, it came back under the town's old number, lower than the dungeon's, and the
     plugins took it for that old connection's last frames.
+  - **A zone change, on the wire** (all five in the four captures): the old
+    connection's last heartbeat; 0.10 to 0.18 s later the new connection's SYN and
+    its first frame, 276 bytes the parser does not read (`11 36` or `5b 42`); then
+    nothing for 2.4 to 2.7 s, the load, until a `15 36` and its first heartbeat. The old server
+    sent its FIN within milliseconds of the new SYN in four of them, and not at all
+    in the arena's return to town.
+  - **A game connection's end** (FIN or RST, once its bytes are through) goes to the
+    pipeline as `FrameSink::on_connection_closed`, with its number. The Ping plugin
+    takes it, and a newer connection's first frame, for the end of the old one's
+    heartbeats (plugins/ping/AGENTS.md, Stalls).
 - **The map and the local player's name are the pipeline's**, from 21 36 and 33 36,
   whatever plugins are on: every overlay's `show_in_dungeons_only` and the dashboard
   read them, and they once came from the meter's engine, which hears nothing while
@@ -275,7 +299,10 @@ It gave the faction (Identity, below).
 **Heartbeat and pong**
 - The heartbeat frame is `0E 00 36` plus a u64 LE of server Unix ms, about every 50 ms.
 - The decoder resyncs on one whose time is within a day of the capture's. Only such a
-  frame (no flag, an 8-byte body, a time that close) counts as a heartbeat.
+  frame (no flag, an 8-byte body, a time that close) counts as a heartbeat, for the
+  decoder's watchdog and the parser's `Heartbeat` event alike
+  (`FrameDecoder::heartbeat_server_ms`, the one rule). Any other `00 36` is a parse
+  failure; none of the four captures had one.
 - 3 s with no heartbeat while bytes keep flowing means the decoder is misaligned, and it
   resyncs.
 - **Pong `03 36`:** the server's answer to the client's ping. 18 bytes: two bytes
@@ -425,9 +452,18 @@ It gave the faction (Identity, below).
     - **It is found from the tag,** not from the end: 11 records had one byte more
       after the zeros (01 in 6, 00 in 5), and a figure's own high bytes are zeros, so
       from the end those five read 256 times too small.
-    - **The other shapes:** 2 records had a 01 between the rank and the figure; the
-      level-11 character's had no title and no rank, the figure straight after the
-      tag. A record with no tag is read from the end, past a last byte that is not 0.
+    - **The other shapes:** 2 records had a 01 between the rank and the figure (6
+      of the three captures' records: four 01, two 03); the level-11 character's had
+      no title and no rank, the figure straight after the tag. A record with no tag
+      is read from the end, past a last byte that is not 0.
+    - **That byte and a 00 after the zeros can look alike.** Before a figure under
+      39,063, read from the byte, the figure is 256 times itself plus the byte, and
+      the record reads as one ending in a 00 more would (4,756 read 1,217,537). Where
+      both read, a byte of 1 to 3 is taken for the inserted one: a figure's low byte
+      is anything, so 1 to 3 there is that byte far more often than a figure's.
+    - **Not read yet:** 4 of the dungeon capture's records had a title and no rank
+      (13 bytes after the tag), and 2 of the map-20 capture's four bytes more
+      between the rank and the figure. Those show "-".
     - Item level (2,700 on the opponent's page) is not among these fields.
     - **33 36 does not end with it:** the local player's own record ends in a list of
       small u32s, and their combat power has not been found.
@@ -631,10 +667,17 @@ the three captures read as a point on their map):
   flags byte whose low four bits are 2 or 6 (D2, 52, 92, 12, D6), then x, y, z. In
   `45 36` that is straight after the class; in `33 36`, 154 bytes on. So the local
   player's position is known on entering each map.
-  - **On map 20 one byte more comes before the flags byte,** in both records (the
-    faction again, in 45 36). The reader finds the flags byte in either place
-    (`read_identity_position`); read two bytes after the class as on other maps,
-    that capture's records put their players at or near the origin.
+  - **On map 20 one byte more comes before the flags byte,** in both records. In
+    45 36 it is the faction again, straight after the class. In 33 36 it is in a
+    list that ends some 20 bytes before the position (`05 01 03 01 7f ...` where
+    other maps had `05 03 01 7f ...`), the byte before the flags 80 still. The
+    reader finds the flags byte in either place (`read_identity_position`); read two
+    bytes after the class as on other maps, that capture's records put their
+    players at or near the origin.
+  - **The byte before the flags never passed as one:** 00, 80, 88 or C0 in every
+    record of the captures. Should one, the point decides: read a byte early, a
+    point's floats are cut across, and an axis comes out under a unit (-47,736 read
+    as 0.0009), so the reading whose every axis is a unit or more is taken.
   - A position within a unit of the origin on every axis is not believed.
 - **A pressed cast's tail** (`02 38`, mode 2) is a heading (f32, degrees) and a point:
   the target's last position to the unit in many records, some metres from it in
@@ -683,7 +726,8 @@ the three captures read as a point on their map):
   `4a 36` stat is Illusion is unknown. The Auras plugin learns each skill's figure
   instead (plugins/auras/AGENTS.md, Cooldowns);
 - whether a skill with a second use ("+1 consecutive use") recharges each use on its
-  own, as the Auras plugin assumes, or both at once;
+  own, as the Auras plugin assumes, or both at once; and which use a 47 38 for it
+  speaks of (the plugin takes the one cooling that is back soonest, never a ready one);
 - what a wipe looks like on the wire. The whole party at HP 0 is not one: in the second
   capture's last boss fight they all were, for 1.2 s, and got up again and won
   (plugins/combat_meter/AGENTS.md, Fight end). `wipe_detection` stays off until then.
@@ -737,6 +781,10 @@ the three captures read as a point on their map):
   counts for nothing (plugins/combat_meter/AGENTS.md, Party and Healing);
 - what the extra byte in a player's record on map 20 marks (a PvP zone, perhaps),
   and what map 20 is: it has no row in `maps.tsv`;
+- **whether the local player's position always sits 154 bytes on in 33 36.** The
+  bytes before it end in a list, a byte longer on map 20. A faction-2 character's,
+  or one with more in that list, may run longer still, and the reader looks in two
+  places only. Every own record of the captures is one faction-1 character's;
 
 **The client's own files cannot fill in names.** They were checked on the Steam install
 in 2026-10.
@@ -776,6 +824,12 @@ capture, one tray and one updater, around them.
   takes effect on the engine thread through `AppRuntime::update_settings`
   (`Pipeline::set_plugins`): the meter ends its live fight, the auras, the ping and
   the combat power forget everything.
+  - **The meter switched back on is handed where it is.** While it is off the
+    pipeline keeps the last map load, the last own `33 36` and the last party roster
+    (`keep_for_meter`), and hands them over, in the order they came, as it comes back
+    on. It kept the map it was switched off on: back on in the open world after a
+    dungeon, its fights were filed under the dungeon and strangers counted as party.
+    The rest it learns as a meter started mid-visit does.
 - **A plugin's page** opens with its header and switch, then its own settings, then its
   overlay's, as ffxiv-hub orders them. Overlays it draws are separate windows of the
   app (`win32/overlay_window`), each shown by its plugin's switch and its own hide

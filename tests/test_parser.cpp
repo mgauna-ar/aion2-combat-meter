@@ -103,6 +103,15 @@ TEST_CASE(Parser, AnotherPlayersRecordEndsWithTheirCombatPower) {
     TEST_ASSERT_EQ(power(74'992, PlayerTrailer::ExtraZero), 74'992u);
     // A byte between the rank and the figure.
     TEST_ASSERT_EQ(power(187'649, PlayerTrailer::Inserted), 187'649u);
+    // Before a figure under 39,063, read from that byte as the ExtraZero shape is, a
+    // figure 256 times as large reads too: 4,756 read 1,217,537.
+    TEST_ASSERT_EQ(power(4'756, PlayerTrailer::Inserted), 4'756u);
+    TEST_ASSERT_EQ(power(39'062, PlayerTrailer::Inserted), 39'062u);
+    Bytes three = player_body(227, "Nezekan", kServer, 4'756, PlayerTrailer::Inserted);
+    three[three.size() - 10] = 0x03;  // the byte: 03 in two of the captures' six
+    TEST_ASSERT_EQ(only<Identity>(parse_one(p, opcode::OtherPlayer, three)).combat_power, 4'756u);
+    // A figure whose low byte is no such byte is the figure.
+    TEST_ASSERT_EQ(power(70'404, PlayerTrailer::ExtraZero), 70'404u);  // 0x011304
     // A character with no title yet: the figure follows the tag.
     TEST_ASSERT_EQ(power(4'756, PlayerTrailer::Untitled), 4'756u);
     // A small figure's own high bytes are zeros too.
@@ -180,10 +189,13 @@ TEST_CASE(Parser, APlayersRecordAndAnEffectCarryAPosition) {
     TEST_ASSERT(zoned.has_position);
     TEST_ASSERT_NEAR(zoned.position.x, 58'224.0f, 1e-2f);
     TEST_ASSERT_EQ(zoned.combat_power, 204'221u);
-    const Identity own_zoned = only<Identity>(parse_one(
-        p, opcode::OwnCharacter, own_player_body(501, "Ariel", kServer, -47'736.0f, 49'824.0f, 20'335.0f, 1, true)));
-    TEST_ASSERT(own_zoned.has_position);
-    TEST_ASSERT_NEAR(own_zoned.position.y, 49'824.0f, 1e-2f);
+    for (const uint8_t faction : {uint8_t{1}, uint8_t{2}}) {
+        const Identity own_zoned = only<Identity>(parse_one(
+            p, opcode::OwnCharacter, own_player_body(501, "Ariel", kServer, -47'736.0f, 49'824.0f, 20'335.0f, faction, true)));
+        TEST_ASSERT(own_zoned.has_position);
+        TEST_ASSERT_NEAR(own_zoned.position.x, -47'736.0f, 1e-2f);
+        TEST_ASSERT_NEAR(own_zoned.position.y, 49'824.0f, 1e-2f);
+    }
     // Zeros where a position should be are no one's position.
     TEST_ASSERT_FALSE(only<Identity>(parse_one(p, opcode::OtherPlayer,
                                                player_body(229, "Vaizel", kServer, 90'000, PlayerTrailer::Plain,
@@ -203,6 +215,41 @@ TEST_CASE(Parser, APlayersRecordAndAnEffectCarryAPosition) {
     TEST_ASSERT_EQ(effect.caster, EntityId{501});
     TEST_ASSERT_NEAR(effect.caster_position.x, 232.25f, 1e-3f);
     TEST_ASSERT_NEAR(effect.caster_position.z, 2426.0f, 1e-3f);
+    TEST_ASSERT_EQ(p.stats().failed, uint64_t{0});
+}
+
+TEST_CASE(Parser, AFlagsLookAlikeBeforeTheFlagsDoesNotMoveThePoint) {
+    PacketParser p;
+    // Map 20's own record, the byte before the flags made 02: a faction-2 byte where
+    // the tests once put it. Read from there, x came out 0.0009 and y 80.
+    const size_t own_class_end = own_identity_body(501, "Ariel", kServer, 0).size() - 4;
+    Bytes own = own_player_body(501, "Ariel", kServer, -47'736.0f, 49'824.0f, 20'335.0f, 2, true);
+    TEST_ASSERT_EQ(own[own_class_end + 156], uint8_t{0xD2});
+    own[own_class_end + 155] = 0x02;
+    const Identity me = only<Identity>(parse_one(p, opcode::OwnCharacter, own));
+    TEST_ASSERT(me.has_position);
+    TEST_ASSERT_NEAR(me.position.x, -47'736.0f, 1e-2f);
+    TEST_ASSERT_NEAR(me.position.y, 49'824.0f, 1e-2f);
+    TEST_ASSERT_NEAR(me.position.z, 20'335.0f, 1e-2f);
+
+    // Another player's, the byte after their faction one that passes as the flags.
+    const size_t class_end = identity_body(228, "Zikel", kServer, 0).size() - 4;
+    Bytes other = player_body(228, "Zikel", kServer, 204'221, PlayerTrailer::Plain, 58'224.0f, 18'775.0f, 36'512.0f, 2,
+                              true);
+    TEST_ASSERT_EQ(other[class_end + 2], uint8_t{0xD2});
+    other[class_end + 1] = 0x86;
+    const Identity them = only<Identity>(parse_one(p, opcode::OtherPlayer, other));
+    TEST_ASSERT(them.has_position);
+    TEST_ASSERT_NEAR(them.position.x, 58'224.0f, 1e-2f);
+    TEST_ASSERT_NEAR(them.position.y, 18'775.0f, 1e-2f);
+
+    // The flags byte where it belongs, a look-alike after it: the first stands.
+    Bytes plain = player_body(228, "Zikel", kServer, 90'000, PlayerTrailer::Plain, 1'234.5f, -6'586.0f, 2'442.0f);
+    TEST_ASSERT_EQ(plain[class_end + 1], uint8_t{0xD2});
+    plain[class_end + 2] = 0x52;  // x's low byte
+    const Identity third = only<Identity>(parse_one(p, opcode::OtherPlayer, plain));
+    TEST_ASSERT(third.has_position);
+    TEST_ASSERT_NEAR(third.position.y, -6'586.0f, 1e-2f);
     TEST_ASSERT_EQ(p.stats().failed, uint64_t{0});
 }
 
@@ -645,6 +692,39 @@ TEST_CASE(Parser, PartyScanSkipsOneLetterLookAlikes) {
     const auto& roster = only<PartyRoster>(parse_one(p, opcode::PartyRoster, body));
     TEST_ASSERT_EQ(roster.members.size(), size_t{2});
     TEST_ASSERT_EQ(roster.members[1].name, std::string("Lumiel"));
+}
+
+// --- Heartbeat (00 36) ---
+
+// The parser's heartbeat is the decoder's: no flag, an 8-byte body, a time near the
+// capture's. Any other 00 36 fails, and the plugins hear nothing of it.
+TEST_CASE(Parser, AHeartbeatIsWhatTheDecoderCountsAsOne) {
+    constexpr uint64_t kMs = 1'792'152'000'000ULL;
+    const Micros ts = (kMs + 200) * kMicrosPerMilli;
+    PacketParser parser;
+    const auto parse = [&](uint8_t flag, const Bytes& body, Micros at) {
+        Frame f;
+        f.opcode = opcode::Heartbeat;
+        f.flag = flag;
+        f.body = body;
+        f.ts = at;
+        std::vector<ParsedEvent> out;
+        parser.parse(f, out);
+        return out;
+    };
+    Bytes body;
+    put_le64(body, kMs);
+    TEST_ASSERT_EQ(only<Heartbeat>(parse(0, body, ts)).server_ms, kMs);
+    TEST_ASSERT_EQ(parser.stats().failed, uint64_t{0});
+
+    // Flagged, longer, or a day and more from the capture's clock: not one.
+    TEST_ASSERT(parse(0xF3, body, ts).empty());
+    Bytes longer = body;
+    put_le32(longer, 0xDEADBEEF);
+    TEST_ASSERT(parse(0, longer, ts).empty());
+    TEST_ASSERT(parse(0, body, ts + 2 * 86'400 * kMicrosPerSecond).empty());
+    TEST_ASSERT_EQ(parser.stats().failed, uint64_t{3});
+    TEST_ASSERT_EQ(parser.stats().failures_by_opcode.at(opcode::Heartbeat), uint64_t{3});
 }
 
 // --- Pong (03 36) ---
