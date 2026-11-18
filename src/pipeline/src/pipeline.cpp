@@ -28,10 +28,19 @@ void Pipeline::on_frame(const proto::Frame& frame) {
     if (m_plugins.combat_meter) m_engine.set_capture_counters(capture_totals());
     for (const auto& e : m_events) {
         if (m_event_observer) m_event_observer(e);
+        note_where(e);
         if (m_plugins.combat_meter) m_engine.on_event(e);
         if (m_plugins.auras) m_auras.on_event(e);
         if (m_plugins.ping) m_ping.on_event(e);
         if (m_plugins.combat_power) m_power.on_event(e);
+    }
+}
+
+void Pipeline::note_where(const proto::ParsedEvent& e) {
+    if (const auto* m = std::get_if<proto::MapLoad>(&e.event)) {
+        m_map_id = m->map_id;
+    } else if (const auto* id = std::get_if<proto::Identity>(&e.event)) {
+        if (id->own && !id->scanned && !id->name.empty()) m_local_name = id->name;
     }
 }
 
@@ -86,9 +95,15 @@ LiveSnapshot Pipeline::snapshot(Micros now) const {
     } else {
         s.capture = CaptureState::Live;
     }
-    const auto& reg = m_engine.registry();
-    if (reg.local_player() != 0) s.local_name = reg.display_name(reg.local_player());
-    s.map_id = m_engine.map_id();
+    // The meter's registry knows the local player best (it names them from 00 8D
+    // when 33 36 was missed), but only while it is fed. The map and the name are
+    // every overlay's and the dashboard's, so they never hang on the meter's switch.
+    if (m_plugins.combat_meter) {
+        const auto& reg = m_engine.registry();
+        if (reg.local_player() != 0) s.local_name = reg.display_name(reg.local_player());
+    }
+    if (s.local_name.empty()) s.local_name = m_local_name;
+    s.map_id = m_map_id;
     s.now = now;
     s.parse = m_parser.stats();
     s.capture_totals = capture_totals();

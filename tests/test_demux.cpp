@@ -108,6 +108,41 @@ TEST_CASE(StreamDemux, EachConnectionHasItsOwnNumber) {
     TEST_ASSERT_EQ(sink.connections[3], sink.connections[2]);
 }
 
+TEST_CASE(StreamDemux, AFourTupleOpenedAgainIsANewConnection) {
+    // Back in town after a dungeon, Windows can hand out the town's client port
+    // again: a new SYN on it is a new connection, numbered after the dungeon's.
+    StreamDemux demux;
+    OpcodeSink sink;
+    const auto open = [&](TcpSpec spec, uint32_t isn, uint64_t ms) {
+        spec.seq = isn;
+        spec.flags = capture::tcp_flag::Syn | capture::tcp_flag::Ack;
+        demux.on_packet(capture::link_type::Ethernet, ethernet_tcp(spec, Bytes{}), kTs, sink);
+        spec.seq = isn + 1;
+        spec.flags = capture::tcp_flag::Ack | capture::tcp_flag::Psh;
+        send(demux, sink, spec, heartbeat(ms), 64, kTs);
+    };
+    TcpSpec town;
+    TcpSpec dungeon;
+    dungeon.src_ip = ip4(10, 0, 0, 9);
+    dungeon.dst_port = static_cast<uint16_t>(kClientPort + 1);
+    open(town, 1000, kServerMs);
+    open(dungeon, 50'000, kServerMs + 50);
+    open(town, 900'000, kServerMs + 100);
+    TEST_ASSERT_EQ(sink.connections.size(), size_t{3});
+    TEST_ASSERT(sink.connections[1] > sink.connections[0]);
+    TEST_ASSERT(sink.connections[2] > sink.connections[1]);
+    // A SYN sent again for the stream already open changes nothing.
+    TcpSpec again = town;
+    again.seq = 900'000;
+    again.flags = capture::tcp_flag::Syn | capture::tcp_flag::Ack;
+    demux.on_packet(capture::link_type::Ethernet, ethernet_tcp(again, Bytes{}), kTs, sink);
+    again.seq = 900'001 + static_cast<uint32_t>(heartbeat(0).size());
+    again.flags = capture::tcp_flag::Ack | capture::tcp_flag::Psh;
+    send(demux, sink, again, heartbeat(kServerMs + 150), 64, kTs);
+    TEST_ASSERT_EQ(sink.connections.size(), size_t{4});
+    TEST_ASSERT_EQ(sink.connections[3], sink.connections[2]);
+}
+
 TEST_CASE(StreamDemux, NoisyFlowIsRejected) {
     StreamDemux demux;
     OpcodeSink sink;

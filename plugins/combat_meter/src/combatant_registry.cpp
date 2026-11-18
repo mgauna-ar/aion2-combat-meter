@@ -239,10 +239,18 @@ void CombatantRegistry::on_map_change(bool instance) {
     m_pending.clear();
 }
 
+bool CombatantRegistry::owned_by_npc(const Actor& a) const {
+    if (a.owner == 0) return false;
+    const Actor* o = find(a.owner);
+    if (o == nullptr || o->is_player) return false;
+    if (o->spawned) return !proto::spawn_kind::is_player_object(o->spawn_kind);
+    return npc_by_hp(*o) || o->inferred_side == Side::Enemy;
+}
+
 EntityId CombatantRegistry::resolve(EntityId id) const {
     for (int hop = 0; hop < kMaxOwnerHops; ++hop) {
         const Actor* a = find(id);
-        if (a == nullptr || a->owner == 0) return id;
+        if (a == nullptr || a->owner == 0 || owned_by_npc(*a)) return id;
         id = a->owner;
     }
     return id;
@@ -254,8 +262,11 @@ Side CombatantRegistry::side(EntityId id) const {
         const Actor* a = find(id);
         if (a == nullptr) return Side::Unknown;
         if (a->is_player) return Side::Player;
-        // A summon or effect fights for the players whoever owns it, known or not.
-        if (a->spawned && proto::spawn_kind::is_player_object(a->spawn_kind)) return Side::Player;
+        // A summon or effect fights for the players whoever owns it, known or not,
+        // unless an NPC owns it.
+        if (a->spawned && proto::spawn_kind::is_player_object(a->spawn_kind)) {
+            return owned_by_npc(*a) ? Side::Enemy : Side::Player;
+        }
         if (a->owner != 0) {
             id = a->owner;
             continue;

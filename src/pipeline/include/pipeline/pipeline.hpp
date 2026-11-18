@@ -128,6 +128,10 @@ public:
 
 private:
     void on_frame(const proto::Frame& frame) override;
+    /// Keeps the map and the local player's name whatever plugins are on: the
+    /// overlays' "only in dungeons" and the dashboard read them, and no plugin may
+    /// depend on another being switched on.
+    void note_where(const proto::ParsedEvent& e);
     [[nodiscard]] meter::CaptureQuality capture_totals() const;
 
     StreamDemux m_demux;
@@ -140,6 +144,9 @@ private:
     std::vector<proto::ParsedEvent> m_events;
     uint64_t m_dropped{0};
     Micros m_last_tick{0};
+    /// The last 21 36's map, and the last 33 36's name.
+    uint32_t m_map_id{0};
+    std::string m_local_name;
     std::function<void(const proto::Frame&, FrameOutcome)> m_frame_observer;
     std::function<void(const proto::ParsedEvent&)> m_event_observer;
 };

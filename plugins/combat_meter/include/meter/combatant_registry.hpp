@@ -121,8 +121,12 @@ public:
     void on_map_reload();
 
     /// The id a hit by `id` is credited to: the owner of a summon, through chains
-    /// of them.
+    /// of them. A summon an NPC owns is itself (owned_by_npc).
     [[nodiscard]] EntityId resolve(EntityId id) const;
+    /// A summon whose owner is an NPC: Ludra's adds (kind 1F, as a player's spirit
+    /// is) name the boss. Such an add is an enemy of its own: hits on it are not
+    /// the boss's, nor is its death, and the party's effects on it are on an enemy.
+    [[nodiscard]] bool owned_by_npc(const Actor& a) const;
     [[nodiscard]] Side side(EntityId id) const;
     /// Side, with the folded-range guess for an id nothing else settled.
     [[nodiscard]] Side side_or_guess(EntityId id) const;

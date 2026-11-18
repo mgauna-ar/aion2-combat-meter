@@ -395,6 +395,33 @@ TEST_CASE(Engine, ABossNeverSeenSpawningStaysTheBossThroughItsAdds) {
     TEST_ASSERT_EQ(s.boss.hp, uint64_t{70'000'000});
 }
 
+TEST_CASE(Engine, AnAddItsBossOwnsIsAnEnemyOfItsOwn) {
+    // Ludra's adds are kind 1F, as a player's spirit is, name the boss as owner, and
+    // carry its max HP. Hits on one are not the boss's, nor is its death.
+    constexpr EntityId kOwnedAdd = 0x4300;
+    EncounterEngine e = setup();
+    proto::Spawn add = summon(kOwnedAdd, kBoss);
+    add.has_hp = true;
+    add.cur_hp = add.max_hp = kBossHp;
+    e.on_event(ev(at_s(0.5), add));
+    e.on_event(ev(at_s(1), hit(kMe, kBoss, 10)));
+    e.on_event(ev(at_s(2), hit(kMe, kOwnedAdd, 1000)));
+    FightSummary s = e.current();
+    // The same max HP and less damage taken: the owner is still the boss.
+    TEST_ASSERT_EQ(s.boss.id, kBoss);
+    TEST_ASSERT_EQ(s.boss.damage_taken, uint64_t{10});
+    TEST_ASSERT_EQ(s.total_damage, uint64_t{1010});
+
+    e.on_event(ev(at_s(10), hp(kOwnedAdd, 0)));
+    e.on_event(ev(at_s(11), hit(kMe, kBoss, 1000)));
+    e.on_event(ev(at_s(11), hp(kBoss, 0)));
+    e.on_event(ev(at_s(12.5), dot(kMe, kBoss, 777)));  // inside the boss's own grace
+    e.tick(at_s(20));
+    s = e.take_finished().at(0);
+    TEST_ASSERT(s.end_reason == EndReason::BossKilled);
+    TEST_ASSERT_EQ(s.total_damage, uint64_t{2010 + 777});
+}
+
 TEST_CASE(Engine, SummonOfAnUnseenOwnerCountsOnAnyTarget) {
     // Mid-session: no names, and a target that spawned before the meter started.
     EncounterEngine e;

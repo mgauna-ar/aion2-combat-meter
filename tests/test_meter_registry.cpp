@@ -242,13 +242,17 @@ TEST_CASE(Registry, ABossAddNeverMakesItsOwnerAPlayer) {
     TEST_ASSERT(r.side(51076) == Side::Enemy);
     r.on_spawn(summon(33429, 51076));
     TEST_ASSERT(r.side(51076) == Side::Enemy);
-    TEST_ASSERT_EQ(r.resolve(33429), EntityId{51076});
+    // An NPC's add is an enemy of its own, not its owner.
+    TEST_ASSERT(r.side(33429) == Side::Enemy);
+    TEST_ASSERT_EQ(r.resolve(33429), EntityId{33429});
 
     // An add before any HP for its owner: the HP, when it comes, still says NPC.
     r.on_spawn(summon(39848, 52000));
     TEST_ASSERT(r.side(52000) == Side::Player);
     r.on_hp(52000, 85'640'625);
     TEST_ASSERT(r.side(52000) == Side::Enemy);
+    TEST_ASSERT(r.side(39848) == Side::Enemy);
+    TEST_ASSERT_EQ(r.resolve(39848), EntityId{39848});
 
     // A player's HP still lets their summon's spawn settle them.
     r.observe_hit(100, 3696);

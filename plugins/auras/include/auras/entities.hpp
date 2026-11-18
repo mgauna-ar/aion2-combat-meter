@@ -75,8 +75,8 @@ public:
 
     /// The enemy the local player is fighting at `now`: of those they or their
     /// summons hit directly in the last kTargetMemory and that still stand, the one
-    /// with the most max HP, the latest hit on a tie; 0 for none. In a boss fight
-    /// with adds, the boss.
+    /// with the most max HP, then one no NPC owns, then the latest hit; 0 for none.
+    /// In a boss fight with adds, the boss.
     [[nodiscard]] EntityId target(Micros now) const;
     /// What an enemy is called: its npc code's name, "NPC #code" for one the table
     /// does not list, "#id" for one with no code.

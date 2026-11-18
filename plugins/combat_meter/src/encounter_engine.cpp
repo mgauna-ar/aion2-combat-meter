@@ -513,15 +513,23 @@ void EncounterEngine::finish(EndReason reason, Micros) {
 BossSummary EncounterEngine::boss_of(const Fight& fight) const {
     EntityId best = 0;
     uint64_t best_max = 0;
+    bool best_owned = false;
     uint64_t best_taken = 0;
     for (const auto& [id, taken] : fight.enemies) {
         const Actor* a = m_registry.find(id);
         const uint64_t max_hp = a != nullptr ? a->max_hp : 0;
-        const bool better = best == 0 || max_hp > best_max ||
-                            (max_hp == best_max && (taken > best_taken || (taken == best_taken && id < best)));
+        // An add the boss owns can carry the boss's own max HP (Ludra's did): at
+        // the same max HP, the owner wins, whatever damage either took.
+        const bool owned = a != nullptr && a->owner != 0;
+        const bool better =
+            best == 0 || max_hp > best_max ||
+            (max_hp == best_max &&
+             ((best_owned && !owned) ||
+              (owned == best_owned && (taken > best_taken || (taken == best_taken && id < best)))));
         if (better) {
             best = id;
             best_max = max_hp;
+            best_owned = owned;
             best_taken = taken;
         }
     }

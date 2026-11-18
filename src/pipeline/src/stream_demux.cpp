@@ -8,7 +8,8 @@ namespace aion2::pipeline {
 /// while it is a candidate.
 class StreamDemux::Flow final : public capture::StreamSink, public proto::FrameSink {
 public:
-    Flow(capture::FlowKey key, FlowRole role, uint32_t connection) : m_role(role), m_connection(connection) {
+    Flow(StreamDemux& owner, capture::FlowKey key, FlowRole role)
+        : m_owner(owner), m_role(role), m_connection(owner.m_next_connection++) {
         m_summary.key = key;
     }
 
@@ -44,7 +45,14 @@ public:
     }
 
     // capture::StreamSink
-    void on_stream_start(bool at_boundary, Micros ts) override { m_decoder.start(at_boundary, ts); }
+    void on_stream_start(bool at_boundary, Micros ts) override {
+        // The same 4-tuple opened again (a new SYN, a new sequence): a new
+        // connection. Windows can hand the town's client port out again after a
+        // dungeon, and the plugins take a lower number for an old connection's last
+        // frames.
+        if (m_streams++ > 0) m_connection = m_owner.m_next_connection++;
+        m_decoder.start(at_boundary, ts);
+    }
 
     void on_stream_data(std::span<const uint8_t> bytes, Micros ts) override {
         m_summary.bytes += bytes.size();
@@ -121,8 +129,11 @@ private:
         }
     }
 
+    StreamDemux& m_owner;
     FlowRole m_role;
     uint32_t m_connection;
+    /// Streams started on this 4-tuple: each after the first is a new connection.
+    uint32_t m_streams{0};
     FlowSummary m_summary;
     capture::TcpReassembler m_reassembler;
     proto::FrameDecoder m_decoder;
@@ -151,7 +162,7 @@ void StreamDemux::on_segment(const capture::TcpSegment& segment, proto::FrameSin
         // heartbeats, so it is rejected without decoding.
         const bool client_side = segment.flow.dst_port == m_options.server_port;
         const FlowRole role = server_side ? FlowRole::Game : client_side ? FlowRole::Rejected : FlowRole::Candidate;
-        it = m_flows.emplace(segment.flow, std::make_unique<Flow>(segment.flow, role, m_next_connection++)).first;
+        it = m_flows.emplace(segment.flow, std::make_unique<Flow>(*this, segment.flow, role)).first;
     }
     Flow& flow = *it->second;
     flow.push(segment, sink);

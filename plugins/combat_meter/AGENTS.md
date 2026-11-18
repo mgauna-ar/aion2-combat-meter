@@ -34,6 +34,11 @@ is switched off the pipeline feeds it nothing; switching it off ends its live fi
       seen spawning whose HP reaches 100,000 is never made a player, and one made a
       player before its HP came goes back to the enemy side when it does. Players
       had at most 40,703 there.
+    - **A summon an NPC owns is an enemy of its own** (`owned_by_npc`): its owner
+      spawned as an NPC, or has HP no player has, or was put on the enemy side.
+      `resolve` stops at it, so a hit on one of Ludra's adds is the add's damage
+      taken, not the boss's, its death is not the boss's kill, and the party's
+      effects on it are effects on an enemy.
   - Ids the meter was never told about get their side from the hits they trade: PvE
     damage only crosses sides.
   - Hits between two unknown ids are held (up to 4096) and settled when either end
@@ -107,7 +112,8 @@ is switched off the pipeline feeds it nothing; switching it off ends its live fi
   least `boss_min_max_hp`.
   - Calibrated on one dungeon: its bosses had 5.22M–9.86M max HP, its trash
     203k–435k. Undamaged adds and mechanics can share the boss's max HP; they never
-    win, having taken no damage.
+    win, having taken no damage. A damaged add its boss owns (Ludra's carry the
+    boss's max HP) loses to its owner at the same max HP, whatever damage either took.
   - Its name comes from its spawn's npc code (`npc_label`): "NPC #code" when the table
     does not list it, "#id" when it was never seen spawning. The label is saved with
     the fight, so a fight keeps the name it had.

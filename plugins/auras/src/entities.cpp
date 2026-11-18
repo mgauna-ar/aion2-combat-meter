@@ -107,10 +107,13 @@ bool Entities::is_enemy(EntityId id) const {
 
 EntityId Entities::target(Micros now) const {
     EntityId best = 0;
-    std::tuple<uint64_t, Micros> best_rank{0, 0};
+    std::tuple<uint64_t, bool, Micros> best_rank{0, false, 0};
     for (const auto& [id, s] : m_spawns) {
         if (s.last_hit == 0 || s.dead || s.aimed || now > s.last_hit + kTargetMemory) continue;
-        const std::tuple<uint64_t, Micros> rank{s.max_hp, s.last_hit};
+        // An add its boss owns (Ludra's, at the boss's own max HP) never takes the
+        // target from an owner of the same max HP: only enemies get a last hit, so
+        // any owner here is an NPC.
+        const std::tuple<uint64_t, bool, Micros> rank{s.max_hp, s.owner == 0, s.last_hit};
         if (best == 0 || rank > best_rank) {
             best = id;
             best_rank = rank;

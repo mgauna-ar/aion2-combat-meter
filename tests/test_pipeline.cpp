@@ -166,6 +166,24 @@ TEST_CASE(Pipeline, APluginSwitchedOffGetsNothing) {
     TEST_ASSERT(auras_only.snapshot(end).auras.seen == both.snapshot(end).auras.seen);
 }
 
+TEST_CASE(Pipeline, TheMapAndTheLocalNameDoNotHangOnTheMeter) {
+    // Every overlay's "only in dungeons" reads the map, and the dashboard the name.
+    const Session session = boss_session();
+    const Micros in_dungeon = kStartMs * kMicrosPerMilli + 30 * kMicrosPerSecond;
+    const Micros end = kStartMs * kMicrosPerMilli + 80 * kMicrosPerSecond;
+    PipelineOptions none = only(false, false);
+    none.plugins.ping = false;
+    none.plugins.combat_power = false;
+    Pipeline p(none);
+    uint32_t map_then = 0;
+    (void)replay(session.pcapng, p, [&](Micros ts) {
+        if (map_then == 0 && ts >= in_dungeon) map_then = p.snapshot(ts).map_id;
+    });
+    TEST_ASSERT_EQ(map_then, kDungeon);
+    TEST_ASSERT_EQ(p.snapshot(end).map_id, kTown);
+    TEST_ASSERT_EQ(p.snapshot(end).local_name, std::string("Ariel"));
+}
+
 TEST_CASE(Pipeline, SwitchingTheMeterOffEndsItsFightAndTheAurasForget) {
     const Session session = boss_session();
     const Micros cut = kStartMs * kMicrosPerMilli + from_seconds(session.truth.first_hit_s + 1.0);
