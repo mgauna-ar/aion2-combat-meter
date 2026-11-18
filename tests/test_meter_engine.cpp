@@ -540,6 +540,20 @@ TEST_CASE(Engine, SkillsCollectTheirVariantsHitsAndTicks) {
     TEST_ASSERT_EQ(me.hits.back, uint64_t{2});
 }
 
+TEST_CASE(Engine, APlayersMaxHitIsTheirOwnDirectHit) {
+    // Each skill's max counts direct hits; the player's is the biggest of their
+    // own. A DoT tick, or their summon's hit, was taken for it.
+    EncounterEngine e = setup();
+    e.on_event(ev(at_s(0), summon(0x4300, kMe)));
+    e.on_event(ev(at_s(1), hit(kMe, kBoss, 100)));
+    e.on_event(ev(at_s(2), dot(kMe, kBoss, 5000)));
+    e.on_event(ev(at_s(3), hit(0x4300, kBoss, 3000)));
+    const FightSummary s = e.current();
+    const CombatantTotals& me = row_of(s, kMe);
+    TEST_ASSERT_EQ(me.damage, uint64_t{8100});
+    TEST_ASSERT_EQ(me.max_hit, uint64_t{100});
+}
+
 TEST_CASE(Engine, AnIdentityWithAnUnknownClassKeepsTheSkillsClass) {
     EncounterEngine e = setup();
     e.on_event(ev(at_s(1), skilled(hit(kAlly, kBoss, 100), 16040020)));
@@ -867,4 +881,56 @@ TEST_CASE(Engine, ANewRunOfTheSameMapKeepsItsPlayersApart) {
     TEST_ASSERT_EQ(s.combatants.size(), size_t{2});
     TEST_ASSERT_EQ(damage_by_name(s, "Rhea"), std::optional<uint64_t>{1000});
     TEST_ASSERT_EQ(damage_by_name(s, "Kaisinel"), std::optional<uint64_t>{500});
+}
+
+TEST_CASE(Engine, AnIdHandedOnWithinAFightIsSomeoneElsesRow) {
+    // A teleport within a run, the same map over the same connection: the fight
+    // goes on, and the server may hand one player's id to another. Lumiel, down on
+    // 200, is on 400 after it, and Zikel on 200. Both rows carried id 200, Zikel's
+    // death was taken for Lumiel's still open, and so was named after her.
+    constexpr EntityId kLumielBefore = 200;
+    constexpr EntityId kLumielAfter = 400;
+    constexpr EntityId kZikel = 200;
+    EncounterEngine e;
+    e.on_event(ev_on(1, at_s(0), proto::MapLoad{1, kDungeon}));
+    e.on_event(ev_on(1, at_s(0), player(kMe, "Ariel", true)));
+    e.on_event(ev_on(1, at_s(0), player(kLumielBefore, "Lumiel")));
+    e.on_event(ev_on(1, at_s(0), npc(kBoss, kBossHp, 777)));
+    e.on_event(ev_on(1, at_s(1), hit(kLumielBefore, kBoss, 1000)));
+    e.on_event(ev_on(1, at_s(1.2), hit(kMe, kBoss, 10)));
+    e.on_event(ev_on(1, at_s(1.5), hit(kBoss, kLumielBefore, 5000)));
+    e.on_event(ev_on(1, at_s(1.8), hp(kLumielBefore, 0)));  // Lumiel dies
+    e.on_event(ev_on(1, at_s(2), proto::MapLoad{2, kDungeon}));
+    e.on_event(ev_on(1, at_s(2.1), player(kLumielAfter, "Lumiel")));
+    e.on_event(ev_on(1, at_s(2.1), player(kZikel, "Zikel")));
+    e.on_event(ev_on(1, at_s(3), hit(kZikel, kBoss, 50)));
+    e.on_event(ev_on(1, at_s(4), hp(kZikel, 0)));  // Zikel dies
+    e.on_event(ev_on(1, at_s(4.5), hit(kMe, kBoss, 10)));
+    TEST_ASSERT(e.in_fight());
+    e.end_fight(EndReason::Manual, at_s(5));
+    const FightSummary s = e.take_finished().at(0);
+
+    TEST_ASSERT_EQ(s.combatants.size(), size_t{3});
+    for (size_t i = 0; i < s.combatants.size(); ++i) {
+        for (size_t j = i + 1; j < s.combatants.size(); ++j) TEST_ASSERT(s.combatants[i].id != s.combatants[j].id);
+    }
+    // The first to hold the id keeps it.
+    TEST_ASSERT_EQ(row_of(s, kLumielBefore).name, std::string("Lumiel"));
+    TEST_ASSERT_EQ(damage_by_name(s, "Zikel"), std::optional<uint64_t>{50});
+
+    TEST_ASSERT(s.detail != nullptr);
+    const auto& deaths = s.detail->deaths;
+    TEST_ASSERT_EQ(deaths.size(), size_t{2});
+    TEST_ASSERT_EQ(deaths[0].name, std::string("Lumiel"));
+    TEST_ASSERT_EQ(deaths[0].player, kLumielBefore);
+    TEST_ASSERT_FALSE(deaths[0].up());
+    TEST_ASSERT(deaths[0].killing_blow() != nullptr);
+    TEST_ASSERT_EQ(deaths[0].killing_blow()->amount, uint64_t{5000});
+    TEST_ASSERT_EQ(deaths[1].name, std::string("Zikel"));
+    TEST_ASSERT(deaths[1].player != kLumielBefore);
+    TEST_ASSERT_EQ(deaths[1].player, row_of(s, deaths[1].player).id);
+    // What hit Lumiel on that id before is not Zikel's.
+    TEST_ASSERT(deaths[1].recap.empty());
+    // Each row has its own line on the timeline.
+    TEST_ASSERT_EQ(s.detail->timeline.rows.size(), size_t{3});
 }

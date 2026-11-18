@@ -12,7 +12,9 @@
 #include "capture/file_source.hpp"
 #include "capture/os/npcap_source.hpp"
 #include "common/time_format.hpp"
+#include "protocol/entity_id.hpp"
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cmath>
@@ -824,9 +826,27 @@ TEST_CASE(DisplayFormat, TheLocalPlayerAlwaysShows) {
     TEST_ASSERT(ranks(shown_rows(rows, 3, true)) == (Ranks{{0, 1}, {1, 2}, {5, 6}}));
     TEST_ASSERT(ranks(shown_rows(rows, 1, false)) == (Ranks{{5, 5}}));
     TEST_ASSERT(ranks(shown_rows(rows, 8, false)).size() == 5);
-    // A local player who dealt no damage is ranked with the healers.
+    // A local player who dealt no damage still shows, ranked below everyone who did,
+    // with the Heal column off too.
     rows[5].damage = 0;
-    TEST_ASSERT(ranks(shown_rows(rows, 3, false)) == (Ranks{{0, 1}, {1, 2}, {3, 3}}));
+    TEST_ASSERT(ranks(shown_rows(rows, 3, false)) == (Ranks{{0, 1}, {1, 2}, {5, 5}}));
+    TEST_ASSERT(ranks(shown_rows(rows, 8, false)) == (Ranks{{0, 1}, {1, 2}, {3, 3}, {4, 4}, {5, 5}}));
+    TEST_ASSERT(ranks(shown_rows(rows, 8, true)).size() == 6);
+}
+
+// README: "Your own row always shows on the overlay". A healer who only healed,
+// with the Heal column off, still has theirs.
+TEST_CASE(DisplayFormat, ALocalPlayerWhoOnlyHealedShows) {
+    std::vector<meter::CombatantTotals> rows(2);
+    rows[0].id = 1;
+    rows[0].damage = 1000;
+    rows[1].id = 2;
+    rows[1].is_local = true;
+    rows[1].healing = 500;
+    const auto shown = shown_rows(rows, 8, false);
+    TEST_ASSERT_EQ(shown.size(), size_t{2});
+    TEST_ASSERT_EQ(shown[1].index, size_t{1});
+    TEST_ASSERT_EQ(shown[1].rank, 2);
 }
 
 TEST_CASE(AppRuntime, MissingCaptureFileFailsToStart) {
@@ -893,6 +913,56 @@ TEST_CASE(AppRuntime, NewSettingsReachTheEngine) {
     }));
     runtime.stop();
     TEST_ASSERT(runtime.history().empty());
+}
+
+TEST_CASE(AppRuntime, QuittingSavesTheFightUnderWay) {
+    // Exit and Update & restart stop the runtime with the fight still live: a boss
+    // fight is, for kill_grace_s after the kill, and any for its idle wait. It ends
+    // and is saved, as switching the meter off would.
+    using namespace test::synthetic;
+    ScratchDir dir("aion2_test_runtime_quit");
+    std::vector<std::pair<double, Bytes>> script;
+    for (int i = 0; i <= 30 * 20; ++i) script.emplace_back(i * 0.05, heartbeat(kStartMs + static_cast<uint64_t>(i) * 50));
+    script.emplace_back(0.001, opcode_frame(proto::opcode::OwnCharacter, own_identity_body(kMe, "Ariel", 0x0123, 7)));
+    script.emplace_back(0.002, opcode_frame(proto::opcode::MapLoad, map_load_body(1, kDungeon)));
+    SpawnSpec boss;
+    boss.raw_id = kBossRaw;
+    boss.npc_code = kBossNpc;
+    boss.cur_hp = boss.max_hp = kBossHp;
+    script.emplace_back(0.006, opcode_frame(proto::opcode::Spawn, spawn_body(boss)));
+    // 25 s of hits on a boss left standing, the capture ending 5 s later.
+    for (int t = 1; t <= 25; ++t) {
+        DamageSpec d;
+        d.target = static_cast<uint64_t>(proto::normalize_entity_id(kBossRaw));
+        d.actor = kMe;
+        d.skill = 15210000;
+        d.amount = 1000;
+        script.emplace_back(static_cast<double>(t), opcode_frame(proto::opcode::Damage, damage_body({d})));
+    }
+    std::stable_sort(script.begin(), script.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
+    SessionWriter w;
+    for (const auto& [t, frame] : script) w.at(t, frame);
+    const Bytes capture = w.finish();
+    const auto file = dir.path / "fight.pcapng";
+    {
+        std::ofstream out(file, std::ios::binary);
+        out.write(reinterpret_cast<const char*>(capture.data()), static_cast<std::streamsize>(capture.size()));
+    }
+
+    AppRuntime runtime(AppSettings{}, dir.path / "data");
+    std::string error;
+    TEST_ASSERT(runtime.start(std::make_unique<capture::FileSource>(file, 0.0), error));
+    TEST_ASSERT(wait_for([&] {
+        const auto snap = runtime.snapshot();
+        return runtime.source_finished() && snap != nullptr && snap->fight.live && snap->fight.duration_s >= 24.0;
+    }));
+    TEST_ASSERT(runtime.history().empty());
+    runtime.stop();
+    const auto saved = meter::HistoryStore(runtime.history_dir()).load_index();
+    TEST_ASSERT_EQ(saved.size(), size_t{1});
+    TEST_ASSERT_EQ(saved[0].total_damage, uint64_t{25'000});
+    TEST_ASSERT(saved[0].end_reason == meter::EndReason::Manual);
+    TEST_ASSERT_EQ(runtime.history().size(), size_t{1});
 }
 
 TEST_CASE(OverlayVisibility, CombatOnlyKeepsItUpAfterAFight) {

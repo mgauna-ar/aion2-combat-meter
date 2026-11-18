@@ -89,8 +89,9 @@ std::vector<ShownRow> shown_rows(const std::vector<meter::CombatantTotals>& rows
     const auto limit = static_cast<size_t>(max_rows);
     int rank = 0;
     for (size_t i = 0; i < rows.size(); ++i) {
-        // Players who only healed or were hit rank below everyone who dealt damage.
-        if (rows[i].damage == 0 && !with_healers) continue;
+        // Players who only healed or were hit rank below everyone who dealt damage,
+        // and show only with the healers; the local player always does.
+        if (rows[i].damage == 0 && !with_healers && !rows[i].is_local) continue;
         ++rank;
         if (out.size() < limit) {
             out.push_back({i, rank});

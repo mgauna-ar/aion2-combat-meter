@@ -4,7 +4,9 @@
 #include "capture/capture_file.hpp"
 #include "game/skill_names.hpp"
 #include "meter/fight_detail.hpp"
+#include "meter/history_store.hpp"
 #include "pipeline/pipeline.hpp"
+#include "protocol/entity_id.hpp"
 
 #include <algorithm>
 #include <functional>
@@ -201,6 +203,70 @@ TEST_CASE(Pipeline, SwitchingTheMeterOffEndsItsFightAndTheAurasForget) {
     TEST_ASSERT_EQ(fights.size(), size_t{1});
     TEST_ASSERT(fights[0].end_reason == meter::EndReason::Manual);
     TEST_ASSERT(fights[0].total_damage < session.truth.boss_damage);
+}
+
+TEST_CASE(Pipeline, TheMeterBackOnIsWhereTheGameIs) {
+    // On in a dungeon, off across a load into the open world, back on there. It
+    // used to keep the dungeon: the open-world fight was filed under it (so
+    // save_only_dungeons kept it), and a stranger counted, as every player does in
+    // a dungeon. The local player is on a new id there, named while it was off.
+    constexpr uint64_t kMeThere = 1101;
+    constexpr uint64_t kStranger = 1500;
+    constexpr uint64_t kMobRaw = 2'000'500;
+    std::vector<std::pair<double, Bytes>> script;
+    for (int i = 0; i <= 60 * 20; ++i) script.emplace_back(i * 0.05, heartbeat(kStartMs + static_cast<uint64_t>(i) * 50));
+    script.emplace_back(0.001, opcode_frame(proto::opcode::OwnCharacter, own_identity_body(kMe, "Ariel", 0x0123, 7)));
+    script.emplace_back(0.002, opcode_frame(proto::opcode::MapLoad, map_load_body(1, kDungeon)));
+    script.emplace_back(20.0, opcode_frame(proto::opcode::MapLoad, map_load_body(2, kTown)));
+    script.emplace_back(20.05, opcode_frame(proto::opcode::OwnCharacter, own_identity_body(kMeThere, "Ariel", 0x0123, 7)));
+    script.emplace_back(20.1, opcode_frame(proto::opcode::OtherPlayer, identity_body(kStranger, "Strangr", 0x0123, 3)));
+    SpawnSpec mob;
+    mob.raw_id = kMobRaw;
+    mob.cur_hp = mob.max_hp = 200'000;
+    script.emplace_back(20.2, opcode_frame(proto::opcode::Spawn, spawn_body(mob)));
+    const auto target = static_cast<uint64_t>(proto::normalize_entity_id(kMobRaw));
+    for (int t = 31; t <= 55; ++t) {
+        DamageSpec mine;
+        mine.target = target;
+        mine.actor = kMeThere;
+        mine.skill = 15210000;
+        mine.amount = 100;
+        DamageSpec theirs = mine;
+        theirs.actor = kStranger;
+        theirs.skill = 11010000;
+        theirs.amount = 900;
+        script.emplace_back(static_cast<double>(t), opcode_frame(proto::opcode::Damage, damage_body({mine})));
+        script.emplace_back(t + 0.01, opcode_frame(proto::opcode::Damage, damage_body({theirs})));
+    }
+    std::stable_sort(script.begin(), script.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
+    SessionWriter w;
+    for (const auto& [t, frame] : script) w.at(t, frame);
+
+    Pipeline p;
+    const Micros off_at = kStartMs * kMicrosPerMilli + from_seconds(10.0);
+    const Micros on_at = kStartMs * kMicrosPerMilli + from_seconds(30.0);
+    int step = 0;
+    const auto fights = replay(w.finish(), p, [&](Micros ts) {
+        if (step == 0 && ts >= off_at) {
+            p.set_plugins(aion2::plugins::PluginSwitches{false, false}, ts);
+            step = 1;
+        } else if (step == 1 && ts >= on_at) {
+            p.set_plugins(aion2::plugins::PluginSwitches{true, false}, ts);
+            step = 2;
+        }
+    });
+    TEST_ASSERT_EQ(step, 2);
+    TEST_ASSERT_EQ(p.engine().map_id(), kTown);
+    TEST_ASSERT_EQ(fights.size(), size_t{1});
+    const meter::FightSummary& f = fights[0];
+    TEST_ASSERT_EQ(f.map_id, kTown);
+    TEST_ASSERT_EQ(f.combatants.size(), size_t{1});
+    TEST_ASSERT_EQ(f.combatants[0].name, std::string("Ariel"));
+    TEST_ASSERT(f.combatants[0].is_local);
+    TEST_ASSERT_EQ(f.total_damage, uint64_t{25 * 100});
+    meter::MeterSettings dungeons_only;
+    dungeons_only.save_only_dungeons = true;
+    TEST_ASSERT_FALSE(meter::worth_saving(f, dungeons_only));
 }
 
 TEST_CASE(Pipeline, ThePingPluginReadsThePongsAgainstTheCounter) {

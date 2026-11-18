@@ -95,6 +95,17 @@ void AppRuntime::run() {
             last_publish = now;
         }
     }
+    // Quitting, or restarting into an update, ends the fight under way as switching
+    // the meter off does, and saves it: a boss fight is still live for kill_grace_s
+    // after the kill, and any fight for its idle wait. What is still queued goes in
+    // first; the queue is closed, so that is all there is.
+    while (auto pkt = m_queue.pop_for(std::chrono::milliseconds(0))) {
+        if (m_recorder.is_open()) m_recorder.write(pkt->link_type, pkt->ts, pkt->data);
+        m_pipeline.on_packet(pkt->link_type, pkt->data, pkt->ts);
+        last_packet = std::max(last_packet, pkt->ts);
+    }
+    m_pipeline.end_fight(meter::EndReason::Manual, last_packet);
+    save_finished();
     if (m_recorder.is_open()) m_recorder.close();
 }
 

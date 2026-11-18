@@ -213,7 +213,7 @@ plugin; capture + the plugins ← pipeline ← app. No plugin depends on another
 |---|---|---|
 | Capture (one per Npcap adapter, or the FileSource thread) | its pcap handle | `BoundedQueue<OwnedPacket>` (8192), `try_push` only. A full queue drops and counts, and the drop shows up as a TCP gap. Each Npcap thread also samples the capture clock against the performance counter (`ClockOffsetEstimator`, under its own mutex), which the engine reads each tick. |
 | Npcap watcher | the loopback filter text | a mutex plus an atomic generation counter. Each capture thread applies a new filter itself between `pcap_next_ex` calls, because a pcap handle is not shared. |
-| Engine (`AppRuntime::run`) | `Pipeline`, `HistoryStore` writes, the recorder | publishes `LiveSnapshot` into a `SnapshotSlot` every 200 ms of capture time, and whenever the queue runs dry. A fight's `FightDetail` is shared, never copied: a snapshot holds a pointer to it. |
+| Engine (`AppRuntime::run`) | `Pipeline`, `HistoryStore` writes, the recorder | publishes `LiveSnapshot` into a `SnapshotSlot` every 200 ms of capture time, and whenever the queue runs dry. A fight's `FightDetail` is shared, never copied: a snapshot holds a pointer to it. Stopped (Exit, Update & restart), it drains the closed queue, ends the live fight (`Manual`, at the last packet's time) and saves it before it returns. |
 | UI (`wWinMain`) | the five windows (the app window and the meter, aura, ping and combat power overlays, each with its own ImGui context), the tray, `AppSettings`, the `Updater` | reads snapshots and the history index (copied under a mutex). Requests go to the engine as atomics: end fight, recording on/off, clear history. New meter and history settings and the plugin switches go through `AppRuntime::update_settings`, under the mutex; the engine applies them on its next pass. |
 | Updater worker (one at a time) | the check or the download | `Updater::status()`, copied under its mutex, which the UI reads each frame. Staged files are moved into place on the UI thread (`apply_staged`). `stop()` cancels a download and joins, before the engine stops. |
 
@@ -797,6 +797,12 @@ capture, one tray and one updater, around them.
   takes effect on the engine thread through `AppRuntime::update_settings`
   (`Pipeline::set_plugins`): the meter ends its live fight, the auras, the ping and
   the combat power forget everything.
+  - **The meter switched back on is handed where it is.** While it is off the
+    pipeline keeps the last map load, the last own `33 36` and the last party roster
+    (`keep_for_meter`), and hands them over, in the order they came, as it comes back
+    on. It kept the map it was switched off on: back on in the open world after a
+    dungeon, its fights were filed under the dungeon and strangers counted as party.
+    The rest it learns as a meter started mid-visit does.
 - **A plugin's page** opens with its header and switch, then its own settings, then its
   overlay's, as ffxiv-hub orders them. Overlays it draws are separate windows of the
   app (`win32/overlay_window`), each shown by its plugin's switch and its own hide

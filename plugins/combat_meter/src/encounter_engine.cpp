@@ -6,9 +6,11 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <map>
 #include <tuple>
 #include <type_traits>
+#include <unordered_set>
 #include <utility>
 #include <variant>
 
@@ -242,7 +244,7 @@ void EncounterEngine::book_heal(EntityId actor, EntityId target, uint64_t amount
     if (record && !m_registry.in_party(target)) return;
     if (!counts_in_fight(healer)) return;
     m_registry.on_skill_class(healer, game::class_of_skill(skill));
-    Accum& acc = m_fight->players[row_key(healer)];
+    Accum& acc = fight_row(healer);
     acc.healing += amount;
     ++acc.heal_hits;
     const uint32_t key = game::skill_key(skill);
@@ -265,7 +267,7 @@ void EncounterEngine::book_taken(EntityId actor, EntityId target, uint64_t amoun
     const EntityId attacker = m_registry.resolve(actor);
     if (m_registry.side_or_guess(attacker) != Side::Enemy) return;
     if (!counts_in_fight(victim)) return;
-    Accum& acc = m_fight->players[row_key(victim)];
+    Accum& acc = fight_row(victim);
     acc.taken += amount;
     if (direct != nullptr) count(acc.taken_hits, *direct);
     const Actor* a = m_registry.find(attacker);
@@ -314,17 +316,18 @@ void EncounterEngine::credit(EntityId actor, EntityId target, uint64_t amount, u
     }
 
     Fight& fight = *m_fight;
-    const auto [row, added] = fight.players.try_emplace(row_key(player));
-    Accum& acc = row->second;
+    bool added = false;
+    Accum& acc = fight_row(player, &added);
     // A first hit can make a player count: their presses so far go in with it.
     if (added) book_pending_casts();
     acc.damage += amount;
-    acc.max_hit = std::max(acc.max_hit, amount);
     const uint32_t key = game::skill_key(skill);
     SkillTotals& sk = acc.skills[key];
     sk.code = key;
     sk.damage += amount;
     if (direct != nullptr) {
+        // Their biggest hit is one of their own: a tick or a summon's is not.
+        if (actor == player) acc.max_hit = std::max(acc.max_hit, amount);
         count(acc.hits, *direct);
         sk.min_hit = sk.hits.hits == 0 ? amount : std::min(sk.min_hit, amount);
         sk.max_hit = std::max(sk.max_hit, amount);
@@ -583,16 +586,50 @@ FightSummary EncounterEngine::summarize(const Fight& fight, bool live, EndReason
         EntityId id{0};
         CharacterId who{0};
         bool local{false};
+        /// Its rows' ids, and when the first of its rows came into the fight.
+        std::vector<EntityId> ids;
+        uint64_t first{std::numeric_limits<uint64_t>::max()};
         Accum acc;
     };
     std::unordered_map<uint64_t, Group> groups;
     for (const auto& [key, acc] : fight.players) {
         const CharacterId who = key.who != 0 ? key.who : m_registry.character_of(key.id);
-        Group& g = groups.try_emplace(group_key(key.id, key.who), Group{key.id, who, false, {}}).first->second;
-        // The lowest id, so a row keeps its id from one snapshot to the next.
-        g.id = std::min(g.id, key.id);
+        Group& g = groups.try_emplace(group_key(key.id, key.who)).first->second;
+        g.who = who;
+        g.ids.push_back(key.id);
+        g.first = std::min(g.first, acc.seq);
         g.local = g.local || key.id == m_registry.local_player();
         g.acc.merge(acc);
+    }
+    // Each row's id is its lowest, so a row keeps its id from one snapshot to the
+    // next. The server hands ids on, and a reload within a run can give one player's
+    // old id to another in the same fight: the row that came first keeps it, and the
+    // other takes its next, or one no row has. Two rows never share an id.
+    {
+        std::vector<Group*> by_first;
+        by_first.reserve(groups.size());
+        for (auto& [gk, g] : groups) by_first.push_back(&g);
+        std::sort(by_first.begin(), by_first.end(), [](const Group* a, const Group* b) { return a->first < b->first; });
+        std::unordered_set<EntityId> taken;
+        // From the top of the range, far above any entity id (those over 1,000,000
+        // are folded), and never one of this fight's rows.
+        EntityId spare = std::numeric_limits<EntityId>::max();
+        for (Group* g : by_first) {
+            std::sort(g->ids.begin(), g->ids.end());
+            const auto free = std::find_if(g->ids.begin(), g->ids.end(),
+                                           [&](EntityId id) { return !taken.contains(id); });
+            if (free != g->ids.end()) {
+                g->id = *free;
+            } else {
+                const auto is_a_rows = [&](EntityId id) {
+                    return std::any_of(fight.players.begin(), fight.players.end(),
+                                       [&](const auto& row) { return row.first.id == id; });
+                };
+                while (taken.contains(spare) || is_a_rows(spare)) --spare;
+                g->id = spare;
+            }
+            taken.insert(g->id);
+        }
     }
     // Presses join the rows their players have; a player who only pressed has none.
     for (const auto& [key, by_skill] : fight.casts) {
@@ -737,14 +774,26 @@ void EncounterEngine::sample_hp(EntityId id, uint64_t hp, std::optional<uint64_t
     }
 }
 
+EncounterEngine::Accum& EncounterEngine::fight_row(EntityId player, bool* added) {
+    const auto [it, inserted] = m_fight->players.try_emplace(row_key(player));
+    if (inserted) it->second.seq = m_fight->next_row++;
+    if (added != nullptr) *added = inserted;
+    return it->second;
+}
+
 void EncounterEngine::push_recap(EntityId target, const RecapSample& sample) {
     if (!m_fight) return;
+    const CharacterId who = m_registry.character_of(target);
     auto it = m_fight->recaps.find(target);
     if (it == m_fight->recaps.end()) {
         if (m_fight->recaps.size() >= kMaxRecapRings) return;
-        it = m_fight->recaps.emplace(target, RecapRing{}).first;
+        it = m_fight->recaps.emplace(target, Fight::Recap{}).first;
     }
-    it->second.push(sample);
+    Fight::Recap& recap = it->second;
+    // What landed on the id's last character is not this one's.
+    if (recap.who != 0 && who != 0 && recap.who != who) recap.ring = RecapRing{};
+    if (who != 0) recap.who = who;
+    recap.ring.push(sample);
 }
 
 void EncounterEngine::record_death(EntityId id, Micros ts) {
@@ -754,13 +803,14 @@ void EncounterEngine::record_death(EntityId id, Micros ts) {
     const CharacterId who = m_registry.character_of(id);
     for (const Fight::Death& d : m_fight->deaths) {
         // Down already: a second 0 is the same death.
-        if (d.up_ts == 0 && (d.key.id == id || (who != 0 && d.key.who == who))) return;
+        if (d.up_ts == 0 && same_player(d.key, id, who)) return;
     }
     Fight::Death d;
     d.key = RowKey{id, who};
     d.ts = ts;
-    if (const auto ring = m_fight->recaps.find(id); ring != m_fight->recaps.end()) {
-        for (const RecapSample& sample : recap_before(ring->second, ts)) {
+    if (const auto it = m_fight->recaps.find(id);
+        it != m_fight->recaps.end() && (it->second.who == 0 || who == 0 || it->second.who == who)) {
+        for (const RecapSample& sample : recap_before(it->second.ring, ts)) {
             RecapEvent e;
             e.before_s = to_seconds(ts - sample.ts);
             e.kind = sample.kind;
@@ -780,7 +830,7 @@ bool EncounterEngine::just_died(EntityId id, Micros ts) const {
     const CharacterId who = m_registry.character_of(id);
     for (auto it = m_fight->deaths.rbegin(); it != m_fight->deaths.rend(); ++it) {
         if (it->up_ts != 0) continue;
-        if (it->key.id == id || (who != 0 && it->key.who == who)) return ts < it->ts + kInFlight;
+        if (same_player(it->key, id, who)) return ts < it->ts + kInFlight;
     }
     return false;
 }
@@ -790,7 +840,7 @@ void EncounterEngine::note_alive(EntityId id, Micros ts, bool by_hit) {
     const CharacterId who = m_registry.character_of(id);
     for (auto it = m_fight->deaths.rbegin(); it != m_fight->deaths.rend(); ++it) {
         if (it->up_ts != 0) continue;
-        if (it->key.id == id || (who != 0 && it->key.who == who)) {
+        if (same_player(it->key, id, who)) {
             if (by_hit && ts < it->ts + kInFlight) return;
             it->up_ts = std::max(ts, it->ts);
             return;

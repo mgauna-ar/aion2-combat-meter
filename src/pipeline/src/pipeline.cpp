@@ -1,5 +1,8 @@
 #include "pipeline/pipeline.hpp"
 
+#include <utility>
+#include <variant>
+
 namespace aion2::pipeline {
 
 Pipeline::Pipeline(PipelineOptions options)
@@ -29,7 +32,11 @@ void Pipeline::on_frame(const proto::Frame& frame) {
     for (const auto& e : m_events) {
         if (m_event_observer) m_event_observer(e);
         note_where(e);
-        if (m_plugins.combat_meter) m_engine.on_event(e);
+        if (m_plugins.combat_meter) {
+            m_engine.on_event(e);
+        } else {
+            keep_for_meter(e);
+        }
         if (m_plugins.auras) m_auras.on_event(e);
         if (m_plugins.ping) m_ping.on_event(e);
         if (m_plugins.combat_power) m_power.on_event(e);
@@ -42,6 +49,17 @@ void Pipeline::note_where(const proto::ParsedEvent& e) {
     } else if (const auto* id = std::get_if<proto::Identity>(&e.event)) {
         if (id->own && !id->scanned && !id->name.empty()) m_local_name = id->name;
     }
+}
+
+void Pipeline::keep_for_meter(const proto::ParsedEvent& e) {
+    const auto* id = std::get_if<proto::Identity>(&e.event);
+    const bool where = std::holds_alternative<proto::MapLoad>(e.event) ||
+                       std::holds_alternative<proto::PartyRoster>(e.event) ||
+                       (id != nullptr && id->own && !id->scanned);
+    if (!where) return;
+    // Only the last of each kind: one says all an earlier one did.
+    std::erase_if(m_kept_for_meter, [&](const proto::ParsedEvent& kept) { return kept.event.index() == e.event.index(); });
+    m_kept_for_meter.push_back(e);
 }
 
 void Pipeline::tick(Micros now) {
@@ -66,6 +84,11 @@ void Pipeline::set_plugins(const aion2::plugins::PluginSwitches& on, Micros now)
         end_fight(meter::EndReason::Manual, now);
         // It will miss what is put on and taken off meanwhile.
         m_engine.forget_effects();
+        m_kept_for_meter.clear();
+    } else if (!m_plugins.combat_meter && on.combat_meter) {
+        // Back on: a map loaded meanwhile is a map change to it, as it would have
+        // been; the rest it learns as a meter started mid-visit does.
+        for (const proto::ParsedEvent& e : std::exchange(m_kept_for_meter, {})) m_engine.on_event(e);
     }
     if (m_plugins.auras && !on.auras) m_auras.clear();
     if (m_plugins.ping && !on.ping) m_ping.clear();

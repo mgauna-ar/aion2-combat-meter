@@ -54,8 +54,9 @@ struct ShownRow {
 };
 
 /// The overlay's rows: the best `max_rows`, ranked among those who dealt damage
-/// (or everyone, `with_healers`). The local player always shows: ranked below
-/// them, in a crowd, they take the last place, with their own rank.
+/// (or everyone, `with_healers`). The local player always shows, with no damage
+/// too (ranked below everyone who dealt some): ranked below the rows shown, in a
+/// crowd, they take the last place, with their own rank.
 [[nodiscard]] std::vector<ShownRow> shown_rows(const std::vector<meter::CombatantTotals>& rows, int max_rows,
                                                bool with_healers);
 

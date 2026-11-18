@@ -14,7 +14,12 @@ and the Combat Meter page (`src/app/src/ui/view_meter.cpp`).
 **What it may use:** the protocol layer and the game data (`src/game`: skill, npc and
 map names, classes). Never the Auras plugin: the two do not know of each other. When it
 is switched off the pipeline feeds it nothing; switching it off ends its live fight
-(`EndReason::Manual`), which is saved like any other.
+(`EndReason::Manual`), which is saved like any other. Switched back on, it is handed
+the last map load, own 33 36 and party roster it missed, in the order they came
+(`Pipeline::keep_for_meter`), so a map loaded meanwhile is a map change to it, as it
+would have been; the rest it learns as a meter started mid-visit does. Quitting the
+app, or restarting it into an update, ends the live fight the same way and saves it
+(`AppRuntime::run`, once stopped).
 
 ---
 
@@ -54,6 +59,12 @@ is switched off the pipeline feeds it nothing; switching it off ends its live fi
     - a hit goes to its id's row for the character the id was then, and the summary
       joins a character's rows. An id named after it hit joins its character. Ids are
       never joined to each other, so two characters never share a row;
+    - **nor a row's id** (`CombatantTotals::id`, which the page's selection, the
+      timeline's rows and the deaths go by). A row's id is the lowest of its ids,
+      unless a row that came into the fight first has it: a reload within a run
+      keeps the fight going, and the server can hand one player's id to another
+      there. The later row takes its next id, or one no row has, counted down from
+      the top of the range;
     - a map load, or a reload within a run, leaves players stale rather than
       dropping them, since their names may have come before it. A spawn on a stale id makes it the spawn, and a character named on a
       new id leaves its stale one. On the map they were named on, two ids can share a
@@ -87,6 +98,9 @@ is switched off the pipeline feeds it nothing; switching it off ends its live fi
   perfect (PERF), double (DOUB), back (BACK), front (FRNT), multi-hits (MULT: a
   record with the 0x20 tail, one hit however many strikes) and blocked (BLOC).
   History files before the block was known saved it as `"parry"`, which still loads.
+- **Max hit:** a skill's biggest direct hit, and a player's their biggest own direct
+  hit: a DoT tick, or their summon's hit, is not theirs (a summon's skill row keeps
+  its own max).
 - **Aimed mechanics:** a spawn aimed at a player (Spawn::aimed_at), such as a trap the
   party breaks, takes no damage that counts: hits on it are neither damage nor hits,
   and never start or extend a fight, as in the game's window. Its hits on players are
@@ -98,7 +112,8 @@ is switched off the pipeline feeds it nothing; switching it off ends its live fi
   comes over a new connection: running a dungeon again, straight back in; not over the
   same one, a teleport or a revive within the run), idle time with no party hit (`idle_timeout_s`, or
   `boss_idle_timeout_s` while a boss stands), no traffic (`capture_lost_s`), a wipe
-  (`wipe_detection`, off: see below) or by hand.
+  (`wipe_detection`, off: see below) or by hand (the hotkey, switching the plugin off,
+  quitting the app).
   - A wipe is every party member in the fight dead at once. A player is dead from
     00 8D HP 0 until HP above 0, or their own direct hit more than `kInFlight` (1 s)
     after (one in flight as they died proves nothing), and stays dead while their DoTs
@@ -180,8 +195,12 @@ is switched off the pipeline feeds it nothing; switching it off ends its live fi
     and not a stranger's (`counts_in_fight`). Repeated zeros while down are one death;
   - up again at HP above 0, or at their own direct hit more than `kInFlight` (1 s)
     after: one landed 55 ms after, already in flight, 3.9 s before their HP came back;
+  - a death is the character's (`same_player`): on an id the server handed on within
+    the fight, someone else's death, or their being up, is not this one's. By id only
+    while either is unnamed;
   - the recap: the newest 10 of the last 16 hits taken and heals received, within 12 s,
-    booked under the same filters as Damage Taken and Healing. The killing blow is the
+    booked under the same filters as Damage Taken and Healing, on the character who
+    died: what landed on the id's last owner is left out. The killing blow is the
     last damage in it;
   - a death adds no row: it keeps its own name and class;
   - checked on the second capture: 19 deaths in the last boss fight, every one up again
