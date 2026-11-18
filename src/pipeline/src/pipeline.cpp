@@ -18,6 +18,9 @@ void Pipeline::on_frame(const proto::Frame& frame) {
     const uint64_t decoded = stats.decoded;
     const uint64_t failed = stats.failed;
     const uint64_t unknown = stats.unknown;
+    // Before the parse: a frame the parser cannot read still says a connection is
+    // there (the first of a zone's new one is such a frame).
+    if (m_plugins.ping) m_ping.on_connection_seen(frame.connection);
     m_events.clear();
     m_parser.parse(frame, m_events);
     if (m_frame_observer) {
@@ -41,6 +44,10 @@ void Pipeline::on_frame(const proto::Frame& frame) {
         if (m_plugins.ping) m_ping.on_event(e);
         if (m_plugins.combat_power) m_power.on_event(e);
     }
+}
+
+void Pipeline::on_connection_closed(uint32_t connection, Micros ts) {
+    if (m_plugins.ping) m_ping.on_connection_closed(connection, ts);
 }
 
 void Pipeline::note_where(const proto::ParsedEvent& e) {

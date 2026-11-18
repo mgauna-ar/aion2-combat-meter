@@ -35,7 +35,8 @@ struct PingSecond {
     Micros ts{0};
     /// The ping as that second closed; negative for none.
     float ping_ms{-1.0f};
-    /// How late that second's latest heartbeat came, at worst (PingTracker, lateness).
+    /// How late that second's heartbeats came, at worst, or how late the next one
+    /// already was as the second closed, in a stall (PingTracker, lateness).
     float late_ms{0.0f};
 };
 
@@ -50,13 +51,15 @@ struct PingSnapshot {
     float min_ms{0.0f};
     float avg_ms{0.0f};
     float max_ms{0.0f};
-    /// The heartbeats' jitter; false before two of them.
+    /// The heartbeats' jitter; false before two of them, and once they have stopped
+    /// (the connection closed, or none for PingTracker::kHeartbeatsGone). In a stall
+    /// it is at least what the next heartbeat will make it.
     bool has_jitter{false};
     float jitter_ms{0.0f};
     /// Capture time of the latest heartbeat followed; 0 for none.
     Micros heartbeat_at{0};
     /// The last PingTracker::kGraphWindow, oldest first. A second with no heartbeat
-    /// has no entry.
+    /// has no entry, unless a stall passed through it.
     std::vector<PingSecond> seconds;
     uint64_t pongs{0};
     uint64_t rejected{0};
@@ -76,6 +79,9 @@ struct PingSnapshot {
  * - **Lateness** is a heartbeat's arrival less its server time, above the least
  *   that was over the last kBaselineWindow: the delay added to the usual one. It
  *   needs no counter, and shows a spike between two pongs.
+ * - **A stall** is a heartbeat overdue: by `now` it is already at least that late,
+ *   so the snapshot shows it as it lasts, and the seconds it passed through keep
+ *   it once the heartbeats come again.
  *
  * It follows one connection, the newest: entering a dungeon opens another, to
  * another server, and the old one's last frames are ignored.
@@ -92,11 +98,28 @@ public:
     /// A heartbeat whose server time is further than this from the capture's is not
     /// one (the decoder's own rule).
     static constexpr Micros kMaxClockGap = 86'400 * kMicrosPerSecond;
+    /// The server sends a heartbeat every 50 ms (19 to 20 a second in the captures).
+    static constexpr uint64_t kHeartbeatEveryMs = 50;
+    /// A heartbeat this late (above the baseline) and not yet come is a stall, shown
+    /// before it ends. Under it, a heartbeat shows its lateness as it arrives.
+    static constexpr Micros kStallAfter = 250 * kMicrosPerMilli;
+    /// Heartbeats missing longer than this have stopped: no stall is shown past it,
+    /// and the jitter goes. The connection closing, or a newer one opening, says so
+    /// at once.
+    static constexpr Micros kHeartbeatsGone = 30 * kMicrosPerSecond;
 
     /// Capture time less the performance counter's; nothing when there is no counter.
     void set_counter_offset(std::optional<Micros> offset) noexcept { m_offset = offset; }
     void on_pong(const proto::Pong& pong, uint32_t connection, Micros ts);
     void on_heartbeat(uint64_t server_ms, uint32_t connection, Micros ts);
+    /// The connection numbered `connection` closed (a FIN or an RST): nothing more
+    /// comes on it, so its silence is no stall.
+    void on_connection_closed(uint32_t connection, Micros ts);
+    /// A frame came on the connection numbered `connection`, whatever it held. A
+    /// newer one than the followed means the game has moved on: the old one's
+    /// silence is no stall, though its server may not close it. It is followed once
+    /// its first pong or heartbeat comes.
+    void on_connection_seen(uint32_t connection) noexcept;
     /// Drops what has left the windows.
     void tick(Micros now);
     void clear();
@@ -108,16 +131,28 @@ public:
     }
 
 private:
+    /// A pong, and what it gave.
     struct Sample {
         Micros ts{0};
         Micros rtt{0};
+        /// False for a pong that gave no ping (no counter, or rejected).
+        bool measured{true};
     };
 
     /// Whether an event of `connection` counts: a newer one takes over, an older
     /// one is done with.
     [[nodiscard]] bool follow(uint32_t connection);
-    /// The ping to draw at `at`: the latest, unless it is stale.
+    /// The ping to draw at `at`: the latest pong's by then, unless that one gave
+    /// none or it is stale.
     [[nodiscard]] float ping_at(Micros at) const noexcept;
+    /// The least delay of the baseline window; nothing before a heartbeat.
+    [[nodiscard]] std::optional<int64_t> least() const noexcept;
+    /// How late, in µs above the baseline, the heartbeat after the latest already is
+    /// at `at`, when that makes a stall (kStallAfter, kHeartbeatsGone); else nothing.
+    [[nodiscard]] std::optional<int64_t> stall_late(Micros at) const noexcept;
+    /// Appends the open second, and each after it up to `until` (exclusive) that a
+    /// stall passed through, each as it stood at its end or at `at`, the sooner.
+    void seconds_until(Micros until, Micros at, std::vector<PingSecond>& out) const;
 
     std::optional<Micros> m_offset;
     uint32_t m_connection{0};
@@ -128,12 +163,16 @@ private:
     double m_last_rejected_ms{0.0};
 
     // The connection's heartbeats.
+    /// The followed connection is done with: it closed, or a newer one opened.
+    bool m_ended{false};
     Micros m_prev_ts{0};
     uint64_t m_prev_server_ms{0};
     bool m_has_jitter{false};
     double m_jitter_ms{0.0};
     /// Arrival less server time, in µs: the least of the current half of the
-    /// baseline window and of the one before.
+    /// baseline window and of the one before. The halves run on the server's time,
+    /// so a stall does not age them: what was held up behind it is measured
+    /// against the delay before it.
     Micros m_half_start{0};
     std::optional<int64_t> m_least;
     std::optional<int64_t> m_least_before;

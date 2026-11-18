@@ -62,7 +62,11 @@ public:
 
     void on_stream_gap(uint64_t, Micros) override { m_decoder.on_gap(); }
 
-    void on_stream_closed(Micros) override {}
+    void on_stream_closed(Micros ts) override {
+        // Only a game connection's end means anything: the Ping plugin's silence is
+        // then no stall.
+        if (m_role == FlowRole::Game && m_out != nullptr) m_out->on_connection_closed(m_connection, ts);
+    }
 
     // proto::FrameSink
     void on_frame(const proto::Frame& frame) override {

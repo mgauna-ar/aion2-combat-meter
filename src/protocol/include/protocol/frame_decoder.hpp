@@ -3,6 +3,7 @@
 #include "common/micros.hpp"
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <span>
 #include <vector>
 
@@ -32,6 +33,12 @@ class FrameSink {
 public:
     virtual ~FrameSink() = default;
     virtual void on_frame(const Frame& frame) = 0;
+    /// The connection numbered `connection` (Frame::connection) closed, a FIN or an
+    /// RST, once every byte before it was delivered: nothing more comes on it.
+    virtual void on_connection_closed(uint32_t connection, Micros ts) {
+        (void)connection;
+        (void)ts;
+    }
 };
 
 struct DecoderStats {
@@ -84,6 +91,11 @@ public:
     /// True when `bytes` (11 or more) start with a heartbeat whose server time is
     /// within kClockToleranceMs of `ts`, or of any time this century when `ts` is 0.
     [[nodiscard]] static bool is_heartbeat_at(std::span<const uint8_t> bytes, Micros ts) noexcept;
+
+    /// The server time `frame` carries when it is a heartbeat: opcode 00 36, no flag,
+    /// an 8-byte body, and a time is_heartbeat_at() would take. Nothing for any other
+    /// frame, 00 36 or not. The one rule, for the decoder's count and the parser's event.
+    [[nodiscard]] static std::optional<uint64_t> heartbeat_server_ms(const Frame& frame) noexcept;
 
 private:
     enum class Step : uint8_t { Frame, NeedMore, Lost };

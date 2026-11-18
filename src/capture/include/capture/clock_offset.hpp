@@ -20,7 +20,9 @@ namespace aion2::capture {
  * against the wall clock once, and the two drift apart by tens of milliseconds an
  * hour.
  *
- * Capture threads sample; the engine thread reads.
+ * Capture threads sample; the engine thread reads. Each thread reads its counter
+ * before it takes the lock, so samples can come in a little out of order: one read
+ * before the current half began counts for the half before.
  */
 class ClockOffsetEstimator {
 public:

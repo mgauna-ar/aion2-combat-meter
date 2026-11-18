@@ -10,10 +10,15 @@ void ClockOffsetEstimator::sample(Micros packet_ts, Micros counter) noexcept {
     const Micros value = packet_ts - counter;
     const Micros half = kWindow / 2;
     std::lock_guard<std::mutex> lock(m_mutex);
-    if (m_current == 0 || counter < m_half_start) {
+    if (m_current == 0 || counter + half < m_half_start) {
+        // The first sample, or a counter gone far back: start over.
         m_half_start = counter;
         m_current = value;
         m_previous = 0;
+    } else if (counter < m_half_start) {
+        // Another capture thread read its counter before this half began and took
+        // the lock after: the sample is the half before's, and as good as any.
+        m_previous = std::max(m_previous, value);
     } else if (counter - m_half_start >= half) {
         // After a silence longer than the window the half before is too old to keep.
         m_previous = counter - m_half_start >= kWindow ? 0 : m_current;

@@ -495,3 +495,33 @@ TEST_CASE(ClockOffset, OldSamplesGiveWay) {
     e.sample(kOffset - 9'000 + kCounter + 10 * step, kCounter + 10 * step + 100);
     TEST_ASSERT_EQ(*e.offset(), kOffset - 9'100);
 }
+
+// Two capture threads: B reads its counter after A but takes the lock first,
+// opening a new half. A's sample, read before that half began, belongs to the half
+// before: it must not throw away the window's best for its one slow sample.
+TEST_CASE(ClockOffset, ASampleReadJustBeforeTheHalfCountsForTheOneBefore) {
+    ClockOffsetEstimator e;
+    constexpr Micros kOffset = 1'792'152'000'000'000ULL;
+    constexpr Micros kCounter = 3'600 * kMicrosPerSecond;
+    e.sample(kOffset + kCounter, kCounter + 40);
+    const Micros step = ClockOffsetEstimator::kWindow / 2 + kMicrosPerSecond;
+    // Thread B: read 10 us after its stamp. It opens a new half.
+    e.sample(kOffset + kCounter + step, kCounter + step + 10);
+    TEST_ASSERT_EQ(*e.offset(), kOffset - 10);
+    // Thread A: read 5 us before B did, after its packet had waited a millisecond.
+    e.sample(kOffset + kCounter + step + 5 - 1'000, kCounter + step + 5);
+    TEST_ASSERT_EQ(*e.offset(), kOffset - 10);
+    // The half B opened goes on as before.
+    e.sample(kOffset + kCounter + step + 50'000, kCounter + step + 50'004);
+    TEST_ASSERT_EQ(*e.offset(), kOffset - 4);
+}
+
+TEST_CASE(ClockOffset, ACounterGoneFarBackStartsOver) {
+    ClockOffsetEstimator e;
+    constexpr Micros kOffset = 1'792'152'000'000'000ULL;
+    constexpr Micros kCounter = 3'600 * kMicrosPerSecond;
+    e.sample(kOffset + kCounter, kCounter + 40);
+    // More than half a window back: not another thread's late sample.
+    e.sample(kOffset + 7'000'000 + kCounter / 2, kCounter / 2 + 100);
+    TEST_ASSERT_EQ(*e.offset(), kOffset + 7'000'000 - 100);
+}

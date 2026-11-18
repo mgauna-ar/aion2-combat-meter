@@ -78,6 +78,20 @@ License).
      `AppRuntime` is the only place that turns wall time into ticks. While packets are
      queued, it uses their time, never the source's clock, which runs ahead of a
      backlog.
+   - **Quiet time runs on from the latest packet.** With the queue empty, time moves
+     on from that packet's stamp by as much as the source's clock has run since the
+     engine took it off the queue, never to the source's clock itself: live,
+     `NpcapSource::now()` is the wall clock, while Npcap stamps packets on the
+     performance counter, and the gap between the two read as quiet time (a stall to
+     the Ping plugin, a reassembly hole expiring early). Taken at dequeue, a backlog
+     makes it trail, never lead. It never goes back: a step back of the source's
+     clock holds it still. Before the first packet there is no capture time; the
+     source's clock only names a recording, and the pipeline is not ticked.
+   - **What is left of the two clocks:** a forward step of the wall clock (a time
+     sync) while the queue is empty still shows live as that much quiet time, and
+     time then holds there until the packets' stamps catch up. A Windows-only
+     `NpcapSource::now()` on the capture's own clock (the performance counter plus
+     the counter offset) would close it.
 3. **Nothing throws on wire data.**
    - `ByteReader` fails sticky and returns zeros.
    - Every length is bounded: frames 1 MiB, LZ4 output 4 MiB, pcap blocks 64 MiB.
@@ -211,9 +225,9 @@ plugin; capture + the plugins ← pipeline ← app. No plugin depends on another
 
 | Thread | Owns | Talks through |
 |---|---|---|
-| Capture (one per Npcap adapter, or the FileSource thread) | its pcap handle | `BoundedQueue<OwnedPacket>` (8192), `try_push` only. A full queue drops and counts, and the drop shows up as a TCP gap. Each Npcap thread also samples the capture clock against the performance counter (`ClockOffsetEstimator`, under its own mutex), which the engine reads each tick. |
+| Capture (one per Npcap adapter, or the FileSource thread) | its pcap handle | `BoundedQueue<OwnedPacket>` (8192), `try_push` only. A full queue drops and counts, and the drop shows up as a TCP gap. Each Npcap thread also samples the capture clock against the performance counter (`ClockOffsetEstimator`, under its own mutex), which the engine reads before each packet and each tick. |
 | Npcap watcher | the loopback filter text | a mutex plus an atomic generation counter. Each capture thread applies a new filter itself between `pcap_next_ex` calls, because a pcap handle is not shared. |
-| Engine (`AppRuntime::run`) | `Pipeline`, `HistoryStore` writes, the recorder | publishes `LiveSnapshot` into a `SnapshotSlot` every 200 ms of capture time, and whenever the queue runs dry. A fight's `FightDetail` is shared, never copied: a snapshot holds a pointer to it. Stopped (Exit, Update & restart), it drains the closed queue, ends the live fight (`Manual`, at the last packet's time) and saves it before it returns. |
+| Engine (`AppRuntime::run`) | `Pipeline`, `HistoryStore` writes, the recorder | publishes `LiveSnapshot` into a `SnapshotSlot` every 200 ms of capture time, and whenever the queue runs dry. Its clock is the packets' time; with the queue empty, the latest packet's plus the source's clock elapsed since it was dequeued (One clock). A fight's `FightDetail` is shared, never copied: a snapshot holds a pointer to it. Stopped (Exit, Update & restart), it drains the closed queue, ends the live fight (`Manual`, at the last packet's time) and saves it before it returns. |
 | UI (`wWinMain`) | the five windows (the app window and the meter, aura, ping and combat power overlays, each with its own ImGui context), the tray, `AppSettings`, the `Updater` | reads snapshots and the history index (copied under a mutex). Requests go to the engine as atomics: end fight, recording on/off, clear history. New meter and history settings and the plugin switches go through `AppRuntime::update_settings`, under the mutex; the engine applies them on its next pass. |
 | Updater worker (one at a time) | the check or the download | `Updater::status()`, copied under its mutex, which the UI reads each frame. Staged files are moved into place on the UI thread (`apply_staged`). `stop()` cancels a download and joins, before the engine stops. |
 
@@ -256,6 +270,16 @@ It gave the faction (Identity, below).
     the next number, as the reassembler starts a new stream there. Kept by address
     pair, it came back under the town's old number, lower than the dungeon's, and the
     plugins took it for that old connection's last frames.
+  - **A zone change, on the wire** (all five in the four captures): the old
+    connection's last heartbeat; 0.10 to 0.18 s later the new connection's SYN and
+    its first frame, 276 bytes the parser does not read (`11 36` or `5b 42`); then
+    nothing for 2.4 to 2.7 s, the load, until a `15 36` and its first heartbeat. The old server
+    sent its FIN within milliseconds of the new SYN in four of them, and not at all
+    in the arena's return to town.
+  - **A game connection's end** (FIN or RST, once its bytes are through) goes to the
+    pipeline as `FrameSink::on_connection_closed`, with its number. The Ping plugin
+    takes it, and a newer connection's first frame, for the end of the old one's
+    heartbeats (plugins/ping/AGENTS.md, Stalls).
 - **The map and the local player's name are the pipeline's**, from 21 36 and 33 36,
   whatever plugins are on: every overlay's `show_in_dungeons_only` and the dashboard
   read them, and they once came from the meter's engine, which hears nothing while
@@ -275,7 +299,10 @@ It gave the faction (Identity, below).
 **Heartbeat and pong**
 - The heartbeat frame is `0E 00 36` plus a u64 LE of server Unix ms, about every 50 ms.
 - The decoder resyncs on one whose time is within a day of the capture's. Only such a
-  frame (no flag, an 8-byte body, a time that close) counts as a heartbeat.
+  frame (no flag, an 8-byte body, a time that close) counts as a heartbeat, for the
+  decoder's watchdog and the parser's `Heartbeat` event alike
+  (`FrameDecoder::heartbeat_server_ms`, the one rule). Any other `00 36` is a parse
+  failure; none of the four captures had one.
 - 3 s with no heartbeat while bytes keep flowing means the decoder is misaligned, and it
   resyncs.
 - **Pong `03 36`:** the server's answer to the client's ping. 18 bytes: two bytes

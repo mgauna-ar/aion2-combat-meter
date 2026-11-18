@@ -68,6 +68,16 @@ bool FrameDecoder::is_heartbeat_at(std::span<const uint8_t> bytes, Micros ts) no
     return plausible_server_ms(r.u64le(), ts);
 }
 
+std::optional<uint64_t> FrameDecoder::heartbeat_server_ms(const Frame& frame) noexcept {
+    if (frame.opcode != opcode::Heartbeat || frame.flag != 0 || frame.body.size() != kHeartbeatFrameBytes - 3) {
+        return std::nullopt;
+    }
+    ByteReader r(frame.body);
+    const uint64_t ms = r.u64le();
+    if (!r.ok() || !plausible_server_ms(ms, frame.ts)) return std::nullopt;
+    return ms;
+}
+
 void FrameDecoder::start(bool at_boundary, Micros ts) {
     m_buf.clear();
     m_pos = 0;
@@ -193,14 +203,10 @@ void FrameDecoder::emit(std::span<const uint8_t> raw, std::span<const uint8_t> p
     frame.stream_offset = offset;
 
     // Counted only when it is one: a misread 00 36 would keep the watchdog quiet.
-    if (op == opcode::Heartbeat && flag == 0 && frame.body.size() == kHeartbeatFrameBytes - 3) {
-        ByteReader r(frame.body);
-        const uint64_t ms = r.u64le();
-        if (plausible_server_ms(ms, ts)) {
-            m_stats.last_server_ms = ms;
-            ++m_stats.heartbeats;
-            m_last_heartbeat_ts = ts;
-        }
+    if (const auto ms = heartbeat_server_ms(frame)) {
+        m_stats.last_server_ms = *ms;
+        ++m_stats.heartbeats;
+        m_last_heartbeat_ts = ts;
     }
     sink.on_frame(frame);
 }

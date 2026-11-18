@@ -499,9 +499,11 @@ bool PacketParser::parse_known(const Frame& frame, std::vector<ParsedEvent>& out
 
     switch (frame.opcode) {
         case opcode::Heartbeat: {
-            const uint64_t ms = r.u64le();
-            if (!r.ok()) return false;
-            emit(Heartbeat{ms});
+            // The decoder's rule, so the plugins hear of exactly the heartbeats it
+            // counts: a flagged or longer 00 36 is something else.
+            const auto ms = FrameDecoder::heartbeat_server_ms(frame);
+            if (!ms) return false;
+            emit(Heartbeat{*ms});
             return true;
         }
         case opcode::Pong: {

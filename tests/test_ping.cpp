@@ -231,6 +231,183 @@ TEST_CASE(Ping, ANewConnectionStartsItsHeartbeatsAfresh) {
     TEST_ASSERT_NEAR(s.ping_ms, 70.0f, 1e-3f);
 }
 
+// A rejected pong leaves no ping to draw: the figure shows "-", and the graph's
+// seconds after it have none either ("Rejected, never guessed").
+TEST_CASE(Ping, ARejectedPongTakesThePingOffTheGraph) {
+    PingTracker t;
+    t.set_counter_offset(kOffset);
+    beats(t, kStart, 1, 200);
+    const Micros good = kStart + kMicrosPerSecond;
+    t.on_pong(pong_at(good, 60), 1, good);
+    beats(t, good, 9, 200);
+    // Six seconds: rejected as no ping could be.
+    const Micros bad = kStart + 10 * kMicrosPerSecond;
+    t.on_pong(pong_at(bad, 6'000), 1, bad);
+    beats(t, bad, 3, 200);
+    const Micros now = bad + 3 * kMicrosPerSecond - 50 * kMicrosPerMilli;
+    const PingSnapshot s = t.snapshot(now);
+    TEST_ASSERT(s.state == PingState::ClockRejected);
+    TEST_ASSERT_FALSE(app::shown_ping(s, now).has_value());
+    // The second the pong was rejected in and the ones after: no ping.
+    TEST_ASSERT_EQ(s.seconds.back().ts, kStart + 12 * kMicrosPerSecond);
+    for (size_t i = s.seconds.size() - 3; i < s.seconds.size(); ++i) TEST_ASSERT(s.seconds[i].ping_ms < 0.0f);
+    // The ones before still had theirs.
+    TEST_ASSERT_NEAR(s.seconds[s.seconds.size() - 4].ping_ms, 60.0f, 1e-3f);
+    // The earlier ping stays in the snapshot, for the range, as before.
+    TEST_ASSERT_NEAR(s.ping_ms, 60.0f, 1e-3f);
+    TEST_ASSERT_EQ(s.samples, uint32_t{1});
+    // And a capture with no counter draws none either.
+    PingTracker replay;
+    replay.on_pong(pong_at(kStart, 60), 1, kStart);
+    beats(replay, kStart, 1, 200);
+    TEST_ASSERT(replay.snapshot(kStart + 500 * kMicrosPerMilli).seconds.back().ping_ms < 0.0f);
+}
+
+// A second closes with the ping it had: across a load screen, the dungeon's first
+// pong is not the town's last second's.
+TEST_CASE(Ping, AClosedSecondKeepsItsOwnPing) {
+    PingTracker t;
+    t.set_counter_offset(kOffset);
+    t.on_pong(pong_at(kStart, 40), 1, kStart);
+    beats(t, kStart, 1, 200);
+    // Twenty seconds of loading, then the dungeon's connection: its pong first.
+    const Micros entered = kStart + 20 * kMicrosPerSecond;
+    t.on_pong(pong_at(entered, 150), 2, entered);
+    beats(t, entered + 10 * kMicrosPerMilli, 1, 300, 2);
+    const PingSnapshot s = t.snapshot(entered + kMicrosPerSecond);
+    TEST_ASSERT_EQ(s.seconds.front().ts, kStart);
+    TEST_ASSERT_NEAR(s.seconds.front().ping_ms, 40.0f, 1e-3f);
+    TEST_ASSERT_NEAR(s.seconds.back().ping_ms, 150.0f, 1e-3f);
+}
+
+// --- Stalls: a heartbeat overdue is already that late ---
+
+// The server's heartbeats stop for four seconds. The graph shows it as it lasts, a
+// second at a time, and the jitter moves; once the heartbeats come again, the
+// seconds keep what was shown.
+TEST_CASE(Ping, AStallShowsWhileItLasts) {
+    PingTracker t;
+    t.set_counter_offset(kOffset);
+    t.on_pong(pong_at(kStart, 40), 1, kStart);
+    beats(t, kStart, 10, 200);  // the last at 9.95 s, sent at 9.75 s
+    const Micros last = kStart + 9'950 * kMicrosPerMilli;
+
+    // Under kStallAfter it is a heartbeat a little late: nothing yet.
+    PingSnapshot s = t.snapshot(last + 200 * kMicrosPerMilli);
+    TEST_ASSERT_EQ(s.seconds.size(), size_t{10});
+    TEST_ASSERT_NEAR(s.seconds.back().late_ms, 0.0f, 1e-3f);
+    TEST_ASSERT_NEAR(s.jitter_ms, 0.0f, 1e-6f);
+    // From it on, the stall shows in the second it is in.
+    s = t.snapshot(last + 300 * kMicrosPerMilli);
+    TEST_ASSERT_EQ(s.seconds.back().ts, kStart + 10 * kMicrosPerSecond);
+    TEST_ASSERT_NEAR(s.seconds.back().late_ms, 250.0f, 1e-3f);
+
+    // Four and a half seconds on: a second each, as late as the next heartbeat
+    // already was as it closed, the last as it is now.
+    const Micros now = kStart + 14'500 * kMicrosPerMilli;
+    s = t.snapshot(now);
+    TEST_ASSERT_EQ(s.seconds.size(), size_t{15});
+    const float expected[] = {1'000.0f, 2'000.0f, 3'000.0f, 4'000.0f, 4'500.0f};
+    for (size_t i = 0; i < 5; ++i) {
+        const PingSecond& second = s.seconds[10 + i];
+        TEST_ASSERT_EQ(second.ts, kStart + static_cast<Micros>(10 + i) * kMicrosPerSecond);
+        TEST_ASSERT_NEAR(second.late_ms, expected[i], 1e-2f);
+        TEST_ASSERT_NEAR(second.ping_ms, 40.0f, 1e-3f);
+    }
+    const app::PingGraph g = app::ping_graph(s, now);
+    TEST_ASSERT_NEAR(g.columns.back().late_ms, 4'500.0f, 1e-2f);
+    // The jitter the next heartbeat makes, at least: 4.5 s against 50 ms, over 16.
+    TEST_ASSERT(s.has_jitter);
+    TEST_ASSERT_NEAR(s.jitter_ms, 4'500.0f / 16.0f, 1e-2f);
+
+    // The heartbeat sent next comes at last: the seconds keep what was shown.
+    t.on_heartbeat((last - 200 * kMicrosPerMilli) / kMicrosPerMilli + 50, 1, now);
+    s = t.snapshot(now);
+    TEST_ASSERT_EQ(s.seconds.size(), size_t{15});
+    for (size_t i = 0; i < 5; ++i) TEST_ASSERT_NEAR(s.seconds[10 + i].late_ms, expected[i], 1e-2f);
+    TEST_ASSERT_NEAR(*t.jitter_ms(), 4'500.0 / 16.0, 1e-6);
+}
+
+// The game closed its connection (a zone change, the game quit): the silence after
+// is no stall, and the jitter goes with the heartbeats.
+TEST_CASE(Ping, AClosedConnectionIsNoStall) {
+    PingTracker t;
+    beats(t, kStart, 10, 200);
+    t.on_connection_closed(2, kStart + 10 * kMicrosPerSecond);  // another one's
+    const Micros now = kStart + 14 * kMicrosPerSecond;
+    TEST_ASSERT(t.snapshot(now).seconds.back().late_ms > 1'000.0f);
+    t.on_connection_closed(1, kStart + 10 * kMicrosPerSecond);
+    const PingSnapshot s = t.snapshot(now);
+    TEST_ASSERT_EQ(s.seconds.size(), size_t{10});
+    TEST_ASSERT_NEAR(s.seconds.back().late_ms, 0.0f, 1e-3f);
+    TEST_ASSERT_FALSE(s.has_jitter);
+    // The next connection's heartbeats are followed afresh.
+    beats(t, now, 2, 300, 2);
+    TEST_ASSERT(t.snapshot(now + 2 * kMicrosPerSecond).has_jitter);
+}
+
+// A zone's new connection opens 0.10 to 0.18 s after the old one's last heartbeat,
+// and its own heartbeats come 2.4 to 2.7 s later: that wait is a load, not a stall,
+// though the old server may never close its connection.
+TEST_CASE(Ping, ANewerConnectionEndsTheOldOnesStall) {
+    PingTracker t;
+    t.on_connection_seen(1);  // nothing followed yet: nothing to end
+    beats(t, kStart, 10, 200);
+    t.on_connection_seen(1);
+    const Micros now = kStart + 12 * kMicrosPerSecond;
+    TEST_ASSERT(t.snapshot(now).seconds.back().late_ms > 1'000.0f);
+    t.on_connection_seen(2);
+    PingSnapshot s = t.snapshot(now);
+    TEST_ASSERT_EQ(s.seconds.size(), size_t{10});
+    TEST_ASSERT_FALSE(s.has_jitter);
+    // Followed from its first heartbeat; the old one's last say nothing then.
+    beats(t, now, 1, 300, 2);
+    beats(t, now + 500 * kMicrosPerMilli, 1, 200, 1);
+    s = t.snapshot(now + kMicrosPerSecond);
+    TEST_ASSERT_EQ(s.heartbeat_at, now + 950 * kMicrosPerMilli);
+    TEST_ASSERT(s.has_jitter);
+}
+
+// Heartbeats gone for good with no close seen (the game crashed, or the capture
+// stopped): the jitter goes, and the stall shows no further than kHeartbeatsGone.
+TEST_CASE(Ping, TheJitterGoesWithTheHeartbeats) {
+    PingTracker t;
+    beats(t, kStart, 2, 200);
+    const Micros last = kStart + 1'950 * kMicrosPerMilli;
+    TEST_ASSERT(t.snapshot(last + PingTracker::kHeartbeatsGone).has_jitter);
+    const Micros hour = kStart + 3'600 * kMicrosPerSecond;
+    t.tick(hour);
+    PingSnapshot s = t.snapshot(hour);
+    TEST_ASSERT_FALSE(s.has_jitter);
+    TEST_ASSERT(s.seconds.empty());
+    s = t.snapshot(last + 60 * kMicrosPerSecond);
+    TEST_ASSERT_FALSE(s.has_jitter);
+    TEST_ASSERT(s.seconds.back().ts <= last + PingTracker::kHeartbeatsGone);
+}
+
+// A stall that ends as the baseline's half is due to turn: what was held up behind
+// it is measured against the delay before it, not against itself.
+TEST_CASE(Ping, AStallAcrossTheBaselineWindowStillShows) {
+    for (const int before_s : {30, 20}) {
+        PingTracker t;
+        beats(t, kStart, before_s, 200);
+        // 16 s of nothing; then the heartbeats sent meanwhile arrive at once.
+        const Micros burst = kStart + static_cast<Micros>(before_s + 16) * kMicrosPerSecond;
+        for (int i = 0; i < 16 * 20; ++i) {
+            const uint64_t sent = kStart / kMicrosPerMilli + static_cast<uint64_t>(before_s) * 1'000 +
+                                  static_cast<uint64_t>(i) * 50;
+            t.on_heartbeat(sent - 200, 1, burst);
+        }
+        const PingSnapshot s = t.snapshot(burst);
+        TEST_ASSERT_EQ(s.seconds.back().ts, burst);
+        // The first of them came 16 s late.
+        TEST_ASSERT_NEAR(s.seconds.back().late_ms, 16'000.0f, 1e-2f);
+        // And on time after it, the usual delay is still the one before.
+        t.on_heartbeat(burst / kMicrosPerMilli - 200, 1, burst + 10 * kMicrosPerMilli);
+        TEST_ASSERT(t.snapshot(burst + 10 * kMicrosPerMilli).seconds.back().late_ms >= 16'000.0f);
+    }
+}
+
 TEST_CASE(Ping, TheGraphKeepsTwoMinutesASecondEach) {
     PingTracker t;
     t.set_counter_offset(kOffset);

@@ -17,11 +17,15 @@ A third window you place like the meter's (unlock with Ctrl+Alt+L, drag, resize)
   that is how often the game pings. "-" means there is none to show yet, or the last
   one is older than 25 seconds.
 - **Jitter:** how unevenly the server's heartbeats arrive (it sends 20 a second). It
-  moves within a second of a lag spike, between two pings.
+  moves within a second of a lag spike, between two pings, and climbs while the
+  heartbeats are held up. "-" once they have stopped: the game closed its connection,
+  or none came for 30 seconds.
 - **The graph:** the last two minutes, a column a second. The blue line is the ping;
-  the amber bars are how late that second's worst heartbeat came, so a spike shows the
-  moment it happens. Under it, the least, average and most of the last five minutes'
-  pings.
+  the amber bars are how late that second's worst heartbeat came. **A stall shows
+  while it lasts:** once the next heartbeat is a quarter of a second overdue, a bar
+  grows second by second, as late as it already is, and stays once the heartbeats
+  come again. A load between two zones is no stall. Under it, the least, average and
+  most of the last five minutes' pings.
 - **Hiding it:** locked, it can hide while the game is not in front, and outside
   dungeons, by its own settings. Jitter and the graph each have a switch.
 - **Locking it changes nothing but the header.** Unlocked, a header to drag it by sits
@@ -48,8 +52,8 @@ A third window you place like the meter's (unlock with Ctrl+Alt+L, drag, resize)
   back, since it is the game's own question that is timed.
 - **Which clock the game uses is inferred** from two captures, not confirmed against
   the game's own display. If it is another one, a ping would read as nonsense: the
-  plugin then shows "-" rather than a wrong number, and its page says so. Jitter and
-  the graph's bars do not depend on it.
+  plugin then shows "-" rather than a wrong number, on the graph too, and its page
+  says so. Jitter and the graph's bars do not depend on it.
 - **Jitter** is the usual one (RFC 3550): the gap between two heartbeats' arrivals
   against the gap between their server times, smoothed over 16. The heartbeat's time
   is in whole milliseconds, so a calm line still reads 1 to 3 ms.

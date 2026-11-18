@@ -694,6 +694,39 @@ TEST_CASE(Parser, PartyScanSkipsOneLetterLookAlikes) {
     TEST_ASSERT_EQ(roster.members[1].name, std::string("Lumiel"));
 }
 
+// --- Heartbeat (00 36) ---
+
+// The parser's heartbeat is the decoder's: no flag, an 8-byte body, a time near the
+// capture's. Any other 00 36 fails, and the plugins hear nothing of it.
+TEST_CASE(Parser, AHeartbeatIsWhatTheDecoderCountsAsOne) {
+    constexpr uint64_t kMs = 1'792'152'000'000ULL;
+    const Micros ts = (kMs + 200) * kMicrosPerMilli;
+    PacketParser parser;
+    const auto parse = [&](uint8_t flag, const Bytes& body, Micros at) {
+        Frame f;
+        f.opcode = opcode::Heartbeat;
+        f.flag = flag;
+        f.body = body;
+        f.ts = at;
+        std::vector<ParsedEvent> out;
+        parser.parse(f, out);
+        return out;
+    };
+    Bytes body;
+    put_le64(body, kMs);
+    TEST_ASSERT_EQ(only<Heartbeat>(parse(0, body, ts)).server_ms, kMs);
+    TEST_ASSERT_EQ(parser.stats().failed, uint64_t{0});
+
+    // Flagged, longer, or a day and more from the capture's clock: not one.
+    TEST_ASSERT(parse(0xF3, body, ts).empty());
+    Bytes longer = body;
+    put_le32(longer, 0xDEADBEEF);
+    TEST_ASSERT(parse(0, longer, ts).empty());
+    TEST_ASSERT(parse(0, body, ts + 2 * 86'400 * kMicrosPerSecond).empty());
+    TEST_ASSERT_EQ(parser.stats().failed, uint64_t{3});
+    TEST_ASSERT_EQ(parser.stats().failures_by_opcode.at(opcode::Heartbeat), uint64_t{3});
+}
+
 // --- Pong (03 36) ---
 
 TEST_CASE(Parser, PongAsTheCaptureHasIt) {

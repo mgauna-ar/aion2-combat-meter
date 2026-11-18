@@ -56,6 +56,8 @@ struct FlowSummary {
  * and a reconnect is a new flow. Each frame says which connection it came on
  * (Frame::connection), numbered as each opens: entering a dungeon opens a
  * connection to its server, and a 4-tuple opened again (a new SYN) is a new one.
+ * A game connection's FIN or RST, once its bytes are through, goes to the sink too
+ * (FrameSink::on_connection_closed).
  */
 class StreamDemux {
 public:

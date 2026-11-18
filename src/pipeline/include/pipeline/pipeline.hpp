@@ -129,6 +129,8 @@ public:
 
 private:
     void on_frame(const proto::Frame& frame) override;
+    /// A game connection closed: the Ping plugin's heartbeats on it have stopped.
+    void on_connection_closed(uint32_t connection, Micros ts) override;
     /// Keeps the map and the local player's name whatever plugins are on: the
     /// overlays' "only in dungeons" and the dashboard read them, and no plugin may
     /// depend on another being switched on.

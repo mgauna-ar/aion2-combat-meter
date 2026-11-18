@@ -11,6 +11,7 @@
 #include "capture/capture_file.hpp"
 #include "capture/file_source.hpp"
 #include "capture/os/npcap_source.hpp"
+#include "capture/tcp_reassembler.hpp"
 #include "common/time_format.hpp"
 #include "protocol/entity_id.hpp"
 
@@ -963,6 +964,214 @@ TEST_CASE(AppRuntime, QuittingSavesTheFightUnderWay) {
     TEST_ASSERT_EQ(saved[0].total_damage, uint64_t{25'000});
     TEST_ASSERT(saved[0].end_reason == meter::EndReason::Manual);
     TEST_ASSERT_EQ(runtime.history().size(), size_t{1});
+}
+
+namespace {
+
+/// A live source as Npcap is: every packet queued as start() returns, and the
+/// counter's offset known from the first, since a capture thread samples it before
+/// it pushes. It joins mid-stream, as when the meter starts in game.
+class LiveLikeSource final : public capture::PacketSource {
+public:
+    LiveLikeSource(test::wire::Bytes file, Micros offset) : m_file(std::move(file)), m_offset(offset) {}
+    bool start(Push push, std::string& error) override {
+        auto reader = capture::CaptureFileReader::from_bytes(m_file, error);
+        if (!reader) return false;
+        capture::CapturedPacket pkt;
+        bool first = true;
+        while (reader->next(pkt)) {
+            if (std::exchange(first, false)) continue;  // the SYN
+            capture::OwnedPacket o;
+            o.link_type = pkt.link_type;
+            o.ts = pkt.ts;
+            o.data.assign(pkt.data.begin(), pkt.data.end());
+            m_last = pkt.ts;
+            push(std::move(o));
+        }
+        return true;
+    }
+    void stop() override {}
+    [[nodiscard]] Micros now() const override { return m_last; }
+    [[nodiscard]] uint64_t dropped() const override { return 0; }
+    [[nodiscard]] std::optional<Micros> counter_offset() const override { return m_offset; }
+    [[nodiscard]] std::string status() const override { return "live-like"; }
+
+private:
+    test::wire::Bytes m_file;
+    Micros m_offset;
+    std::atomic<Micros> m_last{0};
+};
+
+} // namespace
+
+// The counter offset reaches the pipeline before the packet: a pong in the first
+// packets the engine handles is measured, not taken for a replay's.
+TEST_CASE(AppRuntime, ALivePongBeforeTheFirstTickIsMeasured) {
+    using namespace aion2::test::synthetic;
+    ScratchDir dir("aion2_test_runtime_ping");
+    const Micros at = kStartMs * kMicrosPerMilli;
+    const Micros offset = at - 3'600 * kMicrosPerSecond;
+    // One packet: a heartbeat, which the decoder aligns on, and the pong, 70 ms.
+    test::wire::Bytes first = heartbeat(kStartMs - 200);
+    test::wire::put_bytes(first, pong(ping::kClientClockBaseMs + (at - offset) / kMicrosPerMilli - 70, kStartMs - 35));
+    SessionWriter w;
+    w.at(0.0, first);
+    for (int i = 1; i <= 20; ++i) w.at(i * 0.05, heartbeat(kStartMs + static_cast<uint64_t>(i) * 50 - 200));
+    AppSettings settings;
+    settings.plugins.ping = true;
+    AppRuntime runtime(settings, dir.path / "data");
+    std::string error;
+    TEST_ASSERT(runtime.start(std::make_unique<LiveLikeSource>(w.finish(), offset), error));
+    std::shared_ptr<const pipeline::LiveSnapshot> snap;
+    TEST_ASSERT(wait_for([&] {
+        snap = runtime.snapshot();
+        return snap != nullptr && snap->ping.pongs > 0;
+    }));
+    runtime.stop();
+    TEST_ASSERT_EQ(snap->ping.pongs, uint64_t{1});
+    TEST_ASSERT(snap->ping.state == ping::PingState::Measured);
+    TEST_ASSERT_NEAR(snap->ping.ping_ms, 70.0f, 1e-3f);
+}
+
+namespace {
+
+/// A live source whose clock the test sets, `skew` away from the stamps it gives its
+/// packets, as Npcap's wall-clock now() sits apart from its counter-based stamps.
+class SkewedSource final : public capture::PacketSource {
+public:
+    explicit SkewedSource(int64_t skew) : m_skew(skew) {}
+    bool start(Push push, std::string&) override {
+        m_push = std::move(push);
+        return true;
+    }
+    void stop() override {}
+    /// A packet stamped `ts`, handed over as the capture's clock reads `ts`.
+    void deliver(const test::wire::Bytes& packet, Micros ts) {
+        m_clock = ts;
+        capture::OwnedPacket o;
+        o.link_type = capture::link_type::Ethernet;
+        o.ts = ts;
+        o.data = packet;
+        m_push(std::move(o));
+    }
+    /// The capture's clock now: the source's own reads `skew` from it.
+    void set_clock(Micros stamp_now) { m_clock = stamp_now; }
+    [[nodiscard]] Micros now() const override {
+        const Micros clock = m_clock.load();
+        return clock == 0 ? 0 : static_cast<Micros>(static_cast<int64_t>(clock) + m_skew);
+    }
+    [[nodiscard]] uint64_t dropped() const override { return 0; }
+    [[nodiscard]] std::string status() const override { return "skewed"; }
+
+private:
+    int64_t m_skew;
+    Push m_push;
+    std::atomic<Micros> m_clock{0};
+};
+
+/// The source's clock an hour ahead of its stamps, and 2 s behind them.
+constexpr int64_t kSkews[] = {3'600 * static_cast<int64_t>(kMicrosPerSecond), -2 * static_cast<int64_t>(kMicrosPerSecond)};
+
+/// Waits for the snapshot published at `now`.
+std::shared_ptr<const pipeline::LiveSnapshot> snapshot_at(AppRuntime& runtime, Micros now) {
+    std::shared_ptr<const pipeline::LiveSnapshot> snap;
+    if (!wait_for([&] {
+            snap = runtime.snapshot();
+            return snap != nullptr && snap->now == now;
+        })) {
+        return nullptr;
+    }
+    return snap;
+}
+
+} // namespace
+
+// With the queue empty, time runs on from the latest packet by what the source's
+// clock has run since, never to that clock itself: an hour off, or 2 s, it shows no
+// stall between two heartbeats, and a real one as long as it is.
+TEST_CASE(AppRuntime, QuietTimeRunsOnFromTheLatestPacket) {
+    using namespace aion2::test::synthetic;
+    for (const int64_t skew : kSkews) {
+        ScratchDir dir("aion2_test_runtime_quiet");
+        AppSettings settings;
+        settings.plugins.ping = true;
+        AppRuntime runtime(settings, dir.path / "data");
+        auto owned = std::make_unique<SkewedSource>(skew);
+        SkewedSource& source = *owned;
+        std::string error;
+        TEST_ASSERT(runtime.start(std::move(owned), error));
+
+        const Micros t0 = kStartMs * kMicrosPerMilli;
+        TcpSpec spec;
+        spec.flags = capture::tcp_flag::Syn | capture::tcp_flag::Ack;
+        source.deliver(ethernet_tcp(spec, Bytes{}), t0);
+        spec.seq += 1;
+        spec.flags = capture::tcp_flag::Ack | capture::tcp_flag::Psh;
+        Micros last = t0;
+        for (int i = 1; i <= 20; ++i) {
+            last = t0 + static_cast<Micros>(i) * 50 * kMicrosPerMilli;
+            const Bytes hb = heartbeat(last / kMicrosPerMilli - 200);
+            source.deliver(ethernet_tcp(spec, hb), last);
+            spec.seq += static_cast<uint32_t>(hb.size());
+        }
+        TEST_ASSERT(snapshot_at(runtime, last) != nullptr);
+
+        // Between two heartbeats: no stall, and the jitter shows.
+        source.set_clock(last + 40 * kMicrosPerMilli);
+        auto snap = snapshot_at(runtime, last + 40 * kMicrosPerMilli);
+        TEST_ASSERT(snap != nullptr);
+        TEST_ASSERT(snap->ping.has_jitter);
+        TEST_ASSERT_FALSE(snap->ping.seconds.empty());
+        for (const ping::PingSecond& second : snap->ping.seconds) TEST_ASSERT(second.late_ms < 250.0f);
+
+        // A second and a half with nothing: the next heartbeat is 1,450 ms late.
+        source.set_clock(last + 1'500 * kMicrosPerMilli);
+        snap = snapshot_at(runtime, last + 1'500 * kMicrosPerMilli);
+        TEST_ASSERT(snap != nullptr);
+        TEST_ASSERT_NEAR(snap->ping.seconds.back().late_ms, 1'450.0f, 1e-2f);
+        runtime.stop();
+    }
+}
+
+// A reassembly hole still expires TcpReassembler::kHoleTimeout of the source's
+// elapsed time after the packet held behind it, however far its clock is off.
+TEST_CASE(AppRuntime, AHoleExpiresOnTheSourcesElapsedTime) {
+    using namespace aion2::test::synthetic;
+    for (const int64_t skew : kSkews) {
+        ScratchDir dir("aion2_test_runtime_hole");
+        AppRuntime runtime(AppSettings{}, dir.path / "data");
+        auto owned = std::make_unique<SkewedSource>(skew);
+        SkewedSource& source = *owned;
+        std::string error;
+        TEST_ASSERT(runtime.start(std::move(owned), error));
+
+        const Micros t0 = kStartMs * kMicrosPerMilli;
+        TcpSpec spec;
+        spec.flags = capture::tcp_flag::Syn | capture::tcp_flag::Ack;
+        source.deliver(ethernet_tcp(spec, Bytes{}), t0);
+        spec.seq += 1;
+        spec.flags = capture::tcp_flag::Ack | capture::tcp_flag::Psh;
+        const Bytes first = heartbeat(kStartMs + 50);
+        source.deliver(ethernet_tcp(spec, first), t0 + 50 * kMicrosPerMilli);
+        // The next segment is lost; the one after it waits behind the hole.
+        spec.seq += static_cast<uint32_t>(first.size() * 2);
+        const Micros held = t0 + 100 * kMicrosPerMilli;
+        source.deliver(ethernet_tcp(spec, heartbeat(kStartMs + 150)), held);
+        auto snap = snapshot_at(runtime, held);
+        TEST_ASSERT(snap != nullptr);
+        TEST_ASSERT_EQ(snap->capture_totals.gap_bytes, uint64_t{0});
+
+        source.set_clock(held + capture::TcpReassembler::kHoleTimeout - 50 * kMicrosPerMilli);
+        snap = snapshot_at(runtime, held + capture::TcpReassembler::kHoleTimeout - 50 * kMicrosPerMilli);
+        TEST_ASSERT(snap != nullptr);
+        TEST_ASSERT_EQ(snap->capture_totals.gap_bytes, uint64_t{0});
+
+        source.set_clock(held + capture::TcpReassembler::kHoleTimeout + 50 * kMicrosPerMilli);
+        snap = snapshot_at(runtime, held + capture::TcpReassembler::kHoleTimeout + 50 * kMicrosPerMilli);
+        TEST_ASSERT(snap != nullptr);
+        TEST_ASSERT_EQ(snap->capture_totals.gap_bytes, static_cast<uint64_t>(first.size()));
+        runtime.stop();
+    }
 }
 
 TEST_CASE(OverlayVisibility, CombatOnlyKeepsItUpAfterAFight) {

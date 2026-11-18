@@ -15,7 +15,8 @@ namespace aion2::ping {
  *
  * Fed by the pipeline like the others, on the same thread and the same capture
  * clock. It reads two events, the pong and the heartbeat, and sends nothing: the
- * ping is the game's own, read off its echo (PingTracker).
+ * ping is the game's own, read off its echo (PingTracker). The pipeline also tells
+ * it the counter offset, each frame's connection, and when a connection closes.
  */
 class PingPlugin final : public game::Plugin {
 public:
@@ -28,6 +29,13 @@ public:
     /// (capture::PacketSource::counter_offset): the one figure from outside the
     /// capture, without which a pong gives no ping.
     void set_counter_offset(std::optional<Micros> offset) noexcept { m_tracker.set_counter_offset(offset); }
+
+    /// A game connection closed (the pipeline's, from the demux): nothing more
+    /// comes on it, so its silence is no stall.
+    void on_connection_closed(uint32_t connection, Micros ts) { m_tracker.on_connection_closed(connection, ts); }
+    /// A frame came on `connection`, parsed or not (the pipeline's): a newer
+    /// connection than the followed one ends its stall.
+    void on_connection_seen(uint32_t connection) noexcept { m_tracker.on_connection_seen(connection); }
 
     /// What the overlay draws at `now`.
     [[nodiscard]] PingSnapshot snapshot(Micros now) const { return m_tracker.snapshot(now); }

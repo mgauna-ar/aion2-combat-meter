@@ -326,6 +326,55 @@ TEST_CASE(Pipeline, ThePingPluginReadsThePongsAgainstTheCounter) {
     TEST_ASSERT_EQ(live.snapshot(end).ping.pongs, uint64_t{0});
 }
 
+// The game closing its connection reaches the Ping plugin: its silence after is no
+// stall. Nor is it once a newer connection's first frame came, one the parser does
+// not read (a zone's first is such a frame). Without either, the silence is one.
+TEST_CASE(Pipeline, AClosedConnectionIsNoStallForThePing) {
+    const Micros start = kStartMs * kMicrosPerMilli;
+    enum class Then { Nothing, Close, NewConnection };
+    const auto run = [&](Then then, Micros& last) {
+        Pipeline p;
+        test::wire::TcpSpec spec;
+        spec.flags = capture::tcp_flag::Syn | capture::tcp_flag::Ack;
+        p.on_packet(capture::link_type::Ethernet, test::wire::ethernet_tcp(spec, Bytes{}), start);
+        spec.seq += 1;
+        spec.flags = capture::tcp_flag::Ack | capture::tcp_flag::Psh;
+        for (int i = 1; i <= 40; ++i) {
+            last = start + static_cast<Micros>(i) * 50 * kMicrosPerMilli;
+            const Bytes hb = heartbeat(last / kMicrosPerMilli - 200);
+            p.on_packet(capture::link_type::Ethernet, test::wire::ethernet_tcp(spec, hb), last);
+            spec.seq += static_cast<uint32_t>(hb.size());
+        }
+        if (then == Then::Close) {
+            spec.flags = capture::tcp_flag::Fin | capture::tcp_flag::Ack;
+            p.on_packet(capture::link_type::Ethernet, test::wire::ethernet_tcp(spec, Bytes{}), last + kMicrosPerMilli);
+        } else if (then == Then::NewConnection) {
+            test::wire::TcpSpec zone;
+            zone.src_ip = test::wire::ip4(10, 0, 0, 9);
+            zone.dst_port = static_cast<uint16_t>(test::wire::kClientPort + 1);
+            zone.flags = capture::tcp_flag::Syn | capture::tcp_flag::Ack;
+            const Micros at = last + 150 * kMicrosPerMilli;
+            p.on_packet(capture::link_type::Ethernet, test::wire::ethernet_tcp(zone, Bytes{}), at);
+            zone.seq += 1;
+            zone.flags = capture::tcp_flag::Ack | capture::tcp_flag::Psh;
+            p.on_packet(capture::link_type::Ethernet,
+                        test::wire::ethernet_tcp(zone, opcode_frame(0x5b42, Bytes(40, 0x11))), at);
+        }
+        p.tick(last + 3 * kMicrosPerSecond);
+        return p.snapshot(last + 3 * kMicrosPerSecond).ping;
+    };
+    Micros last = 0;
+    const ping::PingSnapshot open = run(Then::Nothing, last);
+    TEST_ASSERT(open.seconds.back().late_ms > 2'000.0f);
+    TEST_ASSERT(open.has_jitter);
+    for (const Then then : {Then::Close, Then::NewConnection}) {
+        const ping::PingSnapshot ended = run(then, last);
+        TEST_ASSERT(ended.seconds.back().ts < last + kMicrosPerSecond);
+        TEST_ASSERT(ended.seconds.back().late_ms < 1.0f);
+        TEST_ASSERT_FALSE(ended.has_jitter);
+    }
+}
+
 TEST_CASE(Pipeline, TheAurasSeeTheLocalPlayersHpAndChainSkills) {
     const Session session = boss_session();
     const Micros scene = kStartMs * kMicrosPerMilli + 30 * kMicrosPerSecond;
