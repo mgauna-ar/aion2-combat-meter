@@ -77,8 +77,15 @@ void CooldownTracker::on_used(uint32_t code, Micros ts) {
 void CooldownTracker::on_set(uint32_t skill, uint32_t remaining_ms, Micros ts) {
     State& s = m_skills[game::skill_base(skill)];
     if (s.ready_at.empty()) s.ready_at.assign(1, 0);
-    // The use that shows: the one ready soonest.
-    *std::min_element(s.ready_at.begin(), s.ready_at.end()) = ts + uint64_t{remaining_ms} * kMicrosPerMilli;
+    // What is left of a use still cooling, the one back soonest: a use that is ready
+    // has nothing left to cut. With none cooling, the cooldown started unseen, and
+    // takes a ready use.
+    auto use = s.ready_at.end();
+    for (auto it = s.ready_at.begin(); it != s.ready_at.end(); ++it) {
+        if (*it > ts && (use == s.ready_at.end() || *it < *use)) use = it;
+    }
+    if (use == s.ready_at.end()) use = std::min_element(s.ready_at.begin(), s.ready_at.end());
+    *use = ts + uint64_t{remaining_ms} * kMicrosPerMilli;
     s.exact = true;
     s.set_since_use = true;
     // Never seen used (the plugin started mid-cooldown): the bar starts full.

@@ -59,6 +59,19 @@ TEST_CASE(EffectBook, AnEndFarFromTheDurationIsNotBelieved) {
     TEST_ASSERT_EQ(b.now->expires_at, at_s(4.6));
 }
 
+TEST_CASE(EffectBook, ADurationPastForeverNeverEndsBeforeItStarts) {
+    EffectBook book;
+    book.on_heartbeat(server_ms(at_s(0)), at_s(0));
+    // Short of all ones (no end) by one bit: times 1000 it wrapped to 1 ms before the
+    // start, and the effect never showed. Nor may a wild server end undo the clamp.
+    const auto a = book.on_applied(buff(kMe, kMe, 1, 3015, 0x7FFF'FFFF'FFFF'FFFFULL), at_s(1));
+    TEST_ASSERT(a.now->runs_at(at_s(1)));
+    TEST_ASSERT(a.now->expires_at >= kForever);
+    const auto b = book.on_applied(buff(kMe, kMe, 2, 3015, 0xFFFF'FFFF'FFFF'FFF0ULL, ~uint64_t{0} - 1), at_s(1));
+    TEST_ASSERT(b.now->runs_at(at_s(1) + 3600 * kMicrosPerSecond));
+    TEST_ASSERT_EQ(book.instances_on(kMe, at_s(2)), size_t{2});
+}
+
 TEST_CASE(EffectBook, ARemovalTakesTheSoonestAndSaysWhich) {
     EffectBook book;
     (void)book.on_applied(buff(kMe, kMe, 10, 3015, 3000), at_s(1));

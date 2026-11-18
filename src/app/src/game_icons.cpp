@@ -66,6 +66,8 @@ int effect_icon(uint32_t buff_id, uint32_t source_skill) noexcept {
     return skill != 0 ? skill_icon(skill) : kNoIcon;
 }
 
+int effect_key_icon(uint32_t key) noexcept { return game::is_skill_key(key) ? skill_icon(key) : effect_icon(key); }
+
 int icon_slot_count() noexcept { return kIconSlots; }
 
 int icon_sheet_px() noexcept { return kIconPx; }

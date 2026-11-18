@@ -1,6 +1,7 @@
 #pragma once
 
 #include "app/app_settings.hpp"
+#include "app/game_icons.hpp"
 #include "app/overlay_view.hpp"
 #include "auras/aura_tracker.hpp"
 #include "common/micros.hpp"
@@ -79,6 +80,8 @@ struct TileLayout {
 struct MissingEffect {
     uint32_t key{0};
     std::string label;
+    /// Its icon, for a tile (game_icons): the skill's, or the item's; kNoIcon for none.
+    int icon{kNoIcon};
 
     bool operator==(const MissingEffect&) const = default;
 };

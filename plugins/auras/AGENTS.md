@@ -33,7 +33,9 @@ hits, no party.
   values (00 8D kind 1 or 3), unless that id is a spawn. Another player's identity on
   that id, or a spawn on it after a new map, means it is no longer theirs.
 - **Their character** is the own identity's `name@server`. A new one clears the
-  cooldowns: what was learned was the other character's.
+  cooldowns as its identity comes, not at its first skill: until then the old
+  character's showed, and as icons their ready skills stayed lit. What was learned
+  was the other character's.
 - **Owners:** a spawn of a player-object kind with an owner (`proto::spawn_kind`)
   belongs to its owner, a summon's summon too. `mine()` is the local player or what
   they own.
@@ -81,6 +83,9 @@ watch list and what the overlay shows are the tracker's own.
 - An instance ends at its record's stated end, brought onto the capture clock by the
   last heartbeat (One clock): a replay shows what the live overlay did. An end more than
   5 s from the stated duration is not believed, and the duration stands in.
+  - A duration short of all ones (no end) but past `kForever` is clamped there: times
+    1000 it wrapped to an end before the start, and the effect never showed. None
+    has come on the wire.
 - A death (HP 0 or 42 36) drops the entity's effects. A map load (a reload within a run
   too, since ids may change) drops every instance not put on or renewed in the 2 s
   before it.
@@ -107,6 +112,10 @@ watch list and what the overlay shows are the tracker's own.
   20 s says when to use it again.
 - It also carries every effect seen on the local player this session (`seen`, an
   enemy's marked hostile), which is what the page's Watch and Hide switches offer.
+  - One seen before its caster spawned (the plugin switched on mid-fight) is an ally's
+    "Effect <id>" at first; once the caster spawns, it is marked hostile and takes
+    their name, as the overlay's entry does. Never the other way: a caster a map load
+    forgot says nothing new.
 - The overlay counts down between snapshots on the wall clock, at most 250 ms past the
   snapshot's own time (`aura_display_time`): drawing only, never the plugin.
 
@@ -122,7 +131,10 @@ watch list and what the overlay shows are the tracker's own.
 - A 47 38 sets what is left, exactly.
 - A "+1 consecutive use" specialty gives a second use: each recharges on its own, the
   skill shows only once both are cooling, and it learns nothing from its gaps.
-- Another local character starts from nothing learned.
+  - A 47 38 sets the use back soonest of those cooling, never a ready one: put on the
+    use left, it showed the skill cooling with a use still there. Whether the game
+    cuts that use or both is unknown (AGENTS.md, Unknown or guessed).
+- Another local character starts from nothing learned, as they log in.
 - aion2.app's Brawler pages list no specialties (2026-11): Brawler cooldowns start
   from the listed figure, and every Brawler row reads as an active skill.
 - Checked on the second capture: over 274 uses of 12 skills, 13 came while the
@@ -164,6 +176,13 @@ watch list and what the overlay shows are the tracker's own.
   known max, never at HP 0, which is a death), the watch list's missing effects, the
   chain skills on offer. Then the effects on the local player, their cooldowns, and
   theirs on the target.
+- **A watched effect not seen this session** (after a restart, a scroll not on yet)
+  has only its key to go by: `game::effect_key_label` and `effect_key_icon`, which the
+  page uses too. A key is a skill's when the skill table lists that very code, as
+  every skill `game::effect_key` gives is; else an effect id, named and drawn as its
+  own (Speed Scroll, with the scroll). The overlay read every key as a skill: a
+  scroll was "Effect 22101031" with no tile, and the monsters' Burn (12000121), by
+  its ten thousands, "Dodge".
 - **Bars or icons** (`auras.icons`). The pure parts are in `aura_view` and tested
   without ImGui: `shown_cooldowns` (bars: cooling, and `just_ready` for `kReadyFlash`,
   soonest first; icons: ready ones too, by skill code, so a tile keeps its place),

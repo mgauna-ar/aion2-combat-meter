@@ -110,4 +110,11 @@ std::string effect_label(uint32_t buff_id, uint32_t source_skill) {
     return "Effect " + std::to_string(buff_id);
 }
 
+bool is_skill_key(uint32_t key) noexcept { return find(key) != nullptr; }
+
+std::string effect_key_label(uint32_t key) {
+    if (is_skill_key(key)) return std::string(skill_name(key));
+    return effect_label(key);
+}
+
 } // namespace aion2::game

@@ -12,8 +12,11 @@ void EffectBook::on_heartbeat(uint64_t server_ms, Micros ts) noexcept {
 }
 
 Micros EffectBook::expiry(const proto::BuffApplied& b, Micros ts) const noexcept {
-    const Micros stated = ts + b.duration_ms * kMicrosPerMilli;
-    if (!m_have_offset || b.expires_server_ms == 0) return stated;
+    // Short of all ones (permanent), a duration past kForever is as good as none, and
+    // must not wrap round to an end before it starts.
+    constexpr uint64_t kLongestMs = kForever / kMicrosPerMilli;
+    const Micros stated = ts + std::min<uint64_t>(b.duration_ms, kLongestMs) * kMicrosPerMilli;
+    if (!m_have_offset || b.expires_server_ms == 0 || b.expires_server_ms > kLongestMs) return stated;
     const int64_t at = static_cast<int64_t>(b.expires_server_ms * kMicrosPerMilli) - m_server_offset;
     if (at <= static_cast<int64_t>(ts)) return stated;
     const auto end = static_cast<Micros>(at);

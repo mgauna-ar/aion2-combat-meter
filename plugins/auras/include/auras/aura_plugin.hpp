@@ -40,9 +40,10 @@ public:
 
 private:
     void on_map(const proto::MapLoad& m, uint32_t connection, Micros ts);
-    /// Before a skill use or cooldown of the local player's: a new character's
-    /// cooldowns start from nothing learned.
-    void on_own_cooldown();
+    /// After an identity: another character than the one the cooldowns are of drops
+    /// them, as it logs in, not at its first skill. Cooldowns seen before any own
+    /// identity are the first character's.
+    void follow_character();
 
     Entities m_entities;
     AuraTracker m_tracker;

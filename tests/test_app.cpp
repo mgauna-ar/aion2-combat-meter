@@ -237,6 +237,24 @@ TEST_CASE(AuraView, FiltersAndTheMissingWatchList) {
     TEST_ASSERT_EQ(format_time_left(4'560'000), std::string("4.5"));
 }
 
+TEST_CASE(AuraView, AWatchedEffectNotSeenYetIsNamedAndDrawnByItsKey) {
+    // After a restart, before the scroll is on: it read "Effect 22101031", with no
+    // tile as icons, though effects.tsv names it and the sheet has the scroll. A
+    // monster's Burn read as the skill its ten thousands point to, Dodge.
+    const auras::AuraSnapshot none;
+    const auto missing = missing_effects(none, {22'101'031, 12'000'121, 12'350'000, 777}, 1'000'000);
+    TEST_ASSERT_EQ(missing.size(), size_t{4});
+    TEST_ASSERT_EQ(missing[0].label, std::string("Speed Scroll"));
+    TEST_ASSERT(missing[0].icon != kNoIcon);
+    TEST_ASSERT_EQ(missing[0].icon, effect_icon(22'101'031));
+    TEST_ASSERT_EQ(missing[1].label, std::string("Burn"));
+    TEST_ASSERT_EQ(missing[2].label, std::string("Warding Strike"));
+    TEST_ASSERT(missing[2].icon != kNoIcon);
+    TEST_ASSERT_EQ(missing[2].icon, skill_icon(12'350'000));
+    TEST_ASSERT_EQ(missing[3].label, std::string("Effect 777"));
+    TEST_ASSERT_EQ(missing[3].icon, kNoIcon);
+}
+
 TEST_CASE(AuraView, CooldownsLongEnoughAndRunning) {
     const Micros now = 1'792'152'000'000'000ULL;
     std::vector<auras::CooldownEntry> c(3);

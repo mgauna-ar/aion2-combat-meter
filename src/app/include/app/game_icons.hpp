@@ -26,6 +26,9 @@ inline constexpr int kNoIcon = -1;
 [[nodiscard]] int skill_icon(uint32_t code) noexcept;
 /// An effect's icon: that of the skill that names it (game::effect_skill).
 [[nodiscard]] int effect_icon(uint32_t buff_id, uint32_t source_skill = 0) noexcept;
+/// The icon of an effect_key with no effect of it at hand (a watch list's): its
+/// skill's, or the effect's own as effect_icon reads its id (a scroll's).
+[[nodiscard]] int effect_key_icon(uint32_t key) noexcept;
 
 /// The sheet's slots: how many, and their side in pixels.
 [[nodiscard]] int icon_slot_count() noexcept;

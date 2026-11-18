@@ -68,7 +68,8 @@ struct CooldownEntry {
  *
  * A skill with more than one use (skill_charges) recharges each on its own: a use
  * takes the one ready soonest, and it shows as cooling only once none is ready. Its
- * gaps say nothing of the cooldown, so it learns none.
+ * gaps say nothing of the cooldown, so it learns none. A 47 38 sets the use back
+ * soonest of those cooling, never a ready one.
  */
 class CooldownTracker {
 public:

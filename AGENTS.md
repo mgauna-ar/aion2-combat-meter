@@ -699,7 +699,8 @@ the three captures read as a point on their map):
   `4a 36` stat is Illusion is unknown. The Auras plugin learns each skill's figure
   instead (plugins/auras/AGENTS.md, Cooldowns);
 - whether a skill with a second use ("+1 consecutive use") recharges each use on its
-  own, as the Auras plugin assumes, or both at once;
+  own, as the Auras plugin assumes, or both at once; and which use a 47 38 for it
+  speaks of (the plugin takes the one cooling that is back soonest, never a ready one);
 - what a wipe looks like on the wire. The whole party at HP 0 is not one: in the second
   capture's last boss fight they all were, for 1.2 s, and got up again and won
   (plugins/combat_meter/AGENTS.md, Fight end). `wipe_detection` stays off until then.

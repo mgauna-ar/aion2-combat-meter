@@ -18,10 +18,8 @@ void AuraPlugin::on_event(const proto::ParsedEvent& event) {
             } else if constexpr (std::is_same_v<T, proto::BuffRemoved>) {
                 m_tracker.on_removed(e);
             } else if constexpr (std::is_same_v<T, proto::SkillUsed>) {
-                on_own_cooldown();
                 m_cooldowns.on_used(e.skill, ts);
             } else if constexpr (std::is_same_v<T, proto::CooldownSet>) {
-                on_own_cooldown();
                 m_cooldowns.on_set(e.skill, e.remaining_ms, ts);
             } else if constexpr (std::is_same_v<T, proto::ChainOffered>) {
                 m_chains.on_offered(e, ts);
@@ -29,6 +27,7 @@ void AuraPlugin::on_event(const proto::ParsedEvent& event) {
                 m_chains.on_withdrawn(e);
             } else if constexpr (std::is_same_v<T, proto::Identity>) {
                 m_entities.on_identity(e);
+                follow_character();
             } else if constexpr (std::is_same_v<T, proto::Spawn>) {
                 m_entities.on_spawn(e);
             } else if constexpr (std::is_same_v<T, proto::RemainingHp>) {
@@ -69,7 +68,7 @@ void AuraPlugin::tick(Micros now) {
 
 void AuraPlugin::clear() { *this = AuraPlugin{}; }
 
-void AuraPlugin::on_own_cooldown() {
+void AuraPlugin::follow_character() {
     const std::string& who = m_entities.local_character();
     if (who.empty() || who == m_cooldown_character) return;
     if (!m_cooldown_character.empty()) m_cooldowns.clear();
