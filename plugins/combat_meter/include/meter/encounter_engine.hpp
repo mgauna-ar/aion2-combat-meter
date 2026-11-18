@@ -223,6 +223,9 @@ private:
     /// A new HP figure for `id` at `ts`: the fight keeps it as the HP the party left
     /// it at when they hit it no more than kHpSettle before.
     void note_hp_when_hit(EntityId id, Micros ts);
+    /// `hp` is `id`'s max HP or more: a boss reset, as one does the instant the last
+    /// of the party dies, not anything the party did.
+    [[nodiscard]] bool back_to_full(EntityId id, uint64_t hp) const;
     /// A party member's HP reached 0 during a fight: a death, with its recap.
     void record_death(EntityId id, Micros ts);
     /// HP above 0, or their own hit (`by_hit`) more than kInFlight after it: a death
