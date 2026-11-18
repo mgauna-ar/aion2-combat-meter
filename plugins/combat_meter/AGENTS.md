@@ -26,6 +26,14 @@ is switched off the pipeline feeds it nothing; switching it off ends its live fi
     effect kinds.
   - A summon's side is the player side, whoever owns it, and its spawn makes the owner
     a player before any name arrives.
+    - **Unless the owner's HP is no player's** (`kPlayerHpCeiling`, 100,000): a boss
+      owns kind 1F adds too. In the Ludra capture the meter never saw the boss spawn
+      (it started mid-run), the boss's first adds made it a player, and every hit on
+      it after that counted for nothing: each pull ended on idle at its first add
+      phase, 82% left, while the party fought on to the wipe. An id never named or
+      seen spawning whose HP reaches 100,000 is never made a player, and one made a
+      player before its HP came goes back to the enemy side when it does. Players
+      had at most 40,703 there.
   - Ids the meter was never told about get their side from the hits they trade: PvE
     damage only crosses sides.
   - Hits between two unknown ids are held (up to 4096) and settled when either end

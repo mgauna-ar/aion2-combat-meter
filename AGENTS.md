@@ -429,6 +429,10 @@ It gave the faction (Identity, below).
   - **Mask:** 3 bytes, the first the kind (then `20 00` for mobs, `10 00` for the one
     summon seen). 1F/5F are summons (with an owner); 1D/5D are spirits and effects;
     1C is a boss mechanic.
+    - **An NPC can own a 1F:** in the Ludra capture, 37 1F spawns (npc 2,920,671
+      and 2,920,702, unlisted) named the boss as owner, each with the boss's own max
+      HP (85,640,625). An Elementalist's spirit (2,920,107) is a 1F owned by a player,
+      so the kind alone does not tell. Every 5F seen had a player for owner.
   - **Aimed at a player:** bit 0 of the mask's third byte (`1C 00 01`, also on kinds
     14 and 54) puts a name before the npc code: length u8, then the name of the
     party member the mechanic is aimed at. All 57 such spawns in the second capture

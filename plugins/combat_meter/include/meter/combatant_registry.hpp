@@ -91,6 +91,10 @@ public:
     /// Spawn ids fold into [kFoldedLow, kFoldedHigh) (protocol/entity_id.hpp).
     static constexpr EntityId kFoldedLow = 0x4000;
     static constexpr EntityId kFoldedHigh = 0x8000;
+    /// HP no player has: the most any had in the captures was 40,703 (Ludra, 2026-11),
+    /// where open-world mobs have about 120,000 and bosses millions. An id never named
+    /// or seen spawning whose HP reaches it is an NPC, whatever summons it owns.
+    static constexpr uint64_t kPlayerHpCeiling = 100'000;
 
     void on_identity(const proto::Identity& identity);
     void on_spawn(const proto::Spawn& spawn);
@@ -161,8 +165,12 @@ private:
     /// Spawned, and on the enemy side: an NPC for certain, not by inference.
     [[nodiscard]] bool known_npc(EntityId id) const;
     /// Settles `id` as a player over any earlier inference; identity and spawn
-    /// packets still win.
+    /// packets still win, and so does HP no player has.
     void make_player(EntityId id);
+    /// Never named or seen spawning, with HP no player has (kPlayerHpCeiling).
+    [[nodiscard]] static bool npc_by_hp(const Actor& a) noexcept {
+        return !a.is_player && !a.spawned && a.max_hp >= kPlayerHpCeiling;
+    }
     /// Settles held hits that touch a newly known id, and what that settles in turn.
     void settle_pending(EntityId known);
     void mark_players_stale();

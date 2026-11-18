@@ -380,6 +380,21 @@ TEST_CASE(Engine, AResetInTheInstantOfTheLastHitsIsNotWhatTheyLeft) {
     TEST_ASSERT_EQ(line.back(), uint16_t{220});
 }
 
+TEST_CASE(Engine, ABossNeverSeenSpawningStaysTheBossThroughItsAdds) {
+    // The meter started after the boss spawned; the adds it calls name it as owner.
+    constexpr EntityId kUnseenBoss = 51076;
+    EncounterEngine e = setup();
+    e.on_event(ev(at_s(1), hit(kMe, kUnseenBoss, 1'000'000)));
+    e.on_event(ev(at_s(1), hp(kUnseenBoss, 80'000'000)));
+    e.on_event(ev(at_s(5), summon(33429, kUnseenBoss)));
+    e.on_event(ev(at_s(8), hit(kAlly, kUnseenBoss, 2'000'000)));
+    e.on_event(ev(at_s(8), hp(kUnseenBoss, 70'000'000)));
+    const FightSummary s = e.current();
+    TEST_ASSERT_EQ(s.boss.id, kUnseenBoss);
+    TEST_ASSERT_EQ(s.total_damage, uint64_t{3'000'000});
+    TEST_ASSERT_EQ(s.boss.hp, uint64_t{70'000'000});
+}
+
 TEST_CASE(Engine, SummonOfAnUnseenOwnerCountsOnAnyTarget) {
     // Mid-session: no names, and a target that spawned before the meter started.
     EncounterEngine e;
