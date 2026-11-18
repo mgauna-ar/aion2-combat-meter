@@ -98,7 +98,10 @@ std::vector<EffectInstance> EffectBook::on_map_load(Micros ts) {
 
 void EffectBook::prune(Micros now) {
     for (auto on = m_on.begin(); on != m_on.end();) {
-        std::erase_if(on->second, [&](const auto& kv) { return !kv.second.runs_at(now); });
+        // One that ran out stays a little: its 1a 92 is still coming, and must take it.
+        std::erase_if(on->second, [&](const auto& kv) {
+            return !kv.second.permanent && kv.second.expires_at + kRemovalLag <= now;
+        });
         on = on->second.empty() ? m_on.erase(on) : std::next(on);
     }
 }

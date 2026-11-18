@@ -56,7 +56,7 @@ struct EffectApplied {
  *
  * Each application is an instance, so an effect applied again while it runs
  * stacks; 1a 92 names the effect but not the instance, and takes the one that ends
- * soonest. An instance ends at the time its record states, in the server's clock,
+ * soonest: one that ran out a moment ago, whose own 1a 92 it is. An instance ends at the time its record states, in the server's clock,
  * brought onto the capture clock through the last heartbeat (an end more than
  * kExpirySlack from the stated duration is not believed), so a replay sees what the
  * live meter did. A death drops the entity's effects. Ids belong to a map, so a
@@ -76,6 +76,12 @@ public:
     /// A stated end further than this from the stated duration is not believed: the
     /// record's duration, from its arrival, stands in. Renewals ran up to 1.4 s apart.
     static constexpr Micros kExpirySlack = 5 * kMicrosPerSecond;
+    /// How long an instance that ran out is kept for its 1a 92. The server sends one
+    /// as an instance runs its course, 0 to 100 ms after the end the book computes
+    /// (median 49 ms); pruned before it came, it took a live instance of the same
+    /// effect instead (6 of 1,900 removals in the dungeon capture, 25 of 1,816 in
+    /// Ludra's).
+    static constexpr Micros kRemovalLag = 500 * kMicrosPerMilli;
 
     using Instances = std::map<uint32_t, EffectInstance>;
 
@@ -91,12 +97,12 @@ public:
     /// Drops every instance not put on or renewed in the kMapLoadLead before `ts`
     /// (a reload within a run too, since ids may change), and returns them.
     std::vector<EffectInstance> on_map_load(Micros ts);
-    /// Drops what ran out by `now`.
+    /// Drops what ran out kRemovalLag or more before `now`.
     void prune(Micros now);
     void clear() noexcept;
 
     /// The instances on `id` by number, nullptr for none. Those that ran out stay
-    /// until the next prune: ask runs_at().
+    /// for kRemovalLag: ask runs_at().
     [[nodiscard]] const Instances* on(EntityId id) const;
     [[nodiscard]] const std::unordered_map<EntityId, Instances>& all() const noexcept { return m_on; }
     /// Instances running on `id` at `now`.

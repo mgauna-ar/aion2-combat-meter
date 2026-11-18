@@ -469,6 +469,23 @@ TEST_CASE(AuraTarget, TheBiggestEnemyHitLatelyWins) {
     TEST_ASSERT_EQ(p.snapshot(at_s(3)).target_label, std::string("NPC #778"));
 }
 
+TEST_CASE(AuraTarget, AnAddItsBossOwnsNeverTakesTheTarget) {
+    // Ludra's adds are kind 1F, as a player's spirit is, owned by the boss and at
+    // its own max HP: hitting one leaves the boss the target.
+    constexpr EntityId kAdd = 0x4300;
+    AuraPlugin p = setup();
+    proto::Spawn add = summon(kAdd, kBoss);
+    add.has_hp = true;
+    add.cur_hp = add.max_hp = 5'000'000;
+    p.on_event(ev(at_s(0), add));
+    p.on_event(ev(at_s(1), hit(kMe, kBoss, 1000)));
+    p.on_event(ev(at_s(2), hit(kMe, kAdd, 1000)));
+    TEST_ASSERT_EQ(p.snapshot(at_s(2)).target, kBoss);
+    // With the boss down, the add is what is left.
+    p.on_event(ev(at_s(3), hp(kBoss, 0)));
+    TEST_ASSERT_EQ(p.snapshot(at_s(3)).target, kAdd);
+}
+
 TEST_CASE(AuraPluginState, ClearForgetsEverything) {
     AuraPlugin p = setup();
     p.on_event(ev(at_s(1), buff(kMe, kChanter, 1, kMantra, 2400, 0, kMantraSkill)));

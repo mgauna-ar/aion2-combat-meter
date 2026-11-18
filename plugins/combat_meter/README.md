@@ -56,6 +56,8 @@ always be found and dragged back. Switching the plugin off hides it too.
 - In a party, only its members are listed. Pets and summons count for their owner.
 - Started in the middle of a dungeon, it still counts a boss it never saw appear,
   through the adds the boss calls.
+- The adds a boss calls are enemies of their own: damage to them is not the boss's,
+  and one dying is not the boss's kill.
 - Out of a party, only you are listed in the open world, so a crowd at a world boss
   stays out. In a dungeon only your group can be there, so every player is listed.
 - Your own row always shows on the overlay: when you rank below the rows it shows, you

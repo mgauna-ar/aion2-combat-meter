@@ -73,6 +73,24 @@ TEST_CASE(EffectBook, ARemovalTakesTheSoonestAndSaysWhich) {
     TEST_ASSERT(book.on(kMe) == nullptr);
 }
 
+TEST_CASE(EffectBook, ARemovalJustAfterAPruneTakesTheOneThatRanOut) {
+    // The server's 1a 92 for an instance that ran its course comes up to 100 ms
+    // after its end: a prune in between must not leave it a live one to take.
+    EffectBook book;
+    (void)book.on_applied(buff(kMe, kMe, 10, 3015, 5'000), at_s(0));
+    (void)book.on_applied(buff(kMe, kMe, 11, 3015, 15'000), at_s(0));
+    book.prune(at_s(5));
+    TEST_ASSERT_EQ(book.instances_on(kMe, at_s(5)), size_t{1});
+    TEST_ASSERT_EQ(book.on_removed(proto::BuffRemoved{kMe, 3015})->instance, uint32_t{10});
+    TEST_ASSERT_EQ(book.instances_on(kMe, at_s(6)), size_t{1});
+    // One whose 1a 92 never comes goes kRemovalLag after its end.
+    (void)book.on_applied(buff(kMe, kMe, 12, 3015, 1'000), at_s(6));
+    book.prune(at_s(7) + EffectBook::kRemovalLag - 1);
+    TEST_ASSERT_EQ(book.on(kMe)->size(), size_t{2});
+    book.prune(at_s(7) + EffectBook::kRemovalLag);
+    TEST_ASSERT_EQ(book.on(kMe)->size(), size_t{1});
+}
+
 TEST_CASE(EffectBook, AMarkerTakesAwayItsNumber) {
     EffectBook book;
     (void)book.on_applied(buff(kMe, kMe, 3, kMantra, 5000), at_s(1));

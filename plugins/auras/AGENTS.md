@@ -54,9 +54,10 @@ hits, no party.
 
 The overlay's "On <enemy>" section names the enemy the local player is fighting: of
 those they or their summons hit directly (04 38, an amount above 0) in the last 10 s
-(`Entities::kTargetMemory`) and still standing, the one with the most max HP, the
-latest hit on a tie. In a boss fight with adds, the boss. A mechanic aimed at a player
-(`Spawn::aimed_at`) never is.
+(`Entities::kTargetMemory`) and still standing, the one with the most max HP, then
+one no NPC owns, then the latest hit. In a boss fight with adds, the boss: Ludra's adds
+are kind 1F, owned by the boss and at its own max HP, and one hit on one took the
+target until owners counted. A mechanic aimed at a player (`Spawn::aimed_at`) never is.
 - Its label is `game::npc_label` of its npc code, "#id" without one.
 - It replaced "the combat meter's live boss" when Auras became a plugin. Checked on the
   dungeon capture: over the 544 seconds of its three boss fights, it was the meter's
@@ -72,6 +73,11 @@ live in `game::EffectBook` (`src/game`), which the combat meter keeps one of too
 watch list and what the overlay shows are the tracker's own.
 - Every entity's effects are kept, by instance, from 2a 38, 2b 38 and 1a 92. A 1a 92
   takes the instance of that effect that ends soonest.
+  - **One that ran out stays 0.5 s for its 1a 92** (`EffectBook::kRemovalLag`). The
+    server sends one as an instance runs its course, 0 to 100 ms after the end the
+    book computes (median 49 ms). Pruned at the 100 ms tick before it came, its 1a 92
+    took a live instance of the same effect: 6 of 1,900 removals in the dungeon
+    capture, 25 of 1,816 in Ludra's.
 - An instance ends at its record's stated end, brought onto the capture clock by the
   last heartbeat (One clock): a replay shows what the live overlay did. An end more than
   5 s from the stated duration is not believed, and the duration stands in.

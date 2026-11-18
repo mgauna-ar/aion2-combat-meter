@@ -251,6 +251,16 @@ It gave the faction (Identity, below).
   numbers them (`Frame::connection`, carried into `ParsedEvent`), and the plugins tell
   a new run of a dungeon from a reload within one by it
   (plugins/combat_meter/AGENTS.md, Fight end).
+  - **A number is a connection, not an address pair.** Back in town, Windows can
+    hand the town's client port out again: a new SYN on a 4-tuple already seen gets
+    the next number, as the reassembler starts a new stream there. Kept by address
+    pair, it came back under the town's old number, lower than the dungeon's, and the
+    plugins took it for that old connection's last frames.
+- **The map and the local player's name are the pipeline's**, from 21 36 and 33 36,
+  whatever plugins are on: every overlay's `show_in_dungeons_only` and the dashboard
+  read them, and they once came from the meter's engine, which hears nothing while
+  the meter is off. The meter's registry still names the local player while it runs
+  (it knows them from 00 8D when 33 36 was missed).
 - Reassembly (`TcpReassembler`): a hole waits 300 ms, or until 1 MiB queues behind it,
   then is a gap. A segment more than 4 MiB ahead is ignored as a stray, unless nothing
   else arrives for 300 ms: then the capture lost that much, and the stream skips there.
@@ -433,6 +443,9 @@ It gave the faction (Identity, below).
       and 2,920,702, unlisted) named the boss as owner, each with the boss's own max
       HP (85,640,625). An Elementalist's spirit (2,920,107) is a 1F owned by a player,
       so the kind alone does not tell. Every 5F seen had a player for owner.
+      A summon an NPC owns is an enemy of its own to the plugins: the meter books
+      no hit on it, nor its death, to the boss, and the Auras' target stays on the
+      boss (plugins/combat_meter/AGENTS.md, Sides; plugins/auras/AGENTS.md, The target).
   - **Aimed at a player:** bit 0 of the mask's third byte (`1C 00 01`, also on kinds
     14 and 54) puts a name before the npc code: length u8, then the name of the
     party member the mechanic is aimed at. All 57 such spawns in the second capture
