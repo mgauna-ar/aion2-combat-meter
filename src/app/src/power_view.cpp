@@ -48,32 +48,16 @@ PowerLayout power_layout(const combat_power::PowerSnapshot& power, const PowerSe
     PowerLayout layout;
     layout.distances = settings.sort_by_distance && power.has_local_position;
     layout.stale = layout.distances && power.local_position_stale;
-    // An order by distance from where the local player stood a while ago is no order.
-    const bool by_distance = layout.distances && !layout.stale;
-    std::vector<combat_power::PowerRow> source =
-        settings.only_enemies ? power.enemies : by_distance ? power.nearest : power.players;
-    if (settings.only_enemies && by_distance) {
-        // The enemies come strongest first: nearest first, as `nearest` is, those
-        // that lead still leading.
-        std::stable_sort(source.begin(), source.end(), [](const auto& a, const auto& b) {
-            if (a.threat != b.threat) return a.threat;
-            if (a.has_distance() != b.has_distance()) return a.has_distance();
-            return a.has_distance() && a.distance_m < b.distance_m;
-        });
-    }
-    if (!settings.enemies_first) {
-        // The snapshot's lists lead with the enemies: back to one order for all.
-        std::stable_sort(source.begin(), source.end(), [&](const auto& a, const auto& b) {
-            if (!by_distance) return a.combat_power > b.combat_power;
-            if (a.has_distance() != b.has_distance()) return a.has_distance();
-            return a.has_distance() && a.distance_m < b.distance_m;
-        });
-    }
+    // An order by distance from where the local player stood a while ago is no
+    // order: the rows carry no distance then, and come strongest first.
+    const combat_power::ListOrder order{layout.distances && !layout.stale, settings.enemies_first};
     if (settings.show_list) {
-        const size_t shown = std::min(source.size(), static_cast<size_t>(std::max(settings.list_max_players, 0)));
-        layout.rows.assign(source.begin(), source.begin() + static_cast<std::ptrdiff_t>(shown));
+        // The snapshot's own cut, for whichever order: the first rows of every
+        // order are in it, and only there are they known to be the first.
+        layout.rows = power.list(settings.only_enemies, order, static_cast<size_t>(std::max(settings.list_max_players, 0)));
         const uint32_t all = settings.only_enemies ? power.enemies_in_view : power.in_view;
-        layout.more = all > shown ? all - static_cast<uint32_t>(shown) : 0;
+        const auto shown = static_cast<uint32_t>(layout.rows.size());
+        layout.more = all > shown ? all - shown : 0;
     }
     const bool listed = std::any_of(layout.rows.begin(), layout.rows.end(),
                                     [&](const combat_power::PowerRow& row) { return row.id == power.target.id; });

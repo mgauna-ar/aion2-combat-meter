@@ -203,24 +203,53 @@ std::optional<Position> read_position(ByteReader& r, uint16_t op) {
 /// its low four bits were 2 or 6 in every record of the four captures.
 [[nodiscard]] bool position_flags(uint8_t b) noexcept { return (b & 0x0F) == 0x02 || (b & 0x0F) == 0x06; }
 
+/// The point after `bytes`' first byte, if that byte is a flags byte
+/// (position_flags) and three floats follow that are a point on a map and not its
+/// origin: no map has anyone within a unit of it on every axis, so that is misread
+/// zeros.
+[[nodiscard]] std::optional<Point> point_after_flags(std::span<const uint8_t> bytes) {
+    ByteReader r(bytes);
+    if (!position_flags(r.u8())) return std::nullopt;
+    const Point at{r.f32le(), r.f32le(), r.f32le()};
+    if (!r.ok() || !plausible_coordinate(at.x) || !plausible_coordinate(at.y) || !plausible_coordinate(at.z)) {
+        return std::nullopt;
+    }
+    if (std::fabs(at.x) < 1.0f && std::fabs(at.y) < 1.0f && std::fabs(at.z) < 1.0f) return std::nullopt;
+    return at;
+}
+
+/// Whether every axis of `p` is a unit or more from the origin. Read a byte off, a
+/// point's floats are cut across, and their exponents come from the true ones'
+/// fractions: one axis or more lands under a unit (-47,736 read as 0.0009) as
+/// often as not.
+[[nodiscard]] bool whole_units(const Point& p) noexcept {
+    return std::fabs(p.x) >= 1.0f && std::fabs(p.y) >= 1.0f && std::fabs(p.z) >= 1.0f;
+}
+
 /// Where a player's record (33 36, 45 36) says they stand, read after its class.
 /// - A byte, a flags byte (position_flags), then x, y, z: straight after the class
 ///   in another player's record, 154 bytes on in the local player's own.
 /// - On the fourth capture's map (20, both factions in view) one byte more comes
-///   before the flags byte, in both records: read as the position there, it put
-///   everyone at the origin.
+///   before them, in both records: read as the position there, it put everyone at
+///   the origin. So the flags byte is the first or the second looked at.
+/// - The byte before the flags (00, 80, 88 or C0 in every record of the captures)
+///   never passed as one. Should a byte that does come first, the point decides:
+///   the reading whose every axis is a unit or more (whole_units), the first when
+///   both or neither are.
 /// Nothing for a record too short to hold it, whose flags byte is not where either
 /// shape puts it, or whose floats are no point or the origin: the name it gave
 /// stands either way.
 void read_identity_position(ByteReader r, Identity& id) {
     r.skip(id.own ? 155 : 1);
-    if (!position_flags(r.u8()) && !position_flags(r.u8())) return;
-    const Point at{r.f32le(), r.f32le(), r.f32le()};
-    if (!r.ok() || !plausible_coordinate(at.x) || !plausible_coordinate(at.y) || !plausible_coordinate(at.z)) return;
-    // No map has anyone within a unit of its origin on every axis: misread zeros.
-    if (std::fabs(at.x) < 1.0f && std::fabs(at.y) < 1.0f && std::fabs(at.z) < 1.0f) return;
+    const std::span<const uint8_t> rest = r.rest();
+    if (rest.empty()) return;
+    const std::optional<Point> first = point_after_flags(rest);
+    const std::optional<Point> second = point_after_flags(rest.subspan(1));
+    std::optional<Point> at = first;
+    if (!first || (second && !whole_units(*first) && whole_units(*second))) at = second;
+    if (!at) return;
     id.has_position = true;
-    id.position = at;
+    id.position = *at;
 }
 
 std::optional<Spawn> read_spawn(std::span<const uint8_t> body) {

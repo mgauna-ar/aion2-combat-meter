@@ -296,15 +296,20 @@ inline Bytes own_identity_body(uint64_t id, std::string_view name, uint16_t serv
 }
 
 /// 33 36 as the game sends it, as far as it is read: the identity (its class's
-/// third byte the faction), 155 bytes of filler, a flags byte and where the local
-/// player stands, then the rest of the record (filler). `zone_byte` puts one byte
-/// more before the flags, as the fourth capture's map does.
+/// third byte the faction), 154 bytes of filler ending 00 00, a byte (80), a flags
+/// byte and where the local player stands, then the rest of the record (filler).
+/// `zone_byte` puts one byte more (01) before the 00 00, as the fourth capture's
+/// map does: there it came in a list some 20 bytes before the position, and the
+/// byte before the flags was 80 still.
 inline Bytes own_player_body(uint64_t id, std::string_view name, uint16_t server, float x = kTownX,
                              float y = kTownY, float z = kTownZ, uint8_t faction = 1, bool zone_byte = false) {
     Bytes b = own_identity_body(id, name, server, 0x2D000000u | (uint32_t{faction} << 16));
     // own_identity_body's level is the first four of the 155.
-    b.resize(b.size() + 151, 0x64);
-    if (zone_byte) b.push_back(faction);
+    b.resize(b.size() + 148, 0x64);
+    if (zone_byte) b.push_back(0x01);
+    b.push_back(0x00);
+    b.push_back(0x00);
+    b.push_back(0x80);
     b.push_back(0xD2);
     put_f32(b, x);
     put_f32(b, y);

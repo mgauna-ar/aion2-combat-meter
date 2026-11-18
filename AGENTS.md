@@ -425,9 +425,18 @@ It gave the faction (Identity, below).
     - **It is found from the tag,** not from the end: 11 records had one byte more
       after the zeros (01 in 6, 00 in 5), and a figure's own high bytes are zeros, so
       from the end those five read 256 times too small.
-    - **The other shapes:** 2 records had a 01 between the rank and the figure; the
-      level-11 character's had no title and no rank, the figure straight after the
-      tag. A record with no tag is read from the end, past a last byte that is not 0.
+    - **The other shapes:** 2 records had a 01 between the rank and the figure (6
+      of the three captures' records: four 01, two 03); the level-11 character's had
+      no title and no rank, the figure straight after the tag. A record with no tag
+      is read from the end, past a last byte that is not 0.
+    - **That byte and a 00 after the zeros can look alike.** Before a figure under
+      39,063, read from the byte, the figure is 256 times itself plus the byte, and
+      the record reads as one ending in a 00 more would (4,756 read 1,217,537). Where
+      both read, a byte of 1 to 3 is taken for the inserted one: a figure's low byte
+      is anything, so 1 to 3 there is that byte far more often than a figure's.
+    - **Not read yet:** 4 of the dungeon capture's records had a title and no rank
+      (13 bytes after the tag), and 2 of the map-20 capture's four bytes more
+      between the rank and the figure. Those show "-".
     - Item level (2,700 on the opponent's page) is not among these fields.
     - **33 36 does not end with it:** the local player's own record ends in a list of
       small u32s, and their combat power has not been found.
@@ -631,10 +640,17 @@ the three captures read as a point on their map):
   flags byte whose low four bits are 2 or 6 (D2, 52, 92, 12, D6), then x, y, z. In
   `45 36` that is straight after the class; in `33 36`, 154 bytes on. So the local
   player's position is known on entering each map.
-  - **On map 20 one byte more comes before the flags byte,** in both records (the
-    faction again, in 45 36). The reader finds the flags byte in either place
-    (`read_identity_position`); read two bytes after the class as on other maps,
-    that capture's records put their players at or near the origin.
+  - **On map 20 one byte more comes before the flags byte,** in both records. In
+    45 36 it is the faction again, straight after the class. In 33 36 it is in a
+    list that ends some 20 bytes before the position (`05 01 03 01 7f ...` where
+    other maps had `05 03 01 7f ...`), the byte before the flags 80 still. The
+    reader finds the flags byte in either place (`read_identity_position`); read two
+    bytes after the class as on other maps, that capture's records put their
+    players at or near the origin.
+  - **The byte before the flags never passed as one:** 00, 80, 88 or C0 in every
+    record of the captures. Should one, the point decides: read a byte early, a
+    point's floats are cut across, and an axis comes out under a unit (-47,736 read
+    as 0.0009), so the reading whose every axis is a unit or more is taken.
   - A position within a unit of the origin on every axis is not believed.
 - **A pressed cast's tail** (`02 38`, mode 2) is a heading (f32, degrees) and a point:
   the target's last position to the unit in many records, some metres from it in
@@ -737,6 +753,10 @@ the three captures read as a point on their map):
   counts for nothing (plugins/combat_meter/AGENTS.md, Party and Healing);
 - what the extra byte in a player's record on map 20 marks (a PvP zone, perhaps),
   and what map 20 is: it has no row in `maps.tsv`;
+- **whether the local player's position always sits 154 bytes on in 33 36.** The
+  bytes before it end in a list, a byte longer on map 20. A faction-2 character's,
+  or one with more in that list, may run longer still, and the reader looks in two
+  places only. Every own record of the captures is one faction-1 character's;
 
 **The client's own files cannot fill in names.** They were checked on the Steam install
 in 2026-10.

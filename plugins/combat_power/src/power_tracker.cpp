@@ -7,6 +7,8 @@
 #include <cmath>
 #include <cstddef>
 #include <iterator>
+#include <string_view>
+#include <utility>
 #include <vector>
 
 namespace aion2::combat_power {
@@ -23,7 +25,48 @@ constexpr float kUnitsPerMetre = 100.0f;
     return std::sqrt(dx * dx + dy * dy + dz * dz) / kUnitsPerMetre;
 }
 
+/// What a list orders a player by: a row's fields, or a player's worked out once
+/// without copying their name.
+struct ListKey {
+    bool threat{false};
+    uint32_t combat_power{0};
+    /// Negative for none known.
+    float distance_m{-1.0f};
+    std::string_view name;
+    EntityId id{0};
+};
+
+[[nodiscard]] bool before(const ListKey& a, const ListKey& b, ListOrder order) noexcept {
+    if (order.threats_first && a.threat != b.threat) return a.threat;
+    if (order.by_distance) {
+        const bool a_known = a.distance_m >= 0.0f;
+        const bool b_known = b.distance_m >= 0.0f;
+        if (a_known != b_known) return a_known;
+        if (a_known && a.distance_m != b.distance_m) return a.distance_m < b.distance_m;
+    }
+    if (a.combat_power != b.combat_power) return a.combat_power > b.combat_power;
+    if (a.name != b.name) return a.name < b.name;
+    return a.id < b.id;
+}
+
+/// Every order the view can list in, the first the snapshot's own.
+constexpr ListOrder kOrders[] = {{false, true}, {false, false}, {true, true}, {true, false}};
+
 } // namespace
+
+bool listed_before(const PowerRow& a, const PowerRow& b, ListOrder order) noexcept {
+    return before(ListKey{a.threat, a.combat_power, a.distance_m, a.name, a.id},
+                  ListKey{b.threat, b.combat_power, b.distance_m, b.name, b.id}, order);
+}
+
+std::vector<PowerRow> PowerSnapshot::list(bool only_enemies, ListOrder order, size_t count) const {
+    std::vector<PowerRow> rows = only_enemies ? enemies : players;
+    const size_t shown = std::min({rows.size(), count, PowerTracker::kMaxListed});
+    std::partial_sort(rows.begin(), rows.begin() + static_cast<std::ptrdiff_t>(shown), rows.end(),
+                      [&](const PowerRow& a, const PowerRow& b) { return listed_before(a, b, order); });
+    rows.resize(shown);
+    return rows;
+}
 
 bool PowerTracker::follow(uint32_t connection) {
     if (!m_has_connection) {
@@ -197,7 +240,9 @@ void PowerTracker::aim(EntityId target, Micros ts) {
     m_target_at = ts;
 }
 
-void PowerTracker::on_cast(const proto::SkillCast& cast, Micros ts) {
+void PowerTracker::on_cast(const proto::SkillCast& cast, uint32_t connection, Micros ts) {
+    // Another connection's ids are another map's: its caster is someone else here.
+    if (!current(connection)) return;
     learn_class(cast.caster, cast.skill);
     if (m_local == 0 || cast.caster != m_local || !cast.pressed) return;
     // A self-cast says nothing of the target.
@@ -206,11 +251,16 @@ void PowerTracker::on_cast(const proto::SkillCast& cast, Micros ts) {
     else m_target = 0;
 }
 
-void PowerTracker::on_damage(const proto::Damage& damage, Micros ts) {
+void PowerTracker::on_damage(const proto::Damage& damage, uint32_t connection, Micros ts) {
+    if (!current(connection)) return;
     learn_class(damage.actor, damage.skill);
     if (m_local == 0 || damage.actor != m_local || damage.target == m_local) return;
     // An area skill hits monsters around a player too: only a press lets go.
-    if (m_players.contains(damage.target)) aim(damage.target, ts);
+    const auto player = m_players.find(damage.target);
+    if (player == m_players.end()) return;
+    // 04 38 carries heals too, and a passive's or a spirit's heal on an ally is no
+    // aim: a hit names an enemy, and on anyone else only renews the target.
+    if (hostile(player->second) || damage.target == m_target) aim(damage.target, ts);
 }
 
 void PowerTracker::on_map_load(const proto::MapLoad& map, uint32_t connection, Micros ts) {
@@ -248,56 +298,63 @@ PowerSnapshot PowerTracker::snapshot(Micros now) const {
         if (const auto target = m_players.find(m_target); target != m_players.end()) s.target = row_of(target->second);
     }
 
-    // Pointers first: a town's crowd is sorted without copying its names.
-    std::vector<const Player*> rows;
-    rows.reserve(m_players.size());
-    std::transform(m_players.begin(), m_players.end(), std::back_inserter(rows),
-                   [](const auto& entry) { return &entry.second; });
-    const auto listed = static_cast<std::ptrdiff_t>(std::min(rows.size(), kMaxListed));
+    // Each player as a list sees them, worked out once: a town's crowd is sorted by
+    // these, its names not copied.
+    struct Ranked {
+        const Player* player;
+        ListKey key;
+        bool hostile;
+    };
+    std::vector<Ranked> everyone;
+    everyone.reserve(m_players.size());
+    for (const auto& entry : m_players) {
+        const Player& player = entry.second;
+        const float distance = measurable && player.has_position ? metres_between(player.at, m_local_at) : -1.0f;
+        everyone.push_back(Ranked{&player,
+                                  ListKey{threat(player, measurable), player.row.combat_power, distance,
+                                          player.row.name, player.row.id},
+                                  hostile(player)});
+    }
     s.hostile_in_view = static_cast<uint32_t>(
-        std::count_if(rows.begin(), rows.end(), [&](const Player* p) { return threat(*p, measurable); }));
-    // Enemies lead either list: the cut at kMaxListed must not be what hides one.
-    const auto stronger = [&](const Player* a, const Player* b) {
-        if (threat(*a, measurable) != threat(*b, measurable)) return threat(*a, measurable);
-        if (a->row.combat_power != b->row.combat_power) return a->row.combat_power > b->row.combat_power;
-        if (a->row.name != b->row.name) return a->row.name < b->row.name;
-        return a->row.id < b->row.id;
-    };
-    std::partial_sort(rows.begin(), rows.begin() + listed, rows.end(), stronger);
-    s.players.reserve(static_cast<size_t>(listed));
-    for (std::ptrdiff_t i = 0; i < listed; ++i) s.players.push_back(row_of(*rows[static_cast<size_t>(i)]));
+        std::count_if(everyone.begin(), everyone.end(), [](const Ranked& r) { return r.key.threat; }));
 
-    // The enemies on their own: the cut above keeps those that lead, not those out
-    // of range or dead, who still have their red name.
-    std::vector<const Player*> enemies;
-    std::copy_if(rows.begin(), rows.end(), std::back_inserter(enemies), [&](const Player* p) { return hostile(*p); });
-    s.enemies_in_view = static_cast<uint32_t>(enemies.size());
-    const auto enemies_listed = static_cast<std::ptrdiff_t>(std::min(enemies.size(), kMaxListed));
-    std::partial_sort(enemies.begin(), enemies.begin() + enemies_listed, enemies.end(), stronger);
-    s.enemies.reserve(static_cast<size_t>(enemies_listed));
-    for (std::ptrdiff_t i = 0; i < enemies_listed; ++i) s.enemies.push_back(row_of(*enemies[static_cast<size_t>(i)]));
-    if (!measurable) return s;
-
-    // The nearest: squared distances order as distances do. One whose position is
-    // not known comes after all that are, the strongest of those first.
-    const auto squared = [&](const Player* p) {
-        const float dx = p->at.x - m_local_at.x;
-        const float dy = p->at.y - m_local_at.y;
-        const float dz = p->at.z - m_local_at.z;
-        return dx * dx + dy * dy + dz * dz;
-    };
-    std::partial_sort(rows.begin(), rows.begin() + listed, rows.end(), [&](const Player* a, const Player* b) {
-        if (threat(*a, true) != threat(*b, true)) return threat(*a, true);
-        if (a->has_position != b->has_position) return a->has_position;
-        if (a->has_position) {
-            const float da = squared(a);
-            const float db = squared(b);
-            if (da != db) return da < db;
+    // Of a crowd, the first kMaxListed in each order the view can pick: cut in one
+    // order and sorted in another, a list loses the rows that lead the second (the
+    // nearest enemy, cut for being the weakest). Enemies lead the orders that put the
+    // threats first, so no crowd of allies hides one.
+    const auto listable = [](std::vector<Ranked>& rows) {
+        const auto cut = static_cast<std::ptrdiff_t>(std::min(rows.size(), kMaxListed));
+        std::vector<Ranked> kept;
+        kept.reserve(static_cast<size_t>(cut) * std::size(kOrders));
+        for (const ListOrder order : kOrders) {
+            std::partial_sort(rows.begin(), rows.begin() + cut, rows.end(),
+                              [&](const Ranked& a, const Ranked& b) { return before(a.key, b.key, order); });
+            kept.insert(kept.end(), rows.begin(), rows.begin() + cut);
         }
-        return stronger(a, b);
-    });
-    s.nearest.reserve(static_cast<size_t>(listed));
-    for (std::ptrdiff_t i = 0; i < listed; ++i) s.nearest.push_back(row_of(*rows[static_cast<size_t>(i)]));
+        std::sort(kept.begin(), kept.end(),
+                  [](const Ranked& a, const Ranked& b) { return before(a.key, b.key, kOrders[0]); });
+        kept.erase(std::unique(kept.begin(), kept.end(),
+                               [](const Ranked& a, const Ranked& b) { return a.player == b.player; }),
+                   kept.end());
+        std::vector<PowerRow> out;
+        out.reserve(kept.size());
+        for (const Ranked& r : kept) {
+            PowerRow row = r.player->row;
+            row.hostile = r.hostile;
+            row.threat = r.key.threat;
+            row.distance_m = r.key.distance_m;
+            out.push_back(std::move(row));
+        }
+        return out;
+    };
+    s.players = listable(everyone);
+
+    // The enemies on their own: a crowd's cut keeps those that lead, not those out
+    // of range or dead, who still have their red name.
+    std::vector<Ranked> enemies;
+    std::copy_if(everyone.begin(), everyone.end(), std::back_inserter(enemies), [](const Ranked& r) { return r.hostile; });
+    s.enemies_in_view = static_cast<uint32_t>(enemies.size());
+    s.enemies = listable(enemies);
     return s;
 }
 

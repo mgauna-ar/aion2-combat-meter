@@ -300,7 +300,6 @@ combat_power::PowerSnapshot power_demo() {
         {227, "Nezekan", 9, game::AionClass::Templar, 134'667, 3.0f},
         {301, "Triniel", 9, game::AionClass::Assassin, 121'480, 14.0f},
     };
-    p.nearest = p.players;
     p.has_local_position = true;
     p.in_view = static_cast<uint32_t>(p.players.size());
     p.target = p.players.front();
@@ -312,12 +311,11 @@ combat_power::PowerSnapshot power_demo() {
 combat_power::PowerSnapshot power_distance_demo() {
     combat_power::PowerSnapshot p;
     p.map_id = 20;
-    p.nearest = {
-        {227, "Nezekan", 23, game::AionClass::Templar, 134'667, 38.0f, true},
+    p.players = {
+        {227, "Nezekan", 23, game::AionClass::Templar, 134'667, 38.0f, true, true},
         {301, "Triniel", 9, game::AionClass::Assassin, 121'480, 4.0f},
         {512, "Vaizel", 9, game::AionClass::Ranger, 98'300, 9.0f},
     };
-    p.players = p.nearest;
     p.has_local_position = true;
     p.in_view = 12;
     p.hostile_in_view = 1;

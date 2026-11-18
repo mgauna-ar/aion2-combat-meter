@@ -43,21 +43,36 @@ struct PowerRow {
     bool operator==(const PowerRow&) const = default;
 };
 
+/// An order the players can be listed in: the overlay's sort_by_distance and
+/// enemies_first.
+struct ListOrder {
+    /// Nearest first, those at no known distance after all who are; else strongest
+    /// first.
+    bool by_distance{false};
+    /// The threats (PowerRow::threat) ahead of everyone else.
+    bool threats_first{true};
+};
+
+/// Whether `a` is listed before `b` in `order`: the threats first where the order
+/// puts them there, then the nearest or the strongest, then the stronger, by name,
+/// by id. The engine cuts its lists by it and the view sorts by it, so the rows a
+/// cut keeps are the rows the view would put first.
+[[nodiscard]] bool listed_before(const PowerRow& a, const PowerRow& b, ListOrder order) noexcept;
+
 /// What the combat power overlay draws.
 struct PowerSnapshot {
     /// The player the local player last used a skill on; `target.id` 0 for none.
     PowerRow target;
-    /// The other players on the map, the enemies within reach first, each group
-    /// strongest first: all of an arena's opponents or a dungeon's party, and of a
-    /// crowd the first PowerTracker::kMaxListed, so no crowd of allies hides an enemy.
+    /// The other players on the map a list can show: each that some ListOrder puts
+    /// among its first PowerTracker::kMaxListed. All of an arena's opponents or a
+    /// dungeon's party; of a crowd, the union of every order's cut, so no crowd of
+    /// allies hides an enemy and no order loses a row to another order's cut. In the
+    /// first order (threats first, then strongest); list() puts them in any.
     std::vector<PowerRow> players;
-    /// The same players, the enemies within reach first, each group nearest first,
-    /// those at no known distance last: of a crowd, the first PowerTracker::kMaxListed.
-    /// Empty while the local player's position is not known, or stale.
-    std::vector<PowerRow> nearest;
-    /// The hostile players alone, near or far, alive or dead, in `players`' order:
-    /// the first PowerTracker::kMaxListed. A crowd's cut of `players` can leave out
-    /// an enemy out of range or dead, and a list of enemies only must not.
+    /// The hostile players alone, near or far, alive or dead, the same way: each that
+    /// some order puts among the first kMaxListed of them. A crowd's cut of `players`
+    /// can leave out an enemy out of range or dead, and a list of enemies only must
+    /// not.
     std::vector<PowerRow> enemies;
     /// How many there are, listed or not; how many of them are enemies within
     /// PowerTracker::kEnemyRange and alive, the ones that lead the lists; and how
@@ -75,6 +90,12 @@ struct PowerSnapshot {
     /// sooner after moving fast): the rows' distances are not worked out, and an
     /// enemy leads the lists at any distance, as when it is not known.
     bool local_position_stale{false};
+
+    /// The first `count` of the players, or of the enemies alone, in `order`: at most
+    /// PowerTracker::kMaxListed, the most the snapshot holds for every order. With no
+    /// distance known (no position of the local player's, or a stale one) the rows
+    /// carry none, and by distance is strongest first.
+    [[nodiscard]] std::vector<PowerRow> list(bool only_enemies, ListOrder order, size_t count) const;
 
     bool operator==(const PowerSnapshot&) const = default;
 };
@@ -128,7 +149,8 @@ public:
     static constexpr Micros kTargetMemory = 30 * kMicrosPerSecond;
     /// How long before a map's 21 36 its players may be named.
     static constexpr Micros kEarlyArrival = 2 * kMicrosPerSecond;
-    /// Most players a snapshot lists: of a crowd, the strongest.
+    /// Most players a list of a snapshot's holds (PowerSnapshot::list): of a crowd,
+    /// the first in its order.
     static constexpr size_t kMaxListed = 12;
     /// How far an enemy may be and still lead the lists, in metres: about twice as
     /// far as the farthest a player's record first came in the fourth capture.
@@ -154,8 +176,13 @@ public:
     /// 00 8D: the local player's own values name them when 33 36 was missed; anyone
     /// else's HP says whether they are dead.
     void on_values(const proto::RemainingHp& values, uint32_t connection);
-    void on_cast(const proto::SkillCast& cast, Micros ts);
-    void on_damage(const proto::Damage& damage, Micros ts);
+    /// A skill going off (02 38): it says the caster's class, and the local player's
+    /// press names the target. Over another connection than the one followed, the
+    /// ids are another map's, and it says nothing.
+    void on_cast(const proto::SkillCast& cast, uint32_t connection, Micros ts);
+    /// A hit (04 38): the actor's class, and the local player's hit on an enemy names
+    /// the target. Over another connection, nothing.
+    void on_damage(const proto::Damage& damage, uint32_t connection, Micros ts);
     void on_map_load(const proto::MapLoad& map, uint32_t connection, Micros ts);
     /// A step, or a skill that moved someone: a listed player's, or the local player's.
     void on_position(const proto::Position& position, uint32_t connection, Micros ts);
