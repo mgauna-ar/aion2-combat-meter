@@ -163,6 +163,9 @@ void CombatantRegistry::on_hp(EntityId id, uint64_t hp) {
     // Without a spawn (it came into view before the meter started), the most HP
     // seen is the best lower bound on its max.
     if (hp > a.max_hp) a.max_hp = hp;
+    // A boss the meter never saw spawn, taken for a player by a summon's spawn naming
+    // it as owner before its HP came: no player has that much.
+    if (npc_by_hp(a) && a.inferred_side == Side::Player) a.inferred_side = Side::Enemy;
     // A player is up again: one named, or one known only from the hits they trade.
     if (hp > 0 && (a.is_player || a.inferred_side == Side::Player)) a.dead = false;
 }
@@ -281,8 +284,10 @@ bool CombatantRegistry::known_npc(EntityId id) const {
 
 void CombatantRegistry::make_player(EntityId id) {
     const Actor* a = find(id);
-    // Identity and spawn packets outrank anything inferred.
-    if (a != nullptr && (a->is_player || a->spawned)) return;
+    // Identity and spawn packets outrank anything inferred. So does HP: Ludra's adds
+    // (kind 1F, as a player's spirit is) name the boss as their owner, and a boss the
+    // meter never saw spawn would have become a player, its hits no longer counted.
+    if (a != nullptr && (a->is_player || a->spawned || npc_by_hp(*a))) return;
     if (side(id) == Side::Player) return;
     get_or_create(id).inferred_side = Side::Player;
     settle_pending(id);

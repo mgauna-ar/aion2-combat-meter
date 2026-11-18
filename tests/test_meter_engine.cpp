@@ -357,6 +357,44 @@ TEST_CASE(Engine, AWipeKeepsTheEstimateOverABossSpawnedAgain) {
     TEST_ASSERT_EQ(s.boss.hp, kBossHp - 2'500'000);
 }
 
+TEST_CASE(Engine, AResetInTheInstantOfTheLastHitsIsNotWhatTheyLeft) {
+    // Ludra, second pull: the last of the party died with hits in flight, and the
+    // boss's next figure, in the same 100 ms, was its max HP.
+    EncounterEngine e = setup();
+    e.on_event(ev(at_s(1), hit(kMe, kBoss, 1'000'000)));
+    e.on_event(ev(at_s(1), hp(kBoss, 3'000'000)));
+    e.on_event(ev(at_s(8.0), hit(kAlly, kBoss, 500'000)));
+    e.on_event(ev(at_s(8.0), hp(kBoss, 1'100'000)));
+    e.on_event(ev(at_s(8.1), hp(kAlly, 0)));
+    e.on_event(ev(at_s(8.2), hit(kMe, kBoss, 4'000)));
+    e.on_event(ev(at_s(8.2), hp(kBoss, kBossHp)));
+    // A DoT still ticking on it once it reset.
+    e.on_event(ev(at_s(8.3), dot(kMe, kBoss, 300)));
+    e.tick(at_s(60));
+    const FightSummary s = e.take_finished().at(0);
+    TEST_ASSERT_FALSE(s.boss.killed);
+    TEST_ASSERT_EQ(s.boss.hp, uint64_t{1'100'000});
+    // The boss's line ends where they left it, too.
+    const auto& line = s.detail->timeline.boss_hp.permille;
+    TEST_ASSERT_FALSE(line.empty());
+    TEST_ASSERT_EQ(line.back(), uint16_t{220});
+}
+
+TEST_CASE(Engine, ABossNeverSeenSpawningStaysTheBossThroughItsAdds) {
+    // The meter started after the boss spawned; the adds it calls name it as owner.
+    constexpr EntityId kUnseenBoss = 51076;
+    EncounterEngine e = setup();
+    e.on_event(ev(at_s(1), hit(kMe, kUnseenBoss, 1'000'000)));
+    e.on_event(ev(at_s(1), hp(kUnseenBoss, 80'000'000)));
+    e.on_event(ev(at_s(5), summon(33429, kUnseenBoss)));
+    e.on_event(ev(at_s(8), hit(kAlly, kUnseenBoss, 2'000'000)));
+    e.on_event(ev(at_s(8), hp(kUnseenBoss, 70'000'000)));
+    const FightSummary s = e.current();
+    TEST_ASSERT_EQ(s.boss.id, kUnseenBoss);
+    TEST_ASSERT_EQ(s.total_damage, uint64_t{3'000'000});
+    TEST_ASSERT_EQ(s.boss.hp, uint64_t{70'000'000});
+}
+
 TEST_CASE(Engine, SummonOfAnUnseenOwnerCountsOnAnyTarget) {
     // Mid-session: no names, and a target that spawned before the meter started.
     EncounterEngine e;

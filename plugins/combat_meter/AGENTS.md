@@ -26,6 +26,14 @@ is switched off the pipeline feeds it nothing; switching it off ends its live fi
     effect kinds.
   - A summon's side is the player side, whoever owns it, and its spawn makes the owner
     a player before any name arrives.
+    - **Unless the owner's HP is no player's** (`kPlayerHpCeiling`, 100,000): a boss
+      owns kind 1F adds too. In the Ludra capture the meter never saw the boss spawn
+      (it started mid-run), the boss's first adds made it a player, and every hit on
+      it after that counted for nothing: each pull ended on idle at its first add
+      phase, 82% left, while the party fought on to the wipe. An id never named or
+      seen spawning whose HP reaches 100,000 is never made a player, and one made a
+      player before its HP came goes back to the enemy side when it does. Players
+      had at most 40,703 there.
   - Ids the meter was never told about get their side from the hits they trade: PvE
     damage only crosses sides.
   - Hits between two unknown ids are held (up to 4096) and settled when either end
@@ -107,10 +115,19 @@ is switched off the pipeline feeds it nothing; switching it off ends its live fi
     HP minus all damage seen since the spawn, shown with `~`.
   - **A finished fight keeps the HP the party left it at:** its HP as the last hit
     landed, and the server's figures up to `kHpSettle` (0.5 s) after a hit. A boss
-    left standing by a wipe resets to full HP once no one is left, seconds before
-    the fight times out, by a new HP figure or a new spawn; the history's "Wipe 23%"
-    and "23% left" would otherwise always read 100%. The live fight shows the HP
-    now. What the reset sends is inferred, not seen in a capture (AGENTS.md).
+    left standing by a wipe resets to full HP once no one is left, before the fight
+    times out; the history's "Wipe 23%" and "23% left" would otherwise always read
+    100%. The live fight shows the HP now.
+    - **Full HP is never what a hit left** (`back_to_full`): the Ludra capture's
+      second wipe sent the reset (a 00 8D at max HP) in the same 100 ms as the party's
+      last hits, in flight as the last of them died. So a figure at max HP, or a hit
+      landing on a boss at it, leaves the kept HP as it was. That wipe's fight kept
+      21.8%, the server's last figure before the reset; the first wipe's reset came
+      30 s later, and kept 65.2%.
+    - The boss's timeline line skips a reset in the same second as a lower figure,
+      so it ends where the party left it.
+    - A new spawn at full HP after the last hit is caught the same way, by
+      `kHpSettle`; no capture has shown one.
   - A mob that spawned before the meter started has no max HP; the most 00 8D HP seen
     stands in for it.
   - **Partial:** a killed boss that lost less than `partial_damage_ratio` of its HP (by

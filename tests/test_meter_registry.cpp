@@ -232,6 +232,32 @@ TEST_CASE(Registry, SummonsOwnerIsAPlayerBeforeTheirName) {
     TEST_ASSERT(r.side(300) == Side::Player);
 }
 
+TEST_CASE(Registry, ABossAddNeverMakesItsOwnerAPlayer) {
+    // Ludra: the meter never saw the boss spawn, and its adds (kind 1F, as a
+    // player's spirit is) name it as their owner.
+    CombatantRegistry r;
+    r.on_identity(player(100, "Ariel", true));
+    r.observe_hit(100, 51076);
+    r.on_hp(51076, 70'000'000);
+    TEST_ASSERT(r.side(51076) == Side::Enemy);
+    r.on_spawn(summon(33429, 51076));
+    TEST_ASSERT(r.side(51076) == Side::Enemy);
+    TEST_ASSERT_EQ(r.resolve(33429), EntityId{51076});
+
+    // An add before any HP for its owner: the HP, when it comes, still says NPC.
+    r.on_spawn(summon(39848, 52000));
+    TEST_ASSERT(r.side(52000) == Side::Player);
+    r.on_hp(52000, 85'640'625);
+    TEST_ASSERT(r.side(52000) == Side::Enemy);
+
+    // A player's HP still lets their summon's spawn settle them.
+    r.observe_hit(100, 3696);
+    r.on_hp(3696, 40'703);
+    TEST_ASSERT(r.side(3696) == Side::Enemy);
+    r.on_spawn(summon(24710, 3696));
+    TEST_ASSERT(r.side(3696) == Side::Player);
+}
+
 TEST_CASE(Registry, AScannedIdentityNamesNoOne) {
     // A scan pairs a name with some other number: in the second capture, none of
     // its 38 had the named character's id.

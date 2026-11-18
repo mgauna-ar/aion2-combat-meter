@@ -429,6 +429,10 @@ It gave the faction (Identity, below).
   - **Mask:** 3 bytes, the first the kind (then `20 00` for mobs, `10 00` for the one
     summon seen). 1F/5F are summons (with an owner); 1D/5D are spirits and effects;
     1C is a boss mechanic.
+    - **An NPC can own a 1F:** in the Ludra capture, 37 1F spawns (npc 2,920,671
+      and 2,920,702, unlisted) named the boss as owner, each with the boss's own max
+      HP (85,640,625). An Elementalist's spirit (2,920,107) is a 1F owned by a player,
+      so the kind alone does not tell. Every 5F seen had a player for owner.
   - **Aimed at a player:** bit 0 of the mask's third byte (`1C 00 01`, also on kinds
     14 and 54) puts a name before the npc code: length u8, then the name of the
     party member the mechanic is aimed at. All 57 such spawns in the second capture
@@ -670,8 +674,12 @@ the three captures read as a point on their map):
 - what a wipe looks like on the wire. The whole party at HP 0 is not one: in the second
   capture's last boss fight they all were, for 1.2 s, and got up again and won
   (plugins/combat_meter/AGENTS.md, Fight end). `wipe_detection` stays off until then.
-  Nor is it seen how a boss resets after one: a finished fight keeps the boss's HP
-  from the party's last hits, whichever way the reset comes (plugins/combat_meter/AGENTS.md,
+  **How the boss resets after one** was seen in the Ludra capture (two wipes on Ludra,
+  max HP 85,640,625): a 00 8D at exactly its max HP. In one pull it came 30 s after
+  the party's last hit; in the other, in the same 100 ms as their last hits, which
+  were in flight as the last of them died. Each wipe also sent the same map's 21 36
+  over the same connection, as the party went back to the entrance. A finished
+  fight keeps the boss's HP from the party's last hits (plugins/combat_meter/AGENTS.md,
   Boss);
 - whether the game's Total Heal counts heals before a fight's first hit: the meter's
   healing came to 97% of it;
@@ -700,7 +708,8 @@ the three captures read as a point on their map):
   the name switching from pull to pull, points to reuse. The meter assumes both
   (plugins/combat_meter/AGENTS.md, Sides).
 - whether a teleport or a revive within a dungeon sends a 21 36, and over which
-  connection. Re-entering the same dungeon straight away did, as the runs that shared
+  connection. A wipe does: the same map, over the same connection (above).
+  Re-entering the same dungeon straight away did, as the runs that shared
   one visit showed, and runs then split once every load was taken for a new one. The
   plugins take the same map over the same connection for a reload within a run, and
   over a new connection for a new run, since entering a dungeon opened one in the

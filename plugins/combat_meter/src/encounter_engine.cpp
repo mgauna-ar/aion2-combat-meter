@@ -336,7 +336,11 @@ void EncounterEngine::credit(EntityId actor, EntityId target, uint64_t amount, u
     }
     fight.enemies[enemy] += amount;
     if (ts > fight.last_hit_ts) fight.last_hit_ts = ts;
-    if (const std::optional<HpNow> now = hp_now(enemy)) fight.hp_when_hit[enemy] = *now;
+    // A hit landing on a boss that has just reset leaves the HP the party had left it at.
+    if (const std::optional<HpNow> now = hp_now(enemy)) {
+        const auto [left, first] = fight.hp_when_hit.try_emplace(enemy, *now);
+        if (!first && !back_to_full(enemy, now->hp)) left->second = *now;
+    }
     if (TimelineBin* bin = timeline_bin(acc.bins, fight.start_ts, ts)) add_capped(bin->damage, amount);
     // Only the player's own hand proves them alive, and only it counts as time spent
     // hitting: their DoTs and summons keep going after they die.
@@ -684,13 +688,21 @@ std::optional<EncounterEngine::HpNow> EncounterEngine::hp_now(EntityId id) const
     return HpNow{taken >= a->spawn_hp ? 0 : a->spawn_hp - taken, false};
 }
 
+bool EncounterEngine::back_to_full(EntityId id, uint64_t hp) const {
+    const Actor* a = m_registry.find(id);
+    return a != nullptr && a->max_hp > 0 && hp >= a->max_hp;
+}
+
 void EncounterEngine::note_hp_when_hit(EntityId id, Micros ts) {
     if (!m_fight) return;
     const auto it = m_fight->hp_when_hit.find(id);
     // Only an enemy the party hit, and only while the figure can still be the
     // last hit's: once they stop, its HP coming back up is no work of theirs.
     if (it == m_fight->hp_when_hit.end() || ts > m_fight->last_hit_ts + kHpSettle) return;
-    if (const std::optional<HpNow> now = hp_now(id)) it->second = *now;
+    const std::optional<HpNow> now = hp_now(id);
+    // A reset can come in the same instant as the last hits, in flight as the last
+    // of the party died: full HP is never what a hit left.
+    if (now && !back_to_full(id, now->hp)) it->second = *now;
 }
 
 void EncounterEngine::sample_hp(EntityId id, uint64_t hp, std::optional<uint64_t> before, Micros ts) {
@@ -708,6 +720,9 @@ void EncounterEngine::sample_hp(EntityId id, uint64_t hp, std::optional<uint64_t
     // The first figure in a fight: the one the meter had before stood at its start.
     if (series.empty() && at > 0 && before) series.push_back(Fight::HpSample{0, *before});
     if (!series.empty() && series.back().second == at) {
+        // A reset in the second of the last hits would leave the line's end at
+        // full HP; a later second still shows it.
+        if (hp > series.back().hp && back_to_full(id, hp)) return;
         series.back().hp = hp;
     } else {
         series.push_back(Fight::HpSample{at, hp});
