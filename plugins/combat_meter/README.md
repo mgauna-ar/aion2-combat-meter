@@ -46,6 +46,9 @@ always be found and dragged back. Switching the plugin off hides it too.
   While a boss is still standing, the wait is 30 s instead, to cover phases where it
   can't be hit. Switching the plugin off ends it too, and so does quitting the app or
   restarting it into an update: the fight is saved like any other.
+- **Kill or wipe:** a boss counts as killed only when its HP came down to its death. One
+  that disappears or drops to 0 from high HP, as a boss resetting after a wipe can, is
+  a wipe, saved with the HP you left it at.
 - **Duration:** a fight's time runs from the first hit to the last, so the wait before
   a fight is called never lowers its DPS.
 - **Saving:** boss fights and fights longer than 20 s are saved, and listed on the

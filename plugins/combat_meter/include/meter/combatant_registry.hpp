@@ -61,6 +61,9 @@ struct Actor {
     bool has_live_hp{false};
     uint64_t live_hp{0};
     bool dead{false};
+    /// Dead without a kill: it went (an HP of 0, or a 42 36) without its HP falling
+    /// to it. A boss resetting, a mechanic ending (EncounterEngine::fell_to_it).
+    bool vanished{false};
     /// Learned only from which side it trades damage with.
     Side inferred_side{Side::Unknown};
 };
@@ -98,7 +101,9 @@ public:
 
     void on_identity(const proto::Identity& identity);
     void on_spawn(const proto::Spawn& spawn);
-    void on_death(EntityId id);
+    /// HP 0 or a 42 36. `fell`: its HP came down to it, a kill; else it vanished.
+    /// A second death changes nothing: the first said which it was.
+    void on_death(EntityId id, bool fell = true);
     void on_revive(EntityId id);
     void on_party(const proto::PartyRoster& roster);
     /// 00 8D for the local player's own values: `id` is the local player, even if

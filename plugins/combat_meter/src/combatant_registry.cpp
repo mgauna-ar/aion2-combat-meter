@@ -168,6 +168,8 @@ void CombatantRegistry::on_hp(EntityId id, uint64_t hp) {
     if (npc_by_hp(a) && a.inferred_side == Side::Player) a.inferred_side = Side::Enemy;
     // A player is up again: one named, or one known only from the hits they trade.
     if (hp > 0 && (a.is_player || a.inferred_side == Side::Player)) a.dead = false;
+    // One that only vanished is back, with HP: a boss reset at full.
+    if (hp > 0 && a.vanished) a.dead = a.vanished = false;
 }
 
 void CombatantRegistry::on_spawn(const proto::Spawn& spawn) {
@@ -187,6 +189,7 @@ void CombatantRegistry::on_spawn(const proto::Spawn& spawn) {
     a.npc_code = spawn.npc_code;
     a.aimed_mechanic = !spawn.aimed_at.empty();
     a.dead = false;
+    a.vanished = false;
     a.inferred_side = Side::Unknown;
     a.has_live_hp = false;
     if (spawn.has_hp) {
@@ -202,10 +205,13 @@ void CombatantRegistry::on_spawn(const proto::Spawn& spawn) {
     settle_pending(spawn.id);
 }
 
-void CombatantRegistry::on_death(EntityId id) {
+void CombatantRegistry::on_death(EntityId id, bool fell) {
     if (id == 0) return;
     // Not resolve(): a summon dying leaves its owner alive.
-    get_or_create(id).dead = true;
+    Actor& a = get_or_create(id);
+    if (a.dead) return;
+    a.dead = true;
+    a.vanished = !fell;
 }
 
 void CombatantRegistry::on_revive(EntityId id) {

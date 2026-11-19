@@ -123,6 +123,8 @@ TEST_CASE(Engine, BossKillEndsAfterGraceWithLateTicks) {
     EncounterEngine e = setup();
     e.on_event(ev(at_s(1), hit(kMe, kBoss, 4'000'000)));
     e.on_event(ev(at_s(9), hit(kAlly, kBoss, 1'000'000)));
+    // A kill comes down to it: the server's last figure is low.
+    e.on_event(ev(at_s(9), hp(kBoss, 150'000)));
     e.on_event(ev(at_s(9), proto::Death{kBoss}));
     TEST_ASSERT(e.in_fight());
     e.on_event(ev(at_s(10), dot(kMe, kBoss, 300)));  // inside the grace
@@ -146,7 +148,9 @@ TEST_CASE(Engine, ServerHpIsExactAndZeroIsTheKill) {
     TEST_ASSERT(b.hp_exact);
     TEST_ASSERT_EQ(b.hp, uint64_t{3'500'000});
 
-    e.on_event(ev(at_s(9), hit(kAlly, kBoss, 3'500'000)));
+    e.on_event(ev(at_s(8), hit(kAlly, kBoss, 2'900'000)));
+    e.on_event(ev(at_s(8), hp(kBoss, 600'000)));
+    e.on_event(ev(at_s(9), hit(kAlly, kBoss, 600'000)));
     e.on_event(ev(at_s(9), hp(kBoss, 0)));
     // No 42 36 yet (it comes with the corpse): HP 0 alone is the kill.
     e.tick(at_s(11));
@@ -413,6 +417,7 @@ TEST_CASE(Engine, AnAddItsBossOwnsIsAnEnemyOfItsOwn) {
     TEST_ASSERT_EQ(s.total_damage, uint64_t{1010});
 
     e.on_event(ev(at_s(10), hp(kOwnedAdd, 0)));
+    e.on_event(ev(at_s(10.5), hp(kBoss, 300'000)));
     e.on_event(ev(at_s(11), hit(kMe, kBoss, 1000)));
     e.on_event(ev(at_s(11), hp(kBoss, 0)));
     e.on_event(ev(at_s(12.5), dot(kMe, kBoss, 777)));  // inside the boss's own grace
@@ -420,6 +425,70 @@ TEST_CASE(Engine, AnAddItsBossOwnsIsAnEnemyOfItsOwn) {
     s = e.take_finished().at(0);
     TEST_ASSERT(s.end_reason == EndReason::BossKilled);
     TEST_ASSERT_EQ(s.total_damage, uint64_t{2010 + 777});
+}
+
+TEST_CASE(Engine, ABossGoneFromHighHpIsNoKill) {
+    // A wipe: the boss goes (a 42 36, as a despawn sends) at 40%, nowhere near 0.
+    EncounterEngine e = setup();
+    e.on_event(ev(at_s(1), hit(kMe, kBoss, 1'000'000)));
+    e.on_event(ev(at_s(1), hp(kBoss, 2'000'000)));
+    e.on_event(ev(at_s(5), proto::Death{kBoss}));
+    e.tick(at_s(8));
+    TEST_ASSERT(e.in_fight());
+    TEST_ASSERT_FALSE(e.current().boss.killed);
+    e.tick(at_s(40));
+    const FightSummary s = e.take_finished().at(0);
+    TEST_ASSERT(s.end_reason == EndReason::Idle);
+    TEST_ASSERT_FALSE(s.boss.killed);
+    TEST_ASSERT_EQ(s.boss.hp, uint64_t{2'000'000});
+}
+
+TEST_CASE(Engine, ABossDroppedToZeroFromHighHpIsNoKill) {
+    // The same as an HP of 0 straight from 40%, then its reset at full.
+    EncounterEngine e = setup();
+    e.on_event(ev(at_s(1), hit(kMe, kBoss, 1'000'000)));
+    e.on_event(ev(at_s(1), hp(kBoss, 2'000'000)));
+    e.on_event(ev(at_s(5), hp(kBoss, 0)));
+    e.tick(at_s(8));
+    TEST_ASSERT(e.in_fight());
+    e.on_event(ev(at_s(12), hp(kBoss, kBossHp)));
+    e.tick(at_s(40));
+    const FightSummary s = e.take_finished().at(0);
+    TEST_ASSERT(s.end_reason == EndReason::Idle);
+    TEST_ASSERT_FALSE(s.boss.killed);
+    TEST_ASSERT_EQ(s.boss.hp, uint64_t{2'000'000});
+    // Nor does the boss's line drop to 0 for it.
+    const auto& line = s.detail->timeline.boss_hp.permille;
+    TEST_ASSERT_FALSE(line.empty());
+    TEST_ASSERT_EQ(line.back(), uint16_t{400});
+}
+
+TEST_CASE(Engine, AMechanicWithTheBossMaxHpGoingIsNoKill) {
+    // A mechanic with the boss's own max HP, hit hardest, goes from full with no
+    // figure between: the second capture's did, 74 times.
+    constexpr EntityId kPillar = 0x4400;
+    EncounterEngine e = setup();
+    e.on_event(ev(at_s(0), npc(kPillar, kBossHp, 2'920'463)));
+    e.on_event(ev(at_s(1), hit(kMe, kBoss, 1000)));
+    e.on_event(ev(at_s(2), hit(kMe, kPillar, 50'000)));
+    TEST_ASSERT_EQ(e.current().boss.id, kPillar);
+    e.on_event(ev(at_s(3), proto::Death{kPillar}));
+    e.tick(at_s(6));
+    TEST_ASSERT(e.in_fight());
+    TEST_ASSERT_FALSE(e.current().boss.killed);
+}
+
+TEST_CASE(Engine, AKillStillComesDownToZero) {
+    // The second capture's three boss kills came down to 10% or less first.
+    EncounterEngine e = setup();
+    e.on_event(ev(at_s(1), hit(kMe, kBoss, 1'000'000)));
+    e.on_event(ev(at_s(1), hp(kBoss, 1'200'000)));  // 24%: one big step still counts
+    e.on_event(ev(at_s(2), hit(kAlly, kBoss, 1'200'000)));
+    e.on_event(ev(at_s(2), hp(kBoss, 0)));
+    e.tick(at_s(5));
+    const FightSummary s = e.take_finished().at(0);
+    TEST_ASSERT(s.end_reason == EndReason::BossKilled);
+    TEST_ASSERT(s.boss.killed);
 }
 
 TEST_CASE(Engine, SummonOfAnUnseenOwnerCountsOnAnyTarget) {
@@ -484,11 +553,13 @@ TEST_CASE(Engine, BiggerBossHitDuringTheGraceKeepsTheFight) {
     EncounterEngine e = setup();
     e.on_event(ev(at_s(0), npc(kBigger, 2 * kBossHp, 779)));
     e.on_event(ev(at_s(1), hit(kMe, kBoss, 100)));
+    e.on_event(ev(at_s(4.9), hp(kBoss, 100'000)));
     e.on_event(ev(at_s(5), proto::Death{kBoss}));
     e.on_event(ev(at_s(6), hit(kMe, kBigger, 100)));
     e.tick(at_s(8));
     TEST_ASSERT(e.in_fight());
     TEST_ASSERT_EQ(e.current().boss.id, kBigger);
+    e.on_event(ev(at_s(19.9), hp(kBigger, 100'000)));
     e.on_event(ev(at_s(20), proto::Death{kBigger}));
     e.tick(at_s(23));
     TEST_ASSERT_FALSE(e.in_fight());

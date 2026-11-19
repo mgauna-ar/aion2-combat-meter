@@ -262,6 +262,24 @@ TEST_CASE(Registry, ABossAddNeverMakesItsOwnerAPlayer) {
     TEST_ASSERT(r.side(3696) == Side::Player);
 }
 
+TEST_CASE(Registry, AVanishedNpcIsBackWithHp) {
+    CombatantRegistry r;
+    r.on_spawn(npc(0x4100, 5'000'000));
+    r.on_death(0x4100, false);
+    const Actor* a = r.find(0x4100);
+    TEST_ASSERT(a->dead && a->vanished);
+    // A second death says nothing new: the first said which it was.
+    r.on_death(0x4100, true);
+    TEST_ASSERT(a->vanished);
+    r.on_hp(0x4100, 5'000'000);
+    TEST_ASSERT_FALSE(a->dead);
+    TEST_ASSERT_FALSE(a->vanished);
+    // A kill stays one, HP or not.
+    r.on_death(0x4100, true);
+    r.on_hp(0x4100, 10);
+    TEST_ASSERT(a->dead);
+}
+
 TEST_CASE(Registry, AScannedIdentityNamesNoOne) {
     // A scan pairs a name with some other number: in the second capture, none of
     // its 38 had the named character's id.

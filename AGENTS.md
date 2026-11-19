@@ -510,6 +510,13 @@ It gave the faction (Identity, below).
 - **Other opcodes:**
   - Death `42 36`: id varint. For a mob it comes about 4 s after 00 8D says HP 0: the
     corpse going. HP 0 is the death.
+    - **Not every one is a death.** A boss's kill came down in figures to 10% or
+      less, then HP 0, then 42 36 (the second capture's three). Things carrying the
+      boss's own max HP (mechanics, adds, traps: 9.86M there, 85.6M in Ludra) went
+      from full to HP 0, or got a 42 36, with no figure between: a mechanic ending,
+      not a kill. Trash gets no 00 8D at all, and dies by 42 36 alone. How a boss
+      resetting with two parties on it goes is not seen (Unknown, below;
+      plugins/combat_meter/AGENTS.md, Boss).
     - A player gets none: their death is 00 8D HP 0 (kind 2, or kind 3 for the local
       player), and HP above 0 that they are up again. In the second capture's last boss
       fight 19 deaths came that way, each back up 3 to 17 s later, at full HP.
@@ -737,7 +744,9 @@ the three captures read as a point on their map):
   were in flight as the last of them died. Each wipe also sent the same map's 21 36
   over the same connection, as the party went back to the entrance. A finished
   fight keeps the boss's HP from the party's last hits (plugins/combat_meter/AGENTS.md,
-  Boss);
+  Boss). **With two parties on Ludra** every wipe showed as a kill (the user, no
+  capture): what the boss's reset sends then is unknown. The meter now counts a
+  boss-sized death as a kill only when its HP came down to it;
 - whether the game's Total Heal counts heals before a fight's first hit: the meter's
   healing came to 97% of it;
 - what the 5-HP object (2,920,366, kind 14, no name) the party broke in the second

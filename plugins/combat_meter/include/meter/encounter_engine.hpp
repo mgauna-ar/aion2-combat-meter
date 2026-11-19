@@ -206,7 +206,17 @@ private:
     void on_tick(const proto::Tick& t, Micros ts);
     /// 00 8D: the local player's id, and HP, whose 0 is a death.
     void on_values(const proto::RemainingHp& v, Micros ts);
-    void on_death(EntityId id, Micros ts);
+    /// HP 0 or a 42 36 for `id`; `fell` says whether its HP came down to it
+    /// (fell_to_it): a boss that only vanished is no kill.
+    void on_death(EntityId id, Micros ts, bool fell = true);
+    /// Whether a death of `id` now is a kill, the server's last HP figure for it
+    /// (exact_hp: its 00 8D, else its spawn's) at `last_figure`. Always, but for a
+    /// boss-sized enemy: Ludra's adds,
+    /// traps and mechanics, and the second capture's, carry the boss's own max HP and
+    /// went from full to 0, or got a 42 36, with no figure between. A boss's kill came
+    /// down to at most 10% of its max first, in every one seen; one gone from higher
+    /// is a reset or a despawn, as a wipe sends.
+    [[nodiscard]] bool fell_to_it(EntityId id, std::optional<uint64_t> last_figure) const;
     void on_map(const proto::MapLoad& m, uint32_t connection, Micros ts);
     /// 02 38: a player's own press counts in the fight, by skill. Procs, pulses and
     /// summons' skills do not, and a press never starts or extends a fight.
