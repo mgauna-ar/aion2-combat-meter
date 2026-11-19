@@ -149,6 +149,26 @@ app, or restarting it into an update, ends the live fight the same way and saves
       so it ends where the party left it.
     - A new spawn at full HP after the last hit is caught the same way, by
       `kHpSettle`; no capture has shown one.
+  - **A kill comes down to 0** (`fell_to_it`): a boss-sized enemy's HP 0 or 42 36 is
+    its death only when the server's last HP figure for it before (`exact_hp`: its
+    00 8D, else its spawn's) was at most `kFellPercent` (25%) of its max. Else it
+    *vanished* (`Actor::vanished`): dead to the registry, never killed, so the fight
+    goes on to its idle end and keeps the HP the party left it at. The HP 0 takes no
+    place on the boss's line or in that HP either. HP above 0 later brings it back.
+    - Every boss kill in the captures came down to 10% or less first (the second
+      capture's three), then HP 0, then the 42 36 about 4 s on.
+    - Things with the boss's own max HP go without that, by the hundred: the second
+      capture's mechanics (9.86M, kind 1C, 74 from full straight to HP 0, 72 with only
+      a 42 36), and Ludra's adds, traps and mechanics (85.6M, kinds 14, 17, 1C, 1F).
+      One the party hits harder than the boss is the fight's boss, and its going
+      was its kill.
+    - Ludra with two parties on the boss showed every wipe as a kill, the user said,
+      with no capture of it: a boss despawning at its reset (42 36), or an HP of 0 for
+      it, reads that way, and so does one of those things being the boss. Each is
+      caught here. A wipe at 25% or less that resets the boss that way still reads as
+      a kill.
+    - Small enemies (under `boss_min_max_hp`) die by a 42 36 alone, no figure ever
+      sent: 135 of the second capture's trash. Their deaths stay deaths.
   - A mob that spawned before the meter started has no max HP; the most 00 8D HP seen
     stands in for it.
   - **Partial:** a killed boss that lost less than `partial_damage_ratio` of its HP (by

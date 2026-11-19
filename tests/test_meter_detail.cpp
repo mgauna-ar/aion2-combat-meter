@@ -167,13 +167,14 @@ TEST_CASE(Engine, ABossKilledAfterTheLastHitStillReachesZero) {
     EncounterEngine e = setup();
     e.on_event(ev(at_s(10), hit(kMe, kBoss, 1000)));
     e.on_event(ev(at_s(14.9), hit(kMe, kBoss, 1000)));
+    e.on_event(ev(at_s(14.9), hp(kBoss, 400'000)));
     e.on_event(ev(at_s(15.2), hp(kBoss, 0)));
     e.tick(at_s(30));
     const FightSummary s = e.take_finished().at(0);
     const FightTimeline& tl = detail_of(s).timeline;
     TEST_ASSERT_EQ(tl.seconds, uint32_t{6});
     TEST_ASSERT_EQ(tl.boss_hp.at(5), 0);
-    TEST_ASSERT_EQ(tl.boss_hp.at(4), 1000);
+    TEST_ASSERT_EQ(tl.boss_hp.at(4), 80);
 }
 
 // ---- Active time -------------------------------------------------------------

@@ -23,6 +23,9 @@ constexpr double kMinDurationSeconds = 1.0;
 /// How long after a hit the server's HP figure for it may come and still be the HP
 /// the hit left. A boss resetting after a wipe does so seconds after the last hit.
 constexpr Micros kHpSettle = 500'000;
+/// A boss's last HP figure before its death, at most this share of its max for the
+/// death to be a kill: every kill seen came from 10% or less (fell_to_it).
+constexpr uint64_t kFellPercent = 25;
 
 [[nodiscard]] uint64_t grew(uint64_t now, uint64_t then) noexcept { return now >= then ? now - then : 0; }
 
@@ -157,7 +160,7 @@ void EncounterEngine::on_event(const proto::ParsedEvent& event) {
             } else if constexpr (std::is_same_v<T, proto::Spawn>) {
                 on_spawn(e, ts);
             } else if constexpr (std::is_same_v<T, proto::Death>) {
-                on_death(e.id, ts);
+                on_death(e.id, ts, fell_to_it(e.id, exact_hp(e.id)));
             } else if constexpr (std::is_same_v<T, proto::MapLoad>) {
                 on_map(e, event.connection, ts);
             } else if constexpr (std::is_same_v<T, proto::Damage>) {
@@ -403,27 +406,40 @@ void EncounterEngine::on_values(const proto::RemainingHp& v, Micros ts) {
     if (v.self) m_registry.on_self_values(v.id);
     if (!v.has_hp) return;
     const std::optional<uint64_t> before = exact_hp(v.id);
+    // Zero from far above, with nothing between: no hit's work, so neither the
+    // boss's line nor the HP the party left it at takes it.
+    const bool fell = v.hp != 0 || fell_to_it(v.id, before);
     m_registry.on_hp(v.id, v.hp);
     m_hp_loss[v.id].observe(v.hp);
-    sample_hp(v.id, v.hp, before, ts);
-    note_hp_when_hit(v.id, ts);
+    if (fell) {
+        sample_hp(v.id, v.hp, before, ts);
+        note_hp_when_hit(v.id, ts);
+    }
     // HP reaching 0 is the death; 42 36 follows seconds later, with the corpse. A
     // player gets no 42 36: HP 0 is all the server says, and HP above 0 that they
     // are up.
     if (v.hp == 0) {
-        on_death(v.id, ts);
+        on_death(v.id, ts, fell);
     } else {
         note_alive(v.id, ts);
     }
 }
 
-void EncounterEngine::on_death(EntityId id, Micros ts) {
-    m_registry.on_death(id);
+bool EncounterEngine::fell_to_it(EntityId id, std::optional<uint64_t> last_figure) const {
+    const Actor* a = m_registry.find(id);
+    if (a == nullptr || a->max_hp < m_settings.boss_min_max_hp || m_registry.side_or_guess(id) != Side::Enemy) {
+        return true;
+    }
+    return last_figure && *last_figure * 100 <= a->max_hp * kFellPercent;
+}
+
+void EncounterEngine::on_death(EntityId id, Micros ts, bool fell) {
+    m_registry.on_death(id, fell);
     m_effects.on_death(id, ts);
     if (!m_fight) return;
     const EntityId who = m_registry.resolve(id);
     const BossSummary boss = boss_of(*m_fight);
-    if (boss.present() && boss.is_boss && boss.id == who && !m_fight->boss_killed) {
+    if (boss.present() && boss.is_boss && boss.id == who && boss.killed && !m_fight->boss_killed) {
         m_fight->boss_killed = true;
         m_fight->kill_ts = ts;
         return;
@@ -545,7 +561,8 @@ BossSummary EncounterEngine::boss_of(const Fight& fight) const {
     b.is_boss = best_max >= m_settings.boss_min_max_hp && best_max > 0;
     if (const Actor* a = m_registry.find(best)) {
         b.npc_code = a->npc_code;
-        b.killed = a->dead;
+        // Gone without its HP falling to it is no kill: a reset, a mechanic ending.
+        b.killed = a->dead && !a->vanished;
         if (const std::optional<HpNow> now = hp_now(best)) {
             b.hp = now->hp;
             b.hp_known = true;
