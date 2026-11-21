@@ -15,7 +15,7 @@ void AuraTracker::on_removed(const proto::BuffRemoved& b) { (void)m_book.on_remo
 
 void AuraTracker::on_death(EntityId id) { (void)m_book.on_death(id); }
 
-void AuraTracker::on_map_load(Micros ts) { (void)m_book.on_map_load(ts); }
+void AuraTracker::on_map_load(Micros ts, bool reload) { (void)m_book.on_map_load(ts, reload); }
 
 std::string AuraTracker::label(const game::EffectInstance& i, const Entities& entities) {
     if (game::effect_name(i.buff_id, i.source_skill).empty() && entities.is_enemy(i.caster)) {

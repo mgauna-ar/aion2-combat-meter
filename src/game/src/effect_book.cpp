@@ -1,5 +1,7 @@
 #include "game/effect_book.hpp"
 
+#include "game/skill_names.hpp"
+
 #include <algorithm>
 #include <iterator>
 #include <tuple>
@@ -72,22 +74,32 @@ std::optional<EffectInstance> EffectBook::on_removed(const proto::BuffRemoved& b
     return removed;
 }
 
+bool EffectBook::kept_through(const EffectInstance& i) noexcept {
+    return !i.permanent && i.caster == i.target && effect_kind(i.buff_id) == EffectKind::Item;
+}
+
 std::vector<EffectInstance> EffectBook::on_death(EntityId id) {
     std::vector<EffectInstance> dropped;
     const auto on = m_on.find(id);
     if (on == m_on.end()) return dropped;
-    dropped.reserve(on->second.size());
-    for (const auto& [instance, i] : on->second) dropped.push_back(i);
-    m_on.erase(on);
+    for (auto it = on->second.begin(); it != on->second.end();) {
+        if (kept_through(it->second)) {
+            ++it;
+            continue;
+        }
+        dropped.push_back(it->second);
+        it = on->second.erase(it);
+    }
+    if (on->second.empty()) m_on.erase(on);
     return dropped;
 }
 
-std::vector<EffectInstance> EffectBook::on_map_load(Micros ts) {
+std::vector<EffectInstance> EffectBook::on_map_load(Micros ts, bool reload) {
     std::vector<EffectInstance> dropped;
     const Micros keep_from = ts > kMapLoadLead ? ts - kMapLoadLead : 0;
     for (auto on = m_on.begin(); on != m_on.end();) {
         for (auto it = on->second.begin(); it != on->second.end();) {
-            if (it->second.updated_at < keep_from) {
+            if (it->second.updated_at < keep_from && !(reload && kept_through(it->second))) {
                 dropped.push_back(it->second);
                 it = on->second.erase(it);
             } else {

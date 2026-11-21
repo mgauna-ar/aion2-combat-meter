@@ -109,7 +109,8 @@ public:
     void on_applied(const proto::BuffApplied& b, Micros ts);
     void on_removed(const proto::BuffRemoved& b);
     void on_death(EntityId id);
-    void on_map_load(Micros ts);
+    /// `reload`: the same map over the same connection (EffectBook::on_map_load).
+    void on_map_load(Micros ts, bool reload);
     /// Drops what ran out by `now`, and notes the local player's effects as seen
     /// (their id is named only after their first effects arrive), an enemy's marked
     /// hostile.

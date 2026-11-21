@@ -74,8 +74,8 @@ void EffectUptime::on_death(EntityId id, Micros ts) {
     }
 }
 
-void EffectUptime::on_map_load(Micros ts) {
-    for (const game::EffectInstance& i : m_book.on_map_load(ts)) {
+void EffectUptime::on_map_load(Micros ts, bool reload) {
+    for (const game::EffectInstance& i : m_book.on_map_load(ts, reload)) {
         if (m_in_fight) end_span(i.target, i.instance, ts);
     }
 }

@@ -60,7 +60,8 @@ public:
     void on_applied(const proto::BuffApplied& b, Micros ts, const std::optional<EffectTag>& tag);
     void on_removed(const proto::BuffRemoved& b, Micros ts);
     void on_death(EntityId id, Micros ts);
-    void on_map_load(Micros ts);
+    /// `reload`: a reload within a run (EffectBook::on_map_load).
+    void on_map_load(Micros ts, bool reload);
     void prune(Micros now);
 
     /// A fight starts at `ts`: each timed instance running then that `classify`

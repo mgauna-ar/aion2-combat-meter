@@ -230,8 +230,9 @@ app, or restarting it into an update, ends the live fight the same way and saves
   record, fight or not, so a fight knows what is already running as it starts):
   - a span per instance on a party member (by the roster or the map, not a summon) or,
     from a party member or their summon, on an enemy. A renewal while it runs goes on
-    with the span; a 1a 92, a death or a map load (a reload too) ends it. Permanent
-    effects (passives) are left out;
+    with the span; a 1a 92, a death or a map load (a reload too) ends it, but for
+    the items a player put on themself (`EffectBook::kept_through`), which a death and
+    a reload within a run leave on. Permanent effects (passives) are left out;
   - rows per side (on the party from anyone else, on the party from an enemy, on an
     enemy), target (character, or enemy id), `effect_key` and caster; stacks count
     once, clamped to the fight. Only enemies the party damaged keep rows;
@@ -240,6 +241,16 @@ app, or restarting it into an update, ends the live fight the same way and saves
   - at most 16,384 spans a fight. Switching the meter off forgets every effect;
   - checked on the second capture's last boss fight: 151 rows and 42 bands, the party's
     best-kept debuff on the boss up 87.5%.
+  - **Consumables** (the tab's fourth view, `view_effects.cpp`, from those same rows:
+    nothing more is saved): a row per fight row, and per `game::item_effect` (by the
+    id's first two digits: 20 potion, 21, 27, 28 food, 22 scroll, 30 Theostone). Food,
+    scrolls and potions are the target's, on the party side. A Theostone is its
+    caster's, by name: a weapon's goes off on the enemy it hit, so it is known only
+    once it does. Food or a scroll up less than 95% of the fight shows its share.
+  - checked on the Ludra capture: each of the five players' scrolls and food were
+    there. A Sorcerer who died three times used their 600 s scrolls again exactly as
+    the first ran out, through a wipe and its reload. Before items were kept through a
+    death and a reload, they read 65% and 9% in its two pulls.
 - **History:**
   - What is saved: boss fights, and fights of at least `min_saved_duration_s`. With
     `save_only_dungeons`, only in a dungeon (`game::is_dungeon`: a map id of 600000

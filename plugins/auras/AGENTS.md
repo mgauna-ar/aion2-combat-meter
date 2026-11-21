@@ -89,6 +89,12 @@ watch list and what the overlay shows are the tracker's own.
 - A death (HP 0 or 42 36) drops the entity's effects. A map load (a reload within a run
   too, since ids may change) drops every instance not put on or renewed in the 2 s
   before it.
+  - **Except the items one put on oneself** (`EffectBook::kept_through`: scrolls, food,
+    potions, an armour Theostone), which a death and a reload within a run leave on
+    until their stated end or their 1a 92. The server sends neither for them: in the
+    Ludra capture a Sorcerer died three times and wiped once, and used their 600 s
+    scrolls again exactly as the first ran out. A new map still drops them, its ids
+    being others.
 - The snapshot carries the local player's effects (an enemy's marked hostile, their own
   and their summons' marked mine) and their own on the target.
 - **Names:** `game::effect_label`: the effect's own from `effects.tsv`, else its

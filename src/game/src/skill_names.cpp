@@ -93,6 +93,21 @@ EffectKind effect_kind(uint32_t buff_id, uint32_t source_skill) noexcept {
     return effect_skill(buff_id, source_skill) != 0 ? EffectKind::Skill : EffectKind::Unknown;
 }
 
+ItemEffect item_effect(uint32_t buff_id) noexcept {
+    const EffectRow* row = find_effect(buff_id);
+    if (row == nullptr || row->kind != EffectKind::Item) return ItemEffect::None;
+    if (buff_id < 10'000'000 || buff_id > 99'999'999) return ItemEffect::None;
+    switch (buff_id / 1'000'000) {
+        case 20: return ItemEffect::Potion;
+        case 21:
+        case 27:
+        case 28: return ItemEffect::Food;
+        case 22: return ItemEffect::Scroll;
+        case 30: return ItemEffect::Theostone;
+        default: return ItemEffect::None;
+    }
+}
+
 std::string_view effect_name(uint32_t buff_id, uint32_t source_skill) noexcept {
     if (const EffectRow* row = find_effect(buff_id)) return row->name;
     const uint32_t skill = effect_skill(buff_id, source_skill);

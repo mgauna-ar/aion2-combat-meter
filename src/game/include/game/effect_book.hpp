@@ -63,6 +63,12 @@ struct EffectApplied {
  * map load drops the effects of the map before; the new map's own come up to a
  * second ahead of its load (21 36), and stay.
  *
+ * Except the items one puts on oneself (scrolls, food, potions: kept_through):
+ * they outlast a death, and a reload within a run, which keeps the ids. In the
+ * Ludra capture a Sorcerer died three times and the party wiped and reloaded, and
+ * they used their 600 s scrolls again exactly as the first ran out; the server sent
+ * neither a 1a 92 for them nor the effects again after the reload.
+ *
  * Each plugin keeps its own book: plugins never read each other. The mutators
  * return what they changed, so a caller can keep intervals of its own.
  */
@@ -92,11 +98,17 @@ public:
     /// Takes the instance of that effect that ends soonest, a permanent one only when
     /// nothing else is left, and returns it.
     std::optional<EffectInstance> on_removed(const proto::BuffRemoved& b);
-    /// Drops every effect on `id` (HP 0 or 42 36), and returns them.
+    /// Drops every effect on `id` (HP 0 or 42 36) but those kept_through, and
+    /// returns them.
     std::vector<EffectInstance> on_death(EntityId id);
-    /// Drops every instance not put on or renewed in the kMapLoadLead before `ts`
-    /// (a reload within a run too, since ids may change), and returns them.
-    std::vector<EffectInstance> on_map_load(Micros ts);
+    /// Drops every instance not put on or renewed in the kMapLoadLead before `ts`,
+    /// and returns them. A `reload` within a run (the same map over the same
+    /// connection) keeps those kept_through: the ids stay, and the server does not
+    /// send them again.
+    std::vector<EffectInstance> on_map_load(Micros ts, bool reload = false);
+    /// An item's effect the target put on itself, not permanent: what a death and a
+    /// reload leave on.
+    [[nodiscard]] static bool kept_through(const EffectInstance& i) noexcept;
     /// Drops what ran out kRemovalLag or more before `now`.
     void prune(Micros now);
     void clear() noexcept;

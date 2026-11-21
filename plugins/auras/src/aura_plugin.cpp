@@ -55,8 +55,9 @@ void AuraPlugin::on_map(const proto::MapLoad& m, uint32_t connection, Micros ts)
     const bool reload = m.map_id == m_map_id && connection != 0 && connection == m_map_connection;
     m_map_id = m.map_id;
     m_map_connection = connection;
-    // Ids may change on a reload too; the server sends each effect again.
-    m_tracker.on_map_load(ts);
+    // Ids may change on a reload too, and the server sends each effect again, but
+    // for the items one put on oneself (scrolls, food): a reload keeps those.
+    m_tracker.on_map_load(ts, reload);
     m_entities.on_map_load(reload);
     m_chains.clear();
 }
