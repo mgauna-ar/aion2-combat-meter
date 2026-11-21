@@ -131,7 +131,8 @@ carried no figure shows "-".
 ## ⚔️ Enemies (`enemies_first`)
 
 - **Hostile** (`PowerRow::hostile`) is a player whose faction (`Identity::faction`)
-  is known and is not the local player's, outside a dungeon (`game::is_dungeon`)
+  is known and is not the local player's, outside a dungeon (`game::is_party_instance`:
+  600000 and up, so not an arena or a battlefield, whose other side is inside)
   and outside the local player's party (the last `02 97`, by name).
   - The dungeon rule is not caution: two of the dungeon capture's party were of the
     other faction. The roster rule covers a mixed party anywhere else.

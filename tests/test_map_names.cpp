@@ -5,14 +5,27 @@
 using namespace aion2;
 using namespace aion2::game;
 
-// The ids below are aion2.app's dungeon tier ids, as maps.tsv lists them. A capture's
-// dungeon came as 600072, the tier it was: 21 36 carries the same ids (AGENTS.md).
+// The ids below are map ids, as 21 36 carries them and maps.tsv lists them: a
+// capture's dungeon came as 600072, the tier it was (AGENTS.md, Map load).
 
 TEST_CASE(MapNames, EachTierHasItsOwnRow) {
     TEST_ASSERT_EQ(std::string(map_name(600002)), std::string("Krao Cave (Exploration)"));
     TEST_ASSERT_EQ(std::string(map_name(600001)), std::string("Krao Cave (Conquest)"));
     TEST_ASSERT_EQ(std::string(map_name(610052)), std::string("Deus Research Base (Stage 4)"));
     TEST_ASSERT_EQ(map_label(620021), std::string("Chalice of Muspel (Conquest [Hard])"));
+    // A tier aion2.app's pages leave out, named from questlog.gg's record.
+    TEST_ASSERT_EQ(std::string(map_name(600023)), std::string("Fire Temple (Conquest [Hard])"));
+}
+
+TEST_CASE(MapNames, ARowIsTheMapsIdNotTheInstances) {
+    // The captures' arena and PvP zone came as these, their instances' ids being 8 and 21.
+    TEST_ASSERT_EQ(std::string(map_name(61)), std::string("Impetusium Arena"));
+    TEST_ASSERT_EQ(std::string(map_name(20)), std::string("Chaotic Lower Reshanta"));
+    // aion2.app's tier ids where they differ: the instance's, which no map load carries.
+    TEST_ASSERT_EQ(std::string(map_name(600145)), std::string("Citadel of the Fallen Daeva (Conquest)"));
+    TEST_ASSERT(map_name(600152).empty());
+    TEST_ASSERT_EQ(std::string(map_name(156011)), std::string("Beritra Brigade Fortress (Conquest)"));
+    TEST_ASSERT(map_name(690012).empty());
 }
 
 TEST_CASE(MapNames, HardTiersHaveTheirOwnIds) {
@@ -42,9 +55,31 @@ TEST_CASE(MapNames, ADungeonGoesByItsIdNotTheTable) {
     TEST_ASSERT(is_dungeon(kFirstInstanceMapId));
     // The open world (the second capture's town was 1010), and no map load seen yet.
     TEST_ASSERT_FALSE(is_dungeon(kFirstInstanceMapId - 1));
-    TEST_ASSERT_FALSE(is_dungeon(400001));
     TEST_ASSERT_FALSE(is_dungeon(1010));
     TEST_ASSERT_FALSE(is_dungeon(0));
+}
+
+TEST_CASE(MapNames, AnInstanceBelowTheDungeonsIdsIsOneByTheTable) {
+    TEST_ASSERT(is_dungeon(61));      // Impetusium Arena, the arena capture's
+    TEST_ASSERT(is_dungeon(156011));  // Beritra Brigade Fortress (Conquest)
+    TEST_ASSERT(is_dungeon(200002));  // Ascension's Dream of Torment
+    TEST_ASSERT(is_dungeon(400001));  // a seal dungeon
+    TEST_ASSERT(is_dungeon(901));     // a Legion airship
+    // Chaotic Reshanta is open PvP, and an event comes in the open world.
+    TEST_ASSERT_FALSE(is_dungeon(20));
+    TEST_ASSERT_FALSE(is_dungeon(111002)); // Incursion of the Spirits
+}
+
+TEST_CASE(MapNames, OnlyTheDungeonsIdsKeepStrangersOut) {
+    // Only the group that entered: everyone in view is on the local player's side.
+    TEST_ASSERT(is_party_instance(600072));
+    TEST_ASSERT(is_party_instance(600003)); // a tier not yet named
+    // An arena's other side is inside too, and the open world is anyone's.
+    TEST_ASSERT_FALSE(is_party_instance(61));
+    TEST_ASSERT_FALSE(is_party_instance(156011));
+    TEST_ASSERT_FALSE(is_party_instance(20));
+    TEST_ASSERT_FALSE(is_party_instance(1010));
+    TEST_ASSERT_FALSE(is_party_instance(0));
 }
 
 TEST_CASE(MapNames, AnUnnamedDungeonSaysItIsOne) {
@@ -54,9 +89,11 @@ TEST_CASE(MapNames, AnUnnamedDungeonSaysItIsOne) {
 }
 
 TEST_CASE(MapNames, UnlistedIdsHaveALabel) {
-    // Open-world zones have no public ids, so none is listed.
-    TEST_ASSERT(map_name(400001).empty());
-    TEST_ASSERT_EQ(map_label(400001), std::string("Map 400001"));
+    // Open-world zones have no public ids, so none is listed: the second capture's town.
+    TEST_ASSERT(map_name(1010).empty());
+    TEST_ASSERT_EQ(map_label(1010), std::string("Map 1010"));
+    // An instance below the dungeons' ids is named all the same.
+    TEST_ASSERT_EQ(map_label(400001), std::string("Ruins of the Ancient City of Ru"));
     TEST_ASSERT_EQ(map_label(0), std::string("Unknown map"));
     TEST_ASSERT(map_name(0).empty());
 }

@@ -161,7 +161,7 @@ and saves as you go.
 | `show_in_combat_only` | false | Show the overlay only during a fight, and for `hide_after_combat_s` after it. Applies only while locked. |
 | `hide_after_combat_s` | 5 | Seconds it stays up after a fight, to read the result. |
 | `hide_when_game_unfocused` | false | Hide it while neither the game nor the meter's window is in front, and while the game is not running. Applies only while locked. |
-| `show_in_dungeons_only` | false | Show the overlay only in a dungeon, told by the map's id, so a new dungeon counts before the meter can name it. Hidden in the open world and before the first loading screen. Applies only while locked. |
+| `show_in_dungeons_only` | false | Show the overlay only in a dungeon, told by the map's id, so a new dungeon counts before the meter can name it. Arenas, battlefields, Ascension and the other instances count too; Chaotic Reshanta, the open world's events and the open world do not, nor the time before the first loading screen. Applies only while locked. |
 
 **history**
 

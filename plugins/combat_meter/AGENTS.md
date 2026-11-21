@@ -78,8 +78,10 @@ app, or restarting it into an update, ends the live fight the same way and saves
 - **Classes:** from the skill codes a player uses (their summons' count too), unless an
   identity packet's class code names one.
 - **Party:** with a roster, only its names count, and the local player.
-  - With none, it depends on the map. In a dungeon (`game::is_dungeon`: the map's id,
-    whether or not the meter can name it) every player counts: only the group gets in. In the open world, or on a map the meter
+  - With none, it depends on the map. In a dungeon (`game::is_party_instance`: a
+    map id of 600000 or more, whether or not the meter can name it) every player
+    counts: only the group gets in. Not in an arena or a battlefield, whose other
+    side is inside, nor the other instances below 600000 (AGENTS.md, Map load). In the open world, or on a map the meter
     did not see load, only the local player does, so a crowd at a world boss stays
     out.
   - Non-party hits still lower the boss's HP estimate, but never start or extend a
@@ -261,7 +263,9 @@ app, or restarting it into an update, ends the live fight the same way and saves
 - **History:**
   - What is saved: boss fights, and fights of at least `min_saved_duration_s`. With
     `save_only_dungeons`, only in a dungeon (`game::is_dungeon`: a map id of 600000
-    or more, named in maps.tsv or not; so not map 0 or an open-world zone).
+    or more, named in maps.tsv or not, or an instance maps.tsv marks below it, as
+    the arenas, the matched dungeons and Ascension; so not map 0, an open-world zone,
+    Chaotic Reshanta or an open-world event: AGENTS.md, Map load).
   - Each fight is one JSON file (`"v":2`; version 1 files still load, without the
     breakdowns), written atomically, plus a line appended to `index.jsonl`.
   - The detail (`timeline`, `deaths`, `effects`), `active_s` and each row's `casts`

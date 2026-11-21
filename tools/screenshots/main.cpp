@@ -438,7 +438,7 @@ std::vector<meter::HistoryEntry> evening(const meter::FightSummary& kill) {
     std::vector<meter::HistoryEntry> out;
     meter::HistoryEntry earlier = entry_of(kill);
     earlier.file = "earlier-visit.json";
-    earlier.map_id = 400001;
+    earlier.map_id = 1010;  // open world: the map table names none of it
     earlier.visit_ts = kill.start_ts - 3'600 * kMicrosPerSecond;
     earlier.start_ts = earlier.visit_ts + 300 * kMicrosPerSecond;
     earlier.duration_s = 41.0;

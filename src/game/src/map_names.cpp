@@ -10,6 +10,8 @@ namespace {
 struct MapRow {
     uint32_t id;
     const char* name;
+    /// A dungeon to is_dungeon, its id under kFirstInstanceMapId or not.
+    bool dungeon;
 };
 
 constexpr MapRow kMaps[] = {
@@ -29,7 +31,13 @@ std::string_view map_name(uint32_t map_id) noexcept {
     return row != nullptr ? std::string_view(row->name) : std::string_view();
 }
 
-bool is_dungeon(uint32_t map_id) noexcept { return map_id >= kFirstInstanceMapId; }
+bool is_dungeon(uint32_t map_id) noexcept {
+    if (map_id >= kFirstInstanceMapId) return true;
+    const MapRow* row = find(map_id);
+    return row != nullptr && row->dungeon;
+}
+
+bool is_party_instance(uint32_t map_id) noexcept { return map_id >= kFirstInstanceMapId; }
 
 std::string map_label(uint32_t map_id) {
     if (map_id == 0) return "Unknown map";

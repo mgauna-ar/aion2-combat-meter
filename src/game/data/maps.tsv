@@ -1,123 +1,434 @@
-# AION 2 map names by map id, as the map load (21 36) carries it. Names only:
-# whether a map is a dungeon goes by its id (600000 and up, game::is_dungeon),
-# so a dungeon missing here still counts as one.
+# AION 2 map names by map id, as the map load (21 36) carries it, and which
+# are dungeons: an id of 600000 and up is one, named or not, and a row marked
+# `dungeon` is one below it (game::is_dungeon). Every instance is marked but
+# Chaotic Reshanta's and the open world's events'.
 #
-# Source: aion2.app's dungeon pages (aion2.app/db/dungeons/<name>), retrieved
-# 2026-11-05: one row per difficulty tier, keyed by the tier's id. Checked once:
-# a capture's dungeon came as 600072, Vakron Sky Island (Conquest), the run it
-# was, so the tier ids are the ids 21 36 carries. No second source gives tier
-# ids to compare with. Some dungeons the site lists have no tier ids on their
-# pages (the Lv.99 Awakening tiers, Ascension, Legion and more): they show as
-# "Dungeon <id>" until a capture shows their id.
+# Sources, retrieved 2026-11-21: aion2.app's dungeon pages
+# (aion2.app/db/dungeons/<name>), one row per difficulty tier with its tier's
+# name; and questlog.gg's dungeon records (questlog.gg/aion-2/en/db/dungeon/<id>),
+# which give each instance's map id and name every map aion2.app's pages do
+# not give, the tier from the record's difficulty. Keyed by questlog.gg's map
+# id, not the instance's own id where they differ: the arena capture's map 61
+# is Impetusium Arena (instance 8) and the PvP capture's map 20 Chaotic Lower
+# Reshanta (instance 21). Left out: the open world's phasing layers and story
+# instances, whose names are the game's internal ones.
 #
 # Open-world zones have no public ids. The game's own files cannot be read for
 # them (they are encrypted), and no site lists numeric ids for open-world maps.
 # metabot.gg gives zone ids (Reshanta's Root is 622), but they look like zones
 # within a map, not maps. Add rows by hand below as captures show them.
 # Regenerate with tools/gen_map_table.py.
-600001	Krao Cave (Conquest)
-600002	Krao Cave (Exploration)
-600004	Krao Cave (Conquest [Hard])
-600011	Urugugu Canyon (Exploration)
-600012	Urugugu Canyon (Conquest)
-600013	Urugugu Canyon (Conquest [Hard])
-600021	Fire Temple (Exploration)
-600022	Fire Temple (Conquest)
-600031	Draupnir (Exploration)
-600032	Draupnir (Conquest)
-600033	Draupnir (Conquest [Hard])
-600041	Dying Dramata's Nest (Exploration)
-600042	Dying Dramata's Nest (Conquest)
-600051	Deus Research Base (Exploration)
-600053	Deus Research Base (Stage 1)
-600055	Deus Research Base (Stage 2)
-600058	Deus Research Base (Stage 3)
-600061	Shattered Arkanis (Exploration)
-600063	Shattered Arkanis (Stage 1)
-600065	Shattered Arkanis (Stage 2)
-600068	Shattered Arkanis (Stage 3)
-600071	Vakron Sky Island (Exploration)
-600072	Vakron Sky Island (Conquest)
-600073	Vakron Sky Island (Conquest [Hard])
-600082	Abyssal Forge: Ludra (Conquest)
-600083	Abyssal Forge: Ludra (Conquest [Hard])
-600091	Ferocious Horn Den (Exploration)
-600092	Ferocious Horn Den (Conquest)
-600121	Cradle of Nihility (Exploration)
-600122	Cradle of Nihility (Conquest)
-600123	Cradle of Nihility (Conquest [Hard])
-600131	Hall of Illusion (Exploration)
-600132	Hall of Illusion (Conquest)
-600133	Hall of Illusion (Conquest [Hard])
-600141	Azure Breath Island (Exploration)
-600142	Azure Breath Island (Conquest)
-600143	Azure Breath Island (Conquest [Hard])
-600151	Citadel of the Fallen Daeva (Exploration)
-600152	Citadel of the Fallen Daeva (Conquest)
-600153	Citadel of the Fallen Daeva (Conquest [Hard])
-610010	Submerged Life Temple (Stage 1)
-610011	Submerged Life Temple (Stage 2)
-610012	Submerged Life Temple (Stage 3)
-610013	Submerged Life Temple (Stage 4)
-610020	Mirror of Scarlet Desire (Stage 1)
-610021	Mirror of Scarlet Desire (Stage 2)
-610022	Mirror of Scarlet Desire (Stage 3)
-610023	Mirror of Scarlet Desire (Stage 4)
-610044	Dying Dramata's Nest (Conquest [Hard])
-610052	Deus Research Base (Stage 4)
-610062	Shattered Arkanis (Stage 4)
-610070	Abyssal Horn Den (Stage 1)
-610071	Abyssal Horn Den (Stage 2)
-610072	Abyssal Horn Den (Stage 3)
-610073	Abyssal Horn Den (Stage 4)
-620011	Corroded Decontamination Facility
-620021	Chalice of Muspel (Conquest [Hard])
-620022	Chalice of Muspel (Conquest)
-690001	Subjugation Closed (Exploration)
-690002	Subjugation Closed (Conquest)
-690003	Subjugation Closed (Hard)
-690011	Beritra Brigade Fortress (Exploration)
-690012	Beritra Brigade Fortress (Conquest)
-690013	Beritra Brigade Fortress (Hard)
-690031	Orcus's Grave (Exploration)
-690032	Orcus's Grave (Conquest)
-690033	Orcus's Grave (Hard)
-690034	Orcus's Grave (Extreme)
-690035	Orcus's Grave (Despair)
-690036	Orcus's Grave (Hell)
-690041	Fafnite Forge (Exploration)
-690042	Fafnite Forge (Conquest)
-690043	Fafnite Forge (Hard)
-690044	Fafnite Forge (Extreme)
-690045	Fafnite Forge (Despair)
-690046	Fafnite Forge (Hell)
-910011	Nightmare Altar (Easy)
-910012	Nightmare Altar (Normal)
-910013	Nightmare Altar (Hard)
-910014	Nightmare Altar (Challenge)
-910021	Tyrant's Hideout (Easy)
-910022	Tyrant's Hideout (Normal)
-910023	Tyrant's Hideout (Hard)
-910024	Tyrant's Hideout (Challenge)
-910031	Sanctum of Loathing (Easy)
-910032	Sanctum of Loathing (Normal)
-910033	Sanctum of Loathing (Hard)
-910034	Sanctum of Loathing (Challenge)
-910041	Depository of Fates (Easy)
-910042	Depository of Fates (Normal)
-910043	Depository of Fates (Hard)
-910044	Depository of Fates (Challenge)
-910051	Forgotten Repository (Easy)
-910052	Forgotten Repository (Normal)
-910053	Forgotten Repository (Hard)
-910054	Forgotten Repository (Challenge)
-910061	Chamber of the Dead (Easy)
-910062	Chamber of the Dead (Normal)
-910063	Chamber of the Dead (Hard)
-910064	Chamber of the Dead (Challenge)
+20	Chaotic Lower Reshanta
+22	Chaotic Middle Reshanta
+23	Chaotic Outer Reshanta
+50	Pantheon	dungeon
+60	Fire Temple Arena	dungeon
+61	Impetusium Arena	dungeon
+62	Odyle Shard Cradle	dungeon
+63	Stormslumber Snowfield	dungeon
+64	Sandstorm Temple	dungeon
+901	Altgard Legion Airship	dungeon
+902	Verteron Legion Airship	dungeon
+904	Eltnen Legion Airship	dungeon
+905	Morheim Legion Airship	dungeon
+111002	Incursion of the Spirits
+111003	Incursion of the Spirits
+111005	Altgard Shugo Fesetival Protection
+156000	Subjugation Closed (Exploration)	dungeon
+156001	Subjugation Closed (Conquest)	dungeon
+156002	Subjugation Closed (Hard)	dungeon
+156010	Beritra Brigade Fortress (Exploration)	dungeon
+156011	Beritra Brigade Fortress (Conquest)	dungeon
+156012	Beritra Brigade Fortress (Hard)	dungeon
+156030	Orcus's Grave (Exploration)	dungeon
+156031	Orcus's Grave (Conquest)	dungeon
+156032	Orcus's Grave (Hard)	dungeon
+156033	Orcus's Grave (Extreme)	dungeon
+156034	Orcus's Grave (Despair)	dungeon
+156035	Orcus's Grave (Hell)	dungeon
+156040	Fafnite Forge (Exploration)	dungeon
+156041	Fafnite Forge (Conquest)	dungeon
+156042	Fafnite Forge (Hard)	dungeon
+156043	Fafnite Forge (Extreme)	dungeon
+156044	Fafnite Forge (Despair)	dungeon
+156045	Fafnite Forge (Hell)	dungeon
+160000	Silent Graveyard	dungeon
+160001	Fafnite Amphitheater	dungeon
+160002	Silent Graveyard	dungeon
+160003	Silent Graveyard	dungeon
+160004	Fafnite Amphitheater	dungeon
+160005	Fafnite Amphitheater	dungeon
+200002	Dream of Torment	dungeon
+200003	Nightmare	dungeon
+200004	Narun's Dream	dungeon
+200005	Subspace of Ascension	dungeon
+200006	Dream of Shattered Fragments	dungeon
+210003	Dream Remnants	dungeon
+210013	Forgotten Battlefield	dungeon
+210014	Zikel's Collapsed Barracks	dungeon
+210015	Zikel's Distorted Dream	dungeon
+210027	Chloris's Abyss	dungeon
+220003	Dream Remnants	dungeon
+220013	Forgotten Battlefield	dungeon
+220014	Kaisinel's Collapsed Sanctum	dungeon
+220015	Kaisinel's Distorted Dream	dungeon
+220027	Sigebert's Abyss	dungeon
+310001	Poacher's Den	dungeon
+310002	Spirit Flower Cave	dungeon
+310003	Cursed Hideout	dungeon
+310004	Mysterious Mushroom Cave	dungeon
+310005	Cave of the Defeated	dungeon
+310006	Filth Pit	dungeon
+310007	Illusionary Ruins	dungeon
+310008	Dehinon's Hideout	dungeon
+310009	Guardian's Armory	dungeon
+310010	Cave of the Desperate	dungeon
+310011	Hidden Valley	dungeon
+310012	Distorted Cave	dungeon
+310013	Corrupted Spiritmaster's Residence	dungeon
+310014	Karat's Nest	dungeon
+310015	Kius' Residence	dungeon
+310016	Lupyllini Habitat	dungeon
+310017	Looted Repository	dungeon
+310018	Abandoned Odylium Cave	dungeon
+310019	Solitary Rock Tomb	dungeon
+310020	Kidnapper's Hold	dungeon
+310021	Marsh Library	dungeon
+310022	Krall Barracks	dungeon
+310023	Canyon Library	dungeon
+310024	Chilly Hideout	dungeon
+310025	Cave Storage	dungeon
+310026	Grave of the Wrathful Dead	dungeon
+310027	Akilo Thieves Den	dungeon
+310028	Deadly Poison Den	dungeon
+310029	Herb Cave	dungeon
+310030	Looted Pilgrim's Rest	dungeon
+310031	Targoth's Cave	dungeon
+310032	Broken Hall of Knowledge	dungeon
+310033	Deep Underground Cave	dungeon
+310034	Fortress Jail	dungeon
+310035	Scribe's Room	dungeon
+310036	Red Dragon Altar	dungeon
+310037	Wild Biruta Habitat	dungeon
+310038	Fissure Cave	dungeon
+310039	Renegade Base	dungeon
+310040	Klaw Den	dungeon
+310041	Rift Cave	dungeon
+310042	Deep and Dark Pit	dungeon
+310043	Wild Kuru Habitat	dungeon
+310044	Fortress Grave	dungeon
+310045	Anguish Hideout	dungeon
+310046	Aullaeu Oratory	dungeon
+310047	Prison of Exiles	dungeon
+310048	Kraka's Altar	dungeon
+310049	Dratona Outpost	dungeon
+310050	Balaur Scouts Campsite	dungeon
+310051	Altar of Hope	dungeon
+310052	Experimental Prison Compound	dungeon
+310053	Balaur Scouts Outpost	dungeon
+310054	Hidden Ruins Altar	dungeon
+310055	Laborers Training Ground	dungeon
+310056	Konutin's Cave	dungeon
+310057	Plantation Storage	dungeon
+310058	Bibliophile's Grave	dungeon
+310059	Forest Library	dungeon
+310060	Collapsed Fortress Basement	dungeon
+310061	Hidden Lepharist Research Center	dungeon
+310062	Abandoned Life Hideout	dungeon
+310063	Life Awakening Site	dungeon
+310064	Sunken Ancient Legacy	dungeon
+310065	Ishtar Logistics Base	dungeon
+310066	Drok the Outlaw's Den	dungeon
+310067	Filthy Cave	dungeon
+310068	Defunct Creion Laboratory	dungeon
+310069	Fallen Haven	dungeon
+310070	Life Daeva Library	dungeon
+310071	Lepharist Special Operations Research Center	dungeon
+310072	Ratcatchers Base	dungeon
+310073	Gravarax Research Center	dungeon
+310074	Manduri Habitat	dungeon
+310075	Mutated Drana Plantation	dungeon
+310076	Sunken Temple	dungeon
+310077	Barrier Tower Fortress Vault	dungeon
+310078	Forgotten Spring	dungeon
+310079	Fugitive Hideout	dungeon
+310080	Iagosh's Secret Storage	dungeon
+320001	Abandoned Memorial Room	dungeon
+320002	Trickster's Den	dungeon
+320003	Abandoned One's Grave	dungeon
+320004	Dratona Cave	dungeon
+320005	Predator's Lair	dungeon
+320006	Dusk Pit	dungeon
+320007	Lost Ruins	dungeon
+320008	Poisonous Plant Habitat	dungeon
+320009	Valka's Nest	dungeon
+320010	Old Graveyard	dungeon
+320011	Treasure Hunter's Residence	dungeon
+320012	Abandoned Archon Jail	dungeon
+320013	Fafnite Storage Room	dungeon
+320014	Insectoid Tunnel	dungeon
+320015	Bloodsoaked Confessional	dungeon
+320016	Prison of Oblivion	dungeon
+320017	Watcher's Temporary Outpost	dungeon
+320018	Blue Dragon's Trap	dungeon
+320019	Hidden Vein Cave	dungeon
+320020	Fortuneteller's Grave	dungeon
+320021	Howling Den	dungeon
+320022	Ossuary of the Noble	dungeon
+320023	Smuggler's Cave	dungeon
+320024	Homish's Prison Compound	dungeon
+320025	Kumbahum's Cave	dungeon
+320026	Victims' Cave	dungeon
+320027	Drana Depository	dungeon
+320028	High Priest's Ruins	dungeon
+320029	Closed Hideout	dungeon
+320030	All-Curing Cave	dungeon
+320031	Fungie Habitat	dungeon
+320032	Library of Wisdom	dungeon
+320033	Destroyed Scriptorium	dungeon
+320034	Dark Root Cave	dungeon
+320035	Unstable Cave	dungeon
+320036	Lamnah Base	dungeon
+320037	Twisted Pit	dungeon
+320038	Rift Fissure	dungeon
+320039	Scale Altar	dungeon
+320040	Library of Foresight	dungeon
+320041	Skurv Laborer Den	dungeon
+320042	Dratona Assembly Area	dungeon
+320043	Place of Rest	dungeon
+320044	Final Haven	dungeon
+320045	Worshiper's Underground Cave	dungeon
+320046	Fanatics' Den	dungeon
+320047	Spider Cave	dungeon
+320048	Empty Cave	dungeon
+320049	Lonely Rock Chasm	dungeon
+320050	Rock Cave	dungeon
+320051	Den of Exiles	dungeon
+320052	Pirate's Treasure Storage	dungeon
+320053	Shulak Cave	dungeon
+320054	Destruction Archons Armory	dungeon
+320055	Ascetic's Cave	dungeon
+320056	Lagta Fafnite Storage	dungeon
+320057	Warriors' Rest	dungeon
+320058	Tayga Breeding Ground	dungeon
+320059	Library of Patience	dungeon
+320060	Odylium Marauder Den	dungeon
+320061	Forgotten Fire Altar	dungeon
+320062	Abandoned Kromede Base	dungeon
+320063	Verdandi's Oratory	dungeon
+320064	Blades Secret Repository	dungeon
+320065	Frozen Land of Fate	dungeon
+320066	Land of Raging Flame	dungeon
+320067	Pure Spring	dungeon
+320068	Predator's Nest	dungeon
+320069	Cave of the Stranded	dungeon
+320070	Cave of the Exiled Ones	dungeon
+320071	Blades Base	dungeon
+320072	Patamor Marauder Base	dungeon
+320073	Kurpak Special Operations Unit Base	dungeon
+320074	Camouflaged Fate Archon Base	dungeon
+320075	Fire Cave	dungeon
+320076	Fate Temple	dungeon
+320077	Indnath Secret Base	dungeon
+320078	Guardian Statues' Cave	dungeon
+320079	Iralcig Naga Cave	dungeon
+320080	Patamor Underwater Cave	dungeon
+400001	Ruins of the Ancient City of Ru	dungeon
+400002	Ruins of the Ancient City of Ru	dungeon
+500001	Beritra Air Raid
+500002	Accursed Sword
+500003	Odyle Flight Frenzy
+500004	Goldrin's Treasure Trove
+500005	Incursion of the Spirits
+500006	Incursion of the Spirits
+500007	Defend Shugo Merchants
+500008	Goldrin's Treasure
+500009	Odyle Flight Frenzy
+500010	Wraith Evasion
+500011	Jump Jump
+500012	Hidden Lugi
+500013	Mysterious Track
+500015	Not This Tile?
+500016	Up! Up! Up!
+500017	Beritra Air Raid
+500018	Beritra Air Raid
+500019	Accursed Sword
+500020	Accursed Sword
+500021	Incursion of the Spirits
+500022	Mysterious Track
+500023	Up! Up! Up!
+500024	Jump Jump
+500025	Wraith Evasion
+500026	Defend Shugo Merchants
+500027	Goldrin's Treasure
+500028	Hidden Lugi
+500029	Not This Tile?
+500030	Nyerk Shooter
+500031	Accursed Sword
+500032	Beritra Air Raid
+500033	Incursion of the Spirits
+500034	Shugo's Dilemma
+500035	Up! Up! Up!
+500036	Not This Tile?
+500037	FE Jump Jump L
+500038	Hidden Lugi
+500039	Mysterious Track
+500040	Wraith Evasion
+500041	Goldrin's Treasure
+500042	Odyle Flight Frenzy
+500043	Defend Shugo Merchants
+502001	Accursed Sword
+503001	Abyss Corridor	dungeon
+503002	Abyss Corridor	dungeon
+503003	Abyss Corridor	dungeon
+503004	Abyss Corridor	dungeon
+503005	Abyss Corridor	dungeon
+503006	Abyss Corridor	dungeon
+504001	Abyss Corridor	dungeon
+504002	Abyss Corridor	dungeon
+504003	Abyss Corridor	dungeon
+504004	Abyss Corridor	dungeon
+504005	Abyss Corridor	dungeon
+504006	Abyss Corridor	dungeon
+510001	Odyle Flight Frenzy
+510002	Beritra Air Raid
+510003	Jump Jump
+510004	Hidden Lugi
+510005	Wraith Evasion
+510006	Mysterious Track
+510007	Goldrin's Treasure
+510008	Beritra Air Raid
+510009	Beritra Air Raid
+510010	Up! Up! Up!
+510011	Sticker Shooter
+510012	Not This Tile?
+510013	Accursed Sword
+510014	Accursed Sword
+510015	Incursion of the Spirits
+510016	Odyle Flight Frenzy
+510017	Wraith Evasion
+510018	Up! Up! Up!
+510019	Mysterious Track
+510020	Jump Jump
+510021	Defend Shugo Merchants
+510022	Goldrin's Treasure
+510023	Hidden Lugi
+510024	Not This Tile?
+510025	Nyerk Shooter
+510026	Accursed Sword
+510027	Beritra Air Raid
+510028	Incursion of the Spirits
+510029	Shugo's Dilemma
+510030	Up! Up! Up!
+510031	Not This Tile?
+510032	FE Jump Jump D
+510033	Hidden Lugi
+510034	Mysterious Track
+510035	Wraith Evasion
+510036	Goldrin's Treasure
+510037	Odyle Flight Frenzy
+510038	Defend Shugo Merchants
+600001	Krao Cave (Conquest)	dungeon
+600002	Krao Cave (Exploration)	dungeon
+600004	Krao Cave (Conquest [Hard])	dungeon
+600011	Urugugu Canyon (Exploration)	dungeon
+600012	Urugugu Canyon (Conquest)	dungeon
+600013	Urugugu Canyon (Conquest [Hard])	dungeon
+600021	Fire Temple (Exploration)	dungeon
+600022	Fire Temple (Conquest)	dungeon
+600023	Fire Temple (Conquest [Hard])	dungeon
+600031	Draupnir (Exploration)	dungeon
+600032	Draupnir (Conquest)	dungeon
+600033	Draupnir (Conquest [Hard])	dungeon
+600041	Dying Dramata's Nest (Exploration)	dungeon
+600042	Dying Dramata's Nest (Conquest)	dungeon
+600051	Deus Research Base (Exploration)	dungeon
+600053	Deus Research Base (Stage 1)	dungeon
+600055	Deus Research Base (Stage 2)	dungeon
+600058	Deus Research Base (Stage 3)	dungeon
+600061	Shattered Arkanis (Exploration)	dungeon
+600063	Shattered Arkanis (Stage 1)	dungeon
+600065	Shattered Arkanis (Stage 2)	dungeon
+600068	Shattered Arkanis (Stage 3)	dungeon
+600071	Vakron Sky Island (Exploration)	dungeon
+600072	Vakron Sky Island (Conquest)	dungeon
+600073	Vakron Sky Island (Conquest [Hard])	dungeon
+600081	Abyssal Forge: Ludra (Easy)	dungeon
+600082	Abyssal Forge: Ludra (Conquest)	dungeon
+600083	Abyssal Forge: Ludra (Conquest [Hard])	dungeon
+600091	Ferocious Horn Den (Exploration)	dungeon
+600092	Ferocious Horn Den (Conquest)	dungeon
+600093	Ferocious Horn Den (Conquest [Hard])	dungeon
+600121	Cradle of Nihility (Exploration)	dungeon
+600122	Cradle of Nihility (Conquest)	dungeon
+600123	Cradle of Nihility (Conquest [Hard])	dungeon
+600131	Hall of Illusion (Exploration)	dungeon
+600132	Hall of Illusion (Conquest)	dungeon
+600133	Hall of Illusion (Conquest [Hard])	dungeon
+600141	Azure Breath Island (Exploration)	dungeon
+600142	Azure Breath Island (Conquest)	dungeon
+600143	Azure Breath Island (Conquest [Hard])	dungeon
+600144	Citadel of the Fallen Daeva (Exploration)	dungeon
+600145	Citadel of the Fallen Daeva (Conquest)	dungeon
+600146	Citadel of the Fallen Daeva (Conquest [Hard])	dungeon
+610010	Submerged Life Temple (Stage 1)	dungeon
+610011	Submerged Life Temple (Stage 2)	dungeon
+610012	Submerged Life Temple (Stage 3)	dungeon
+610013	Submerged Life Temple (Stage 4)	dungeon
+610020	Mirror of Scarlet Desire (Stage 1)	dungeon
+610021	Mirror of Scarlet Desire (Stage 2)	dungeon
+610022	Mirror of Scarlet Desire (Stage 3)	dungeon
+610023	Mirror of Scarlet Desire (Stage 4)	dungeon
+610044	Dying Dramata's Nest (Conquest [Hard])	dungeon
+610052	Deus Research Base (Stage 4)	dungeon
+610062	Shattered Arkanis (Stage 4)	dungeon
+610070	Abyssal Horn Den (Stage 1)	dungeon
+610071	Abyssal Horn Den (Stage 2)	dungeon
+610072	Abyssal Horn Den (Stage 3)	dungeon
+610073	Abyssal Horn Den (Stage 4)	dungeon
+620011	Corroded Decontamination Facility	dungeon
+620021	Chalice of Muspel (Conquest [Hard])	dungeon
+620022	Chalice of Muspel (Conquest)	dungeon
+900001	Daeva Bio-Research Base	dungeon
+900002	Odylium Repository	dungeon
+900003	Crobakhi's Secret Depository	dungeon
+910011	Nightmare Altar (Easy)	dungeon
+910012	Nightmare Altar (Normal)	dungeon
+910013	Nightmare Altar (Hard)	dungeon
+910014	Nightmare Altar (Challenge)	dungeon
+910015	Nightmare Altar (Insane)	dungeon
+910016	Nightmare Altar (Hell)	dungeon
+910021	Tyrant's Hideout (Easy)	dungeon
+910022	Tyrant's Hideout (Normal)	dungeon
+910023	Tyrant's Hideout (Hard)	dungeon
+910024	Tyrant's Hideout (Challenge)	dungeon
+910025	Tyrant's Hideout (Insane)	dungeon
+910026	Tyrant's Hideout (Hell)	dungeon
+910031	Sanctum of Loathing (Easy)	dungeon
+910032	Sanctum of Loathing (Normal)	dungeon
+910033	Sanctum of Loathing (Hard)	dungeon
+910034	Sanctum of Loathing (Challenge)	dungeon
+910035	Sanctum of Loathing (Insane)	dungeon
+910036	Sanctum of Loathing (Hell)	dungeon
+910041	Depository of Fates (Easy)	dungeon
+910042	Depository of Fates (Normal)	dungeon
+910043	Depository of Fates (Hard)	dungeon
+910044	Depository of Fates (Challenge)	dungeon
+910045	Depository of Fates (Insane)	dungeon
+910046	Depository of Fates (Hell)	dungeon
+910051	Forgotten Repository (Easy)	dungeon
+910052	Forgotten Repository (Normal)	dungeon
+910053	Forgotten Repository (Hard)	dungeon
+910054	Forgotten Repository (Challenge)	dungeon
+910055	Forgotten Repository (Insane)	dungeon
+910056	Forgotten Repository (Hell)	dungeon
+910057	Forgotten Repository (Doom)	dungeon
+910061	Chamber of the Dead (Easy)	dungeon
+910062	Chamber of the Dead (Normal)	dungeon
+910063	Chamber of the Dead (Hard)	dungeon
+910064	Chamber of the Dead (Challenge)	dungeon
+910065	Chamber of the Dead (Insane)	dungeon
+910066	Chamber of the Dead (Hell)	dungeon
+910067	Chamber of the Dead (Doom)	dungeon
 
 # By hand: ids seen in captures. --import-pages keeps this section as it is.
-# Ludra's Easy tier: aion2.app lists only its Conquest tiers (600082, 600083);
-# questlog.gg's page for 600081 names it (questlog.gg/aion-2/en/db/dungeon/600081,
-# 2026-11-20). Not seen in a capture yet.
-600081	Abyssal Forge: Ludra (Easy)
