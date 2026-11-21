@@ -48,6 +48,16 @@ TEST_CASE(SkillNames, UnlistedCodesHaveALabel) {
     TEST_ASSERT_EQ(skill_label(12060230), std::string("Punishing Strike"));
 }
 
+TEST_CASE(SkillNames, ADamageTheostonesHitIsNamedAfterIt) {
+    // 3000TNN: the tier, then the item's number plus 6 (Ulgorn's Will is 513850013).
+    TEST_ASSERT_EQ(skill_label(3'000'019), std::string("Theostone: Ulgorn's Will"));
+    TEST_ASSERT_EQ(skill_label(3'000'117), std::string("Theostone: Traufnir's Courage"));
+    TEST_ASSERT_EQ(skill_label(3'000'224), std::string("Theostone: Beritra's Selfishness"));
+    // Gear, not a class's skill: its wearer's class comes from their own.
+    TEST_ASSERT(class_of_skill(3'000'019) == AionClass::Unknown);
+    TEST_ASSERT_EQ(skill_key(3'000'019), uint32_t{3'000'019});
+}
+
 TEST_CASE(SkillNames, ClassComesFromTheFirstTwoDigits) {
     TEST_ASSERT(class_of_skill(11020000) == AionClass::Gladiator);
     TEST_ASSERT(class_of_skill(12240347) == AionClass::Templar);
@@ -126,7 +136,8 @@ TEST_CASE(SkillNames, ItemEffectsSortByTheirIdsFirstDigits) {
     TEST_ASSERT(item_effect(21'101'011) == ItemEffect::Food);      // Mela Juice
     TEST_ASSERT(item_effect(27'003'131) == ItemEffect::Food);      // Artisan's Roasted Fogus
     TEST_ASSERT(item_effect(20'111'011) == ItemEffect::Potion);    // Life Potion
-    TEST_ASSERT(item_effect(30'010'141) == ItemEffect::Theostone); // Notun's Craft
+    // A Theostone is gear, not a consumable.
+    TEST_ASSERT(item_effect(30'010'141) == ItemEffect::None);      // Notun's Craft
     // Items the view leaves out, and what is no item's.
     TEST_ASSERT(item_effect(29'001'011) == ItemEffect::None);      // EXP Boost Talisman
     TEST_ASSERT(item_effect(42'000'101) == ItemEffect::None);      // a transformation candy

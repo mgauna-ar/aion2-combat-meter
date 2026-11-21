@@ -85,8 +85,10 @@ The Combat Meter page shows the fight on view, live or saved, in tabs:
   who had it. *Debuffs on party* lists what enemies put on you, the most frequent
   first; *On enemies* the party's own effects on them, where uptime is the best one
   player kept up (a DoT's uptime on the boss). Passives are left out.
-  *Consumables* is a row per player: the food, scrolls and potions on them, and
-  their Theostone (once it goes off in the fight, with how often). A dash is none.
+  *Consumables* is a row per player: the food, scrolls and potions on them. A dash
+  is none. A Theostone is gear, not a consumable: its debuff shows under *On
+  enemies*, and a Theostone that deals damage shows among its wearer's skills
+  ("Theostone: Ulgorn's Will").
   Food or a scroll that was not up the whole fight shows in amber, with how much of
   it; hover one for its time and how often it was put on. Scrolls and food outlast a
   death, as in game, and those used before a loading screen (in town, before the
@@ -115,7 +117,7 @@ A fight saved by a version before these has none of them, and each tab says so.
 
 ![The Buffs & Debuffs tab: each buff on the party with who put it on, how often, for how long, and its uptime](../../docs/images/app-buffs.png)
 
-![The Buffs & Debuffs tab's Consumables: each player's food, scrolls, Theostone and potions, with a dash for a player who used none](../../docs/images/app-consumables.png)
+![The Buffs & Debuffs tab's Consumables: each player's food, scrolls and potions, with a dash for a player who used none](../../docs/images/app-consumables.png)
 
 ![The Casts tab: three players ranked by casts a minute, and one player's skills with their casts, share, casts a minute, average gap and hits per cast](../../docs/images/app-casts.png)
 

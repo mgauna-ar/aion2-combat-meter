@@ -51,7 +51,11 @@ A patch can add or rename skills. Rows the meter cannot name read "Skill 1234567
 2. **Rebuild the table.** Run `python3 tools/gen_skill_table.py --import-pages /tmp/skills`.
    It rewrites `src/game/data/skills.tsv` (names, and each skill's icon) and
    `skill_table.inc`. A skill aion2.app lists with no English name takes
-   questlog.gg's, or failing that keeps the name the TSV had.
+   questlog.gg's, or failing that keeps the name the TSV had. The TSV's `# By hand`
+   section (the damage Theostones' hits, which neither site lists as skills) stays
+   as it is. A patch that adds Theostones adds rows there by its rule
+   (AGENTS.md, Skill codes), from questlog.gg's items
+   (`database.getItems` with `"searchTerm":"Theostone"`).
 3. **Check the diff.** Renamed rows are expected. A class whose codes stopped starting
    with its two digits (`class_of_skill`) is not, and means the codes were renumbered.
 4. **Rebuild the icons**, when an icon column changed, here or in `effects.tsv` (3b) (`make test`'s `check-icons`

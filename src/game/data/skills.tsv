@@ -489,3 +489,40 @@
 19780000	Impact Blow	ICON_GT_SKILL_Passive_008
 19790000	Revitalization Contract	ICON_GT_SKILL_Passive_009
 19800000	Lightweight	ICON_GT_SKILL_Passive_010
+
+# By hand: codes no skill list carries. --import-pages keeps this section as it is.
+#
+# The weapon Theostones that deal damage when their wearer attacks, named after
+# their items in questlog.gg's item database (questlog.gg/aion-2/en/db/items,
+# 2026-11-21). Their hit (04 38) carries 3000TNN: T the tier (0: items 513850011
+# to 513850018, 5,000 Fire damage the first; 1: 51384xxxx, 10,000; 2: 51383xxxx,
+# 15,000), NN the item's number plus 6, as the Theostones that put an effect on
+# run 3001TNN in effects.tsv. Inferred from captures, not stated by any source:
+# in the dungeon capture four players' 3000017, 3000019, 3000020 and 3000024 went
+# off 13, 42, 71 and 193 times, in the order of their items' 1%, 5%, 10% and 20%,
+# for a median 6,020, 859, 379 and 29 against the items' 5,000, 1,000, 500 and
+# 125. Tier 2 has not been seen in a capture.
+3000017	Theostone: Zikel's Vestige	Icon_Item_Usable_Godstone_WP_r_011
+3000018	Theostone: Tassin's Command	Icon_Item_Usable_Godstone_WP_r_012
+3000019	Theostone: Ulgorn's Will	Icon_Item_Usable_Godstone_WP_r_013
+3000020	Theostone: Aultross's Promise	Icon_Item_Usable_Godstone_WP_r_014
+3000021	Theostone: Bargott's Ember	Icon_Item_Usable_Godstone_WP_r_015
+3000022	Theostone: Aulvicar's Sorcery	Icon_Item_Usable_Godstone_WP_r_016
+3000023	Theostone: Gartua's Strength	Icon_Item_Usable_Godstone_WP_r_017
+3000024	Theostone: Rathman's Greed	Icon_Item_Usable_Godstone_WP_r_018
+3000117	Theostone: Traufnir's Courage	Icon_Item_Usable_Godstone_WP_r_011
+3000118	Theostone: Sif's Knowledge	Icon_Item_Usable_Godstone_WP_r_012
+3000119	Theostone: Freyr's Wisdom	Icon_Item_Usable_Godstone_WP_r_013
+3000120	Theostone: Sigyn's Brilliance	Icon_Item_Usable_Godstone_WP_r_014
+3000121	Theostone: Boreas's Encouragement	Icon_Item_Usable_Godstone_WP_r_015
+3000122	Theostone: Charna's Acumen	Icon_Item_Usable_Godstone_WP_r_016
+3000123	Theostone: Thrasymedes's Wisdom	Icon_Item_Usable_Godstone_WP_r_017
+3000124	Theostone: Jumentis's Dexterity	Icon_Item_Usable_Godstone_WP_r_018
+3000217	Theostone: Tiamat's Rage	Icon_Item_Usable_Godstone_WP_r_011
+3000218	Theostone: Triniel's Rationality	Icon_Item_Usable_Godstone_WP_r_012
+3000219	Theostone: Vaizel's Oath	Icon_Item_Usable_Godstone_WP_r_013
+3000220	Theostone: Meslamtaeda's Regret	Icon_Item_Usable_Godstone_WP_r_014
+3000221	Theostone: Tiamat's Counterstrike	Icon_Item_Usable_Godstone_WP_r_015
+3000222	Theostone: Marchutan's Justice	Icon_Item_Usable_Godstone_WP_r_016
+3000223	Theostone: Yustiel's Compassion	Icon_Item_Usable_Godstone_WP_r_017
+3000224	Theostone: Beritra's Selfishness	Icon_Item_Usable_Godstone_WP_r_018
