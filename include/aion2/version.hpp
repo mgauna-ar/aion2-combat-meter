@@ -7,8 +7,8 @@
 // plain preprocessor that rc.exe understands: no #pragma once, no C++.
 #define AION2_VERSION_MAJOR 1
 #define AION2_VERSION_MINOR 6
-#define AION2_VERSION_PATCH 3
-#define AION2_VERSION_STRING "1.6.3"
+#define AION2_VERSION_PATCH 4
+#define AION2_VERSION_STRING "1.6.4"
 
 #ifndef RC_INVOKED
 
