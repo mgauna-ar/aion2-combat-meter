@@ -459,11 +459,11 @@ void EncounterEngine::on_map(const proto::MapLoad& m, uint32_t connection, Micro
     m_map_connection = connection;
     if (reload) {
         m_registry.on_map_reload();
-        m_effects.on_map_load(ts);
+        m_effects.on_map_load(ts, true);
         return;
     }
     if (m_fight) finish(EndReason::MapChange, ts);
-    m_effects.on_map_load(ts);
+    m_effects.on_map_load(ts, false);
     m_map_id = m.map_id;
     m_visit_ts = ts;
     m_registry.on_map_change(game::is_dungeon(m.map_id));

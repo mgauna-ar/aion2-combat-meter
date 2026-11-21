@@ -11,10 +11,12 @@
 
 #ifdef HAVE_IMGUI
 #include <algorithm>
+#include <array>
 #include <iterator>
 #include <map>
 #include <set>
 #include <string>
+#include <string_view>
 #include <vector>
 #endif
 
@@ -89,10 +91,143 @@ std::string first_and_more(const std::set<std::string>& names) {
     return out;
 }
 
-void view_button(AppViewState& state, const char* label, meter::EffectSide side) {
-    if (button(label, state.effect_view == side ? ButtonKind::Primary : ButtonKind::Secondary, ButtonSize::Fit)) {
-        state.effect_view = side;
+void view_button(AppViewState& state, const char* label, EffectView view) {
+    if (button(label, state.effect_view == view ? ButtonKind::Primary : ButtonKind::Secondary, ButtonSize::Fit)) {
+        state.effect_view = view;
     }
+}
+
+/// Food or a scroll up this much of the fight counts as kept up: one used as the
+/// pull began misses the moments before it.
+constexpr double kConsumableFull = 0.95;
+
+/// One item's effect on one player in a fight, its rows joined.
+struct Consumable {
+    uint32_t buff_id{0};
+    uint32_t applications{0};
+    double active_s{0.0};
+};
+
+/// A player's consumables, by game::ItemEffect (None unused).
+struct PlayerConsumables {
+    std::array<std::vector<Consumable>, static_cast<size_t>(game::ItemEffect::Theostone) + 1> by_kind;
+};
+
+void add_to(std::vector<Consumable>& list, const meter::EffectUptimeRow& row) {
+    for (Consumable& c : list) {
+        if (c.buff_id == row.buff_id) {
+            c.applications += row.applications;
+            c.active_s += row.active_s;
+            return;
+        }
+    }
+    list.push_back(Consumable{row.buff_id, row.applications, row.active_s});
+}
+
+/// Food, scrolls and potions are on the player who took them; a Theostone goes off
+/// on whatever its wearer hit, so it is theirs as its caster.
+std::vector<PlayerConsumables> consumables_of(const meter::FightSummary& f) {
+    std::vector<PlayerConsumables> out(f.combatants.size());
+    for (const meter::EffectUptimeRow& row : f.detail->effects) {
+        const game::ItemEffect kind = game::item_effect(row.buff_id);
+        if (kind == game::ItemEffect::None) continue;
+        for (size_t i = 0; i < f.combatants.size(); ++i) {
+            const meter::CombatantTotals& c = f.combatants[i];
+            const bool theirs = kind == game::ItemEffect::Theostone
+                                    ? !row.caster.empty() && row.caster == c.name
+                                    : row.side == meter::EffectSide::PartyBuff && row.target == c.id;
+            if (!theirs) continue;
+            add_to(out[i].by_kind[static_cast<size_t>(kind)], row);
+            break;
+        }
+    }
+    for (PlayerConsumables& p : out) {
+        for (auto& list : p.by_kind) {
+            std::sort(list.begin(), list.end(), [](const Consumable& a, const Consumable& b) {
+                if (a.active_s != b.active_s) return a.active_s > b.active_s;
+                return a.buff_id < b.buff_id;
+            });
+        }
+    }
+    return out;
+}
+
+/// An item's name in its column: the column already says it is a scroll or a
+/// Theostone ("Speed", "Reda's Tenacity").
+std::string short_name(game::ItemEffect kind, uint32_t buff_id) {
+    std::string name = game::effect_label(buff_id);
+    constexpr std::string_view kStone = "Theostone: ";
+    constexpr std::string_view kScroll = " Scroll";
+    if (kind == game::ItemEffect::Theostone && name.starts_with(kStone)) name.erase(0, kStone.size());
+    if (kind == game::ItemEffect::Scroll && name.ends_with(kScroll) && name.size() > kScroll.size()) {
+        name.resize(name.size() - kScroll.size());
+    }
+    return name;
+}
+
+/// Each consumable on a line of its own, its icon, then its name wrapped to the
+/// column. Food and scrolls kept up all fight show their name alone; one that was
+/// not, in amber with how much of the fight it was up. Potions and a Theostone's
+/// procs show how many times.
+void consumable_cell(int column, game::ItemEffect kind, const std::vector<Consumable>& list, double duration) {
+    if (!ImGui::TableSetColumnIndex(column)) return;
+    if (list.empty()) {
+        text_colored_u32(colors::TextDim, "-");
+        return;
+    }
+    const bool by_count = kind == game::ItemEffect::Potion || kind == game::ItemEffect::Theostone;
+    const float side_px = ImGui::GetTextLineHeight();
+    ImGui::PushTextWrapPos(0.0f);
+    for (const Consumable& c : list) {
+        const ImVec2 p = ImGui::GetCursorScreenPos();
+        draw_icon(ImGui::GetWindowDrawList(), effect_icon(c.buff_id), p.x, p.y, side_px);
+        ImGui::SetCursorScreenPos(ImVec2(p.x + side_px + m(6.0f), p.y));
+        const double uptime = std::clamp(c.active_s / duration, 0.0, 1.0);
+        const bool short_of_fight = !by_count && uptime < kConsumableFull;
+        std::string text = short_name(kind, c.buff_id);
+        if (by_count) {
+            text += "  x" + std::to_string(c.applications);
+        } else if (short_of_fight) {
+            text += "  " + std::to_string(static_cast<int>(uptime * 100.0)) + "%";
+        }
+        text_colored_u32(short_of_fight ? colors::Warning : colors::TextBody, "%s", text.c_str());
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("%s\nUp %s of the fight (%s), put on %u time%s.",
+                              game::effect_label(c.buff_id).c_str(), format_percent(uptime).c_str(),
+                              format_seconds(c.active_s).c_str(), c.applications, c.applications == 1 ? "" : "s");
+        }
+    }
+    ImGui::PopTextWrapPos();
+}
+
+void consumables_table(const meter::FightSummary& f) {
+    if (f.combatants.empty()) {
+        empty_state(ICON_FLASK, "No one in this fight", "Each player's food, scrolls, potions and Theostone show here.");
+        return;
+    }
+    const std::vector<PlayerConsumables> players = consumables_of(f);
+    const Column cols[] = {
+        {"Player", 120.0f, nullptr, 0},
+        {"Food", 0.0f, "Food and drinks. In amber, one that was not up the whole fight, with how much of it.", 1},
+        {"Scrolls", 0.0f, "In amber, one that was not up the whole fight, with how much of it.", 2},
+        {"Theostone", 0.0f, "The Theostone the player wears, and how often it went off. It shows once it goes off.",
+         3},
+        {"Potions", 0.0f, "Potions drunk during the fight.", 4},
+    };
+    if (!begin_table("##ConsumableTable", cols, static_cast<int>(std::size(cols)), fill_h(0.0f))) return;
+    const double duration = std::max(f.duration_s, 1.0);
+    constexpr game::ItemEffect kColumns[] = {game::ItemEffect::Food, game::ItemEffect::Scroll,
+                                             game::ItemEffect::Theostone, game::ItemEffect::Potion};
+    for (size_t i = 0; i < f.combatants.size(); ++i) {
+        const meter::CombatantTotals& c = f.combatants[i];
+        ImGui::TableNextRow();
+        player_cell(0, c.name, c.cls);
+        for (int col = 0; col < 4; ++col) {
+            const game::ItemEffect kind = kColumns[col];
+            consumable_cell(col + 1, kind, players[i].by_kind[static_cast<size_t>(kind)], duration);
+        }
+    }
+    ImGui::EndTable();
 }
 
 void render_group(const EffectGroup& group, const meter::FightSummary& f, meter::EffectSide side) {
@@ -148,14 +283,23 @@ void effects_tab(const meter::FightSummary& f, AppViewState& state) {
     }
     const char* debuffs_label = ICON_WARNING "  Debuffs on party##EffectView1";
     const char* enemies_label = ICON_TARGET "  On enemies##EffectView2";
-    view_button(state, ICON_SHIELD "  Buffs on party##EffectView0", meter::EffectSide::PartyBuff);
+    const char* consumables_label = ICON_FLASK "  Consumables##EffectView3";
+    view_button(state, ICON_SHIELD "  Buffs on party##EffectView0", EffectView::PartyBuff);
     same_line_if_room(button_width(debuffs_label, ButtonSize::Fit));
-    view_button(state, debuffs_label, meter::EffectSide::PartyDebuff);
+    view_button(state, debuffs_label, EffectView::PartyDebuff);
     same_line_if_room(button_width(enemies_label, ButtonSize::Fit));
-    view_button(state, enemies_label, meter::EffectSide::OnEnemy);
+    view_button(state, enemies_label, EffectView::OnEnemy);
+    same_line_if_room(button_width(consumables_label, ButtonSize::Fit));
+    view_button(state, consumables_label, EffectView::Consumables);
     ImGui::Dummy(ImVec2(0.0f, m(4.0f)));
 
-    const meter::EffectSide side = state.effect_view;
+    if (state.effect_view == EffectView::Consumables) {
+        consumables_table(f);
+        return;
+    }
+    static_assert(static_cast<int>(EffectView::OnEnemy) == static_cast<int>(meter::EffectSide::OnEnemy),
+                  "the first three views are the sides, in their order");
+    const auto side = static_cast<meter::EffectSide>(state.effect_view);
     const std::vector<EffectGroup> groups = group_rows(f, side);
     if (groups.empty()) {
         const char* title = side == meter::EffectSide::PartyBuff     ? "No buffs on the party"

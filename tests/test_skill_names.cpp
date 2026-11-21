@@ -118,3 +118,19 @@ TEST_CASE(SkillNames, AnEffectsOwnNameComesBeforeItsSkills) {
     TEST_ASSERT(effect_kind(181'900'211, 18'190'021) == EffectKind::Skill);
     TEST_ASSERT(effect_kind(200) == EffectKind::Unknown);
 }
+
+TEST_CASE(SkillNames, ItemEffectsSortByTheirIdsFirstDigits) {
+    TEST_ASSERT(item_effect(22'101'031) == ItemEffect::Scroll);    // Speed Scroll
+    TEST_ASSERT(item_effect(22'104'021) == ItemEffect::Scroll);    // Benediction Scroll
+    TEST_ASSERT(item_effect(21'604'011) == ItemEffect::Food);      // Fruit Salad
+    TEST_ASSERT(item_effect(21'101'011) == ItemEffect::Food);      // Mela Juice
+    TEST_ASSERT(item_effect(27'003'131) == ItemEffect::Food);      // Artisan's Roasted Fogus
+    TEST_ASSERT(item_effect(20'111'011) == ItemEffect::Potion);    // Life Potion
+    TEST_ASSERT(item_effect(30'010'141) == ItemEffect::Theostone); // Notun's Craft
+    // Items the view leaves out, and what is no item's.
+    TEST_ASSERT(item_effect(29'001'011) == ItemEffect::None);      // EXP Boost Talisman
+    TEST_ASSERT(item_effect(42'000'101) == ItemEffect::None);      // a transformation candy
+    TEST_ASSERT(item_effect(181'900'411) == ItemEffect::None);     // Undefeated Mantra
+    TEST_ASSERT(item_effect(12'000'161) == ItemEffect::None);      // the bosses' Burn
+    TEST_ASSERT(item_effect(22'999'999) == ItemEffect::None);      // not listed
+}

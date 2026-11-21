@@ -172,6 +172,31 @@ inline Session boss_session() {
     effect(40.0, kAlly2, kAlly2, 2, 16'770'001, 8'000, false);
     effect(5.0, boss, kMe, 1, 15'320'001, 10'000, false);     // Delayed Explosion
     for (int i = 1; i < 6; ++i) effect(5.0 + 10.0 * i, boss, kMe, 1, 15'320'001, 10'000, true);
+    // Items, as the wire carries them: the effect's own id, the item's code (the id
+    // over ten) for its skill. Lumiel and Zikel ate and read before the pull (Ariel
+    // did not, so her aura overlay stays as it was); Lumiel's outlast her death.
+    const auto item = [&](double t, uint64_t target, uint64_t caster, uint32_t instance, uint32_t buff_id,
+                          int64_t duration_ms) {
+        BuffSpec e;
+        e.target = target;
+        e.caster = caster;
+        e.instance = instance;
+        e.skill = buff_id / 10;
+        e.buff_id = buff_id;
+        e.level = 1;
+        e.duration_ms = duration_ms;
+        e.expires_server_ms = kStartMs + static_cast<uint64_t>(t * 1000.0) + static_cast<uint64_t>(duration_ms);
+        script.emplace_back(t, opcode_frame(proto::opcode::BuffAdd, buff_body(e)));
+    };
+    item(1.0, kAlly, kAlly, 10, 27'003'131, 600'000);  // Artisan's Roasted Fogus
+    item(1.2, kAlly, kAlly, 11, 22'101'031, 600'000);  // Speed Scroll
+    item(1.4, kAlly, kAlly, 12, 22'101'051, 600'000);  // Courage Scroll
+    item(1.6, kAlly, kAlly, 13, 22'104'021, 600'000);  // Benediction Scroll
+    item(1.1, kAlly2, kAlly2, 10, 21'604'011, 600'000); // Fruit Salad
+    item(1.3, kAlly2, kAlly2, 11, 22'101'031, 600'000); // Speed Scroll
+    item(35.0, kAlly, kAlly, 14, 20'111'011, 10'000);  // Life Potion, once up again
+    // Lumiel's Theostone going off on the boss.
+    for (int i = 0; i < 3; ++i) item(12.0 + 12.0 * i, boss, kAlly, 20 + static_cast<uint32_t>(i), 30'010'131, 5'000);
     // Ariel's skill uses, whose cooldowns the aura overlay estimates, and one the
     // server cuts and so states.
     script.emplace_back(12.0, opcode_frame(proto::opcode::SkillUse, skill_use_body(15'060'230)));   // Hellfire, 45 s

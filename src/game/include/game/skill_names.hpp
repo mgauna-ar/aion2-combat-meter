@@ -47,6 +47,23 @@ enum class EffectKind : uint8_t {
 
 [[nodiscard]] EffectKind effect_kind(uint32_t buff_id, uint32_t source_skill = 0) noexcept;
 
+/// What sort of item an item's effect comes from, as the Combat Meter's Consumables
+/// view sorts them.
+enum class ItemEffect : uint8_t {
+    /// Not an item's, or an item the view leaves out (talismans, candy, seeds).
+    None,
+    Potion,
+    /// Food and drinks.
+    Food,
+    Scroll,
+    /// A weapon's or armour's Theostone going off.
+    Theostone,
+};
+
+/// By the id's first two digits, for an effect src/game/data/effects.tsv lists as an
+/// item's: 20 potions, 21, 27 and 28 food and drinks, 22 scrolls, 30 Theostones.
+[[nodiscard]] ItemEffect item_effect(uint32_t buff_id) noexcept;
+
 /// An effect's name (proto::BuffApplied): its own, from src/game/data/effects.tsv
 /// (Punishment's 120900001 is Executor); else the skill that applied it, when the
 /// record names one the skill table lists; else the skill its id points to (the id

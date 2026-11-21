@@ -652,8 +652,13 @@ int main(int argc, char** argv) {
     buffs.file = "app-buffs.png";
     buffs.view.damage_player = 0;
     buffs.view.open_meter_tab = app::MeterTab::Buffs;
-    buffs.view.effect_view = meter::EffectSide::PartyBuff;
+    buffs.view.effect_view = app::EffectView::PartyBuff;
     ok = render_app(buffs, app_settings, out_dir) && ok;
+    // What each player ate, read and drank, and their Theostone going off.
+    AppScene consumables = buffs;
+    consumables.file = "app-consumables.png";
+    consumables.view.effect_view = app::EffectView::Consumables;
+    ok = render_app(consumables, app_settings, out_dir) && ok;
     // What the party pressed, and Ariel's skills.
     AppScene casts = damage;
     casts.file = "app-casts.png";

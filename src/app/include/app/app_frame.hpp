@@ -26,6 +26,10 @@ enum class AppPage : uint8_t { Dashboard, Meter, Auras, Ping, Power, Settings };
 /// The Combat Meter page's tabs, in their order.
 enum class MeterTab : int { Damage, Healing, Taken, Buffs, Casts, Timeline, Deaths, Settings };
 
+/// The Buffs & Debuffs tab's views: the three sides of meter::EffectSide, in its
+/// order, then each player's consumables.
+enum class EffectView : uint8_t { PartyBuff, PartyDebuff, OnEnemy, Consumables };
+
 /// What the window remembers between frames.
 struct AppViewState {
     AppPage page{AppPage::Meter};
@@ -40,7 +44,7 @@ struct AppViewState {
     /// A Combat Meter tab to open on the next frame.
     std::optional<MeterTab> open_meter_tab;
     /// The Buffs & Debuffs tab's view.
-    meter::EffectSide effect_view{meter::EffectSide::PartyBuff};
+    EffectView effect_view{EffectView::PartyBuff};
     /// The Timeline tab's controls, and its chart, rebuilt only when they change.
     TimelineView timeline;
     TimelineChart timeline_chart;

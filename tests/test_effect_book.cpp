@@ -129,6 +129,40 @@ TEST_CASE(EffectBook, DeathsAndMapLoadsSayWhatTheyDropped) {
     TEST_ASSERT_EQ(book.instances_on(kAlly, at_s(10)), size_t{1});
 }
 
+TEST_CASE(EffectBook, OnesOwnItemsOutlastADeathAndAReload) {
+    constexpr uint32_t kSpeedScroll = 22'101'031;
+    constexpr uint32_t kTheostone = 30'010'141;
+    constexpr EntityId kBoss = 900;
+    EffectBook book;
+    (void)book.on_applied(buff(kAlly, kAlly, 1, kSpeedScroll, 600'000), at_s(1));
+    (void)book.on_applied(buff(kAlly, kAlly, 2, kMantra, 60'000), at_s(1));
+    // A scroll someone else put on them is no one's own item.
+    (void)book.on_applied(buff(kAlly, kMe, 3, kSpeedScroll, 600'000), at_s(1));
+    (void)book.on_applied(buff(kBoss, kAlly, 1, kTheostone, 5'000), at_s(1));
+
+    // The skill's buff and the other's scroll go with the death; the scroll stays.
+    TEST_ASSERT_EQ(book.on_death(kAlly).size(), size_t{2});
+    TEST_ASSERT_EQ(book.instances_on(kAlly, at_s(2)), size_t{1});
+    TEST_ASSERT_EQ(book.on(kAlly)->begin()->second.buff_id, kSpeedScroll);
+    // A Theostone going off on an enemy is the enemy's, and goes with it.
+    TEST_ASSERT_EQ(book.on_death(kBoss).size(), size_t{1});
+
+    // A reload within the run keeps it; a new map, whose ids are others, does not.
+    TEST_ASSERT(book.on_map_load(at_s(100), true).empty());
+    TEST_ASSERT_EQ(book.instances_on(kAlly, at_s(100)), size_t{1});
+    TEST_ASSERT_EQ(book.on_map_load(at_s(200)).size(), size_t{1});
+    TEST_ASSERT(book.on(kAlly) == nullptr);
+}
+
+TEST_CASE(EffectBook, AKeptItemStillGoesWithItsRemoval) {
+    EffectBook book;
+    (void)book.on_applied(buff(kMe, kMe, 1, 22'101'031, 600'000), at_s(1));
+    (void)book.on_death(kMe);
+    const auto removed = book.on_removed(proto::BuffRemoved{kMe, 22'101'031});
+    TEST_ASSERT(removed.has_value());
+    TEST_ASSERT(book.on(kMe) == nullptr);
+}
+
 TEST_CASE(EffectBook, OneEntityHoldsAtMostTheCap) {
     EffectBook book;
     for (uint32_t i = 0; i < EffectBook::kMaxInstancesPerEntity + 10; ++i) {

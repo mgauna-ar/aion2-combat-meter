@@ -619,6 +619,12 @@ capture, where all 17,182 records parse):
     melee's reach. It is the one steady source of the local player's own position.
 - **Effect gone `1a 92`:** target varint, effect u32. It names the effect, not the
   instance: a stack of three is taken off by three.
+- **Items outlast a death and a reload.** In the Ludra capture a Sorcerer died three
+  times and the party wiped and reloaded (the same map over the same connection, the
+  ids kept), and the Sorcerer used their 600 s scrolls and food again exactly as the
+  first ran out. No 1a 92 came for them, and the reload sent them no 2a 38 again.
+  `game::EffectBook` keeps an item's effect its target put on itself through both
+  (`kept_through`); skills' effects still go with a death.
 - **Skill used `01 38`:** three bytes (00 00 00 in 1,154 of 1,176), the skill u32. Only
   the local player's own: the hit with that skill follows 0.1 to 0.5 s later.
 - **Cooldown set `47 38`:** a count u8 (always 1), then per entry the skill u32 (the
@@ -784,6 +790,11 @@ the three captures read as a point on their map):
   over a new connection for a new run, since entering a dungeon opened one in the
   second capture. A run still split in two, or two runs in one, would prove it
   wrong;
+- **the shard:** a damage buff of 5% to 10%, by its tier, that a player switches on and
+  off (the user). No effect in `effects.tsv` is called one, and nothing timed of it
+  shows as a buff. A permanent effect, 100,000,401, came on the local player alone in
+  the Ludra capture (17 times, no name); whether it is the shard needs a capture with
+  it switched on and off;
 - **what the faction does not say.** A player of the other faction is told apart
   (Identity, above), and the Combat Power plugin marks them. Still open: who is an
   enemy where the faction is not the line (an arena's opponent of the local
