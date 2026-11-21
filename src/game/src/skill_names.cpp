@@ -103,7 +103,6 @@ ItemEffect item_effect(uint32_t buff_id) noexcept {
         case 27:
         case 28: return ItemEffect::Food;
         case 22: return ItemEffect::Scroll;
-        case 30: return ItemEffect::Theostone;
         default: return ItemEffect::None;
     }
 }

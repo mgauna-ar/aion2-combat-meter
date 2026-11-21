@@ -110,7 +110,7 @@ struct Consumable {
 
 /// A player's consumables, by game::ItemEffect (None unused).
 struct PlayerConsumables {
-    std::array<std::vector<Consumable>, static_cast<size_t>(game::ItemEffect::Theostone) + 1> by_kind;
+    std::array<std::vector<Consumable>, static_cast<size_t>(game::ItemEffect::Scroll) + 1> by_kind;
 };
 
 void add_to(std::vector<Consumable>& list, const meter::EffectUptimeRow& row) {
@@ -124,8 +124,7 @@ void add_to(std::vector<Consumable>& list, const meter::EffectUptimeRow& row) {
     list.push_back(Consumable{row.buff_id, row.applications, row.active_s});
 }
 
-/// Food, scrolls and potions are on the player who took them; a Theostone goes off
-/// on whatever its wearer hit, so it is theirs as its caster.
+/// Food, scrolls and potions are on the player who took them.
 std::vector<PlayerConsumables> consumables_of(const meter::FightSummary& f) {
     std::vector<PlayerConsumables> out(f.combatants.size());
     for (const meter::EffectUptimeRow& row : f.detail->effects) {
@@ -133,10 +132,7 @@ std::vector<PlayerConsumables> consumables_of(const meter::FightSummary& f) {
         if (kind == game::ItemEffect::None) continue;
         for (size_t i = 0; i < f.combatants.size(); ++i) {
             const meter::CombatantTotals& c = f.combatants[i];
-            const bool theirs = kind == game::ItemEffect::Theostone
-                                    ? !row.caster.empty() && row.caster == c.name
-                                    : row.side == meter::EffectSide::PartyBuff && row.target == c.id;
-            if (!theirs) continue;
+            if (row.side != meter::EffectSide::PartyBuff || row.target != c.id) continue;
             add_to(out[i].by_kind[static_cast<size_t>(kind)], row);
             break;
         }
@@ -152,13 +148,10 @@ std::vector<PlayerConsumables> consumables_of(const meter::FightSummary& f) {
     return out;
 }
 
-/// An item's name in its column: the column already says it is a scroll or a
-/// Theostone ("Speed", "Reda's Tenacity").
+/// An item's name in its column: the column already says it is a scroll ("Speed").
 std::string short_name(game::ItemEffect kind, uint32_t buff_id) {
     std::string name = game::effect_label(buff_id);
-    constexpr std::string_view kStone = "Theostone: ";
     constexpr std::string_view kScroll = " Scroll";
-    if (kind == game::ItemEffect::Theostone && name.starts_with(kStone)) name.erase(0, kStone.size());
     if (kind == game::ItemEffect::Scroll && name.ends_with(kScroll) && name.size() > kScroll.size()) {
         name.resize(name.size() - kScroll.size());
     }
@@ -167,15 +160,14 @@ std::string short_name(game::ItemEffect kind, uint32_t buff_id) {
 
 /// Each consumable on a line of its own, its icon, then its name wrapped to the
 /// column. Food and scrolls kept up all fight show their name alone; one that was
-/// not, in amber with how much of the fight it was up. Potions and a Theostone's
-/// procs show how many times.
+/// not, in amber with how much of the fight it was up. Potions show how many times.
 void consumable_cell(int column, game::ItemEffect kind, const std::vector<Consumable>& list, double duration) {
     if (!ImGui::TableSetColumnIndex(column)) return;
     if (list.empty()) {
         text_colored_u32(colors::TextDim, "-");
         return;
     }
-    const bool by_count = kind == game::ItemEffect::Potion || kind == game::ItemEffect::Theostone;
+    const bool by_count = kind == game::ItemEffect::Potion;
     const float side_px = ImGui::GetTextLineHeight();
     ImGui::PushTextWrapPos(0.0f);
     for (const Consumable& c : list) {
@@ -202,7 +194,7 @@ void consumable_cell(int column, game::ItemEffect kind, const std::vector<Consum
 
 void consumables_table(const meter::FightSummary& f) {
     if (f.combatants.empty()) {
-        empty_state(ICON_FLASK, "No one in this fight", "Each player's food, scrolls, potions and Theostone show here.");
+        empty_state(ICON_FLASK, "No one in this fight", "Each player's food, scrolls and potions show here.");
         return;
     }
     const std::vector<PlayerConsumables> players = consumables_of(f);
@@ -210,19 +202,17 @@ void consumables_table(const meter::FightSummary& f) {
         {"Player", 120.0f, nullptr, 0},
         {"Food", 0.0f, "Food and drinks. In amber, one that was not up the whole fight, with how much of it.", 1},
         {"Scrolls", 0.0f, "In amber, one that was not up the whole fight, with how much of it.", 2},
-        {"Theostone", 0.0f, "The Theostone the player wears, and how often it went off. It shows once it goes off.",
-         3},
-        {"Potions", 0.0f, "Potions drunk during the fight.", 4},
+        {"Potions", 0.0f, "Potions drunk during the fight.", 3},
     };
     if (!begin_table("##ConsumableTable", cols, static_cast<int>(std::size(cols)), fill_h(0.0f))) return;
     const double duration = std::max(f.duration_s, 1.0);
     constexpr game::ItemEffect kColumns[] = {game::ItemEffect::Food, game::ItemEffect::Scroll,
-                                             game::ItemEffect::Theostone, game::ItemEffect::Potion};
+                                             game::ItemEffect::Potion};
     for (size_t i = 0; i < f.combatants.size(); ++i) {
         const meter::CombatantTotals& c = f.combatants[i];
         ImGui::TableNextRow();
         player_cell(0, c.name, c.cls);
-        for (int col = 0; col < 4; ++col) {
+        for (int col = 0; col < static_cast<int>(std::size(kColumns)); ++col) {
             const game::ItemEffect kind = kColumns[col];
             consumable_cell(col + 1, kind, players[i].by_kind[static_cast<size_t>(kind)], duration);
         }

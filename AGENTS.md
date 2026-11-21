@@ -203,7 +203,8 @@ tools/check_forbidden_apis.sh, tools/embed_icon_font.py
 tools/gen_app_icon.py            the app's mark (wings around a crystal, our own drawing)
                                  → app.ico and app_mark.inc
 tools/gen_skill_table.py         skills.tsv → skill_table.inc (`make test` checks they agree);
-                                 the TSV's third column names each skill's icon
+                                 the TSV's third column names each skill's icon, and its
+                                 `# By hand` section (the Theostones) outlives an import
 tools/gen_icon_sheet.py          aion2.app's class emblems, skill icons and item icons →
                                  game_icon_sheet.inc (`make test` checks its index against
                                  skills.tsv and effects.tsv)
@@ -381,6 +382,21 @@ It gave the faction (Identity, below).
     database; the skills it lists with no English name (33 of the Brawler's,
     2026-11) take questlog.gg's. Checked against the first capture: every Templar and Elementalist code
     resolved to that class.
+  - **7-digit codes are no class's,** and neither site lists them: monsters' skills
+    (Ludra's 1801xxx), potions (2011101, whose effect 20,111,011 is the Life
+    Potion) and Theostones.
+  - **A damage Theostone's hit is `3000TNN`,** a mode-0 cast of its wearer's, then a
+    04 38: T the tier (0, 1, 2: the items 51385xxxx, 51384xxxx, 51383xxxx, whose
+    Fire stone deals 5,000, 10,000 and 15,000), NN the item's number plus 6 (17 to
+    24), as the Theostones that put an effect on run `3001TNN` (effects.tsv). Read
+    off the figures, not stated anywhere: in the dungeon capture four players'
+    3000017, 3000019, 3000020 and 3000024 went off 13, 42, 71 and 193 times, in the
+    order of their items' 1%, 5%, 10% and 20%, at a median 6,020, 859, 379 and 29
+    against the items' 5,000, 1,000, 500 and 125; in the Ludra capture a Chanter's
+    3000117 and 3000118 came to a median 11,010 and 5,102 against 10,000 and 5,000.
+    Their names sit in the TSV's `# By hand` section, which an import keeps. In
+    Ludra the Earth and Wind stones hit for a sixth of their figure or less (Ulgorn's
+    Will a median 168): the boss resisting them, perhaps.
 - **Tick `05 38`:** target varint, effect u8, actor varint, a varint of unknown meaning,
   skill u32 (×100), amount varint.
   - Effects 02 and 0A are damage; 01, 09 and 0B are heals.
@@ -761,6 +777,10 @@ the three captures read as a point on their map):
   boss-sized death as a kill only when its HP came down to it;
 - whether the game's Total Heal counts heals before a fight's first hit: the meter's
   healing came to 97% of it;
+- **the damage Theostones' codes** (Skill codes, above): read off how often and how
+  hard they hit, not stated by any source. Tier 2's (`30002xx`, the 15,000 stones)
+  have not been seen. Whether a Poison or Bleed Theostone's tick (05 38) carries
+  `3000T15` / `3000T16` or its effect's `3001T15` / `3001T16` is not known either;
 - what the 5-HP object (2,920,366, kind 14, no name) the party broke in the second
   capture's first boss fight is: its 1-damage hits still count, while the game's
   window for that fight was not checked;
