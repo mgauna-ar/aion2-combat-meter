@@ -95,6 +95,11 @@ watch list and what the overlay shows are the tracker's own.
     Ludra capture a Sorcerer died three times and wiped once, and used their 600 s
     scrolls again exactly as the first ran out. A new map still drops them, its ids
     being others.
+- **A player's record lists what runs on them** (`BuffApplied::listed`), as they come
+  into view or onto a new map, where no 2a 38 comes for it: each entry puts on or
+  renews its instance as a 2a 38 would, ending at its stated end, and one already
+  over puts on nothing. Without it, scrolls used in town were gone from the overlay
+  in the dungeon.
 - The snapshot carries the local player's effects (an enemy's marked hostile, their own
   and their summons' marked mine) and their own on the target.
 - **Names:** `game::effect_label`: the effect's own from `effects.tsv`, else its

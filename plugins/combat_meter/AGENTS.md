@@ -251,6 +251,12 @@ app, or restarting it into an update, ends the live fight the same way and saves
     there. A Sorcerer who died three times used their 600 s scrolls again exactly as
     the first ran out, through a wipe and its reload. Before items were kept through a
     death and a reload, they read 65% and 9% in its two pulls.
+  - **What ran before the map came** is known from the players' records
+    (`BuffApplied::listed`, root AGENTS.md, Identity): no 2a 38 comes for a scroll
+    used in town, and before they were read, one used in town and again mid-fight
+    read about half the fight. With them, every scroll of the Ludra capture's two
+    pulls kept up all fight reads 99.5% or more (before, 9% to 100%); those still lower
+    ran out in it.
 - **History:**
   - What is saved: boss fights, and fights of at least `min_saved_duration_s`. With
     `save_only_dungeons`, only in a dungeon (`game::is_dungeon`: a map id of 600000

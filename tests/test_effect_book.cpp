@@ -175,3 +175,29 @@ TEST_CASE(EffectBook, OneEntityHoldsAtMostTheCap) {
     book.prune(at_s(70));
     TEST_ASSERT_EQ(book.instances_on(kMe, at_s(70)), size_t{1});
 }
+
+TEST_CASE(EffectBook, AListedEffectEndsWhenItsRecordSays) {
+    constexpr uint32_t kSpeedScroll = 22'101'031;
+    EffectBook book;
+    book.on_heartbeat(server_ms(at_s(0)), at_s(0));
+    // Put on long before, 600 s in all, 120 s left: the end is the truth.
+    proto::BuffApplied listed = buff(kAlly, 0, 21, kSpeedScroll, 600'000, server_ms(at_s(0)) + 120'000);
+    listed.listed = true;
+    const auto put = book.on_applied(listed, at_s(0));
+    TEST_ASSERT(put.now != nullptr);
+    TEST_ASSERT_EQ(put.now->expires_at, at_s(120));
+    // An item listed with no caster is theirs: a death leaves it on.
+    TEST_ASSERT_EQ(put.now->caster, kAlly);
+    TEST_ASSERT(book.on_death(kAlly).empty());
+
+    // One over by now is not put on.
+    proto::BuffApplied over = buff(kMe, 0, 22, kSpeedScroll, 600'000, server_ms(at_s(0)) - 1'000);
+    over.listed = true;
+    TEST_ASSERT(book.on_applied(over, at_s(0)).now == nullptr);
+    TEST_ASSERT(book.on(kMe) == nullptr);
+
+    // A skill's listed with no caster stays no one's.
+    proto::BuffApplied mantra = buff(kMe, 0, 23, kMantra, 60'000, server_ms(at_s(0)) + 30'000);
+    mantra.listed = true;
+    TEST_ASSERT_EQ(book.on_applied(mantra, at_s(0)).now->caster, EntityId{0});
+}

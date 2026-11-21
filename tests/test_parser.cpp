@@ -946,3 +946,64 @@ TEST_CASE(Parser, BuffRemoveSkillUseAndCooldown) {
     TEST_ASSERT(parse_one(p, opcode::CooldownSet, truncated).empty());
     TEST_ASSERT_EQ(p.stats().failed, uint64_t{1});
 }
+
+TEST_CASE(Parser, APlayersRecordListsTheEffectsOnThem) {
+    // As the captures' records list them: scrolls with no caster (kind 0x10), one
+    // with the byte some entries carry before the position, a permanent mark naming
+    // its caster (0x11), and a mantra naming its skill (0x13).
+    constexpr uint64_t kNowMs = 1'792'152'000'000ULL;
+    const Bytes list = effect_list({
+        {21, 22'101'031, 600'000, kNowMs + 348'000},
+        {22, 22'101'051, 600'000, kNowMs + 379'000, 0, 1, 0, true},
+        {23, 20'100, 2'970'232'209, kNowMs + 2'000'000'000, 502, 10},
+        {24, 181'900'311, 2'400, kNowMs + 1'800, 777, 15, 18'190'031, true},
+        {25, 127'100'001, -1, 0, 502},
+    });
+    PacketParser p;
+    const auto events =
+        parse_one(p, opcode::OtherPlayer, player_body(502, "Israphel", kServer, 150'000, PlayerTrailer::Plain, kTownX,
+                                                      kTownY, kTownZ, 1, false, list));
+    TEST_ASSERT_EQ(events.size(), size_t{6});
+    // The player first, so whoever reads the effects knows them.
+    TEST_ASSERT_EQ(std::get<Identity>(events[0].event).combat_power, 150'000u);
+    std::vector<BuffApplied> listed;
+    for (size_t i = 1; i < events.size(); ++i) listed.push_back(std::get<BuffApplied>(events[i].event));
+    for (const BuffApplied& b : listed) {
+        TEST_ASSERT(b.listed);
+        TEST_ASSERT_FALSE(b.renewed);
+        TEST_ASSERT_EQ(b.target, EntityId{502});
+    }
+    TEST_ASSERT_EQ(listed[0].buff_id, 22'101'031u);
+    TEST_ASSERT_EQ(listed[0].instance, 21u);
+    TEST_ASSERT_EQ(listed[0].caster, EntityId{0});
+    TEST_ASSERT_EQ(listed[0].duration_ms, uint64_t{600'000});
+    TEST_ASSERT_EQ(listed[0].expires_server_ms, kNowMs + 348'000);
+    TEST_ASSERT_EQ(listed[1].buff_id, 22'101'051u);
+    TEST_ASSERT_EQ(listed[2].caster, EntityId{502});
+    TEST_ASSERT_EQ(listed[2].level, uint8_t{10});
+    TEST_ASSERT_EQ(listed[3].caster, EntityId{777});
+    TEST_ASSERT_EQ(listed[3].source_skill, 18'190'031u);
+    TEST_ASSERT_EQ(listed[3].level, uint8_t{15});
+    TEST_ASSERT(listed[4].permanent);
+    TEST_ASSERT_EQ(listed[4].expires_server_ms, uint64_t{0});
+
+    // The local player's own record, entering a map, lists theirs the same way.
+    const auto own = parse_one(p, opcode::OwnCharacter,
+                               own_player_body(501, "Ariel", kServer, kTownX, kTownY, kTownZ, 1, false,
+                                               effect_list({{20, 22'104'021, 600'000, kNowMs + 195'000}})));
+    TEST_ASSERT_EQ(own.size(), size_t{2});
+    TEST_ASSERT_EQ(std::get<BuffApplied>(own[1].event).target, EntityId{501});
+    TEST_ASSERT_EQ(std::get<BuffApplied>(own[1].event).buff_id, 22'104'021u);
+}
+
+TEST_CASE(Parser, AListThatDoesNotHoldItsCountIsNotRead) {
+    constexpr uint64_t kNowMs = 1'792'152'000'000ULL;
+    Bytes list = effect_list({{21, 22'101'031, 600'000, kNowMs + 348'000}, {22, 22'101'051, 600'000, kNowMs}});
+    list[0] = 3;  // a third entry that is not there
+    PacketParser p;
+    const auto events = parse_one(
+        p, opcode::OtherPlayer,
+        player_body(502, "Israphel", kServer, 150'000, PlayerTrailer::Plain, kTownX, kTownY, kTownZ, 1, false, list));
+    TEST_ASSERT_EQ(events.size(), size_t{1});
+    TEST_ASSERT(std::holds_alternative<Identity>(events[0].event));
+}

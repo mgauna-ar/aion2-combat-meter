@@ -650,3 +650,24 @@ TEST_CASE(Engine, ACharactersRowsJoinTheirCasts) {
     TEST_ASSERT_NEAR(pummel->first_s, 0.5, 1e-9);
     TEST_ASSERT_NEAR(pummel->last_s, 3.5, 1e-9);
 }
+
+TEST_CASE(Engine, AScrollTheRecordListsIsUpFromTheFightsStart) {
+    // Used in town, so no 2a 38 comes for it in the dungeon: Lumiel's record, as she
+    // comes into view, is the one word of it.
+    constexpr uint32_t kSpeedScroll = 22'101'031;
+    EncounterEngine e = setup();
+    const uint64_t now_ms = at_s(0) / kMicrosPerMilli;
+    e.on_event(ev(at_s(0), proto::Heartbeat{now_ms}));
+    proto::BuffApplied listed = buff(kAlly, 0, 21, kSpeedScroll, 600'000, now_ms + 300'000);
+    listed.listed = true;
+    e.on_event(ev(at_s(1), listed));
+    e.on_event(ev(at_s(10), hit(kAlly, kBoss, 100)));
+    e.on_event(ev(at_s(13), hp(kAlly, 0)));  // a death leaves a scroll on
+    e.on_event(ev(at_s(20), hit(kAlly, kBoss, 100)));
+    const FightSummary s = e.current();
+    const auto buffs = effects(s, EffectSide::PartyBuff);
+    TEST_ASSERT_EQ(buffs.size(), size_t{1});
+    TEST_ASSERT_EQ(buffs[0].target, kAlly);
+    TEST_ASSERT_EQ(buffs[0].caster, std::string("Lumiel"));
+    TEST_ASSERT_NEAR(buffs[0].uptime(s.duration_s), 1.0, 1e-9);
+}

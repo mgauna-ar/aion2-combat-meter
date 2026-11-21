@@ -169,7 +169,8 @@ carried no figure shows "-".
 
 - **A player's position** is their last: their record's (`Identity::position`), a
   movement packet's (`Position`, flying included: `28 37`), or an effect of theirs
-  (`BuffApplied`, which carries its caster's). Only listed players and the local player are placed.
+  (`BuffApplied`, which carries its caster's; not one a record lists, put on long
+  before). Only listed players and the local player are placed.
 - **The local player's is never streamed.** The server does not send them their own
   steps. It is known from their own record on each map, from every effect they
   cast, and from a skill that moves them (`3c 37`). In the arena capture's fight

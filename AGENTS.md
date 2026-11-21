@@ -472,6 +472,28 @@ It gave the faction (Identity, below).
       small u32s, and their combat power has not been found.
     - The arena sent the opponent's record three times in the match, the figure the
       same each time: it is neither hidden nor equalised there.
+  - **The effects running on them** (`read_listed_effects`): both records list them,
+    and no 2a 38 comes for what already runs as a player comes into view or onto a
+    new map. A count u8, then per entry 2a 38's fields from its kind on: the kind
+    (0x10 to 0x13: bit 0 a caster varint, bit 1 the applying skill u32), the instance
+    (varint, 2a 38's numbering), the effect u32, the whole duration u64, the end u64
+    (the server's Unix ms; 2100-01-01 for a permanent one), the caster, the level u8,
+    the skill, then a position (three f32; FLT_MAX in the local player's own items').
+    - **Some entries carry one byte more before the position** (00, 70, 80, C0 and
+      the like, never 0x10 to 0x13), with no field yet seen to say which: the next
+      entry's kind says it, and the last entry's is not read.
+    - **It is found, not read to:** 104 to 159 bytes into the 45 36 records, 329 into
+      the 33 36, after fields not read (HP, a legion's name, zeros). The first count
+      whose every entry reads, each where the last ends, is the list. In all 338
+      records of the four captures it was found once, its count right.
+    - **The end is the truth:** the local player's food ended 2.9 s later in their
+      own record on a new map than its 2a 38 had said, the loading screen's length.
+    - Entering the arena, the local player's record listed the three scrolls used in
+      town, 195 to 379 s left; nothing else said so. Kind 0x10 entries name no
+      caster: scrolls and food, but also 74 Chanter and Cleric effects, so no
+      caster is not "themself" (`game::effect_caster` takes it so for an item's only).
+    - Most players carry one or two permanent entries of 30,000,071 to 30,001,211,
+      which `effects.tsv` does not list: the Theostones they wear, perhaps.
 - **Spawn `41 36`:**
   - **Id:** a varint. An id over 1,000,000 is folded to `(raw & 0x3FFF) | 0x4000`, in
     `entity_id.cpp` only.
@@ -627,7 +649,8 @@ capture, where all 17,182 records parse):
   ids kept), and the Sorcerer used their 600 s scrolls and food again exactly as the
   first ran out. No 1a 92 came for them, and the reload sent them no 2a 38 again.
   `game::EffectBook` keeps an item's effect its target put on itself through both
-  (`kept_through`); skills' effects still go with a death.
+  (`kept_through`); skills' effects still go with a death. A new map drops them, its
+  ids being others, and the player's record on it lists them again (Identity, above).
 - **Skill used `01 38`:** three bytes (00 00 00 in 1,154 of 1,176), the skill u32. Only
   the local player's own: the hit with that skill follows 0.1 to 0.5 s later.
 - **Cooldown set `47 38`:** a count u8 (always 1), then per entry the skill u32 (the
@@ -795,9 +818,12 @@ the three captures read as a point on their map):
   wrong;
 - **the shard:** a damage buff of 5% to 10%, by its tier, that a player switches on and
   off (the user). No effect in `effects.tsv` is called one, and nothing timed of it
-  shows as a buff. A permanent effect, 100,000,401, came on the local player alone in
-  the Ludra capture (17 times, no name); whether it is the shard needs a capture with
-  it switched on and off;
+  shows as a buff. Permanent effects only the local player's own record lists, with
+  no name: 40,001,011 and 40,002,011, on every map of the three November captures and
+  not in October's; and 100,000,401, in the Ludra capture (17 times). Whether one is
+  the shard needs a capture with it switched on and off;
+- **the byte some listed effects carry before their position** (Identity, above), and
+  what decides it;
 - **what the faction does not say.** A player of the other faction is told apart
   (Identity, above), and the Combat Power plugin marks them. Still open: who is an
   enemy where the faction is not the line (an arena's opponent of the local

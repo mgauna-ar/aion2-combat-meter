@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <cinttypes>
+#include <cstdlib>
 #include <cstdio>
 #include <string_view>
 #include <type_traits>
@@ -211,6 +212,10 @@ void Report::print_unnamed() const {
 }
 
 void Report::on_event(const proto::ParsedEvent& pe, const meter::CombatantRegistry& reg) {
+    if (const auto* beat = std::get_if<proto::Heartbeat>(&pe.event)) {
+        m_server_ahead_ms = static_cast<int64_t>(beat->server_ms) - static_cast<int64_t>(pe.ts / kMicrosPerMilli);
+        m_have_server_clock = true;
+    }
     if (m_opt.ping) note_ping(pe);
     if (m_opt.unnamed) note_unnamed(pe, reg);
     if (!m_opt.events && !m_opt.auras) return;
@@ -226,7 +231,9 @@ void Report::on_event(const proto::ParsedEvent& pe, const meter::CombatantRegist
         [&](const auto& e) {
             using T = std::decay_t<decltype(e)>;
             if constexpr (std::is_same_v<T, proto::BuffApplied>) {
-                std::printf("%+.3f  %s %s <- %s  %s (effect %u", t, e.renewed ? "buff~    " : "buff+    ",
+                // buff= : running as a player's record lists it, not put on now.
+                std::printf("%+.3f  %s %s <- %s  %s (effect %u", t,
+                            e.listed ? "buff=    " : e.renewed ? "buff~    " : "buff+    ",
                             who(e.target, reg).c_str(), who(e.caster, reg).c_str(),
                             game::effect_label(e.buff_id, e.source_skill).c_str(), e.buff_id);
                 if (e.source_skill != 0) std::printf(", skill %u lv %u", e.source_skill, unsigned{e.level});
@@ -234,7 +241,17 @@ void Report::on_event(const proto::ParsedEvent& pe, const meter::CombatantRegist
                 if (e.permanent) {
                     std::printf("permanent\n");
                 } else {
-                    std::printf("%.1f s\n", static_cast<double>(e.duration_ms) / 1000.0);
+                    std::printf("%.1f s", static_cast<double>(e.duration_ms) / 1000.0);
+                    // The stated end, where it is not the duration from now: a renewal's
+                    // can be sooner, and an effect sent again its time left.
+                    if (m_have_server_clock && e.expires_server_ms != 0) {
+                        const int64_t now_ms = static_cast<int64_t>(pe.ts / kMicrosPerMilli) + m_server_ahead_ms;
+                        const int64_t left_ms = static_cast<int64_t>(e.expires_server_ms) - now_ms;
+                        if (std::llabs(left_ms - static_cast<int64_t>(e.duration_ms)) > 1000) {
+                            std::printf(", ends in %.1f s", static_cast<double>(left_ms) / 1000.0);
+                        }
+                    }
+                    std::printf("\n");
                 }
             } else if constexpr (std::is_same_v<T, proto::BuffRemoved>) {
                 std::printf("%+.3f  buff-     %s  %s (effect %u)\n", t, who(e.target, reg).c_str(),

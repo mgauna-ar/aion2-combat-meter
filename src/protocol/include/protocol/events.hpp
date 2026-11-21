@@ -244,6 +244,14 @@ struct BuffApplied {
     uint64_t expires_server_ms{0};
     /// 2b 38: an instance already running was renewed.
     bool renewed{false};
+    /// Read from the list of effects running on a player that their record carries
+    /// (33 36, 45 36; read_listed_effects), not put on now. The server sends no 2a 38
+    /// for what runs on a player as they come into view or onto a new map: the
+    /// record is the only word of it. `expires_server_ms` is then the truth (a
+    /// loading screen pushed it back 2.9 s), `duration_ms` the whole duration, and
+    /// `caster_position` is not read: where the caster stood, if anywhere, when it
+    /// was put on. `caster` is 0 for the entries that name none.
+    bool listed{false};
     /// Where the caster stood: the record's last three floats. In the arena capture
     /// the opponent's effects sat on the opponent's own last position (0 units off),
     /// the local player's a melee's reach from it. It is the one steady source of

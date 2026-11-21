@@ -2,6 +2,7 @@
 
 #include "game/map_names.hpp"
 #include "game/npc_names.hpp"
+#include "game/effect_book.hpp"
 #include "game/skill_names.hpp"
 
 #include <algorithm>
@@ -172,7 +173,7 @@ void EncounterEngine::on_event(const proto::ParsedEvent& event) {
             } else if constexpr (std::is_same_v<T, proto::RemainingHp>) {
                 on_values(e, ts);
             } else if constexpr (std::is_same_v<T, proto::BuffApplied>) {
-                m_effects.on_applied(e, ts, effect_tag(e.target, e.caster));
+                m_effects.on_applied(e, ts, effect_tag(e.target, game::effect_caster(e)));
             } else if constexpr (std::is_same_v<T, proto::BuffRemoved>) {
                 m_effects.on_removed(e, ts);
             } else if constexpr (std::is_same_v<T, proto::SkillCast>) {

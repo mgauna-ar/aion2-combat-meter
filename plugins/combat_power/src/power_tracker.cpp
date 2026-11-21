@@ -204,6 +204,8 @@ void PowerTracker::on_position(const proto::Position& position, uint32_t connect
 }
 
 void PowerTracker::on_effect(const proto::BuffApplied& effect, uint32_t connection, Micros ts) {
+    // A record's listed effects say where no one stands now.
+    if (effect.listed) return;
     if (current(connection)) place(effect.caster, effect.caster_position, ts);
 }
 
