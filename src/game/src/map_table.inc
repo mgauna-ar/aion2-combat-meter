@@ -25,6 +25,7 @@
 {600071u, "Vakron Sky Island (Exploration)"},
 {600072u, "Vakron Sky Island (Conquest)"},
 {600073u, "Vakron Sky Island (Conquest [Hard])"},
+{600081u, "Abyssal Forge: Ludra (Easy)"},
 {600082u, "Abyssal Forge: Ludra (Conquest)"},
 {600083u, "Abyssal Forge: Ludra (Conquest [Hard])"},
 {600091u, "Ferocious Horn Den (Exploration)"},

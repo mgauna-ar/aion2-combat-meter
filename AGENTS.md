@@ -551,6 +551,9 @@ It gave the faction (Identity, below).
     - A tier added later gets an id of its own, with no pattern to guess it by:
       Krao Cave's Conquest [Hard] is 600004, skipping 600003. A raid's normal tier is
       the site's Conquest (Abyssal Forge: Ludra 600082, its Hard tier 600083).
+      Ludra's Easy tier, 600081, is not on aion2.app at all: questlog.gg's
+      dungeon pages give it (`questlog.gg/aion-2/en/db/dungeon/<id>`), and it sits
+      in the TSV's hand-written rows.
     - aion2.app lists dungeons whose pages give no tier ids (2026-11): the Lv.99
       Awakening tiers (Insane, Hell, Doom), Ascension, Abyss Corridor, Growth, Daily,
       the Legion airships, the battlefields, Chaotic Reshanta and the arenas. They

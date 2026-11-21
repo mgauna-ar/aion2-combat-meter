@@ -117,3 +117,7 @@
 910064	Chamber of the Dead (Challenge)
 
 # By hand: ids seen in captures. --import-pages keeps this section as it is.
+# Ludra's Easy tier: aion2.app lists only its Conquest tiers (600082, 600083);
+# questlog.gg's page for 600081 names it (questlog.gg/aion-2/en/db/dungeon/600081,
+# 2026-11-20). Not seen in a capture yet.
+600081	Abyssal Forge: Ludra (Easy)
