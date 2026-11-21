@@ -85,16 +85,19 @@ Npcap is required to capture network packets locally (its license prevents bundl
   - ✅ **Check:** *Support loopback traffic* (required if you use VPNs or ping reducers like ExitLag or GearUP).
   - ❌ **Uncheck:** *Restrict Npcap driver's access to Administrators only* (allows running the meter without administrator privileges).
 
-### 2. Download the Meter
-- Download `aion2-combat-meter-windows-x64.zip` from **[Releases](https://github.com/mgauna-ar/aion2-combat-meter/releases/latest)**.
-- Extract the zip into its own folder where you have write permissions (e.g. `C:\Games\Aion2Meter` or Documents). Avoid `Program Files` so automatic self-updates can write to the directory.
+### 2. Install the Meter
+From **[Releases](https://github.com/mgauna-ar/aion2-combat-meter/releases/latest)**, download either:
+- **`aion2-combat-meter-windows-x64-setup.exe`** (installer). It installs for your Windows user only, with no administrator prompt, into `%LOCALAPPDATA%\Programs\AION 2 Combat Meter`, and adds the meter to the Start menu and to Windows' **Installed apps**, where you can uninstall it. It reminds you about Npcap if it isn't installed yet.
+- **`aion2-combat-meter-windows-x64.zip`** (portable). Extract it into its own folder where you have write permissions (e.g. `C:\Games\Aion2Meter` or Documents). Avoid `Program Files` so automatic self-updates can write to the directory.
+
+Both are the same `aion2-combat-meter.exe`, and both update themselves the same way. Your settings, fights and recordings live in `%APPDATA%\aion2-combat-meter` either way: uninstalling keeps them unless you choose to delete them.
 
 ### 3. Set Game to Borderless Windowed
 In AION 2's display settings, set the window mode to **Borderless Windowed**.
 *(Exclusive fullscreen prevents external overlay windows from displaying on top of the game).*
 
 ### 4. Run & Play
-- Launch `aion2-combat-meter.exe`.
+- Launch **AION 2 Combat Meter** from the Start menu (installer) or `aion2-combat-meter.exe` (zip).
 - Hit an enemy or training dummy—the combat overlay activates automatically when combat starts!
 - To enable the Auras, Ping or Combat Power overlays, open the companion app window and toggle them on their respective pages.
 
@@ -162,7 +165,7 @@ On heavily crowded open-world bosses, the game server culls combat network packe
 A tray balloon and an **Update available** badge appear when a new version is released:
 - Go to **Settings → Updates** and click **Update & restart**.
 - The meter downloads the release, verifies its SHA-256 checksum against GitHub, swaps the executable, and restarts automatically (active fights in progress are preserved or cleanly closed).
-- *Manual updates:* If running from a write-restricted location, you can unzip new releases directly over the existing folder.
+- *Manual updates:* If running from a write-restricted location, you can unzip new releases directly over the existing folder, or run a newer installer over an installed copy.
 
 ---
 

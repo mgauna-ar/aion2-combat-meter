@@ -7,6 +7,7 @@
 #include "common/config/json_file.hpp"
 #include "common/config/key_table.hpp"
 #include "common/os/auto_start.hpp"
+#include "common/os/install_entry.hpp"
 #include "common/os/single_instance.hpp"
 #include "common/snapshot_slot.hpp"
 
@@ -166,6 +167,14 @@ TEST_CASE(AutoStart, MockKeepsTheSetting) {
     TEST_ASSERT(aion2::os::set_auto_start(false));
     TEST_ASSERT_FALSE(aion2::os::auto_start_enabled());
 }
+
+#ifndef _WIN32
+// On Windows it would read this user's real entry.
+TEST_CASE(InstallEntry, MockHasNone) {
+    // Off Windows nothing is installed, so there is no entry to keep in step.
+    TEST_ASSERT_FALSE(aion2::os::refresh_install_entry("1.2.3"));
+}
+#endif
 
 TEST_CASE(SingleInstance, AcquireWithinWaitsForTheHolder) {
     // An updated build waits for the one that launched it to exit and free the lock.

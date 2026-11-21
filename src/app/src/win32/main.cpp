@@ -18,6 +18,7 @@
 #include "capture/os/npcap_source.hpp"
 #include "common/os/auto_start.hpp"
 #include "common/os/http_client.hpp"
+#include "common/os/install_entry.hpp"
 #include "common/os/logger.hpp"
 #include "common/os/paths.hpp"
 #include "common/os/process_launch.hpp"
@@ -130,6 +131,8 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     os::Logger::info(std::string("AION 2 Combat Meter ") + VERSION_STRING);
     // After the lock, so the build that left them has exited.
     app::remove_update_leftovers(os::executable_dir());
+    // An installed copy updated in place: Windows' app list shows the version it runs.
+    os::refresh_install_entry(VERSION_STRING);
 
     const std::filesystem::path config_path = data / "config.json";
     app::AppSettings settings = app::load_settings(config_path);
