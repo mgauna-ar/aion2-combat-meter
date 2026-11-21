@@ -508,8 +508,12 @@ It gave the faction (Identity, below).
       town, 195 to 379 s left; nothing else said so. Kind 0x10 entries name no
       caster: scrolls and food, but also 74 Chanter and Cleric effects, so no
       caster is not "themself" (`game::effect_caster` takes it so for an item's only).
-    - Most players carry one or two permanent entries of 30,000,071 to 30,001,211,
-      which `effects.tsv` does not list: the Theostones they wear, perhaps.
+    - **The Theostones a player wears** are permanent entries, one or two a player
+      (30,000,071 to 30,001,241), each a stone's code (`3000TNN`, Skill codes, above)
+      times ten plus one. In the dungeon capture each of the four players whose
+      damage Theostone went off carried that stone's (3000017, 19, 20 and 24 as
+      30,000,171, 191, 201 and 241), and the one who also put Reda's Tenacity
+      (30,010,131) on the boss carried 30,000,131 as well. `effects.tsv` lists none.
 - **Spawn `41 36`:**
   - **Id:** a varint. An id over 1,000,000 is folded to `(raw & 0x3FFF) | 0x4000`, in
     `entity_id.cpp` only.
