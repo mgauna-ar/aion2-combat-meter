@@ -117,7 +117,7 @@ struct PowerSnapshot {
  * - **An enemy** is a player of the other faction than the local player's
  *   (Identity::faction, sent with their record as they come into view, so before
  *   they do anything), but for two cases where the factions play together: no one
- *   is an enemy in a dungeon (game::is_dungeon), whose parties mix both, and a
+ *   is an enemy in a dungeon (game::is_party_instance), whose parties mix both, and a
  *   member of the local player's party (02 97) never is. A player of the local
  *   player's own faction is never one, an arena's opponent included.
  * - **An enemy leads the lists while within kEnemyRange,** or at no known

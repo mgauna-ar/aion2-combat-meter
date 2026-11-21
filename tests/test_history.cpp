@@ -291,7 +291,7 @@ TEST_CASE(History, WorthSavingOnlyInDungeons) {
     FightSummary f;
     f.boss.is_boss = true;
     const uint32_t dungeon = 600001;  // Krao Cave (Conquest)
-    const uint32_t open_world = 400001;
+    const uint32_t open_world = 1010;  // the second capture's town
     for (const uint32_t map : {dungeon, open_world, 0u}) {
         f.map_id = map;
         TEST_ASSERT(worth_saving(f, s));
@@ -302,7 +302,12 @@ TEST_CASE(History, WorthSavingOnlyInDungeons) {
     // A dungeon newer than the map table has no name, and is saved all the same.
     f.map_id = 600003;
     TEST_ASSERT(worth_saving(f, s));
+    // An arena, its id below the dungeons', is one by the map table.
+    f.map_id = 61;  // Impetusium Arena
+    TEST_ASSERT(worth_saving(f, s));
     f.map_id = open_world;
+    TEST_ASSERT_FALSE(worth_saving(f, s));
+    f.map_id = 20;  // Chaotic Lower Reshanta: the Abyss is open PvP
     TEST_ASSERT_FALSE(worth_saving(f, s));
     // No map load seen yet: not known to be a dungeon.
     f.map_id = 0;

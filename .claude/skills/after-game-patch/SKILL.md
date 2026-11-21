@@ -108,11 +108,24 @@ missing.
    grep -oh 'href="/db/dungeons/[^"?#]*"' /tmp/dungeons/list/*.html | sed 's|href="/db/dungeons/||; s|"$||' | sort -u > /tmp/dungeons/slugs.txt
    while read -r s; do curl -sSL -o "/tmp/dungeons/pages/$s.html" "https://aion2.app/db/dungeons/$s"; sleep 1; done < /tmp/dungeons/slugs.txt
    ```
-   Add list pages if the site shows more than three.
+   Add list pages if the site shows more than three. Then questlog.gg's dungeon
+   records, into the same folder: its list (19 pages of 40 in 2026-11; stop at the
+   `pageCount` the first gives), then each record but the phasing layers' and the
+   story instances' (`instancelayer`, `quest`), which give each instance's map id
+   and difficulty:
+   ```bash
+   mkdir -p /tmp/dungeons/questlog
+   for p in $(seq 1 19); do curl -sSL -G -o /tmp/dungeons/questlog/list$p.json --data-urlencode "input={\"language\":\"en\",\"page\":$p}" "https://questlog.gg/aion-2/api/trpc/database.getDungeons"; sleep 0.5; done
+   python3 -c 'import json,glob; [print(r["id"]) for f in glob.glob("/tmp/dungeons/questlog/list*.json") for r in json.load(open(f))["result"]["data"]["pageData"] if r.get("mainCategory") not in ("instancelayer","quest")]' > /tmp/dungeons/questlog/ids.txt
+   while read -r id; do curl -sSL -G -o "/tmp/dungeons/pages/$id.json" --data-urlencode "input={\"language\":\"en\",\"id\":\"$id\"}" "https://questlog.gg/aion-2/api/trpc/database.getDungeon"; sleep 0.3; done < /tmp/dungeons/questlog/ids.txt
+   ```
 2. **Rebuild the table.** Run `python3 tools/gen_map_table.py --import-pages /tmp/dungeons/pages`.
    It rewrites `src/game/data/maps.tsv` above its `# By hand` line, and `map_table.inc`.
-   It names each page that has no tier ids. Some do (the Lv.99 Awakening tiers,
-   Ascension, Legion and more, at the time of writing), so the list alone is no failure.
+   It names each aion2.app page that has no tier ids. Some do (the Lv.99 Awakening
+   tiers, Ascension, Legion and more, at the time of writing), and questlog.gg's records
+   name those maps instead, so the list alone is no failure. A difficulty it has no
+   tier name for (`QUESTLOG_TIERS`) is said too, and that map keeps its bare name:
+   add the pairing, read off a dungeon both sites give.
    A dungeon that had ids and is now on it means the page's layout moved.
 3. **Check the diff.** New tiers are expected. An id that moved to another dungeon is
    not, and means the ids were renumbered.

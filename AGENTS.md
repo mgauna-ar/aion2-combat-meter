@@ -210,7 +210,8 @@ tools/gen_icon_sheet.py          aion2.app's class emblems, skill icons and item
                                  skills.tsv and effects.tsv)
 tools/gen_effect_table.py        questlog.gg's status-effect pages → effects.tsv → effect_table.inc
                                  (the same)
-tools/gen_map_table.py           maps.tsv → map_table.inc (the same)
+tools/gen_map_table.py           aion2.app's dungeon pages and questlog.gg's dungeon
+                                 records → maps.tsv → map_table.inc (the same)
 tools/gen_npc_table.py           aion2.app's monster and NPC pages → npcs.tsv → npc_table.inc
 tools/gen_cooldown_table.py      aion2.app's skill pages → cooldowns.tsv → cooldown_table.inc
                                  (the same)
@@ -251,10 +252,11 @@ player there, damage (2,265,310), hits (862) and every per-skill CRI, PERF, DOUB
 BACK, FRNT, MULT and BLOC share matched it exactly.
 
 A third, the arena capture: three minutes of a town, a one-on-one arena match (map
-61) and the town again, 79 player records in all. It gave the combat power (Identity,
+61, Impetusium Arena) and the town again, 79 player records in all. It gave the combat power (Identity,
 below).
 
-A fourth, the PvP capture: five minutes on map 20 with both factions in view, 71
+A fourth, the PvP capture: five minutes on map 20 (Chaotic Lower Reshanta, in the
+Abyss) with both factions in view, 71
 player records, and a fight between the local player and one of the other faction.
 It gave the faction (Identity, below).
 
@@ -580,30 +582,57 @@ It gave the faction (Identity, below).
       death and a return, perhaps). Some name NPCs. Not
       needed: any of them means gone.
   - Map load `21 36`: load count u32, map id u32.
-    - **An id of 600000 or more is a dungeon** (`game::is_dungeon`, the one place
-      that says so). It goes by the id alone, never by the table of names, so a
-      dungeon a patch adds counts before the meter can name it: the overlays'
-      `show_in_dungeons_only`, `save_only_dungeons` and the party with no roster all
-      ask it. Every tier known sits there (600001 to 690046, and the Awakening tiers
-      at 910011 to 910064), and the one open-world id seen is the town's, 1010. The
-      community's notes gave 600000–700000 as the instances, which left the
-      Awakening tiers out.
-    - Names come from `src/game/data/maps.tsv`. It holds aion2.app's dungeon tier
-      ids: one row per difficulty, such as Krao Cave 600002 (Exploration) and 600001
-      (Conquest), with Awakening tiers at 910000 and up.
-      The second capture's dungeon came as 600072, which the table names Vakron Sky
-      Island (Conquest), the dungeon that was run: the tier ids are the map ids.
+    - **An id of 600000 or more is a dungeon**, named or not, so a dungeon a patch
+      adds counts before the meter can name it. The party dungeons, raids and
+      Awakening tiers sit there (600001 to 620022, 910011 to 910067), and so do the
+      daily dungeons (900001 to 900003).
+    - **Not every instance does** (questlog.gg's map ids, below): the matched
+      dungeons (Orcus's Grave, Fafnite Forge and two more) are 156000 to 156045,
+      Ascension 200002 to 220027, Growth 160000 to 160005, the Abyss Corridor 503001
+      to 504006, the seal dungeons 310001 to 400002, the arenas 60 to 64, the Legion
+      airships 901 to 905, Pantheon 50, Chaotic Reshanta 20 to 23, the open world's
+      events 111002 to 510038. The one open-world id seen is the town's, 1010.
+    - **Two rules, in `game`'s map_names, the one place that says either:**
+      - `is_dungeon`, for the overlays' `show_in_dungeons_only` and
+        `save_only_dungeons`: 600000 or more, or a row `maps.tsv` marks `dungeon`.
+        The import marks every instance below but Chaotic Reshanta (the Abyss's
+        open PvP) and the events, the user's call (2026-11-21): the arenas and
+        battlefields count, the airships too.
+      - `is_party_instance`, for who is on the local player's side with nothing
+        else to go by: 600000 or more alone. Only the group that entered is in
+        there, so the meter counts everyone in view as party with no roster, and the
+        Combat Power plugin marks no one of the other faction as an enemy. An arena
+        or battlefield has the other side inside, and stays out.
+    - Names come from `src/game/data/maps.tsv`, one row per difficulty, such as
+      Krao Cave 600002 (Exploration) and 600001 (Conquest). Two sources fill it
+      (`tools/gen_map_table.py`): aion2.app's dungeon pages give each tier's name,
+      and questlog.gg's dungeon records (`database.getDungeon`) each instance's map
+      id, a name for every map aion2.app's pages do not give, and a difficulty for
+      its tier. 412 rows, 2026-11-21.
+    - **A row is keyed by the map's id, not the instance's.** questlog.gg gives
+      both: the same for most, not for 32 (Fire Temple Arena is instance 7, map
+      60). The captures went by the map's: the arena capture's 61 is Impetusium
+      Arena's map (instance 8), the PvP capture's 20 Chaotic Lower Reshanta's
+      (instance 21), and the second capture's 600072 Vakron Sky Island (Conquest),
+      the run it was, whose two ids agree. aion2.app's tier ids are the instances':
+      until 2026-11-21 the table held Citadel of the Fallen Daeva under 600151 to
+      600153 (maps 600144 to 600146) and the matched dungeons under 690001 to
+      690046 (maps 156000 to 156045), which no map load would carry.
     - A tier added later gets an id of its own, with no pattern to guess it by:
       Krao Cave's Conquest [Hard] is 600004, skipping 600003. A raid's normal tier is
       the site's Conquest (Abyssal Forge: Ludra 600082, its Hard tier 600083).
-      Ludra's Easy tier, 600081, is not on aion2.app at all: questlog.gg's
-      dungeon pages give it (`questlog.gg/aion-2/en/db/dungeon/<id>`), and it sits
-      in the TSV's hand-written rows.
-    - aion2.app lists dungeons whose pages give no tier ids (2026-11): the Lv.99
-      Awakening tiers (Insane, Hell, Doom), Ascension, Abyss Corridor, Growth, Daily,
-      the Legion airships, the battlefields, Chaotic Reshanta and the arenas. They
-      show as "Dungeon <id>" (an unnamed id below 600000 as "Map <id>"); the import
-      lists them.
+    - **aion2.app's pages leave tiers out:** Fire Temple's and Ferocious Horn Den's
+      Hard tiers (600023, 600093) and Ludra's Easy tier (600081) are on questlog.gg
+      alone, and the Lv.99 Awakening tiers (Insane, Hell, Doom), Ascension, Abyss
+      Corridor, Growth, Daily, the Legion airships, the battlefields, Chaotic
+      Reshanta and the arenas have pages with no tier ids. questlog.gg names them
+      all. Its difficulty is named as aion2.app names the tier, by category
+      (`QUESTLOG_TIERS`: a party dungeon's "advanced" is Conquest [Hard]), except a
+      party dungeon's "hard", aion2.app's "Stage N", which questlog.gg does not
+      number: those come from aion2.app alone.
+    - Left out: questlog.gg's phasing layers of the open world ("World L A Layer
+      01") and story instances ("G Daeva D1 02"), 323 records named as the game
+      names them inside.
     - Open-world zones have no public numeric ids. Their rows go by hand under the
       TSV's `# By hand` line, which `--import-pages` keeps. metabot.gg gives 333 zone
       ids (Reshanta's Root is 622), but they look like zones within a map, not maps,
@@ -761,8 +790,6 @@ the three captures read as a point on their map):
   frame's length, perhaps, where a byte follows the zeros), and whether a battlefield
   or another arena sends the record whole as the one-on-one arena did. The Combat
   Power plugin shows "-" for a record whose end does not read;
-- the arenas' map ids: the one-on-one arena of the third capture was 61, and has no
-  row in `maps.tsv` yet;
 - **the local player's position between their skills.** Nothing found streams it
   (above), so the Combat Power plugin's distances are from where they last cast an
   effect, and none once that is stale. Whether some packet does (`1d 37`? a
@@ -819,12 +846,14 @@ the three captures read as a point on their map):
   `Aion2/Binaries/Win64/AION2.exe`, which the default `Aion2.exe` matches (the match
   ignores case), but no one has checked the name of the running process;
 - the open-world zones' map ids (the second capture's town was 1010);
-- the map ids of the dungeons aion2.app lists without tier ids (above). A capture can
-  give them, and a row added by hand names them;
-- whether every dungeon's id is 600000 or more, and whether anything that is not a
-  dungeon is (the arenas, the battlefields, the Abyss). `is_dungeon` assumes the
-  first and lets the second through: an overlay showing in an arena costs less than
-  one hidden in a dungeon. An id that should stay out needs a rule of its own then;
+- **which instances below 600000 only a group gets into** (Map load, above). The
+  matched dungeons (156xxx, one to four players), Ascension, the seal dungeons and
+  Growth may well be, but whether players outside the group share them, and of
+  which faction, is not known: `is_party_instance` leaves them out, as it does the
+  arenas, so the meter counts no stranger as party there and the Combat Power
+  plugin marks the other faction. Whether the Abyss Corridor is PvP is not known
+  either. None of these map ids has come in a capture but the arena's and
+  Chaotic Reshanta's;
 - whether the server hands a player's old id to someone else. Ids belong to a map
   instance and are handed out on entering it: in the second capture the local
   player's id was new on each of its three maps, while players who stayed in town
@@ -855,8 +884,8 @@ the three captures read as a point on their map):
   the factions as allies. The Combat Meter does not use the faction yet: to it
   they are players like the party, so a PvP fight starts nothing and a hit on them
   counts for nothing (plugins/combat_meter/AGENTS.md, Party and Healing);
-- what the extra byte in a player's record on map 20 marks (a PvP zone, perhaps),
-  and what map 20 is: it has no row in `maps.tsv`;
+- what the extra byte in a player's record on map 20 marks: map 20 is Chaotic
+  Lower Reshanta, the Abyss, where both factions meet;
 - **whether the local player's position always sits 154 bytes on in 33 36.** The
   bytes before it end in a list, a byte longer on map 20. A faction-2 character's,
   or one with more in that list, may run longer still, and the reader looks in two

@@ -153,7 +153,7 @@ void PowerTracker::on_identity(const proto::Identity& identity, uint32_t connect
 bool PowerTracker::hostile(const Player& player) const {
     if (m_local_faction == 0 || player.faction == 0 || player.faction == m_local_faction) return false;
     // A dungeon's party mixes both factions, and no one else is in there.
-    if (game::is_dungeon(m_map_id)) return false;
+    if (game::is_party_instance(m_map_id)) return false;
     return !m_party.contains(player.row.name);
 }
 

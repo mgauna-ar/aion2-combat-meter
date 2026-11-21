@@ -78,7 +78,8 @@ A fourth window you place like the meter's (unlock with Ctrl+Alt+L, drag, resize
 - **The other faction.** Every player's record says which of the two factions they
   are, and so does yours. A player whose faction is not yours is an enemy.
 - **Not in a dungeon, and never your party.** Dungeon parties mix both factions, so
-  no one is marked there, and a member of your party is never marked anywhere.
+  no one is marked there, and a member of your party is never marked anywhere. An
+  arena or a battlefield is no such dungeon: the other faction there is marked.
 - **Not an arena opponent of your own faction.** Only the faction is read: someone
   you duel from your own side shows like anyone else. With "Only enemies" on, they
   show as your target once you use a skill on them, for half a minute after it.
@@ -133,7 +134,7 @@ and saves as you go.
 | `sort_by_distance` | false | List the nearest players first, each with its distance, instead of the strongest. |
 | `list_max_players` | 8 | The most players listed, 1 to 12. With more on the map, these are the strongest (the nearest, with `sort_by_distance`), and a count of the rest follows. |
 | `hide_when_game_unfocused` | false | Hide it while neither the game nor the meter's window is in front, and while the game is not running. Applies only while locked. |
-| `show_in_dungeons_only` | false | Show it only in a dungeon (as the meter overlay's setting of that name). An arena is not one. Applies only while locked. |
+| `show_in_dungeons_only` | false | Show it only in a dungeon (as the meter overlay's setting of that name): an arena or a battlefield is one, Chaotic Reshanta is not. Applies only while locked. |
 | `hide_when_empty` | false | Hide it while it has no one to show: no target and an empty list. Applies only while locked. |
 
 ## For developers
