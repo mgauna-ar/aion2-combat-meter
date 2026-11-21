@@ -57,7 +57,8 @@ CLASSES = [
     ("Brawler", None),
 ]
 
-ICON = re.compile(r"ICON_\w+")
+# A skill's icon (ICON_GL_SKILL_003), or an item's, which a Theostone's hit takes.
+ICON = re.compile(r"(?:ICON|Icon)_\w+")
 PIXELS_MARKER = "// Pixels:"
 UNSERVED = "// Not served by aion2.app, so without an icon:"
 
@@ -73,7 +74,7 @@ def read_icons(path):
             parts = line.split("\t")
             if len(parts) == 3 and parts[2]:
                 if not ICON.fullmatch(parts[2]):
-                    sys.exit(f"{path}:{n}: icon {parts[2]!r} is not an ICON_ name")
+                    sys.exit(f"{path}:{n}: icon {parts[2]!r} is not an icon's name")
                 icons[int(parts[0])] = parts[2]
     return icons
 

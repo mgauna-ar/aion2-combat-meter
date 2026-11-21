@@ -2,8 +2,9 @@
 """Skill names: src/game/data/skills.tsv to src/game/src/skill_table.inc.
 
 The TSV is the source of truth: one `code<TAB>name[<TAB>icon]` per line, `#` for
-comments. The icon is the skill's icon on aion2.app (ICON_AS_SKILL_001), which
-tools/gen_icon_sheet.py packs for the app; the .inc here holds the names only. It
+comments. The icon is the skill's icon on aion2.app (ICON_AS_SKILL_001; for a
+Theostone's hit, its item's), which tools/gen_icon_sheet.py packs for the app; the
+.inc here holds the names only. It
 is generated from the TSV and committed, so the build never runs Python.
 
 Usage:
@@ -15,8 +16,9 @@ Usage:
                                             and questlog.gg's (*.json) for the skills
                                             those list without a name
 
-The import reads pages you downloaded yourself (see .claude/skills/after-game-patch):
-this script never touches the network.
+The import rewrites the rows above the TSV's "# By hand" line and keeps that line and
+everything after it. It reads pages you downloaded yourself (see
+.claude/skills/after-game-patch): this script never touches the network.
 """
 import argparse
 import datetime
@@ -39,7 +41,11 @@ PLACEHOLDERS = {
 }
 
 
-ICON = re.compile(r"ICON_\w+")
+# A skill's icon (ICON_GL_SKILL_003), or an item's (Icon_Item_Usable_Godstone_WP_r_011).
+ICON = re.compile(r"(?:ICON|Icon)_\w+")
+
+HAND_MARKER = "# By hand"
+HAND_SECTION = HAND_MARKER + ": codes no skill list carries. --import-pages keeps this section as it is.\n"
 
 
 def read_rows(path):
@@ -55,7 +61,7 @@ def read_rows(path):
                 sys.exit(f"{path}:{n}: expected code<TAB>name[<TAB>icon]")
             icon = parts[2] if len(parts) == 3 else ""
             if icon and not ICON.fullmatch(icon):
-                sys.exit(f"{path}:{n}: icon {icon!r} is not an ICON_ name")
+                sys.exit(f"{path}:{n}: icon {icon!r} is not an icon's name")
             code = int(parts[0])
             if code in rows:
                 sys.exit(f"{path}:{n}: code {code} listed twice")
@@ -78,6 +84,23 @@ def c_string(s):
         else:
             out.append(f"\\{b:03o}")  # octal: never swallows the next character
     return '"' + "".join(out) + '"'
+
+
+def hand_section(path):
+    """The TSV from its "# By hand" line on, which the import keeps as it is."""
+    if not os.path.exists(path):
+        return HAND_SECTION
+    with open(path, encoding="utf-8") as f:
+        lines = f.readlines()
+    for i, line in enumerate(lines):
+        if line.startswith(HAND_MARKER):
+            return "".join(lines[i:])
+    return HAND_SECTION
+
+
+def codes_by_hand(path):
+    """The codes in the TSV's "# By hand" section, which the import leaves alone."""
+    return {int(line.split("\t")[0]) for line in hand_section(path).splitlines() if line[:1].isdigit()}
 
 
 def render_inc(rows):
@@ -137,15 +160,20 @@ def import_pages(folder):
             filled += 1
     if filled:
         print(f"took questlog.gg's name for {filled} skills aion2.app does not name")
+    hand_codes = codes_by_hand(TSV)
+    for code in hand_codes & rows.keys():
+        print(f"skill {code} is in the TSV's \"# By hand\" section; kept that row", file=sys.stderr)
+    rows = {code: row for code, row in rows.items() if code not in hand_codes}
     kept = 0
     if os.path.exists(TSV):
         for code, (name, _) in read_rows(TSV).items():
-            if code in unnamed and code not in rows:
+            if code in unnamed and code not in rows and code not in hand_codes:
                 rows[code] = (name, unnamed[code])
                 kept += 1
     if kept:
         print(f"kept the TSV's name for {kept} skills the pages list unnamed")
     today = datetime.date.today().isoformat()
+    hand = hand_section(TSV)  # read before the TSV is truncated below
     with open(TSV, "w", encoding="utf-8", newline="\n") as f:
         f.write(
             "# AION 2 skill names by skill code, as damage (04 38) and tick (05 38) records\n"
@@ -164,6 +192,7 @@ def import_pages(folder):
         )
         for code, (name, icon) in sorted(rows.items()):
             f.write(f"{code}\t{name}\t{icon}\n" if icon else f"{code}\t{name}\n")
+        f.write("\n" + hand)
     print(f"wrote {len(rows)} skills to {os.path.relpath(TSV, ROOT)}")
 
 

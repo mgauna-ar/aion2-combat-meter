@@ -35,6 +35,9 @@ TEST_CASE(GameIcons, ASkillsIconFollowsTheRowThatNamesIt) {
     TEST_ASSERT_EQ(skill_icon(16107000), kNoIcon);
     // Two skills can share one picture.
     TEST_ASSERT_EQ(skill_icon(16290002), skill_icon(16290000));
+    // A damage Theostone's hit shows its item, the same stone in every tier.
+    TEST_ASSERT(skill_icon(3'000'019) != kNoIcon);
+    TEST_ASSERT_EQ(skill_icon(3'000'119), skill_icon(3'000'019));
 }
 
 TEST_CASE(GameIcons, CodesWithNoIconGetNone) {

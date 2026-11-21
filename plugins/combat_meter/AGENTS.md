@@ -243,10 +243,11 @@ app, or restarting it into an update, ends the live fight the same way and saves
     best-kept debuff on the boss up 87.5%.
   - **Consumables** (the tab's fourth view, `view_effects.cpp`, from those same rows:
     nothing more is saved): a row per fight row, and per `game::item_effect` (by the
-    id's first two digits: 20 potion, 21, 27, 28 food, 22 scroll, 30 Theostone). Food,
-    scrolls and potions are the target's, on the party side. A Theostone is its
-    caster's, by name: a weapon's goes off on the enemy it hit, so it is known only
-    once it does. Food or a scroll up less than 95% of the fight shows its share.
+    id's first two digits: 20 potion, 21, 27, 28 food, 22 scroll). Food, scrolls and
+    potions are the target's, on the party side. Theostones (30) are gear, not
+    consumables (the user), and are left out: their effects stay in the other three
+    views, and a damage Theostone's hit is a skill of its wearer's (AGENTS.md, Skill
+    codes). Food or a scroll up less than 95% of the fight shows its share.
   - checked on the Ludra capture: each of the five players' scrolls and food were
     there. A Sorcerer who died three times used their 600 s scrolls again exactly as
     the first ran out, through a wipe and its reload. Before items were kept through a
