@@ -1,6 +1,6 @@
 ---
 name: release
-description: Cut a release of the AION 2 meter and keep it installable by every copy already out there. Use when bumping the version, tagging a v*.*.* release, changing the release zip, the CPack name or the install() rules, or diagnosing the release job or a copy that does not update - including any change to src/app/include/app/update_check.hpp.
+description: Cut a release of the AION 2 meter and keep it installable by every copy already out there. Use when bumping the version, tagging a v*.*.* release, changing the release zip, the installer, the CPack name or the install() rules, or diagnosing the release job or a copy that does not update - including any change to src/app/include/app/update_check.hpp.
 ---
 
 # Releasing
@@ -30,11 +30,14 @@ git push origin vX.Y.Z
 
 The `release` job in `.github/workflows/ci.yml` runs only on such a tag, after every
 other job has passed. It checks the tag (less its `v`) against `AION2_VERSION_STRING`,
-refuses one that disagrees, then publishes three assets with generated notes:
+refuses one that disagrees, then publishes four assets with generated notes:
 - `aion2-combat-meter-windows-x64.zip`, what the updater installs;
+- `aion2-combat-meter-windows-x64-setup.exe`, the installer around the same exe
+  (the `installer` job; The installer, below);
 - `aion2meter-replay.exe`, the replay tool, outside the zip and the updater;
-- `SHA256SUMS.txt` for both, with bare file names, so `sha256sum -c SHA256SUMS.txt`
-  works in the folder they were downloaded to. Tag runs are never cancelled.
+- `SHA256SUMS.txt` for the other three, taken in the release job, with bare file
+  names, so `sha256sum -c SHA256SUMS.txt` works in the folder they were downloaded
+  to. Tag runs are never cancelled.
 
 ## 3. Check what was published
 
@@ -44,6 +47,7 @@ gh release view vX.Y.Z --json isDraft,isPrerelease,assets --jq '{isDraft, isPrer
 
 - `isDraft` and `isPrerelease` are false.
 - `aion2-combat-meter-windows-x64.zip` has a `sha256:` digest.
+- `aion2-combat-meter-windows-x64-setup.exe` is there.
 
 Then, without credentials, what an installed copy sees:
 
@@ -89,6 +93,25 @@ The `install()` rules in `CMakeLists.txt` are the only definition: CI packages w
 local `cpack` run on Windows are the same zip. A file the zip should hold is an
 `install()` rule, never a copy step in the workflow. The updater takes only
 `UPDATE_FILES` out of it, and that is all it holds. The replay tool is copied next to
-the zip in the `SHA-256 of the Release Files` step and published beside it.
+the zip in the `Put the Replay Tool beside the Zip` step and published beside it.
+
+## The installer
+
+`packaging/windows/installer.nsi`, built by CI's `installer` job on `windows-2022`
+(the image that has NSIS; `windows-latest` does not) around build-windows' exe, then
+installed and uninstalled on the runner by `try-installer.ps1`. It runs on every push
+and pull request, not only on tags, and its artifact is kept 14 days for trying by
+hand. The release job waits for it.
+
+- **No installed copy depends on it.** The updater looks for the zip by exact name and
+  never downloads the installer, so its name or its script can change freely.
+- **What it must agree with** is the app: the exe's name (`UPDATE_EXE_NAME`), the Run
+  value (`os/auto_start.cpp`), the uninstall key (`os/install_entry.cpp`), the window
+  classes it looks for to tell the meter is running, and the updater's leftovers in
+  the install folder (`app/updater.cpp`). Each is named at the top of the script.
+- **The version** comes from `AION2_VERSION_STRING`, read by the job; Windows wants it
+  as numbers, which the `static_assert` in `version.hpp` already guarantees.
+- **To build it by hand** on Windows with NSIS installed:
+  `makensis /DEXE=<full path of the exe> /DVERSION=X.Y.Z /DOUTFILE=<full path of the setup> packaging\windows\installer.nsi`.
 
 The workflow's token is `contents: read`; only the `release` job gets `contents: write`.

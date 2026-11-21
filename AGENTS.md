@@ -135,7 +135,8 @@ include/aion2/plugin_registry.hpp  every plugin's id, name, description, config 
 src/common/      aion2::config, aion2::os, aion2::common
     config/      json (ported), key_table (ported), json_file (atomic write)
     os/          logger, paths, single_instance, unique_handle, local_time (ported), tray_icon,
-                 auto_start (the Run key), http_client (WinHTTP GET, the only network
+                 auto_start (the Run key), install_entry (the installer's entry in
+                 Windows' app list), http_client (WinHTTP GET, the only network
                  access), process_launch (the updater's relaunch), performance_clock
                  (the machine's performance counter, for the Ping plugin)
     archive/     inflate (RFC 1951) and zip_reader, for the release zip (ported)
@@ -190,6 +191,8 @@ src/app/         aion2::app
                  the Combat Meter page's view_timeline, view_deaths, view_effects and
                  view_casts
     src/win32/   main.cpp, app_window, overlay_window: Windows only
+packaging/windows/  installer.nsi (the per-user installer, NSIS) and try-installer.ps1
+                 (installs and uninstalls it on CI's runner)
 tools/replay/    aion2meter-replay (every platform)
 tools/synth/     aion2meter-synth: writes the tests' made-up boss fight as a pcapng
 tools/screenshots/  renders docs/images from overlay_view and app_frame (software rasterizer from
@@ -909,6 +912,25 @@ public: GitHub's API shows a private repository's releases to no anonymous calle
   exe at the zip's root, the tag scheme and GitHub's digest are what old versions
   look for. Changing any of them strands every copy already installed
   (skill `release`).
+- **The installer is beside the contract, not in it.** A release also carries
+  `aion2-combat-meter-windows-x64-setup.exe` (`packaging/windows/installer.nsi`, NSIS,
+  built by CI's `installer` job around build-windows' exe). It installs for the user
+  alone, with no administrator prompt, into `%LOCALAPPDATA%\Programs\AION 2 Combat
+  Meter`: a folder of the user's own, so Update & restart swaps the exe there as in
+  one the zip was extracted to. The updater never downloads it.
+  - It adds a Start menu shortcut and an entry in Windows' app list (HKCU's
+    `Uninstall\AION2CombatMeter`). An in-app update leaves that entry's version
+    behind, so each start sets it (`os::refresh_install_entry`), when the entry's
+    `InstallLocation` is the running exe's folder: a copy elsewhere leaves it alone.
+  - It does not bundle Npcap, whose licence forbids it: when `System32\Npcap\wpcap.dll`
+    is missing it says so and offers npcap.com.
+  - Uninstalling takes the exe, the updater's staging folder and `.old` backups, and
+    Start with Windows when it starts this copy. `%APPDATA%\aion2-combat-meter` stays
+    unless the user says otherwise (never on a silent uninstall): every copy shares it,
+    and its fights hold character names.
+  - It refuses while the meter runs, any copy of it (the app and overlay windows'
+    classes, `FindWindow`): the exe could not be replaced, and another copy's
+    single-instance lock would keep the installed one from starting.
 
 ---
 
@@ -923,7 +945,8 @@ public: GitHub's API shows a private repository's releases to no anonymous calle
 | `make fixtures` | anywhere | Your own captures against their `.expected.txt`. |
 | `aion2meter-replay --deaths --active --effects` | anywhere | A capture's fight detail, to check against what happened in game. |
 | `aion2meter-replay --ping` | anywhere | A capture's pongs, and per connection how their echo and the heartbeats spread. |
-| CI `build-windows` | GitHub | The only MSVC build: the app, ctest, the replay smoke test, the zip and its SHA-256. |
+| CI `build-windows` | GitHub | The only MSVC build: the app, ctest, the replay smoke test, the zip. |
+| CI `installer` | GitHub (windows-2022, which has NSIS) | The installer around that exe, installed and uninstalled on the runner (`try-installer.ps1`). The release job takes the SHA-256 of every asset. |
 
 **Conventions:**
 - Naming: `snake_case` functions, `PascalCase` types, `m_` members, `kName` constants.
