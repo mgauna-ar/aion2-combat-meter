@@ -3,6 +3,7 @@
 #include "protocol/entity_id.hpp"
 
 #include <algorithm>
+#include <cstdint>
 
 namespace aion2::proto {
 
@@ -161,6 +162,114 @@ std::vector<Identity> scan_identities(std::span<const uint8_t> bytes, std::span<
         }
     }
     return found;
+}
+
+namespace {
+
+/// A player record's list of running effects (read_listed_effects): its entries'
+/// kind byte is 0x10 to 0x13, bit 0 naming a caster and bit 1 the applying skill.
+constexpr uint8_t kListedKindMin = 0x10;
+constexpr uint8_t kListedKindMax = 0x13;
+constexpr uint8_t kListedHasCaster = 0x01;
+constexpr uint8_t kListedHasSkill = 0x02;
+/// Most entries a list is believed to hold: what the effect books keep on one
+/// entity. The captures' longest held 19.
+constexpr uint8_t kMaxListedEffects = 128;
+/// A listed duration past 100 days is no effect's (Effect 20100's 34 days was the
+/// longest timed one).
+constexpr uint64_t kMaxListedDurationMs = 100ULL * 24 * 3600 * 1000;
+/// A listed end, in Unix ms: 2017 to 2103. A permanent effect's is 2100-01-01.
+constexpr uint64_t kMinListedEndMs = 1'500'000'000'000ULL;
+constexpr uint64_t kMaxListedEndMs = 4'200'000'000'000ULL;
+/// A duration of all ones: the effect does not end (as 2a 38's).
+constexpr uint64_t kListedPermanent = ~uint64_t{0};
+/// What every listed entry ends with: a position, three f32 (all FLT_MAX in the
+/// local player's own items'), and before it, in some entries, one byte more.
+constexpr size_t kListedPositionBytes = 12;
+
+/// A listed entry's fixed head: the kind, instance, effect, duration and end.
+struct ListedHead {
+    uint8_t kind{0};
+    uint32_t instance{0};
+    uint32_t buff_id{0};
+    uint64_t duration{0};
+    uint64_t end{0};
+    /// Where the fields after the end start.
+    size_t next{0};
+};
+
+std::optional<ListedHead> read_listed_head(std::span<const uint8_t> body, size_t at) {
+    if (at >= body.size()) return std::nullopt;
+    ByteReader r(body);
+    r.seek(at);
+    ListedHead h;
+    h.kind = r.u8();
+    const uint64_t instance = r.varint();
+    h.buff_id = r.u32le();
+    h.duration = r.u64le();
+    h.end = r.u64le();
+    if (!r.ok() || h.kind < kListedKindMin || h.kind > kListedKindMax || instance > UINT32_MAX || h.buff_id == 0 ||
+        (h.duration != kListedPermanent && h.duration > kMaxListedDurationMs) || h.end < kMinListedEndMs ||
+        h.end > kMaxListedEndMs) {
+        return std::nullopt;
+    }
+    h.instance = static_cast<uint32_t>(instance);
+    h.next = r.pos();
+    return h;
+}
+
+/// The list that starts with its count at `at`, every entry of it, or nothing.
+std::optional<std::vector<BuffApplied>> read_listed_at(std::span<const uint8_t> body, size_t at, EntityId target) {
+    const uint8_t count = body[at];
+    if (count == 0 || count > kMaxListedEffects) return std::nullopt;
+    std::vector<BuffApplied> out;
+    size_t cursor = at + 1;
+    for (uint8_t k = 0; k < count; ++k) {
+        const auto head = read_listed_head(body, cursor);
+        if (!head) return std::nullopt;
+        ByteReader r(body);
+        r.seek(head->next);
+        BuffApplied b;
+        b.listed = true;
+        b.target = target;
+        b.instance = head->instance;
+        b.buff_id = head->buff_id;
+        if ((head->kind & kListedHasCaster) != 0) b.caster = normalize_entity_id(r.varint());
+        b.level = r.u8();
+        if ((head->kind & kListedHasSkill) != 0) b.source_skill = r.u32le();
+        if (!r.ok()) return std::nullopt;
+        b.permanent = head->duration == kListedPermanent;
+        b.duration_ms = b.permanent ? 0 : head->duration;
+        b.expires_server_ms = b.permanent ? 0 : head->end;
+        out.push_back(b);
+        // The position, after one byte more in some entries (00, 70, 80, C0, never
+        // a kind byte): the next entry says which.
+        const size_t plain = r.pos() + kListedPositionBytes;
+        if (k + 1 == count) {
+            if (plain > body.size()) return std::nullopt;
+        } else if (read_listed_head(body, plain)) {
+            cursor = plain;
+        } else if (read_listed_head(body, plain + 1)) {
+            cursor = plain + 1;
+        } else {
+            return std::nullopt;
+        }
+    }
+    return out;
+}
+
+} // namespace
+
+/// Where the list sits depends on the name, the legion's name and fields not read (104 to
+/// 159 bytes into the 45 36 records of the captures, 329 into the 33 36), so it is
+/// found: the first count whose every entry reads, each where the last one ends.
+/// In all 338 records of the four captures it was found once, its count right.
+std::vector<BuffApplied> read_listed_effects(std::span<const uint8_t> body, size_t from, EntityId target) {
+    for (size_t at = from; at + 1 < body.size(); ++at) {
+        if (!read_listed_head(body, at + 1)) continue;
+        if (auto list = read_listed_at(body, at, target)) return std::move(*list);
+    }
+    return {};
 }
 
 } // namespace aion2::proto

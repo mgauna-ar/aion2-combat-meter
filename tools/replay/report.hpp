@@ -120,6 +120,10 @@ private:
     void dump_frame(const proto::Frame& frame, const char* why);
 
     const ReportOptions& m_opt;
+    /// The server's clock less the capture's, in ms, from the last heartbeat: where an
+    /// effect's stated end falls.
+    int64_t m_server_ahead_ms{0};
+    bool m_have_server_clock{false};
     std::map<uint16_t, OpcodeStats> m_stats;
     std::map<uint16_t, size_t> m_dumped;
     Micros m_first_ts{0};

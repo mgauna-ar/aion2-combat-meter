@@ -50,6 +50,11 @@ struct EffectApplied {
     }
 };
 
+/// Who put an effect on: the record's caster. A player's record lists some of
+/// their effects with none (proto::BuffApplied::listed); an item's of those is
+/// theirs, since no one else uses a scroll or food on them.
+[[nodiscard]] EntityId effect_caster(const proto::BuffApplied& b) noexcept;
+
 /**
  * @brief The effects on every entity in view, from 2a 38, 2b 38 and 1a 92: the
  * protocol's rules for them, which every plugin that reads effects shares.
@@ -62,6 +67,10 @@ struct EffectApplied {
  * live meter did. A death drops the entity's effects. Ids belong to a map, so a
  * map load drops the effects of the map before; the new map's own come up to a
  * second ahead of its load (21 36), and stay.
+ *
+ * A player's record lists the effects running on them as they come into view or
+ * onto a new map, for which no 2a 38 comes (proto::BuffApplied::listed): each puts
+ * on, or renews, an instance as 2a 38 would, ending at its stated end.
  *
  * Except the items one puts on oneself (scrolls, food, potions: kept_through):
  * they outlast a death, and a reload within a run, which keeps the ids. In the

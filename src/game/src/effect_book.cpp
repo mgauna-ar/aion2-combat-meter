@@ -20,10 +20,18 @@ Micros EffectBook::expiry(const proto::BuffApplied& b, Micros ts) const noexcept
     const Micros stated = ts + std::min<uint64_t>(b.duration_ms, kLongestMs) * kMicrosPerMilli;
     if (!m_have_offset || b.expires_server_ms == 0 || b.expires_server_ms > kLongestMs) return stated;
     const int64_t at = static_cast<int64_t>(b.expires_server_ms * kMicrosPerMilli) - m_server_offset;
+    // A record's list states the end and the whole duration, applied long before:
+    // the end is the truth, and one past is over.
+    if (b.listed) return at <= static_cast<int64_t>(ts) ? ts : static_cast<Micros>(at);
     if (at <= static_cast<int64_t>(ts)) return stated;
     const auto end = static_cast<Micros>(at);
     const Micros apart = end > stated ? end - stated : stated - end;
     return apart > kExpirySlack ? stated : end;
+}
+
+EntityId effect_caster(const proto::BuffApplied& b) noexcept {
+    if (b.caster != 0 || !b.listed) return b.caster;
+    return effect_kind(b.buff_id) == EffectKind::Item ? b.target : 0;
 }
 
 EffectApplied EffectBook::on_applied(const proto::BuffApplied& b, Micros ts) {
@@ -31,6 +39,11 @@ EffectApplied EffectBook::on_applied(const proto::BuffApplied& b, Micros ts) {
     Instances& on = m_on[b.target];
     const auto had = on.find(b.instance);
     if (had != on.end()) out.before = had->second;
+    if (b.listed && !b.permanent && expiry(b, ts) <= ts) {
+        // Listed, and over by now.
+        if (on.empty()) m_on.erase(b.target);
+        return out;
+    }
     if (!b.permanent && b.duration_ms == 0) {
         // A marker that ends as it starts.
         if (had != on.end()) on.erase(had);
@@ -44,7 +57,7 @@ EffectApplied EffectBook::on_applied(const proto::BuffApplied& b, Micros ts) {
     i.instance = b.instance;
     i.buff_id = b.buff_id;
     i.source_skill = b.source_skill;
-    i.caster = b.caster;
+    i.caster = effect_caster(b);
     i.permanent = b.permanent;
     i.duration_ms = b.duration_ms;
     i.expires_at = b.permanent ? 0 : expiry(b, ts);

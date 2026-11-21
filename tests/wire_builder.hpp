@@ -227,6 +227,43 @@ inline Bytes position_body(uint64_t id, const Bytes& header, float x, float y, f
     return b;
 }
 
+/// One entry of the effect list a player's record carries (proto::read_listed_effects).
+/// A caster makes it kind 0x11, a skill 0x13 with one, 0x12 without; neither, 0x10.
+struct ListedSpec {
+    uint32_t instance{1};
+    uint32_t buff_id{0};
+    /// -1 for a permanent effect.
+    int64_t duration_ms{0};
+    uint64_t expires_server_ms{0};
+    uint64_t caster{0};
+    uint8_t level{1};
+    uint32_t skill{0};
+    /// The byte some entries carry before their position (70 here, as some real ones).
+    bool extra_byte{false};
+};
+
+/// A count, then each entry: kind, instance, effect, duration, end, the caster and
+/// skill its kind names, the level, and a position, as the captures' records have them.
+inline Bytes effect_list(const std::vector<ListedSpec>& entries) {
+    Bytes b;
+    b.push_back(static_cast<uint8_t>(entries.size()));
+    for (const ListedSpec& e : entries) {
+        b.push_back(static_cast<uint8_t>(0x10 | (e.caster != 0 ? 0x01 : 0x00) | (e.skill != 0 ? 0x02 : 0x00)));
+        put_varint(b, e.instance);
+        put_le32(b, e.buff_id);
+        put_le64(b, static_cast<uint64_t>(e.duration_ms));
+        put_le64(b, e.duration_ms < 0 ? 4'102'444'800'000ULL : e.expires_server_ms);
+        if (e.caster != 0) put_varint(b, e.caster);
+        b.push_back(e.level);
+        if (e.skill != 0) put_le32(b, e.skill);
+        if (e.extra_byte) b.push_back(0x70);
+        put_f32(b, kTownX);
+        put_f32(b, kTownY);
+        put_f32(b, kTownZ);
+    }
+    return b;
+}
+
 /// The shapes the end of a real 45 36 took in the arena capture.
 enum class PlayerTrailer : uint8_t {
     /// The tag, a title, a rank, the combat power, five zeros: 63 of its 77.
@@ -251,7 +288,7 @@ enum class PlayerTrailer : uint8_t {
 /// (the faction again) after the class, as the fourth capture's map does.
 inline Bytes player_body(uint64_t id, std::string_view name, uint16_t server, uint32_t combat_power,
                          PlayerTrailer trailer = PlayerTrailer::Plain, float x = kTownX, float y = kTownY,
-                         float z = kTownZ, uint8_t faction = 1, bool zone_byte = false) {
+                         float z = kTownZ, uint8_t faction = 1, bool zone_byte = false, const Bytes& effects = {}) {
     Bytes b;
     put_varint(b, id);
     put_le32(b, 0x00000101);
@@ -265,7 +302,11 @@ inline Bytes player_body(uint64_t id, std::string_view name, uint16_t server, ui
     put_f32(b, x);
     put_f32(b, y);
     put_f32(b, z);
-    b.resize(b.size() + 1200, 0x64);
+    // Its HP, a legion's name and zeros: some 100 bytes the real ones have before
+    // the effect list.
+    b.resize(b.size() + 100, 0x00);
+    put_bytes(b, effects.empty() ? Bytes{0x00} : effects);
+    b.resize(b.size() + 1100, 0x64);
     if (trailer != PlayerTrailer::NoTag) put_le32(b, 0x1FCBF421);
     if (trailer != PlayerTrailer::Untitled) {
         put_le32(b, 1172);
@@ -302,7 +343,8 @@ inline Bytes own_identity_body(uint64_t id, std::string_view name, uint16_t serv
 /// map does: there it came in a list some 20 bytes before the position, and the
 /// byte before the flags was 80 still.
 inline Bytes own_player_body(uint64_t id, std::string_view name, uint16_t server, float x = kTownX,
-                             float y = kTownY, float z = kTownZ, uint8_t faction = 1, bool zone_byte = false) {
+                             float y = kTownY, float z = kTownZ, uint8_t faction = 1, bool zone_byte = false,
+                             const Bytes& effects = {}) {
     Bytes b = own_identity_body(id, name, server, 0x2D000000u | (uint32_t{faction} << 16));
     // own_identity_body's level is the first four of the 155.
     b.resize(b.size() + 148, 0x64);
@@ -314,6 +356,9 @@ inline Bytes own_player_body(uint64_t id, std::string_view name, uint16_t server
     put_f32(b, x);
     put_f32(b, y);
     put_f32(b, z);
+    // Fields not read, then the effect list (329 bytes in, in the real ones).
+    b.resize(b.size() + 130, 0x00);
+    put_bytes(b, effects.empty() ? Bytes{0x00} : effects);
     b.resize(b.size() + 400, 0x64);
     return b;
 }

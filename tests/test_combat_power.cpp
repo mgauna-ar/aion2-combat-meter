@@ -384,6 +384,11 @@ TEST_CASE(CombatPower, DistanceIsFromWhereTheLocalPlayerLastActed) {
     t.on_position(step(227, 0.0f, 0.0f), 1, at(16));
     t.on_effect(effect_from(kMe, 9000.0f, 9000.0f), 3, at(16));
     TEST_ASSERT_NEAR(t.snapshot(at(17)).target.distance_m, 10.0f, 1e-3f);
+    // An effect a record lists was put on long ago: where its caster stood then.
+    proto::BuffApplied listed = effect_from(227, 9000.0f, 9000.0f);
+    listed.listed = true;
+    t.on_effect(listed, 2, at(17));
+    TEST_ASSERT_NEAR(t.snapshot(at(17)).target.distance_m, 10.0f, 1e-3f);
 }
 
 TEST_CASE(CombatPower, AfterFlyingThePositionIsStaleInASecond) {

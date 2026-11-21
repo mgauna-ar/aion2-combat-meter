@@ -46,6 +46,16 @@ inline constexpr size_t kMinCombatPowerBody = 256;
 /// holds no such figure, or reads above kMaxCombatPower.
 [[nodiscard]] uint32_t read_combat_power(std::span<const uint8_t> body) noexcept;
 
+/// The effects running on a player, as their record (33 36, 45 36) lists them, each
+/// a BuffApplied on `target` marked `listed`: a count, then per entry the kind (0x10
+/// to 0x13), the instance (varint), the effect (u32), its whole duration and its end
+/// (u64 each, as in 2a 38), the caster (varint, with kind bit 0), the level (u8), the
+/// applying skill (u32, with kind bit 1), and a position, sometimes after one byte
+/// more. Searched for from `from`, since what comes before it is not read; empty
+/// when none is found.
+[[nodiscard]] std::vector<BuffApplied> read_listed_effects(std::span<const uint8_t> body, size_t from,
+                                                           EntityId target);
+
 /**
  * @brief Identity records embedded in a packet the parser does not otherwise read.
  *

@@ -525,7 +525,13 @@ bool PacketParser::parse_known(const Frame& frame, std::vector<ParsedEvent>& out
             if (!id->name.empty()) read_identity_position(r, *id);
             if (!own && !id->name.empty()) id->combat_power = read_combat_power(frame.body);
             if (!id->name.empty()) remember_server(id->server);
+            const EntityId who = id->id;
+            const bool named = !id->name.empty();
             emit(std::move(*id));
+            // After the record, so whoever reads them knows the player first.
+            if (named) {
+                for (BuffApplied& b : read_listed_effects(frame.body, r.pos(), who)) emit(std::move(b));
+            }
             return true;
         }
         case opcode::Spawn: {

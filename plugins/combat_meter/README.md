@@ -91,7 +91,8 @@ The Combat Meter page shows the fight on view, live or saved, in tabs:
   ("Theostone: Ulgorn's Will").
   Food or a scroll that was not up the whole fight shows in amber, with how much of
   it; hover one for its time and how often it was put on. Scrolls and food outlast a
-  death, as in game.
+  death, as in game, and those used before a loading screen (in town, before the
+  dungeon) count from the start.
 - **Casts**: what each player pressed, ranked by casts a minute. Select a player for
   their skills: how often each was pressed, the average time between presses, and its
   direct hits per press (above 1 for a skill that strikes twice, or several targets).
