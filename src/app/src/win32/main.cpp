@@ -16,6 +16,7 @@
 #include "capture/file_source.hpp"
 #include "capture/os/connection_finder.hpp"
 #include "capture/os/npcap_source.hpp"
+#include "capture/packet_source.hpp"
 #include "common/os/auto_start.hpp"
 #include "common/os/http_client.hpp"
 #include "common/os/install_entry.hpp"
@@ -418,6 +419,8 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
             app::AppFrameInput input;
             input.snapshot = snapshot.get();
             input.history = &history;
+            // The window, not the pipeline: naming a day "Today" is no capture time.
+            input.now = capture::wall_clock_now();
             input.source_status = runtime.source_status();
             input.recording = runtime.recording();
             input.recording_path = runtime.recording_path();
@@ -445,6 +448,9 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
             if (actions.end_fight) runtime.request_end_fight();
             if (actions.toggle_recording) toggle_recording();
             if (actions.clear_history) runtime.request_clear_history();
+            if (!actions.delete_files.empty()) runtime.request_delete_fights(actions.delete_files);
+            if (!actions.keep_files.empty()) runtime.request_keep_fights(actions.keep_files, true);
+            if (!actions.unkeep_files.empty()) runtime.request_keep_fights(actions.unkeep_files, false);
             if (actions.reset_overlay_position) {
                 window.reset_position();
                 settings.overlay.x = -1;

@@ -29,6 +29,32 @@ CivilTime utc_time(Micros ts) noexcept {
     return c;
 }
 
+LocalDay civil_day(int64_t year, unsigned month, unsigned day) noexcept {
+    if (month < 1 || month > 12) month = 1;
+    if (day < 1 || day > 31) day = 1;
+    // Howard Hinnant's days_from_civil, the inverse of utc_time's.
+    const int64_t y = static_cast<int64_t>(year) - (month <= 2 ? 1 : 0);
+    const int64_t era = (y >= 0 ? y : y - 399) / 400;
+    const auto yoe = static_cast<unsigned>(y - era * 400);
+    const unsigned doy = (153 * (month > 2 ? month - 3 : month + 9) + 2) / 5 + day - 1;
+    const unsigned doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    LocalDay d;
+    d.serial = era * 146097 + static_cast<int64_t>(doe) - 719468;
+    d.year = year;
+    d.month = month;
+    d.day = day;
+    // 1970-01-01 was a Thursday.
+    const int64_t w = (d.serial + 4) % 7;
+    d.weekday = static_cast<unsigned>(w < 0 ? w + 7 : w);
+    return d;
+}
+
+LocalDay local_day(Micros ts) {
+    const std::tm t = os::local_time(static_cast<std::time_t>(ts / kMicrosPerSecond));
+    return civil_day(static_cast<int64_t>(t.tm_year) + 1900, static_cast<unsigned>(t.tm_mon + 1),
+                     static_cast<unsigned>(t.tm_mday));
+}
+
 std::string utc_file_stamp(Micros ts) {
     const CivilTime c = utc_time(ts);
     char buf[32];

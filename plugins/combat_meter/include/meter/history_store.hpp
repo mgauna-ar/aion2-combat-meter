@@ -33,6 +33,9 @@ struct HistoryEntry {
     double total_dps{0.0};
     EndReason end_reason{EndReason::None};
     size_t players{0};
+    /// Kept by the user: pruning, clearing and deleting its run leave it. The record
+    /// says so too ("kept"), so an index rebuilt from the records keeps it.
+    bool kept{false};
 };
 
 /// A boss fight, or any fight at least min_saved_duration_s long; with
@@ -60,10 +63,20 @@ public:
     /// Every saved fight, oldest first.
     [[nodiscard]] std::vector<HistoryEntry> load_index() const;
     [[nodiscard]] std::optional<FightSummary> load(const std::string& file) const;
-    /// Deletes all but the newest `keep` fights. The number deleted.
+    /// Deletes these fights, kept or not, and their index lines. A name the index
+    /// does not list is ignored, and a file that will not go keeps its line. The
+    /// number deleted.
+    size_t remove(const std::vector<std::string>& files);
+    /// Marks these fights kept, or no longer kept, in their records and their index
+    /// lines. A record that cannot be read or written stays as it was. The number
+    /// changed.
+    size_t set_kept(const std::vector<std::string>& files, bool kept);
+    /// Deletes the oldest fights not kept until `keep` of them are left; kept fights
+    /// neither go nor count. The number deleted.
     size_t prune(size_t keep);
-    /// Deletes every fight record in the folder and the index; other files stay.
-    /// The number of fights deleted.
+    /// Deletes every fight record in the folder but the kept ones, whose lines are
+    /// all the index then holds (none: no index). Other files stay. The number of
+    /// fights deleted.
     size_t clear();
 
     [[nodiscard]] const std::filesystem::path& dir() const noexcept { return m_dir; }

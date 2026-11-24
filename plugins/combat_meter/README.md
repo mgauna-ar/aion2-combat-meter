@@ -52,9 +52,9 @@ always be found and dragged back. Switching the plugin off hides it too.
 - **Duration:** a fight's time runs from the first hit to the last, so the wait before
   a fight is called never lowers its DPS.
 - **Saving:** boss fights and fights longer than 20 s are saved, and listed on the
-  Combat Meter page, grouped by map visit: each run of a dungeon is its own entry, and
-  a teleport or revive inside a run stays in it. *Save only dungeon fights* keeps the
-  open world out.
+  Combat Meter page by day and by map visit: each run of a dungeon is its own entry,
+  and a teleport or revive inside a run stays in it. *Save only dungeon fights* keeps
+  the open world out.
 
 ## Who counts as party
 
@@ -72,7 +72,26 @@ always be found and dragged back. Switching the plugin off hides it too.
 - A boss left standing keeps the HP you left it at in the saved fight ("Wipe 23%",
   "23% left"), though it resets to full once the party is gone.
 
-![The app window's Combat Meter page: saved fights by map visit on the left, each with its boss and how it ended, the selected fight's ranking with the in-game window's hit columns, and one player's skills below](../../docs/images/app-damage.png)
+## Saved fights
+
+The page lists every saved fight, newest first: under the day its run began (Today,
+Yesterday, then the date), by map visit, each run's fights numbered in the order they
+came. Click one to see it.
+
+- **Keep** a fight to hold on to it: right-click it, or press **Keep** over the fight.
+  A lock shows on its row. Pruning (`max_fights`, below) never deletes a kept fight,
+  and neither do **Clear** and deleting its run.
+- **Delete** a fight from its right-click menu, or with the bin over it. A run's
+  right-click menu keeps or deletes all of its fights; its delete leaves the kept ones.
+- **Select several:** Ctrl-click adds or takes out one, Shift-click a range, Ctrl+A
+  all of them, Esc none. Delete (the key, or the button over the list) deletes them;
+  right-click one of them to keep or delete them all. Fights you select go even when
+  kept: the question says so.
+- **Clear**, over the list, deletes every fight but the kept ones.
+
+Every delete asks first: Enter deletes, Esc cancels. The fights' files go too.
+
+![The app window's Combat Meter page: saved fights by day and map visit on the left, each with its boss and how it ended and the kept one with a lock, the selected fight's ranking with the in-game window's hit columns, Keep and the bin over it, and one player's skills below](../../docs/images/app-damage.png)
 
 ## The fight in detail
 
@@ -167,10 +186,11 @@ and saves as you go.
 
 | Key | Default | Meaning |
 |---|---|---|
-| `max_fights` | 500 | Saved fights kept on disk; the oldest are deleted first. |
+| `max_fights` | 500 | Saved fights on disk, besides those you keep; the oldest are deleted first. |
 
 **Saved fights** go to `%APPDATA%\aion2-combat-meter\history\`, one JSON file per fight
-plus `index.jsonl`. The **Clear** button over the list on the page deletes them.
+plus `index.jsonl`. The **Clear** button over the list on the page deletes them, but
+for the ones you keep.
 
 ## For developers
 

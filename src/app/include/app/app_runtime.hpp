@@ -28,15 +28,16 @@ namespace aion2::app {
  * engine thread owns the Pipeline, the history store and the recorder, and
  * publishes a LiveSnapshot about five times a second; the UI thread reads that
  * snapshot and the history index, and posts requests (end the fight, start or stop
- * recording, clear the history) as atomics, and new settings under the mutex, for
- * the engine thread to pick up. Nothing here touches Win32, so
+ * recording, clear the history) as atomics, and new settings and the saved fights
+ * to delete or keep under the mutex, for the engine thread to pick up. Nothing here
+ * touches Win32, so
  * the whole runtime runs in the tests on the Mac with a FileSource.
  */
 class AppRuntime {
 public:
     static constexpr size_t kQueueCapacity = 8192;
     static constexpr Micros kPublishEvery = 200 * kMicrosPerMilli;
-    /// Saved fights beyond max_fights are pruned in batches of this many.
+    /// Saved fights not kept, beyond max_fights, are pruned in batches of this many.
     static constexpr int kPruneSlack = 50;
 
     AppRuntime(AppSettings settings, std::filesystem::path data_dir);
@@ -62,8 +63,15 @@ public:
     /// way keeps going under them, unless the Combat Meter was switched off.
     void update_settings(const meter::MeterSettings& meter, const HistorySettings& history,
                          const aion2::plugins::PluginSwitches& plugins);
-    /// Deletes every saved fight. The history revision moves once it is done.
+    /// Deletes every saved fight but the kept ones. The history revision moves once
+    /// it is done.
     void request_clear_history() noexcept { m_clear_history_requested = true; }
+    /// Deletes these saved fights, by file name, kept or not. The history revision
+    /// moves once it is done.
+    void request_delete_fights(std::vector<std::string> files);
+    /// Marks these saved fights kept, or no longer kept. The history revision moves
+    /// once it is done.
+    void request_keep_fights(std::vector<std::string> files, bool kept);
     /// Starts or stops writing everything captured to a pcapng in captures_dir().
     void request_recording(bool on) noexcept { m_recording_request = on ? 1 : 0; }
     [[nodiscard]] bool recording() const noexcept { return m_recording.load(); }
@@ -84,7 +92,8 @@ private:
     void run();
     void handle_recording(Micros now);
     void save_finished();
-    /// Engine thread: settings from update_settings(), and a clear request.
+    /// Engine thread: settings from update_settings(), a clear request, and the
+    /// saved fights to delete or keep.
     void apply_requests(Micros now);
     void reload_history();
     void publish(Micros now);
@@ -122,6 +131,14 @@ private:
     };
     /// From update_settings(), until the engine thread takes them.
     std::optional<PendingSettings> m_pending_settings;
+    /// Saved fights to delete or keep, in the order asked, until the engine thread
+    /// takes them.
+    struct HistoryRequest {
+        enum class Kind : uint8_t { Delete, Keep, Unkeep };
+        Kind kind{Kind::Delete};
+        std::vector<std::string> files;
+    };
+    std::vector<HistoryRequest> m_history_requests;
 };
 
 } // namespace aion2::app

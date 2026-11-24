@@ -10,6 +10,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <string>
 
 namespace aion2::app::ui {
 
@@ -195,6 +196,19 @@ bool button(const char* label, ButtonKind kind = ButtonKind::Secondary,
 /// Width button() will take for this label and size. Reserve space for a button
 /// with this, never with the nominal metrics::Button* width.
 [[nodiscard]] float button_width(const char* label, ButtonSize size = ButtonSize::Medium);
+
+// ----------------------------------------------------------------- menus ----
+
+/// Opens the right-click menu of the item just drawn, padded tighter than a card.
+/// True while it is open: the caller emits menu_item()s and then end_context_menu().
+/// `id` is a "##"-style identifier, unique beside the item.
+[[nodiscard]] bool begin_context_menu(const char* id);
+void end_context_menu();
+
+/// One row of a menu: an icon and its words, in the danger colour for one that
+/// deletes. True when clicked. A row not `enabled` is greyed out; give it a tooltip
+/// (ImGuiHoveredFlags_AllowWhenDisabled).
+bool menu_item(const char* icon, const std::string& label, bool danger = false, bool enabled = true);
 
 // -------------------------------------------------------------- settings ----
 

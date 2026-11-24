@@ -3,6 +3,7 @@
 #include "common/os/logger.hpp"
 #include "common/time_format.hpp"
 
+#include <algorithm>
 #include <chrono>
 
 namespace aion2::app {
@@ -173,11 +174,24 @@ void AppRuntime::update_settings(const meter::MeterSettings& meter, const Histor
     m_pending_settings = PendingSettings{meter, history, plugins};
 }
 
+void AppRuntime::request_delete_fights(std::vector<std::string> files) {
+    std::lock_guard<std::mutex> lock(m_mutex);
+    m_history_requests.push_back(HistoryRequest{HistoryRequest::Kind::Delete, std::move(files)});
+}
+
+void AppRuntime::request_keep_fights(std::vector<std::string> files, bool kept) {
+    std::lock_guard<std::mutex> lock(m_mutex);
+    m_history_requests.push_back(
+        HistoryRequest{kept ? HistoryRequest::Kind::Keep : HistoryRequest::Kind::Unkeep, std::move(files)});
+}
+
 void AppRuntime::apply_requests(Micros now) {
     std::optional<PendingSettings> pending;
+    std::vector<HistoryRequest> requests;
     {
         std::lock_guard<std::mutex> lock(m_mutex);
         pending.swap(m_pending_settings);
+        requests.swap(m_history_requests);
     }
     if (pending) {
         m_settings.meter = pending->meter;
@@ -186,11 +200,27 @@ void AppRuntime::apply_requests(Micros now) {
         m_pipeline.set_meter_settings(m_settings.meter);
         m_pipeline.set_plugins(m_settings.plugins, now);
     }
+    bool history_changed = false;
     if (m_clear_history_requested.exchange(false)) {
         const size_t removed = m_store.clear();
         os::Logger::info("history cleared: " + std::to_string(removed) + " fights deleted");
-        reload_history();
+        history_changed = true;
     }
+    // Counts only: file names carry no character's name, but the log never needs them.
+    for (const auto& r : requests) {
+        const std::string asked = std::to_string(r.files.size());
+        if (r.kind == HistoryRequest::Kind::Delete) {
+            const size_t removed = m_store.remove(r.files);
+            os::Logger::info("history: " + std::to_string(removed) + " of " + asked + " fights deleted");
+        } else {
+            const bool keep = r.kind == HistoryRequest::Kind::Keep;
+            const size_t changed = m_store.set_kept(r.files, keep);
+            os::Logger::info("history: " + std::to_string(changed) + " of " + asked + " fights " +
+                             (keep ? "kept" : "no longer kept"));
+        }
+        history_changed = true;
+    }
+    if (history_changed) reload_history();
 }
 
 void AppRuntime::reload_history() {
@@ -215,8 +245,12 @@ void AppRuntime::save_finished() {
     }
     if (!saved_any) return;
 
+    // Kept fights neither go nor count.
     const auto keep = static_cast<size_t>(m_settings.history.max_fights);
-    if (m_store.load_index().size() > keep + static_cast<size_t>(kPruneSlack)) m_store.prune(keep);
+    const auto index = m_store.load_index();
+    const auto unkept = static_cast<size_t>(
+        std::count_if(index.begin(), index.end(), [](const meter::HistoryEntry& e) { return !e.kept; }));
+    if (unkept > keep + static_cast<size_t>(kPruneSlack)) m_store.prune(keep);
     reload_history();
 }
 

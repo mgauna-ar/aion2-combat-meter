@@ -2,6 +2,7 @@
 
 #include "app/display_format.hpp"
 #include "app/game_icons.hpp"
+#include "app/history_list.hpp"
 #include "app/ui/icons.hpp"
 #include "app/ui/meter_tabs.hpp"
 #include "app/ui/page.hpp"
@@ -16,9 +17,12 @@
 
 #ifdef HAVE_IMGUI
 #include <algorithm>
+#include <cctype>
 #include <cinttypes>
 #include <cstdio>
 #include <iterator>
+#include <optional>
+#include <set>
 #include <string>
 #include <vector>
 #endif
@@ -459,14 +463,18 @@ PullOutcome pull_outcome(const meter::HistoryEntry& e) {
     return {"Ended", colors::TextDim};
 }
 
+/// The last line of a saved fight's tooltip: what else a row does.
+const char* const kRowHint = "Right-click to keep or delete it. Ctrl- or Shift-click selects several.";
+
 /// One saved fight, on two lines: what was fought and how it ended, then its number
-/// in the visit, its length and when it started. The tooltip carries all of it.
-bool pull_row(const meter::HistoryEntry& e, int number_in_visit, bool selected) {
+/// in the visit, its length and when it started, with a lock before the time when
+/// it is kept. A picked fight is tinted, with a check where its outcome's dot was.
+/// The tooltip carries all of it. The caller pushes the row's id.
+bool pull_row(const meter::HistoryEntry& e, int number_in_visit, bool selected, bool picked) {
     const ImVec2 pos = ImGui::GetCursorScreenPos();
     const float right = pos.x + ImGui::GetContentRegionAvail().x;
     const float row_h = pull_row_height();
-    const bool clicked = ImGui::Selectable(("##pull" + e.file).c_str(), selected, ImGuiSelectableFlags_None,
-                                           ImVec2(0.0f, row_h));
+    const bool clicked = ImGui::Selectable("##pull", selected, ImGuiSelectableFlags_None, ImVec2(0.0f, row_h));
     // A long visit lists every fight; only the rows on screen are worth formatting.
     if (!ImGui::IsItemVisible()) return clicked;
 
@@ -482,17 +490,31 @@ bool pull_row(const meter::HistoryEntry& e, int number_in_visit, bool selected) 
         tip += "\nStarted " + clock + ", " + duration + ", " + format_rate(e.total_dps) + " party DPS";
         tip += "\nEnded by " + std::string(reason_text(e.end_reason));
         if (e.partial) tip += "\nPartial data: the server sent only some players' hits";
-        ImGui::SetTooltip("%s", tip.c_str());
+        if (e.kept) tip += "\nKept: pruning, Clear and deleting its run leave it";
+        ImGui::BeginTooltip();
+        ImGui::TextUnformatted(tip.c_str());
+        text_dim("%s", kRowHint);
+        ImGui::EndTooltip();
     }
 
     ImDrawList* dl = ImGui::GetWindowDrawList();
+    if (picked) {
+        dl->AddRectFilled(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), colors::with_alpha(colors::Accent, 0.14f),
+                          m(4.0f));
+    }
     const float line_h = ImGui::GetTextLineHeight();
     const float top_y = pos.y + m(4.0f);
     const float bottom_y = top_y + line_h + m(2.0f);
     const float gap = m(8.0f);
     const float dot_r = m(3.0f);
     const float pad = m(6.0f);
-    dl->AddCircleFilled(ImVec2(pos.x + pad + dot_r, top_y + line_h * 0.5f), dot_r, o.color);
+    if (picked) {
+        const ImVec2 check = ImGui::CalcTextSize(ICON_CHECK);
+        dl->AddText(ImVec2(pos.x + pad + dot_r - check.x * 0.5f, top_y + (line_h - check.y) * 0.5f),
+                    colors::AccentHover, ICON_CHECK);
+    } else {
+        dl->AddCircleFilled(ImVec2(pos.x + pad + dot_r, top_y + line_h * 0.5f), dot_r, o.color);
+    }
     const float text_x = pos.x + pad + dot_r * 2.0f + m(7.0f);
 
     // Line one: the outcome keeps the right edge, the name takes what is left.
@@ -507,14 +529,18 @@ bool pull_row(const meter::HistoryEntry& e, int number_in_visit, bool selected) 
                     fit_text(name, name_w).c_str());
     }
 
-    // Line two, dimmer: which pull, how long, when.
+    // Line two, dimmer: which pull, how long, when, and a lock when it is kept.
     std::string detail = num + kDot + duration;
     if (e.partial) detail += std::string(kDot) + "partial";
     const float clock_w = ImGui::CalcTextSize(clock.c_str()).x;
     const float clock_x = right - pad - clock_w;
-    const bool clock_fits = clock_x > text_x + m(40.0f);
-    if (clock_fits) dl->AddText(ImVec2(clock_x, bottom_y), colors::TextDim, clock.c_str());
-    const float detail_w = (clock_fits ? clock_x - gap : right - pad) - text_x;
+    const float lock_w = e.kept ? ImGui::CalcTextSize(ICON_LOCK).x + m(4.0f) : 0.0f;
+    const bool clock_fits = clock_x - lock_w > text_x + m(40.0f);
+    if (clock_fits) {
+        dl->AddText(ImVec2(clock_x, bottom_y), colors::TextDim, clock.c_str());
+        if (e.kept) dl->AddText(ImVec2(clock_x - lock_w, bottom_y), colors::AccentHover, ICON_LOCK);
+    }
+    const float detail_w = (clock_fits ? clock_x - lock_w - gap : right - pad) - text_x;
     if (detail_w > 0.0f) {
         dl->AddText(ImVec2(text_x, bottom_y), e.partial ? colors::WarningLight : colors::TextDim,
                     fit_text(detail, detail_w).c_str());
@@ -553,31 +579,204 @@ bool visit_header(const std::string& map, const std::string& clock, size_t fight
     return open;
 }
 
-void clear_history_popup(size_t count, AppViewState& state, AppActions& out) {
-    if (!ImGui::BeginPopupModal("##ConfirmClear", nullptr,
+/// Puts a delete up for its confirmation. The list opens the dialog on its next
+/// pass: a menu or the top bar sits in another id scope than the dialog.
+void ask_delete(AppViewState& state, DeletePrompt prompt) {
+    if (prompt.files.empty() && !prompt.everything) return;
+    state.pending_delete = std::move(prompt);
+    state.open_delete_prompt = true;
+}
+
+/// The dialog every delete waits in, Clear's too. Enter deletes, Esc cancels.
+void delete_dialog(const std::vector<meter::HistoryEntry>& history, AppViewState& state, AppActions& out) {
+    if (state.open_delete_prompt) {
+        state.open_delete_prompt = false;
+        ImGui::OpenPopup("##ConfirmDelete");
+    }
+    if (!ImGui::BeginPopupModal("##ConfirmDelete", nullptr,
                                 ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar)) {
         return;
     }
+    if (!state.pending_delete) {
+        ImGui::CloseCurrentPopup();
+        ImGui::EndPopup();
+        return;
+    }
+    const DeletePrompt& prompt = *state.pending_delete;
     icon_chip(ICON_WARNING, colors::Danger, metrics::ChipSizeLg);
     ImGui::SameLine(0.0f, m(10.0f));
     ImGui::BeginGroup();
-    const std::string title = count == 1 ? std::string("Delete the saved fight?")
-                                         : "Delete all " + std::to_string(count) + " saved fights?";
     ImGui::PushFont(bold_font());
-    text_colored_u32(colors::TextPrimary, "%s", title.c_str());
+    text_colored_u32(colors::TextPrimary, "%s", prompt.title.c_str());
     ImGui::PopFont();
-    text_dim("Their files go too. The live fight stays.");
+    ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + m(340.0f));
+    text_dim("%s", prompt.body.c_str());
+    ImGui::PopTextWrapPos();
     ImGui::EndGroup();
     ImGui::Dummy(ImVec2(0.0f, m(8.0f)));
-    if (button(ICON_TRASH "  Delete", ButtonKind::Danger, ButtonSize::Medium)) {
-        out.clear_history = true;
-        state.selected_file.clear();
-        state.selected_fight.reset();
+    bool confirm = button(ICON_TRASH "  Delete", ButtonKind::Danger, ButtonSize::Medium);
+    ImGui::SameLine(0.0f, m(8.0f));
+    bool cancel = button("Cancel", ButtonKind::Secondary, ButtonSize::Small);
+    confirm = confirm || ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false);
+    cancel = cancel || ImGui::IsKeyPressed(ImGuiKey_Escape, false);
+    if (confirm) {
+        // The fight on view goes back to live now, not once the engine is done.
+        bool viewed_goes = false;
+        if (!state.selected_file.empty()) {
+            if (prompt.everything) {
+                const auto it = std::find_if(history.begin(), history.end(), [&](const meter::HistoryEntry& e) {
+                    return e.file == state.selected_file;
+                });
+                viewed_goes = it == history.end() || !it->kept;
+            } else {
+                viewed_goes =
+                    std::find(prompt.files.begin(), prompt.files.end(), state.selected_file) != prompt.files.end();
+            }
+        }
+        if (prompt.everything) {
+            out.clear_history = true;
+        } else {
+            out.delete_files = prompt.files;
+        }
+        if (viewed_goes) {
+            state.selected_file.clear();
+            state.selected_fight.reset();
+        }
+        state.picks.marked.clear();
+    }
+    if (confirm || cancel) {
+        state.pending_delete.reset();
         ImGui::CloseCurrentPopup();
     }
-    ImGui::SameLine(0.0f, m(8.0f));
-    if (button("Cancel", ButtonKind::Secondary, ButtonSize::Small)) ImGui::CloseCurrentPopup();
     ImGui::EndPopup();
+}
+
+/// A saved fight's right-click menu: keep it or stop, delete it. On a picked row it
+/// acts on every pick.
+void fight_menu(const std::vector<meter::HistoryEntry>& history, const meter::HistoryEntry& e, AppViewState& state,
+                AppActions& out) {
+    if (!begin_context_menu("##FightMenu")) return;
+    const bool on_picks = state.picks.marked.size() > 1 && state.picks.marked.count(e.file) != 0;
+    const std::set<std::string> files = on_picks ? state.picks.marked : std::set<std::string>{e.file};
+    size_t count = 0;
+    size_t kept = 0;
+    for (const auto& h : history) {
+        if (files.count(h.file) == 0) continue;
+        ++count;
+        if (h.kept) ++kept;
+    }
+    const std::string these = "these " + std::to_string(count) + " fights";
+    if (kept < count && menu_item(ICON_LOCK, on_picks ? "Keep " + these : std::string("Keep this fight"))) {
+        out.keep_files.assign(files.begin(), files.end());
+    }
+    if (kept > 0 && menu_item(ICON_UNLOCK, on_picks ? "Stop keeping " + these : std::string("Stop keeping it"))) {
+        out.unkeep_files.assign(files.begin(), files.end());
+    }
+    ImGui::Separator();
+    if (menu_item(ICON_TRASH, on_picks ? "Delete " + these + "..." : std::string("Delete this fight..."), true)) {
+        ask_delete(state, delete_picked(history, files));
+    }
+    end_context_menu();
+}
+
+/// A run's right-click menu, on its header: keep its fights or stop, delete those
+/// not kept. `where` names the run in the dialog.
+void run_menu(const std::vector<meter::HistoryEntry>& history, const meter::PullGroup& g, const std::string& where,
+              AppViewState& state, AppActions& out) {
+    if (!begin_context_menu("##RunMenu")) return;
+    std::vector<std::string> files;
+    size_t kept = 0;
+    for (const auto& p : g.pulls) {
+        files.push_back(history[p.index].file);
+        if (history[p.index].kept) ++kept;
+    }
+    if (kept < files.size() && menu_item(ICON_LOCK, "Keep this run")) out.keep_files = files;
+    if (kept > 0 && menu_item(ICON_UNLOCK, "Stop keeping this run")) out.unkeep_files = files;
+    ImGui::Separator();
+    const DeletePrompt prompt = delete_run(history, g, where);
+    if (menu_item(ICON_TRASH, "Delete this run...", true, !prompt.files.empty())) ask_delete(state, prompt);
+    if (prompt.files.empty() && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+        ImGui::SetTooltip("%s", files.size() == 1 ? "Its fight is kept" : "Every fight in it is kept");
+    }
+    end_context_menu();
+}
+
+/// A day's caption over the runs that began on it, in capitals like the list's own.
+void day_header(const std::string& label, bool first) {
+    if (!first) ImGui::Dummy(ImVec2(0.0f, m(2.0f)));
+    std::string caps = label;
+    for (char& c : caps) c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+    text_dim("%s", caps.c_str());
+}
+
+/// The list's caption and its buttons, on one line: Clear, or, while fights are
+/// selected, their count, Delete and a button that clears the selection. Spelled out while the rail has room
+/// beside the caption; icons alone, with their tooltips, on a narrow one.
+void caption_row(const std::vector<meter::HistoryEntry>& history, AppViewState& state) {
+    const size_t picked = state.picks.marked.size();
+    const size_t kept = kept_count(history);
+    const size_t unkept = history.size() - kept;
+    const std::string caption = picked > 0 ? std::to_string(picked) + " SELECTED" : std::string("SAVED FIGHTS");
+    const char* main_text = picked > 0 ? ICON_TRASH "  Delete##DeletePicked" : ICON_TRASH "  Clear##ClearHistory";
+    const char* main_icon = picked > 0 ? ICON_TRASH "##DeletePicked" : ICON_TRASH "##ClearHistory";
+    // Clear has nothing to do while every fight is kept.
+    const bool has_main = picked > 0 || unkept > 0;
+    const float icon_w = ImGui::GetFrameHeight();
+    const float gap = m(6.0f);
+    const float unpick_w = picked > 0 ? gap + icon_w : 0.0f;
+    const bool spelled = ImGui::CalcTextSize(caption.c_str()).x + m(10.0f) + button_width(main_text, ButtonSize::Fit) +
+                             unpick_w <=
+                         ImGui::GetContentRegionAvail().x;
+    const float main_w = spelled ? button_width(main_text, ButtonSize::Fit) : icon_w;
+    const float row_h = spelled ? m(metrics::ButtonH) : icon_w;
+    const float start_y = ImGui::GetCursorPosY();
+    ImGui::SetCursorPosY(start_y + (row_h - ImGui::GetTextLineHeight()) * 0.5f);
+    text_colored_u32(picked > 0 ? colors::AccentHover : colors::TextDim, "%s", caption.c_str());
+    if (!has_main) {
+        ImGui::SetCursorPosY(start_y + row_h);
+        return;
+    }
+    ImGui::SameLine();
+    right_align(main_w + unpick_w);
+    ImGui::SetCursorPosY(start_y);
+    const bool pressed = spelled ? button(main_text, ButtonKind::Danger, ButtonSize::Fit)
+                                 : button(main_icon, ButtonKind::Danger, ButtonSize::Icon);
+    if (ImGui::IsItemHovered()) {
+        std::string tip;
+        if (picked > 0) {
+            tip = picked == 1 ? std::string("Delete the selected fight (Del)")
+                              : "Delete the " + std::to_string(picked) + " selected fights (Del)";
+        } else if (kept == 0) {
+            tip = unkept == 1 ? std::string("Delete the saved fight")
+                              : "Delete all " + std::to_string(unkept) + " saved fights";
+        } else {
+            tip = unkept == 1 ? std::string("Delete the fight you don't keep")
+                              : "Delete the " + std::to_string(unkept) + " fights you don't keep";
+        }
+        ImGui::SetTooltip("%s", tip.c_str());
+    }
+    if (pressed) ask_delete(state, picked > 0 ? delete_picked(history, state.picks.marked) : delete_all(history));
+    if (picked > 0) {
+        ImGui::SameLine(0.0f, gap);
+        ImGui::SetCursorPosY(start_y + (row_h - icon_w) * 0.5f);
+        if (button(ICON_CIRCLE_X "##PickNone", ButtonKind::Secondary, ButtonSize::Icon)) state.picks.marked.clear();
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Clear the selection (Esc)");
+    }
+}
+
+/// The list's keys, while the rail has the focus: Delete asks about the picks, or
+/// the fight on view; Esc drops the picks; Ctrl+A picks every fight.
+void list_keys(const std::vector<meter::HistoryEntry>& history, AppViewState& state) {
+    if (!ImGui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows) || ImGui::GetIO().WantTextInput) return;
+    if (ImGui::IsKeyPressed(ImGuiKey_Delete, false)) {
+        if (!state.picks.marked.empty()) {
+            ask_delete(state, delete_picked(history, state.picks.marked));
+        } else if (!state.selected_file.empty()) {
+            ask_delete(state, delete_picked(history, {state.selected_file}));
+        }
+    }
+    if (ImGui::IsKeyPressed(ImGuiKey_Escape, false)) state.picks.marked.clear();
+    if (ImGui::GetIO().KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_A, false)) select_all(state.picks, history);
 }
 
 void rail(const AppFrameInput& in, AppViewState& state, AppActions& out, const std::vector<meter::PullGroup>& groups,
@@ -623,34 +822,9 @@ void rail(const AppFrameInput& in, AppViewState& state, AppActions& out, const s
         }
     }
 
-    // The saved fights, by visit, with Clear on the header's line.
+    // The saved fights, by day and visit, under their caption's line.
     ImGui::Dummy(ImVec2(0.0f, m(8.0f)));
-    // Clear spelled out while the rail has room for it beside the caption; its icon
-    // alone, with the tooltip, on a narrow one.
-    const char* caption = "SAVED FIGHTS";
-    const char* clear_text = ICON_TRASH "  Clear##ClearHistory";
-    const char* clear_icon = ICON_TRASH "##ClearHistory";
-    const bool spelled = ImGui::CalcTextSize(caption).x + m(10.0f) + button_width(clear_text, ButtonSize::Fit) <=
-                         ImGui::GetContentRegionAvail().x;
-    const float clear_w = spelled ? button_width(clear_text, ButtonSize::Fit) : ImGui::GetFrameHeight();
-    const float clear_h = spelled ? m(metrics::ButtonH) : ImGui::GetFrameHeight();
-    const float start_y = ImGui::GetCursorPosY();
-    ImGui::SetCursorPosY(start_y + (clear_h - ImGui::GetTextLineHeight()) * 0.5f);
-    text_dim("%s", caption);
-    if (!history.empty()) {
-        ImGui::SameLine();
-        right_align(clear_w);
-        ImGui::SetCursorPosY(start_y);
-        const bool pressed = spelled ? button(clear_text, ButtonKind::Danger, ButtonSize::Fit)
-                                     : button(clear_icon, ButtonKind::Danger, ButtonSize::Icon);
-        if (pressed) ImGui::OpenPopup("##ConfirmClear");
-        if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip(history.size() == 1 ? "Delete the saved fight" : "Delete all %zu saved fights",
-                              history.size());
-        }
-    } else {
-        ImGui::SetCursorPosY(start_y + clear_h);
-    }
+    caption_row(history, state);
     ImGui::Dummy(ImVec2(0.0f, m(2.0f)));
 
     if (history.empty()) {
@@ -663,31 +837,63 @@ void rail(const AppFrameInput& in, AppViewState& state, AppActions& out, const s
     } else {
         ImGui::BeginChild("##PullList", ImVec2(0.0f, fill_h(0.0f)), ImGuiChildFlags_None,
                           ImGuiWindowFlags_NoBackground);
+        std::optional<common::LocalDay> today;
+        if (in.now != 0) today = common::local_day(in.now);
+        std::optional<int64_t> last_day;
+        std::string day_text;
         for (size_t gi = 0; gi < groups.size(); ++gi) {
             const auto& g = groups[gi];
+            const Micros started = g.visit_ts != 0 ? g.visit_ts : history[g.pulls.back().index].start_ts;
+            // Each day the runs began on, over them.
+            const common::LocalDay day = common::local_day(started);
+            if (!last_day || *last_day != day.serial) {
+                day_text = day_label(day, today);
+                day_header(day_text, !last_day);
+                last_day = day.serial;
+            }
             const bool holds_selection = std::any_of(g.pulls.begin(), g.pulls.end(), [&](const meter::PullRef& p) {
                 return history[p.index].file == state.selected_file;
             });
-            ImGui::PushID(static_cast<int>(gi));
+            // By the visit, not its place in the list: a new run on top, or one deleted,
+            // leaves every other run folded as it was. A version 1 record has no visit,
+            // and its run goes by its first fight.
+            const std::string key = g.visit_ts != 0 ? std::to_string(g.visit_ts) + "/" + std::to_string(g.map_id)
+                                                    : history[g.pulls.back().index].file;
+            ImGui::PushID(key.c_str());
             // The newest visit, and the one holding the selection, start open; after
             // that the user's own folding wins.
             ImGui::SetNextItemOpen(gi == 0 || holds_selection, ImGuiCond_Once);
-            const Micros started = g.visit_ts != 0 ? g.visit_ts : history[g.pulls.back().index].start_ts;
             const std::string map = game::map_label(g.map_id);
             const std::string clock = common::local_clock(started);
             const bool open = visit_header(map, clock, g.pulls.size());
             if (ImGui::IsItemHovered()) {
                 const size_t n = g.pulls.size();
-                ImGui::SetTooltip("%s, from %s\n%zu %s", map.c_str(), clock.c_str(), n,
-                                  n == 1 ? "fight saved" : "fights saved");
+                const size_t kept = static_cast<size_t>(std::count_if(
+                    g.pulls.begin(), g.pulls.end(), [&](const meter::PullRef& p) { return history[p.index].kept; }));
+                std::string tip = map + ", from " + clock + "\n" + std::to_string(n) +
+                                  (n == 1 ? " fight saved" : " fights saved");
+                if (kept > 0) tip += ", " + std::to_string(kept) + " kept";
+                tip += "\nRight-click to keep or delete the run.";
+                ImGui::SetTooltip("%s", tip.c_str());
             }
+            run_menu(history, g, map + ", " + day_text + " " + clock, state, out);
             if (open) {
+                const ImGuiIO& io = ImGui::GetIO();
                 for (const auto& p : g.pulls) {
                     const auto& e = history[p.index];
-                    if (pull_row(e, p.number, e.file == state.selected_file)) {
-                        state.selected_file = e.file;
-                        out.load_file = e.file;
+                    ImGui::PushID(e.file.c_str());
+                    const bool picked = state.picks.marked.count(e.file) != 0;
+                    if (pull_row(e, p.number, e.file == state.selected_file, picked)) {
+                        // The order only a Shift-click's range needs.
+                        const std::vector<std::string> order =
+                            io.KeyShift ? list_order(history, groups) : std::vector<std::string>{};
+                        if (click(state.picks, order, e.file, io.KeyCtrl, io.KeyShift, state.selected_file)) {
+                            state.selected_file = e.file;
+                            out.load_file = e.file;
+                        }
                     }
+                    fight_menu(history, e, state, out);
+                    ImGui::PopID();
                 }
                 ImGui::TreePop();
             }
@@ -695,13 +901,14 @@ void rail(const AppFrameInput& in, AppViewState& state, AppActions& out, const s
         }
         ImGui::EndChild();
     }
-    clear_history_popup(history.size(), state, out);
+    list_keys(history, state);
+    delete_dialog(history, state, out);
     end_card();
 }
 
 // ----------------------------------------------------------------- top bar ---
 
-void top_bar(const Shown& shown, AppActions& out) {
+void top_bar(const Shown& shown, const std::vector<meter::HistoryEntry>& history, AppViewState& state, AppActions& out) {
     CardOptions opts{};
     opts.auto_height = true;
     begin_card("##TopBar", ImVec2(0.0f, 0.0f), opts);
@@ -766,7 +973,13 @@ void top_bar(const Shown& shown, AppActions& out) {
     const Badge o = outcome(f.live, f.boss.killed, f.end_reason);
     const char* end_label = ICON_TIMER "  End fight";
     const bool can_end = f.live && shown.entry == nullptr;
-    const float actions_w = pill_width(o.label) + (can_end ? m(10.0f) + button_width(end_label) : 0.0f);
+    // A saved fight on view: Keep, lit while it is kept, and Delete.
+    const bool saved = shown.entry != nullptr;
+    const bool kept = saved && shown.entry->kept;
+    const char* keep_label = kept ? ICON_LOCK "  Kept##KeepFight" : ICON_LOCK "  Keep##KeepFight";
+    const float icon_w = ImGui::GetFrameHeight();
+    float actions_w = pill_width(o.label) + (can_end ? m(10.0f) + button_width(end_label) : 0.0f);
+    if (saved) actions_w += m(10.0f) + button_width(keep_label, ButtonSize::Fit) + m(6.0f) + icon_w;
     if (same_line_if_room(actions_w, metrics::Gutter)) {
         right_align(actions_w);
         ImGui::SetCursorPosY(line_top + m(3.0f));
@@ -779,6 +992,23 @@ void top_bar(const Shown& shown, AppActions& out) {
         ImGui::SameLine(0.0f, m(10.0f));
         ImGui::SetCursorPosY(actions_y);
         if (button(end_label, ButtonKind::Danger)) out.end_fight = true;
+    }
+    if (saved) {
+        ImGui::SameLine(0.0f, m(10.0f));
+        ImGui::SetCursorPosY(actions_y);
+        if (button(keep_label, kept ? ButtonKind::Primary : ButtonKind::Secondary, ButtonSize::Fit)) {
+            (kept ? out.unkeep_files : out.keep_files).push_back(shown.entry->file);
+        }
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("%s", kept ? "Kept: pruning, Clear and deleting its run leave it. Click to stop keeping it."
+                                         : "Keep this fight: pruning, Clear and deleting its run will leave it.");
+        }
+        ImGui::SameLine(0.0f, m(6.0f));
+        ImGui::SetCursorPosY(actions_y + (m(metrics::ButtonH) - icon_w) * 0.5f);
+        if (button(ICON_TRASH "##DeleteFight", ButtonKind::Danger, ButtonSize::Icon)) {
+            ask_delete(state, delete_picked(history, {shown.entry->file}));
+        }
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Delete this fight (Del)");
     }
 
     if (f.quality.partial) {
@@ -922,9 +1152,8 @@ void tracking_card(const AppFrameInput& in, AppActions& out) {
 void history_card(const AppFrameInput& in, AppActions& out) {
     begin_settings_card("##set_history", ICON_HISTORY, "SAVED FIGHTS", colors::Success);
     const HistorySettings def{};
-    setting_slider("Fights kept", "The oldest are deleted first.", &in.settings->history.max_fights, 10, 5000,
-                   def.max_fights, "%d", out,
-                   Applies::Engine);
+    setting_slider("Fights saved", "The oldest are deleted first; those you keep never are, and don't count.",
+                   &in.settings->history.max_fights, 10, 5000, def.max_fights, "%d", out, Applies::Engine);
     if (button(ICON_FOLDER "  Open folder")) out.open = OpenTarget::History;
     end_settings_card();
 }
@@ -968,7 +1197,8 @@ void pull_view(const AppFrameInput& in, AppViewState& state, AppActions& out, co
             }
         }
     } else {
-        top_bar(shown, out);
+        const std::vector<meter::HistoryEntry> none;
+        top_bar(shown, in.history != nullptr ? *in.history : none, state, out);
         ImGui::Dummy(ImVec2(0.0f, m(4.0f)));
         body(*shown.fight);
     }
@@ -985,8 +1215,9 @@ void render_meter_page(const AppFrameInput& in, AppViewState& state, AppActions&
     const std::vector<meter::HistoryEntry> none;
     const auto& history = in.history != nullptr ? *in.history : none;
     const std::vector<meter::PullGroup> groups = meter::group_by_visit(history);
+    drop_missing(state.picks, history);
 
-    // A selection that left the history (cleared, or pruned) falls back to live.
+    // A selection that left the history (deleted, or pruned) falls back to live.
     Shown shown;
     if (!state.selected_file.empty()) {
         for (const auto& g : groups) {
