@@ -8,8 +8,10 @@
 
 #include <algorithm>
 #include <fstream>
+#include <set>
 #include <sstream>
 #include <system_error>
+#include <utility>
 
 namespace aion2::meter {
 
@@ -37,6 +39,7 @@ JsonValue entry_to_json(const HistoryEntry& e) {
     j["total_dps"] = e.total_dps;
     j["end_reason"] = std::string(end_reason_name(e.end_reason));
     j["players"] = static_cast<uint64_t>(e.players);
+    if (e.kept) j["kept"] = true;
     return j;
 }
 
@@ -61,6 +64,7 @@ std::optional<HistoryEntry> entry_from_json(const JsonValue& j) {
     e.total_dps = j["total_dps"].as_double(0.0);
     e.end_reason = end_reason_from_name(j["end_reason"].as_string());
     e.players = static_cast<size_t>(u64(j["players"]));
+    e.kept = j["kept"].as_bool();
     return e;
 }
 
@@ -92,6 +96,16 @@ HistoryEntry entry_for(const FightSummary& f, std::string file) {
 [[nodiscard]] bool is_plain_name(const std::string& file) noexcept {
     return !file.empty() && file.find('/') == std::string::npos && file.find('\\') == std::string::npos &&
            file.find("..") == std::string::npos;
+}
+
+/// Deletes a fight's file. True once it is gone, deleted now or missing already, so
+/// its index line can go; false while it stays (open elsewhere, say), and its line
+/// with it. A name that is not plain names nothing of ours: its line just goes.
+[[nodiscard]] bool delete_fight_file(const std::filesystem::path& dir, const std::string& file) {
+    if (!is_plain_name(file)) return true;
+    std::error_code ec;
+    std::filesystem::remove(dir / file, ec);
+    return !ec;
 }
 
 void sort_oldest_first(std::vector<HistoryEntry>& entries) {
@@ -158,7 +172,9 @@ std::vector<HistoryEntry> HistoryStore::rebuild_index() const {
         if (!json) continue;
         const auto fight = fight_from_json(*json);
         if (!fight) continue;
-        entries.push_back(entry_for(*fight, item.path().filename().string()));
+        HistoryEntry e = entry_for(*fight, item.path().filename().string());
+        e.kept = (*json)["kept"].as_bool();
+        entries.push_back(std::move(e));
     }
     sort_oldest_first(entries);
     if (!entries.empty()) (void)write_index(entries);
@@ -181,33 +197,103 @@ std::optional<FightSummary> HistoryStore::load(const std::string& file) const {
     return fight_from_json(*json);
 }
 
+size_t HistoryStore::remove(const std::vector<std::string>& files) {
+    const std::set<std::string> wanted(files.begin(), files.end());
+    std::vector<HistoryEntry> entries = load_index();
+    std::vector<HistoryEntry> left;
+    left.reserve(entries.size());
+    size_t removed = 0;
+    for (auto& e : entries) {
+        if (wanted.count(e.file) != 0 && delete_fight_file(m_dir, e.file)) {
+            ++removed;
+            continue;
+        }
+        left.push_back(std::move(e));
+    }
+    if (removed > 0) (void)write_index(left);
+    return removed;
+}
+
+size_t HistoryStore::set_kept(const std::vector<std::string>& files, bool kept) {
+    const std::set<std::string> wanted(files.begin(), files.end());
+    std::vector<HistoryEntry> entries = load_index();
+    size_t changed = 0;
+    for (auto& e : entries) {
+        if (e.kept == kept || wanted.count(e.file) == 0 || !is_plain_name(e.file)) continue;
+        // The record first: it is what a rebuilt index reads. Every number in it was
+        // written from a double, as JsonValue reads it back, so the rest of it is
+        // written again unchanged.
+        const std::filesystem::path path = m_dir / e.file;
+        auto json = config::read_json_file(path);
+        if (!json || !json->is_object() || !readable_version(*json)) continue;
+        if (kept) {
+            (*json)["kept"] = true;
+        } else {
+            json->as_object().erase("kept");
+        }
+        if (!config::write_json_atomic(path, *json).empty()) continue;
+        e.kept = kept;
+        ++changed;
+    }
+    if (changed > 0) (void)write_index(entries);
+    return changed;
+}
+
 size_t HistoryStore::prune(size_t keep) {
     std::vector<HistoryEntry> entries = load_index();
-    if (entries.size() <= keep) return 0;
-    const size_t drop = entries.size() - keep;
-    std::error_code ec;
-    for (size_t i = 0; i < drop; ++i) {
-        if (is_plain_name(entries[i].file)) std::filesystem::remove(m_dir / entries[i].file, ec);
+    const auto unkept = static_cast<size_t>(
+        std::count_if(entries.begin(), entries.end(), [](const HistoryEntry& e) { return !e.kept; }));
+    if (unkept <= keep) return 0;
+    // Oldest first: the first fights not kept go, until `keep` of them are left.
+    size_t to_drop = unkept - keep;
+    size_t dropped = 0;
+    std::vector<HistoryEntry> left;
+    left.reserve(entries.size());
+    for (auto& e : entries) {
+        if (to_drop > 0 && !e.kept) {
+            --to_drop;
+            if (delete_fight_file(m_dir, e.file)) {
+                ++dropped;
+                continue;
+            }
+        }
+        left.push_back(std::move(e));
     }
-    entries.erase(entries.begin(), entries.begin() + static_cast<std::ptrdiff_t>(drop));
-    (void)write_index(entries);
-    return drop;
+    (void)write_index(left);
+    return dropped;
 }
 
 size_t HistoryStore::clear() {
     size_t removed = 0;
     std::error_code ec;
-    std::vector<std::filesystem::path> fights;
+    std::vector<std::pair<std::filesystem::path, HistoryEntry>> fights;
     for (const auto& item : std::filesystem::directory_iterator(m_dir, ec)) {
         if (!item.is_regular_file() || item.path().extension() != ".json") continue;
         // Only fight records: whatever else the user keeps here stays.
         const auto json = config::read_json_file(item.path());
-        if (json && fight_from_json(*json)) fights.push_back(item.path());
+        if (!json) continue;
+        const auto fight = fight_from_json(*json);
+        if (!fight) continue;
+        HistoryEntry e = entry_for(*fight, item.path().filename().string());
+        e.kept = (*json)["kept"].as_bool();
+        fights.emplace_back(item.path(), std::move(e));
     }
-    for (const auto& path : fights) {
-        if (std::filesystem::remove(path, ec)) ++removed;
+    // What stays: the kept fights, and any whose file would not go, which the index
+    // must still list.
+    std::vector<HistoryEntry> left;
+    for (auto& [path, entry] : fights) {
+        if (!entry.kept && std::filesystem::remove(path, ec)) {
+            ++removed;
+            continue;
+        }
+        left.push_back(std::move(entry));
     }
-    std::filesystem::remove(index_path(), ec);
+    if (left.empty()) {
+        std::filesystem::remove(index_path(), ec);
+    } else {
+        sort_oldest_first(left);
+        (void)write_index(left);
+    }
     return removed;
 }
 

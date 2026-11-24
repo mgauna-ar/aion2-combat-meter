@@ -635,6 +635,31 @@ bool button(const char* label, ButtonKind kind, ButtonSize size) {
     return pressed;
 }
 
+// ----------------------------------------------------------------- menus ----
+
+bool begin_context_menu(const char* id) {
+    // The window padding is read as the popup begins; the card's would leave a wide
+    // empty frame around a few short rows.
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(m(6.0f), m(6.0f)));
+    const bool open = ImGui::BeginPopupContextItem(id);
+    ImGui::PopStyleVar();
+    if (open) ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(m(8.0f), m(4.0f)));
+    return open;
+}
+
+void end_context_menu() {
+    ImGui::PopStyleVar();
+    ImGui::EndPopup();
+}
+
+bool menu_item(const char* icon, const std::string& label, bool danger, bool enabled) {
+    const std::string text = std::string(icon) + "  " + label;
+    if (danger && enabled) ImGui::PushStyleColor(ImGuiCol_Text, v4(colors::DangerLight));
+    const bool clicked = ImGui::MenuItem(text.c_str(), nullptr, false, enabled);
+    if (danger && enabled) ImGui::PopStyleColor();
+    return clicked;
+}
+
 // -------------------------------------------------------------- settings ----
 
 void begin_setting_row(const char* label, const char* help) {

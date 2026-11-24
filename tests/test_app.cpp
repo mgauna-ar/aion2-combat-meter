@@ -7,12 +7,15 @@
 #include "app/aura_view.hpp"
 #include "app/overlay_visibility.hpp"
 #include "app/display_format.hpp"
+#include "app/history_list.hpp"
 #include "app/timeline_chart.hpp"
 #include "capture/capture_file.hpp"
 #include "capture/file_source.hpp"
 #include "capture/os/npcap_source.hpp"
 #include "capture/tcp_reassembler.hpp"
 #include "common/time_format.hpp"
+#include "meter/history_store.hpp"
+#include "meter/pull_grouping.hpp"
 #include "protocol/entity_id.hpp"
 
 #include <algorithm>
@@ -21,6 +24,8 @@
 #include <cmath>
 #include <fstream>
 #include <optional>
+#include <set>
+#include <string>
 #include <thread>
 #include <utility>
 #include <vector>
@@ -573,6 +578,21 @@ TEST_CASE(TimeFormat, StampsAndClocks) {
     TEST_ASSERT_EQ(common::clock_duration(-4.0), std::string("0:00"));
 }
 
+TEST_CASE(TimeFormat, CivilDays) {
+    const auto epoch = common::civil_day(1970, 1, 1);
+    TEST_ASSERT_EQ(epoch.serial, int64_t{0});
+    TEST_ASSERT_EQ(epoch.weekday, 4u);  // a Thursday
+    const auto before = common::civil_day(1969, 12, 31);
+    TEST_ASSERT_EQ(before.serial, int64_t{-1});
+    TEST_ASSERT_EQ(before.weekday, 3u);
+    // The tests' own time, 2026-10-16 12:00Z, is that many whole days on.
+    TEST_ASSERT_EQ(common::civil_day(2026, 10, 16).serial,
+                   static_cast<int64_t>(1'792'152'000'000'000ULL / kMicrosPerSecond / 86'400));
+    const auto leap = common::civil_day(2024, 2, 29);
+    TEST_ASSERT_EQ(common::civil_day(2024, 3, 1).serial, leap.serial + 1);
+    TEST_ASSERT_EQ(common::civil_day(2026, 11, 24).weekday, 2u);  // a Tuesday
+}
+
 TEST_CASE(TimeFormat, FromSecondsGuards) {
     TEST_ASSERT_EQ(from_seconds(1.5), Micros{1'500'000});
     TEST_ASSERT_EQ(from_seconds(std::nan("")), Micros{0});
@@ -890,6 +910,34 @@ TEST_CASE(AppRuntime, ClearsTheHistoryOnTheEngineThread) {
     TEST_ASSERT(wait_for([&] { return runtime.source_finished() && !runtime.history().empty(); }));
     const uint64_t revision = runtime.history_revision();
     runtime.request_clear_history();
+    TEST_ASSERT(wait_for([&] { return runtime.history_revision() != revision; }));
+    runtime.stop();
+    TEST_ASSERT(runtime.history().empty());
+    TEST_ASSERT(meter::HistoryStore(runtime.history_dir()).load_index().empty());
+}
+
+TEST_CASE(AppRuntime, KeepsAndDeletesOnTheEngineThread) {
+    ScratchDir dir("aion2_test_runtime_keep");
+    AppRuntime runtime(AppSettings{}, dir.path / "data");
+    std::string error;
+    TEST_ASSERT(runtime.start(std::make_unique<capture::FileSource>(write_session(dir.path), 0.0), error));
+    TEST_ASSERT(wait_for([&] { return runtime.source_finished() && !runtime.history().empty(); }));
+    const std::string file = runtime.history()[0].file;
+
+    uint64_t revision = runtime.history_revision();
+    runtime.request_keep_fights({file}, true);
+    TEST_ASSERT(wait_for([&] { return runtime.history_revision() != revision; }));
+    TEST_ASSERT(runtime.history()[0].kept);
+
+    // Clear leaves the kept fight.
+    revision = runtime.history_revision();
+    runtime.request_clear_history();
+    TEST_ASSERT(wait_for([&] { return runtime.history_revision() != revision; }));
+    TEST_ASSERT_EQ(runtime.history().size(), size_t{1});
+
+    // Deleted by name, it goes.
+    revision = runtime.history_revision();
+    runtime.request_delete_fights({file});
     TEST_ASSERT(wait_for([&] { return runtime.history_revision() != revision; }));
     runtime.stop();
     TEST_ASSERT(runtime.history().empty());
@@ -1243,4 +1291,134 @@ TEST_CASE(OverlayVisibility, ConditionsWaitForTheLock) {
     s.visible = true;
     app.plugins.combat_meter = false;
     TEST_ASSERT_FALSE(overlay_shown(app, now));  // and the plugin switched off over that
+}
+
+namespace {
+
+meter::HistoryEntry saved_fight(std::string file, Micros visit, Micros start) {
+    meter::HistoryEntry e;
+    e.file = std::move(file);
+    e.map_id = 600001;
+    e.visit_ts = visit;
+    e.start_ts = start;
+    return e;
+}
+
+/// Two runs: a and b in the first, c, d and e in the second. The list shows them
+/// newest first: e d c, then b a.
+std::vector<meter::HistoryEntry> two_runs() {
+    const Micros t = 1'792'152'000'000'000ULL;
+    const Micros later = t + 600 * kMicrosPerSecond;
+    return {saved_fight("a", t, t + 10), saved_fight("b", t, t + 20), saved_fight("c", later, later + 10),
+            saved_fight("d", later, later + 20), saved_fight("e", later, later + 30)};
+}
+
+} // namespace
+
+TEST_CASE(HistoryList, OrderIsTheListsNewestFirst) {
+    const auto history = two_runs();
+    const auto order = list_order(history, meter::group_by_visit(history));
+    TEST_ASSERT(order == (std::vector<std::string>{"e", "d", "c", "b", "a"}));
+}
+
+TEST_CASE(HistoryList, PlainCtrlAndShiftClicks) {
+    const auto history = two_runs();
+    const auto order = list_order(history, meter::group_by_visit(history));
+    HistorySelection s;
+    // A plain click opens the fight, and selects nothing.
+    TEST_ASSERT(click(s, order, "d", false, false, ""));
+    TEST_ASSERT(s.marked.empty());
+    // The first Ctrl-click takes the fight on view in too.
+    TEST_ASSERT_FALSE(click(s, order, "b", true, false, "d"));
+    TEST_ASSERT(s.marked == (std::set<std::string>{"b", "d"}));
+    // Taken out again, it stays out.
+    TEST_ASSERT_FALSE(click(s, order, "d", true, false, "d"));
+    TEST_ASSERT_FALSE(click(s, order, "a", true, false, "d"));
+    TEST_ASSERT(s.marked == (std::set<std::string>{"a", "b"}));
+    // Shift: the range from the last fight Ctrl-clicked, across the runs.
+    TEST_ASSERT_FALSE(click(s, order, "d", false, true, "d"));
+    TEST_ASSERT(s.marked == (std::set<std::string>{"a", "b", "c", "d"}));
+    // Again, from the same start: the range replaces what was selected.
+    TEST_ASSERT_FALSE(click(s, order, "b", false, true, "d"));
+    TEST_ASSERT(s.marked == (std::set<std::string>{"a", "b"}));
+    // A plain click starts over; Ctrl+Shift adds a range to the rest.
+    TEST_ASSERT(click(s, order, "e", false, false, "d"));
+    TEST_ASSERT_FALSE(click(s, order, "a", true, false, "e"));
+    TEST_ASSERT(s.marked == (std::set<std::string>{"a", "e"}));
+    TEST_ASSERT_FALSE(click(s, order, "c", true, true, "e"));
+    TEST_ASSERT(s.marked == (std::set<std::string>{"a", "b", "c", "e"}));
+}
+
+TEST_CASE(HistoryList, ShiftWithNoStartTakesTheFightOnView) {
+    const auto history = two_runs();
+    const auto order = list_order(history, meter::group_by_visit(history));
+    HistorySelection s;
+    TEST_ASSERT_FALSE(click(s, order, "a", false, true, "c"));
+    TEST_ASSERT(s.marked == (std::set<std::string>{"a", "b", "c"}));
+    HistorySelection alone;
+    TEST_ASSERT_FALSE(click(alone, order, "b", false, true, ""));
+    TEST_ASSERT(alone.marked == (std::set<std::string>{"b"}));
+}
+
+TEST_CASE(HistoryList, SelectAllAndDropWhatLeft) {
+    auto history = two_runs();
+    HistorySelection s;
+    select_all(s, history);
+    TEST_ASSERT_EQ(s.marked.size(), size_t{5});
+    s.anchor = "c";
+    history.erase(history.begin() + 2);  // c deleted
+    drop_missing(s, history);
+    TEST_ASSERT(s.marked == (std::set<std::string>{"a", "b", "d", "e"}));
+    TEST_ASSERT(s.anchor.empty());
+}
+
+TEST_CASE(HistoryList, DayLabels) {
+    const auto today = common::civil_day(2026, 11, 24);
+    TEST_ASSERT_EQ(day_label(today, today), std::string("Today"));
+    TEST_ASSERT_EQ(day_label(common::civil_day(2026, 11, 23), today), std::string("Yesterday"));
+    TEST_ASSERT_EQ(day_label(common::civil_day(2026, 11, 21), today), std::string("Sat 21 Nov"));
+    // By the days' serials: 31 Dec is yesterday on 1 Jan, and the year shows when
+    // it is another one.
+    const auto new_year = common::civil_day(2026, 1, 1);
+    TEST_ASSERT_EQ(day_label(common::civil_day(2025, 12, 31), new_year), std::string("Yesterday"));
+    TEST_ASSERT_EQ(day_label(common::civil_day(2025, 12, 30), new_year), std::string("Tue 30 Dec 2025"));
+    // No clock: every day by its date.
+    TEST_ASSERT_EQ(day_label(today, std::nullopt), std::string("Tue 24 Nov"));
+}
+
+TEST_CASE(HistoryList, DeletePromptsSayWhatGoesAndWhatStays) {
+    auto history = two_runs();
+    history[3].kept = true;  // d
+    // Picked by hand, a kept fight goes too, and the dialog says so.
+    auto p = delete_picked(history, {"d"});
+    TEST_ASSERT(p.files == (std::vector<std::string>{"d"}));
+    TEST_ASSERT_EQ(p.title, std::string("Delete this fight?"));
+    TEST_ASSERT_EQ(p.body, std::string("Its file goes too, though you keep it."));
+    p = delete_picked(history, {"a", "d", "gone"});
+    TEST_ASSERT(p.files == (std::vector<std::string>{"a", "d"}));
+    TEST_ASSERT_EQ(p.title, std::string("Delete 2 fights?"));
+    TEST_ASSERT_EQ(p.body, std::string("Their files go too, the one you keep among them."));
+    // A run spares its kept fights.
+    const auto groups = meter::group_by_visit(history);
+    p = delete_run(history, groups[0], "Krao Cave (Conquest), Today 12:10");
+    TEST_ASSERT(p.files == (std::vector<std::string>{"c", "e"}));
+    TEST_ASSERT_EQ(p.title, std::string("Delete this run's 2 fights?"));
+    TEST_ASSERT_EQ(p.body,
+                   std::string("Krao Cave (Conquest), Today 12:10. Their files go too. The one you keep stays."));
+    // So does Clear.
+    p = delete_all(history);
+    TEST_ASSERT(p.everything);
+    TEST_ASSERT(p.files.empty());
+    TEST_ASSERT_EQ(p.title, std::string("Delete the 4 fights you don't keep?"));
+    TEST_ASSERT_EQ(p.body, std::string("Their files go too. The one you keep stays, and so does the live fight."));
+    // With none kept, Clear asks as it always did.
+    history[3].kept = false;
+    p = delete_all(history);
+    TEST_ASSERT_EQ(p.title, std::string("Delete all 5 saved fights?"));
+    TEST_ASSERT_EQ(p.body, std::string("Their files go too. The live fight stays."));
+    // Every fight kept: neither Clear nor a run has anything to delete.
+    for (auto& e : history) e.kept = true;
+    TEST_ASSERT_EQ(kept_count(history), size_t{5});
+    TEST_ASSERT_FALSE(delete_all(history).everything);
+    TEST_ASSERT(delete_run(history, groups[0], "").files.empty());
 }

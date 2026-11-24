@@ -384,6 +384,9 @@ bool render_app(AppScene& scene, app::AppSettings& settings, const std::filesyst
     app::AppFrameInput input;
     input.snapshot = &scene.snapshot;
     input.history = &scene.history;
+    // The pictures' wall clock is the made-up evening's, so its runs read as today's
+    // and yesterday's whenever the pictures are drawn.
+    input.now = scene.snapshot.now;
     input.source_status = "Capturing on 2 adapters; the game's connection is on port 13328";
     input.settings = &settings;
     input.data_dir = "C:\\Users\\you\\AppData\\Roaming\\aion2-combat-meter";
@@ -433,13 +436,14 @@ meter::HistoryEntry entry_of(const meter::FightSummary& fight) {
 }
 
 /// A made-up evening around the synthetic fight: two earlier pulls of the same boss
-/// in that visit, and a fight on another map before it. Invented, like the fight.
+/// in that visit, the kill kept, and a fight on another map the day before.
+/// Invented, like the fight.
 std::vector<meter::HistoryEntry> evening(const meter::FightSummary& kill) {
     std::vector<meter::HistoryEntry> out;
     meter::HistoryEntry earlier = entry_of(kill);
     earlier.file = "earlier-visit.json";
     earlier.map_id = 1010;  // open world: the map table names none of it
-    earlier.visit_ts = kill.start_ts - 3'600 * kMicrosPerSecond;
+    earlier.visit_ts = kill.start_ts - 25 * 3'600 * kMicrosPerSecond;
     earlier.start_ts = earlier.visit_ts + 300 * kMicrosPerSecond;
     earlier.duration_s = 41.0;
     earlier.boss_label = "Highland Odyle Sparkie";
@@ -468,6 +472,7 @@ std::vector<meter::HistoryEntry> evening(const meter::FightSummary& kill) {
     out.push_back(reset);
     meter::HistoryEntry last = entry_of(kill);
     last.visit_ts = visit;
+    last.kept = true;
     out.push_back(last);
     return out;
 }
@@ -711,6 +716,17 @@ int main(int argc, char** argv) {
         AppScene no_fight{"app-meter-waiting.png", pipeline::LiveSnapshot{}, {}, {}};
         no_fight.view.open_meter_tab = app::MeterTab::Damage;
         ok = render_app(no_fight, app_settings, out_dir) && ok;
+        // Two wipes selected with Ctrl: the caption counts them, with Delete beside.
+        AppScene selected = damage;
+        selected.file = "app-damage-selected.png";
+        selected.view.picks.marked = {"pull-1.json", "pull-2.json"};
+        ok = render_app(selected, app_settings, out_dir) && ok;
+        // And Delete pressed: the dialog says what goes.
+        AppScene asked = selected;
+        asked.file = "app-delete-dialog.png";
+        asked.view.pending_delete = app::delete_picked(asked.history, asked.view.picks.marked);
+        asked.view.open_delete_prompt = true;
+        ok = render_app(asked, app_settings, out_dir) && ok;
         // No player selected: the hint under the ranking.
         AppScene unselected = damage;
         unselected.file = "app-damage-unselected.png";

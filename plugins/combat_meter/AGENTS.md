@@ -277,8 +277,24 @@ app, or restarting it into an update, ends the live fight the same way and saves
     cut; reading bounds every list.
   - Fights are grouped by map visit (`visit_ts`): every map load starts one but a
     reload within a run (the same map over the same connection), so each run of a
-    dungeon is its own. So does the first fight after the meter starts.
+    dungeon is its own. So does the first fight after the meter starts. The page
+    lists the visits under the local day each began.
   - A cut-off index line is skipped. A missing index is rebuilt from the files.
-  - Pruning keeps `history.max_fights`, in batches of 50.
-  - Clearing (the app window's Clear button) deletes the fight records and the index,
-    on the engine thread; other files in the folder stay.
+  - **Kept** (`HistoryEntry::kept`): `"kept": true` in the record and in its index
+    line, an optional field of version 2: an older build ignores it, and its pruning
+    does not spare it. The record is the truth, as for the rest, so an index rebuilt
+    from the records keeps it. `set_kept` writes the record again whole; its numbers
+    were written from doubles, as JsonValue reads them back, so nothing else in it
+    changes.
+  - Pruning keeps `history.max_fights` of the fights not kept, in batches of 50; kept
+    fights neither go nor count.
+  - Deleting (`remove`) takes fights by file, kept or not, with their index lines; a
+    file that will not go keeps its line. What goes is the page's call
+    (`src/app/src/history_list.cpp`): a fight picked by hand (its menu, the bin over
+    it, a selection) goes kept or not, and the dialog says so; a run's delete leaves
+    its kept fights.
+  - Clearing (the app window's Clear button) deletes every record but the kept ones,
+    and leaves an index of those (none: no index); other files in the folder stay.
+  - All of it runs on the engine thread, which owns the store's writes
+    (`AppRuntime::request_delete_fights`, `request_keep_fights`,
+    `request_clear_history`).

@@ -485,6 +485,88 @@ TEST_CASE(History, ClearDeletesFightsOnly) {
     TEST_ASSERT(std::filesystem::exists(dir.path / "notes.json"));
 }
 
+TEST_CASE(History, RemoveDeletesThoseFightsOnly) {
+    ScratchDir dir("aion2_history_remove");
+    HistoryStore store(dir.path);
+    for (uint64_t i = 1; i <= 3; ++i) TEST_ASSERT(store.save(sample_fight(i, 100.0 * static_cast<double>(i))).empty());
+    const auto before = store.load_index();
+    // A name the index does not list is no fight of ours.
+    TEST_ASSERT_EQ(store.remove({before[1].file, "not-there.json"}), size_t{1});
+    const auto after = store.load_index();
+    TEST_ASSERT_EQ(after.size(), size_t{2});
+    TEST_ASSERT_EQ(after[0].id, uint64_t{1});
+    TEST_ASSERT_EQ(after[1].id, uint64_t{3});
+    TEST_ASSERT_FALSE(std::filesystem::exists(dir.path / before[1].file));
+    // The files left say the same as the index.
+    std::filesystem::remove(store.index_path());
+    TEST_ASSERT_EQ(store.load_index().size(), size_t{2});
+}
+
+TEST_CASE(History, RemoveNeverLeavesTheFolder) {
+    ScratchDir dir("aion2_history_remove_paths");
+    HistoryStore store(dir.path / "history");
+    TEST_ASSERT(store.save(sample_fight(1, 0)).empty());
+    write_file(dir.path / "config.json", "{}");
+    {
+        // An index line naming a file outside, written by hand.
+        std::ofstream out(store.index_path(), std::ios::app | std::ios::binary);
+        out << R"({"v":2,"file":"../config.json","start_ts":1})" << '\n';
+    }
+    TEST_ASSERT_EQ(store.load_index().size(), size_t{2});
+    (void)store.remove({"../config.json"});
+    TEST_ASSERT(std::filesystem::exists(dir.path / "config.json"));
+    TEST_ASSERT_EQ(store.load_index().size(), size_t{1});
+}
+
+TEST_CASE(History, KeptFightsOutlivePruningAndClear) {
+    ScratchDir dir("aion2_history_kept");
+    HistoryStore store(dir.path);
+    for (uint64_t i = 1; i <= 5; ++i) TEST_ASSERT(store.save(sample_fight(i, 100.0 * static_cast<double>(i))).empty());
+    const auto all = store.load_index();
+    // The oldest kept: pruning to two leaves it, and the two newest besides.
+    TEST_ASSERT_EQ(store.set_kept({all[0].file}, true), size_t{1});
+    TEST_ASSERT_EQ(store.prune(2), size_t{2});
+    auto left = store.load_index();
+    TEST_ASSERT_EQ(left.size(), size_t{3});
+    TEST_ASSERT_EQ(left[0].id, uint64_t{1});
+    TEST_ASSERT(left[0].kept);
+    TEST_ASSERT_EQ(left[1].id, uint64_t{4});
+    TEST_ASSERT_EQ(left[2].id, uint64_t{5});
+    // Clear takes the rest, and the index lists the kept one alone.
+    TEST_ASSERT_EQ(store.clear(), size_t{2});
+    left = store.load_index();
+    TEST_ASSERT_EQ(left.size(), size_t{1});
+    TEST_ASSERT(left[0].kept);
+    TEST_ASSERT(std::filesystem::exists(store.index_path()));
+    // Deleted by name, a kept fight goes all the same.
+    TEST_ASSERT_EQ(store.remove({left[0].file}), size_t{1});
+    TEST_ASSERT(store.load_index().empty());
+}
+
+TEST_CASE(History, KeptIsInTheRecordToo) {
+    ScratchDir dir("aion2_history_kept_record");
+    HistoryStore store(dir.path);
+    TEST_ASSERT(store.save(sample_fight(1, 0)).empty());
+    TEST_ASSERT(store.save(sample_fight(2, 100)).empty());
+    const std::string file = store.load_index()[0].file;
+    const std::string saved = read_file(dir.path / file);
+    TEST_ASSERT_EQ(store.set_kept({file}, true), size_t{1});
+    TEST_ASSERT_EQ(store.set_kept({file}, true), size_t{0});
+    // An index rebuilt from the records reads it, and the record loads as before.
+    std::filesystem::remove(store.index_path());
+    const auto rebuilt = store.load_index();
+    TEST_ASSERT(rebuilt[0].kept);
+    TEST_ASSERT_FALSE(rebuilt[1].kept);
+    const auto fight = store.load(file);
+    TEST_ASSERT(fight.has_value());
+    TEST_ASSERT_EQ(fight->id, uint64_t{1});
+    TEST_ASSERT_EQ(fight->combatants.size(), size_t{2});
+    // No longer kept, the record is the very one saved: writing it again lost nothing.
+    TEST_ASSERT_EQ(store.set_kept({file}, false), size_t{1});
+    TEST_ASSERT_EQ(read_file(dir.path / file), saved);
+    TEST_ASSERT_FALSE(store.load_index()[0].kept);
+}
+
 TEST_CASE(PullGrouping, VisitsNewestFirstNumberedFromOne) {
     std::vector<HistoryEntry> entries(5);
     // Two fights in one visit, three in the next.

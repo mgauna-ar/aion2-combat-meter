@@ -184,7 +184,9 @@ src/app/         aion2::app
     game_icon_sheet.inc, painted into
     each window's font atlas at the size it draws them, and the app's mark from
     app_mark.inc at the sidebar chip's), timeline_chart (the Timeline tab's
-    lines as numbers, no ImGui)
+    lines as numbers, no ImGui), history_list (the Combat Meter page's list of
+    saved fights as data: what is selected, the day headers, what a delete asks;
+    no ImGui)
     src/ui/      the app window's pages (a page per plugin, opened by plugin_page's
                  header and master switch), theme, widgets, table (the meter's tables)
                  and Lucide icons (ported from ffxiv-hub; ImGui, behind HAVE_IMGUI);
@@ -237,7 +239,7 @@ plugin; capture + the plugins ← pipeline ← app. No plugin depends on another
 | Capture (one per Npcap adapter, or the FileSource thread) | its pcap handle | `BoundedQueue<OwnedPacket>` (8192), `try_push` only. A full queue drops and counts, and the drop shows up as a TCP gap. Each Npcap thread also samples the capture clock against the performance counter (`ClockOffsetEstimator`, under its own mutex), which the engine reads before each packet and each tick. |
 | Npcap watcher | the loopback filter text | a mutex plus an atomic generation counter. Each capture thread applies a new filter itself between `pcap_next_ex` calls, because a pcap handle is not shared. |
 | Engine (`AppRuntime::run`) | `Pipeline`, `HistoryStore` writes, the recorder | publishes `LiveSnapshot` into a `SnapshotSlot` every 200 ms of capture time, and whenever the queue runs dry. Its clock is the packets' time; with the queue empty, the latest packet's plus the source's clock elapsed since it was dequeued (One clock). A fight's `FightDetail` is shared, never copied: a snapshot holds a pointer to it. Stopped (Exit, Update & restart), it drains the closed queue, ends the live fight (`Manual`, at the last packet's time) and saves it before it returns. |
-| UI (`wWinMain`) | the five windows (the app window and the meter, aura, ping and combat power overlays, each with its own ImGui context), the tray, `AppSettings`, the `Updater` | reads snapshots and the history index (copied under a mutex). Requests go to the engine as atomics: end fight, recording on/off, clear history. New meter and history settings and the plugin switches go through `AppRuntime::update_settings`, under the mutex; the engine applies them on its next pass. |
+| UI (`wWinMain`) | the five windows (the app window and the meter, aura, ping and combat power overlays, each with its own ImGui context), the tray, `AppSettings`, the `Updater` | reads snapshots and the history index (copied under a mutex). Requests go to the engine as atomics: end fight, recording on/off, clear history. New meter and history settings and the plugin switches go through `AppRuntime::update_settings`, under the mutex, and so do the saved fights to delete or keep (`request_delete_fights`, `request_keep_fights`); the engine applies them on its next pass. |
 | Updater worker (one at a time) | the check or the download | `Updater::status()`, copied under its mutex, which the UI reads each frame. Staged files are moved into place on the UI thread (`apply_staged`). `stop()` cancels a download and joins, before the engine stops. |
 
 `make tsan` runs the suite under ThreadSanitizer. The `AppRuntime` tests drive real

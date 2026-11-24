@@ -7,8 +7,10 @@
 // small and the screenshot tool can draw it on the Mac.
 
 #include "app/app_settings.hpp"
+#include "app/history_list.hpp"
 #include "app/timeline_chart.hpp"
 #include "app/updater.hpp"
+#include "common/micros.hpp"
 #include "meter/fight_detail.hpp"
 #include "meter/history_store.hpp"
 #include "meter/types.hpp"
@@ -36,6 +38,13 @@ struct AppViewState {
     /// The saved fight on view; empty for the live one.
     std::string selected_file;
     std::optional<meter::FightSummary> selected_fight;
+    /// The saved fights picked with Ctrl or Shift, for Keep or Delete.
+    HistorySelection picks;
+    /// A delete waiting on its confirmation. A menu or the top bar asks for it, and
+    /// the list opens the dialog on its next pass (open_delete_prompt), where the
+    /// dialog's id lives.
+    std::optional<DeletePrompt> pending_delete;
+    bool open_delete_prompt{false};
     /// The player whose breakdown is open on each tab; 0 for none.
     meter::EntityId damage_player{0};
     meter::EntityId heal_player{0};
@@ -62,6 +71,9 @@ struct AppFrameInput {
     const pipeline::LiveSnapshot* snapshot{nullptr};
     /// Saved fights, oldest first.
     const std::vector<meter::HistoryEntry>* history{nullptr};
+    /// The wall clock, for the saved fights' "Today" and "Yesterday"; 0 names every
+    /// day by its date.
+    Micros now{0};
     std::string source_status;
     bool recording{false};
     std::string recording_path;
@@ -91,7 +103,13 @@ struct AppActions {
     std::optional<bool> start_with_windows;
     bool end_fight{false};
     bool toggle_recording{false};
+    /// Delete every saved fight but the kept ones.
     bool clear_history{false};
+    /// Saved fights to delete, by file, kept or not.
+    std::vector<std::string> delete_files;
+    /// Saved fights to keep, and to stop keeping, by file.
+    std::vector<std::string> keep_files;
+    std::vector<std::string> unkeep_files;
     bool reset_overlay_position{false};
     bool reset_aura_position{false};
     bool reset_ping_position{false};

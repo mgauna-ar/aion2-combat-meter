@@ -47,9 +47,9 @@ The Combat Meter's overlay is the one above, playing a 48-second fight at twice 
 
 ### The app window
 
-Saved fights are grouped by dungeon visit. Pick one to see the party's ranking, then a player to see their skills.
+Saved fights are listed by day and by dungeon visit. Pick one to see the party's ranking, then a player to see their skills. Right-click one, or a whole run, to keep it or delete it; Ctrl- and Shift-click select several.
 
-[![The app window's Combat Meter page: saved fights by map visit on the left, each with its boss and how it ended, the selected fight's ranking with the in-game window's hit columns, and one player's skills below](docs/images/app-damage.png)](docs/images/app-damage.png)
+[![The app window's Combat Meter page: saved fights by day and map visit on the left, each with its boss and how it ended and the kept one with a lock, the selected fight's ranking with the in-game window's hit columns, Keep and the bin over it, and one player's skills below](docs/images/app-damage.png)](docs/images/app-damage.png)
 
 Each fight also keeps its timeline, deaths, buff uptimes and casts:
 
