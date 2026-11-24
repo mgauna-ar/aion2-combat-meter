@@ -71,7 +71,7 @@ pulsing red frame, and a chain skill on offer its icon in a pulsing gold one.
 - **Chain skills** and **your HP** are the game's own: it says when an offer starts and
   ends, and what your HP and max HP are.
 - **Cooldowns** are estimates, marked "~": the server sends none when you use a skill.
-  The plugin starts from aion2.app's figure less the specialties you picked, and
+  The plugin starts from the skill's listed figure (questlog.gg's) less the specialties you picked, and
   shortens it to your quickest reuse as you play (that is where your cooldown
   reduction shows). Over 274 uses on a dungeon capture, no estimate ran more than
   0.65 s long. When the server does say what is left (after a cut or a reset), the bar

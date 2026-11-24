@@ -1,15 +1,25 @@
 # AION 2 monster and NPC names by npc code, the u32 a spawn (41 36) carries
 # after its mask. Every mob spawn in the first capture carried one of these.
 #
-# Source: aion2.app's monster and NPC lists (aion2.app/db/monsters and
-# aion2.app/db/npcs), retrieved 2026-10-17; the site says it reads them from the
-# game client. metabot.gg, read from the client on its own, gives the same ids
-# for the bosses compared (2310601 Atiel, 2301014 Eternal Ludra). A name can
-# have several ids, one per level or difficulty. Where both lists give an id,
-# the monster's name is kept. Regenerate with tools/gen_npc_table.py.
+# Sources, retrieved 2026-11-24: questlog.gg's NPC database
+# (questlog.gg/aion-2/en/db/npcs), every difficulty's id of a boss and the
+# mechanics and summons among them; and aion2.app's monster and NPC lists
+# (aion2.app/db/monsters, aion2.app/db/npcs) for the ids questlog.gg does not
+# list. metabot.gg, read from the client on its own, gives the same ids for the
+# bosses compared (2310601 Atiel, 2301014 Eternal Ludra). A name can have
+# several ids, one per level or difficulty. A developer's identifier
+# (Test_D1_DQ_Seal4_Buff) is no name and is left out. Regenerate with
+# tools/gen_npc_table.py.
+2000000	Punching Bag
+2000001	Punching Bag
 2000002	Draconute Ranger
 2000004	Odyle Spider
 2000053	Modified Krall Warrior
+2000059	Punching Bag
+2000073	Punching Bag
+2000091	Punching Bag
+2000745	Monster (Specimen)
+2000757	Monster (Specimen)
 2000791	Crystal
 2000871	Crystal
 2000923	Red Eye Spider
@@ -209,14 +219,220 @@
 2090001	Forest Spirit
 2090002	Forest Spirit
 2090003	Aullaeu Mage
-2090004	Midsize Monster
+2090004	Medium Monster
 2090005	Illusion Fragment
 2090006	Fungie
 2090007	Illusion Fragment
 2090008	Illusion Fragment
 2090009	Ancient Revenant Knight
+2090010	Fungen
+2090011	Bomb Type Gimmick (Specimen)
+2090017	Fungie
+2090018	Small Mushroom-Grown Fungie
+2090019	Snail-Bearing Fungie
+2090020	Medium Monster
+2090021	Medium Monster
+2090022	Punching Bag_Elyos Tribe
+2090023	Punching Bag_Asmodians Tribe
+2090024	Keneire
+2090025	Keneire
+2090026	Draconute Ranger
+2090027	Monster (Specimen)
 2090029	Poison Flower
+2090030	Balance Test 1
+2090031	Balance Test 2
+2090032	Balance Test 3
+2090033	Balance Test 4
+2090034	Balance Test 5
+2090035	Balance Test 6
+2090036	Balance Test 7
+2090037	Balance Test 8
+2090038	Balance Test 9
+2090039	Balance Test 10
+2090040	Balance Test 11
+2090041	Balance Test 12
+2090042	Balance Test 13
+2090043	Balance Test 14
+2090044	Balance Test 15
+2090045	Balance Test 16
+2090046	Balance Test 17
+2090047	Balance Test 18
+2090048	Balance Test 19
+2090049	Balance Test 20
+2090050	Balance Test 21
+2090051	Balance Test 22
+2090052	Balance Test 23
+2090053	Balance Test 24
+2090054	Balance Test 25
+2090055	Balance Test 26
+2090056	Balance Test 27
+2090057	Balance Test 28
+2090058	Balance Test 29
+2090059	Balance Test 30
+2090060	Balance Test 31
+2090061	Balance Test 32
+2090062	Balance Test 33
+2090063	Balance Test 34
+2090064	Balance Test 35
+2090065	Balance Test 36
+2090066	Balance Test 37
+2090067	Balance Test 38
+2090068	Balance Test 39
+2090069	Balance Test 40
+2090070	Balance Test 41
+2090071	Balance Test 42
+2090072	Balance Test 43
+2090073	Balance Test 44
+2090074	Balance Test 45
+2090075	Balance Test 46
+2090076	Balance Test 47
+2090077	Balance Test 48
+2090078	Balance Test 49
+2090079	Balance Test 50
+2090080	Balance Test 51
+2090081	Balance Test 52
+2090082	Balance Test 53
+2090083	Balance Test 54
+2090084	Balance Test 55
+2090085	Balance Test 56
+2090086	Balance Test 57
+2090087	Balance Test 58
+2090088	Balance Test 59
+2090089	Balance Test 60
+2090090	Balance Test 61
+2090091	Balance Test 62
+2090092	Balance Test 63
+2090093	Balance Test 64
+2090094	Balance Test 65
+2090095	Balance Test 66
+2090096	Balance Test 67
+2090097	Balance Test 68
+2090098	Balance Test 69
+2090099	Balance Test 70
+2090100	Balance Test 71
+2090101	Balance Test 72
+2090102	Balance Test 73
+2090103	Balance Test 74
+2090104	Balance Test 75
+2090105	Balance Test 76
+2090106	Balance Test 77
+2090107	Balance Test 78
+2090108	Balance Test 79
+2090109	Balance Test 80
+2090110	Balance Test 81
+2090111	Balance Test 82
+2090112	Balance Test 83
+2090113	Balance Test 84
+2090114	Balance Test 85
+2090115	Balance Test 86
+2090116	Balance Test 87
+2090117	Balance Test 88
+2090118	Balance Test 89
+2090119	Balance Test 90
+2090120	Balance Test 91
+2090121	Balance Test 92
+2090122	Balance Test 93
+2090123	Balance Test 94
+2090124	Balance Test 95
+2090125	Balance Test 96
+2090126	Balance Test 97
+2090127	Balance Test 98
+2090128	Balance Test 99
+2090129	Balance Test 100
+2090130	Non-Aggressive (Level Scaling Test)
+2090131	Basic Attack (Level Scaling Test)
+2090132	Area-of-Effect (Level Scaling Test)
+2090133	Self Heal (Level Scaling Test)
+2090134	Self Buff (Physical Attack, Magic Attack, Physical Defense, and Magic Defense Up) (Level Scaling Test)
+2090151	Modified Krall Warrior
+2090152	Modified Krall Warrior
+2090153	Area-of-Effect (Level Scaling Test_with All Skill Effects)
+2090154	Beritra Air Raiders Battalion Officer
+2090157	Test Monster_Hidden
+2090158	Modified Krall Warrior
+2090159	Aullaeu Soldier
 2090160	Black Spirit
+2090162	Monster (Specimen)
+2090164	Beritra Air Raiders Captain A
+2090165	Monster (Specimen)
+2090166	Blazing Totem
+2090167	Abandoned Sura Ranger
+2090168	Krall Warshaman
+2090169	Ground
+2090170	Air
+2090171	Water
+2090173	Modified Krall Warrior
+2090175	Fediv Wraith
+2090176	Drakan Elite Officer (Specimen)
+2090177	Kobold Tinkerer Female (Specimen)
+2090178	Kobold Tinkerer Female (Specimen)
+2090179	Kobold Tinkerer Female (Specimen)
+2090180	Kobold Tinkerer Female (Specimen)
+2090181	Kobold Tinkerer Female (Specimen)
+2090182	Kobold Tinkerer Female (Specimen)
+2090187	Ground
+2090188	Air
+2090189	Water
+2090190	All (Spirit)
+2090192	Thief Shulak (Specimen)
+2090193	Pino
+2090194	Reincarnation Stone
+2090195	Reincarnation Stone
+2090196	Reincarnation Stone
+2090197	Kobold Tinkerer Male (Specimen)
+2090198	Kobold Female Worker
+2090199	Kobold Male Worker
+2090220	Mutated Sura Mage
+2090221	Odyle Spider
+2090222	Sealed Sura
+2090223	Sealed Sura
+2090224	Sealed Sura
+2090225	Sealed Sura
+2090226	Sealed Sura
+2090227	Sealed Sura
+2090228	Sealed Sura
+2090229	Sealed Sura
+2090230	Sealed Sura
+2090231	Sealed Sura
+2090232	Aultross
+2090233	Aultross
+2090234	Aultross
+2090235	Aultross
+2090236	Aultross
+2090237	Aultross
+2090238	Aultross
+2090239	Aultross
+2090240	Aultross
+2090241	Aultross
+2090242	Medium Monster
+2090243	Medium Monster
+2090244	Medium Monster
+2090245	Medium Monster
+2090246	Medium Monster
+2090247	Medium Monster
+2090248	Medium Monster
+2090249	Odyle Spider
+2090250	Medium Monster
+2090251	Monster (Specimen)
+2090252	Silver Blade Rotan (Specimen)
+2090253	Silver Blade Rotan (Specimen)
+2090254	Medium Monster
+2090255	Medium Monster
+2090269	Monster (Specimen)
+2090270	Monster (Specimen)
+2090271	Monster (Specimen)
+2090274	Discarded Krao Elite Test Subject (Specimen)
+2090275	Monster (Specimen)
+2090277	Monster (Specimen)
+2090278	Executioner Nua (Specimen)
+2090284	Kaisinel's Illusion (Specimen)
+2090285	Kaisinel's Illusion (Specimen)
+2090305	Minion Level 1
+2090306	Minion Level 1
+2090307	Minion Level 1
+2090308	Minion Level 1
+2090309	Bomb Type Gimmick (Specimen)
+2090330	FLAG
 2090331	Minion Level 1
 2090332	Minion Level 2
 2090333	Minion Level 3
@@ -225,12 +441,16 @@
 2090336	Turret 2 Level
 2090337	Turret 3 Level
 2090338	Turret 4 Level
+2090343	FLAG2
 2090381	Invincible Drakan
 2090382	Incapacitating Lakshmi
 2090383	Rapid Keneire
 2090384	Grappling Aulak
+2090397	Monster (Specimen)
+2090398	Tassin (Specimen)
 2090401	Elyos Core
 2090402	Asmodian Core
+2090403	CAR
 2090404	Mythical Bird Lupyllini
 2090405	Mythical Bird Lupyllini
 2090406	Mythical Bird Lupyllini
@@ -242,10 +462,102 @@
 2090412	Asmodians Outer Turret
 2090413	Elyos Inner Turret
 2090414	Asmodian Inner Turret
+2090425	RING
 2090428	Transcendent Bakarma
+2090433	Fediv Wraith
+2090434	Monster (Specimen)
+2090435	Fediv Wraith
+2090438	Punching Bag
+2090439	Punching Bag
+2090440	Punching Bag
+2090441	Punching Bag
+2090442	Punching Bag
+2090443	Punching Bag
+2090444	Punching Bag
+2090445	Punching Bag
+2090447	Punching Bag
+2090448	Punching Bag
+2090449	Punching Bag
+2090451	Monster (Specimen)
+2090452	Monster (Specimen)
+2090453	Monster (Specimen)
+2090454	Punching Bag
+2090456	Odyle Spider
+2090457	Flame Gatekeeper (Specimen)
+2090458	Punching Bag
+2090463	Drakan Unique
+2090464	Executioner Nua (Specimen)
+2090467	90-Degree Arc
+2090468	89-Degree Arc
+2090469	90-Degree ArcCircle
+2090470	89-Degree ArcCircle
+2090471	Modified Krall Warrior
+2090479	Odyle Spider
+2090480	Baby Odyle Spider
+2090488	Modified Krall Warrior
+2090491	Modified Krall Warrior
+2090536	Punching Bag
+2090538	Chroma
+2090553	Stagger Test_Persistent
+2090554	Stagger Test_Temporary_StaggerGuard
+2090555	Stagger Test_Temporary_StaggerAttack
+2090613	Modified Krall Warrior
+2090614	Elite Ursus (Specimen)
+2090615	Dredgion
+2090616	Dredgion
+2090617	Dredgion
+2090618	Dredgion
+2090619	Blacksmithing Table
+2090620	Blacksmithing Table
+2090621	Blacksmithing Table
+2090622	Blacksmithing Table
+2090623	Decaying Durvati (Specimen)
+2090626	Modified Krall Warrior
+2090634	Shard Catalyst
+2090636	Odyle Shard Storm
+2090649	Parents 40/Exceed/Exceed
+2090650	Parents 40/Exceed/None
+2090652	Parents 40/All/Exceed
+2090653	Parents 40/All/None
+2090654	Parents 40/None/Exceed
+2090655	Parents 40/None/None
 2090656	Punching Bag
 2090657	Punching Bag
 2090658	Punching Bag
+2090663	Mumu Watcher
+2090664	Mumu Worker
+2090665	Mumu Patrol
+2090666	Kobold Worker
+2090667	Kobold Sentry
+2090668	Kobold Laborer
+2090669	Draconute Sentinel
+2090670	Draconute Patrol
+2090671	Labor Manager Krall
+2090672	Drakan Watcher
+2090673	Drakan Guard Dog
+2090674	Drakan Guard
+2090675	Drakan Superior Warmage
+2090680	High Priestess's Illusion
+2090681	High Priestess's Illusion
+2090682	High Priestess's Illusion
+2090683	Drana Watch Scout
+2090684	Labor Manager Oculazen
+2090685	Plantation Krall Ranger
+2090686	Dracuni Processing Laborer
+2090687	Drana Processing Maintenance Machine
+2090688	Draconute Tinkerer
+2090690	Modified Krall Warrior
+2090691	Monster (Specimen)
+2090692	Monster (Specimen)
+2090693	Punching Bag
+2090695	Monster (Specimen)
+2090718	Nathara
+2090719	Eternal Ludra
+2090720	Terminator Bargott
+2090773	Training Scarecrow (Specimen)
+2090816	Balance Test 1
+2090817	Balance Test 1
+2090818	All (Spirit)
 2100000	Twinkling Kalgolem
 2100001	Valley Armadon
 2100002	Hard Kalgolem
@@ -264,6 +576,7 @@
 2100022	Marsh Vine Spirit
 2100023	Ellun River Sylphen
 2100025	Marsh Slime
+2100026	Contaminated Cadaver Worm (Specimen)
 2100027	Collapsed Kouros
 2100028	Withered Agrint
 2100030	Marsh Odyle Spider
@@ -304,6 +617,7 @@
 2100095	Kobold Supervisor
 2100096	Unruly Karnif
 2100097	Enhanced Krall Combatant
+2100098	Valley Sparkie
 2100128	Krall Gatekeeper
 2100129	Krall Gatekeeper
 2100130	Trained Karnif
@@ -1190,6 +1504,7 @@
 2110507	Crimson Manduri Slinger
 2110508	Crimson Agrint
 2110509	Crimson Spider
+2110510	Poison Blood Clots (Specimen)
 2110511	Drana Injector
 2110512	Eternal Moss Crab
 2110513	Crimson Rafflesia
@@ -1296,6 +1611,7 @@
 2200045	Burglar Boss
 2200046	Burglar
 2200047	Burglar
+2200048	Bomb
 2200049	Wind Breeze Merchants Vigilante Group
 2200050	Wind Breeze Merchants Vigilante Group
 2200051	Wind Breeze Merchants Vigilante Group
@@ -1460,6 +1776,7 @@
 2290000	Daminu Forest Kerubar
 2290001	Sky Island Fenix
 2290002	Drakan Combatant
+2290003	Dredgion
 2290004	Kobold Porter
 2290005	Kobold Tinkerer
 2290010	Daminu Forest Kerubian
@@ -1481,7 +1798,7 @@
 2290041	Storage Draconute Tinkerer
 2290042	Balaur Alarm Device
 2290043	Balaur Alarm Device
-2290046	Drana Supervisor
+2290046	Drana Overseer
 2290047	Power Tower Drakan Common Soldier
 2290048	Power Tower Drakan Watcher
 2290049	Electrocuting Monster
@@ -1493,6 +1810,7 @@
 2290055	Cadaver Insectoid
 2290057	Dark Spiritstone
 2290058	Corrupted Spirit
+2290059	Dredgion
 2290060	Dratona Egg
 2290061	Dratona
 2290062	Dratona
@@ -1508,6 +1826,7 @@
 2290073	Contaminated Vine Spirit
 2290074	Contaminated Vine Spirit
 2290075	Contaminated Vine Spirit
+2290076	Level 1 Water Spirit (Specimen)
 2290077	Explosive Spirit
 2290078	Furious Spirit
 2290080	Krall Supporter
@@ -1527,6 +1846,7 @@
 2290100	Aullaeu Patrol
 2290101	Aullaeu Patrol Ranger
 2290102	Ferocious Wild Bee
+2290103	Bomb Type Gimmick (Specimen)
 2290104	Ferocious Wild Zaif
 2290106	Aullaeu Apprentice Shaman
 2290107	Konutin
@@ -1819,6 +2139,7 @@
 2300159	Thermal Vent
 2300160	Thermal Vent
 2300161	Heartbound Elite Priest
+2300162	Durvati's Poison Fluid
 2300163	Heartbound Acolyte Priest
 2300164	Heartbound Knights Gladiator
 2300165	Heartbound Knights Templar
@@ -1830,6 +2151,8 @@
 2300172	Ultimate Berk
 2300173	Ultimate Berk
 2300174	Ultimate Berk
+2300178	Ultimate Berk
+2300181	Chroma
 2300183	Twisted Croka
 2300184	Twisted Croka
 2300185	Rose Garden Bee
@@ -1876,6 +2199,7 @@
 2300226	Urugugu Brawler
 2300227	Urugugu Gladiator
 2300228	Urugugu Skirmisher
+2300229	Training Scarecrow
 2300230	Expanding Xyrepe
 2300231	Heartbound Acolyte Priest
 2300232	Heartbound Knights Gladiator
@@ -1923,6 +2247,25 @@
 2300274	Sparkie
 2300275	Black Spirit
 2300276	Ordeal of Love
+2300277	Ludra Follower Drakan
+2300278	Ludra Follower Beast
+2300279	Ludra Follower Warmage
+2300280	Ludra Follower Officer
+2300281	Ludra Follower Scout
+2300282	Isolation Specialist Rahu
+2300283	Abyssal Wings Ketu
+2300284	Central Abyss Fusion Reactor
+2300285	Auxiliary Abyss Fusion Reactor
+2300286	Laser
+2300287	Laser
+2300288	Auxiliary Abyss Fusion Reactor
+2300289	Auxiliary Abyss Fusion Reactor
+2300290	Eternal Ludra
+2300294	Abyssal Drakan Armed Soldier
+2300295	Abyssal Beast
+2300296	Abyssal Drakan Mage Officer
+2300297	Abyssal Drakan Chief
+2300298	Abyssal Drakan Scout Officer
 2300299	Rotar
 2300300	Robstino
 2300301	Lava Eruption
@@ -1987,6 +2330,10 @@
 2300362	Fungie
 2300363	Fungie
 2300371	Kromede's Desire
+2300397	Ordeal of Love
+2300398	Ordeal of Love
+2300399	Ordeal of Love
+2300400	Ordeal of Love
 2300401	Phantasmal Lakshmi
 2300402	Lakshmi's Handmaiden
 2300403	Predator Saraswati
@@ -2048,6 +2395,7 @@
 2300499	Abyssal Horn Duduka Worker
 2300500	Dratona
 2300501	Dratona Brute
+2300502	Decaying Durvati (Specimen)
 2300503	Dratona Egg
 2300504	Hatched Dratona Larva
 2300505	Dratona Tamer
@@ -2060,7 +2408,11 @@
 2300512	Thermal Vent
 2300513	Thermal Vent
 2300514	Thermal Vent
+2300515	Decaying Durvati (Specimen)
+2300516	Decaying Durvati (Specimen)
+2300517	Decaying Durvati (Specimen)
 2300518	Abyssal Horn Duduka Slinger
+2300519	Durvati's Poison Fluid
 2300520	Abyssal Horn Lupyllini
 2300521	Abyssal Horn Mau Sentry
 2300522	Abyssal Horn Mau Healer
@@ -2094,6 +2446,8 @@
 2300552	Abyssal Horn Duduka Worker
 2300553	Abyssal Horn Duduka Slinger
 2300554	Abyssal Horn Lupyllini
+2300569	Abyssal Depth Moving Platform
+2300570	Abyssal Depth Moving Platform
 2300571	Rock Spirit
 2300572	Earth Spirit
 2300573	Enraged Rock Spirit
@@ -2175,6 +2529,7 @@
 2300916	Fafnite Enhance Totem
 2300917	Ferocious Duduka Worker
 2300918	Ferocious Duduka Slinger
+2300919	Training Scarecrow
 2300920	Abyssal Moss Crab
 2300921	Abyssal Lupyllini
 2301001	Ludra Follower Drakan
@@ -2196,6 +2551,25 @@
 2301020	Abyssal Drakan Mage Officer
 2301021	Abyssal Drakan Chief
 2301022	Abyssal Drakan Scout Officer
+2301025	Ludra Follower Drakan
+2301026	Ludra Follower Beast
+2301027	Ludra Follower Warmage
+2301028	Ludra Follower Officer
+2301029	Ludra Follower Scout
+2301030	Isolation Specialist Rahu
+2301031	Abyssal Wings Ketu
+2301032	Central Abyss Fusion Reactor
+2301033	Auxiliary Abyss Fusion Reactor
+2301034	Laser
+2301035	Laser
+2301036	Auxiliary Abyss Fusion Reactor
+2301037	Auxiliary Abyss Fusion Reactor
+2301038	Eternal Ludra
+2301042	Abyssal Drakan Armed Soldier
+2301043	Abyssal Beast
+2301044	Abyssal Drakan Mage Officer
+2301045	Abyssal Drakan Chief
+2301046	Abyssal Drakan Scout Officer
 2301050	Mutated Elite Chief
 2301051	Mutated Scout
 2301052	Sanctum Barghest
@@ -2245,11 +2619,14 @@
 2301209	Devouring Klawfly
 2301210	Noxious Gas
 2301211	Noxious Gas
+2301212	Wastewater
+2301213	Wastewater
 2301214	Contaminated Poison Sac
 2301215	Defiled Poison Sac
 2301216	Surveillance Device
 2301217	Defiled Sura Captain
 2301218	Backflowing Purifier
+2301223	Defiled Noxious Zone
 2301301	Afflicted Bakarma
 2301302	Multiverse Veltiras
 2301303	Solemn Valkan
@@ -2355,6 +2732,8 @@
 2310172	Ultimate Berk
 2310173	Ultimate Berk
 2310174	Ultimate Berk
+2310178	Ultimate Berk
+2310181	Chroma
 2310183	Twisted Croka
 2310184	Twisted Croka
 2310201	Urugugu Soldier
@@ -2385,6 +2764,7 @@
 2310226	Urugugu Brawler
 2310227	Urugugu Gladiator
 2310228	Urugugu Skirmisher
+2310229	Training Scarecrow
 2310301	Lava Eruption
 2310302	Fire Temple Lava Glob
 2310304	Lava Spider
@@ -2424,6 +2804,7 @@
 2310471	Transcendent Bakarma
 2310500	Dratona
 2310501	Dratona Brute
+2310502	Decaying Durvati (Specimen)
 2310503	Dratona Egg
 2310504	Hatched Dratona Larva
 2310505	Dratona Tamer
@@ -2436,6 +2817,10 @@
 2310512	Thermal Vent
 2310513	Thermal Vent
 2310514	Thermal Vent
+2310515	Decaying Durvati (Specimen)
+2310516	Decaying Durvati (Specimen)
+2310517	Decaying Durvati (Specimen)
+2310519	Durvati's Poison Fluid
 2310601	Atiel
 2310602	Deus Research Base Guard
 2310603	Deus Research Base Warrior
@@ -2488,6 +2873,7 @@
 2310916	Fafnite Enhance Totem
 2310917	Ferocious Duduka Worker
 2310918	Ferocious Duduka Slinger
+2310919	Training Scarecrow
 2310920	Abyssal Moss Crab
 2310921	Abyssal Lupyllini
 2311301	Afflicted Bakarma
@@ -2505,12 +2891,16 @@
 2311313	Bakarma Brigade Skirmisher
 2311314	Bakarma Brigade Strike Force Officer
 2311315	Bakarma Brigade Strike Force Member
+2311316	Subspace Floating Stone
+2311317	Large Subspace Floating Stone
 2311318	Bakarma's Watcheye
 2311319	Crystal
 2311320	Distorted Chunk
 2311321	Multiverse Magic Rafflesia
 2311322	Multiverse Magic Spider
 2311323	Subspace Swarm
+2311324	Subspace Floating Stone
+2311325	Large Subspace Floating Stone
 2311401	Glassvein
 2311402	Nazarak
 2311403	Nathara
@@ -2541,6 +2931,8 @@
 2320172	Ultimate Berk
 2320173	Ultimate Berk
 2320174	Ultimate Berk
+2320178	Ultimate Berk
+2320181	Chroma
 2320183	Twisted Croka
 2320184	Twisted Croka
 2320201	Urugugu Soldier
@@ -2570,6 +2962,7 @@
 2320226	Urugugu Brawler
 2320227	Urugugu Gladiator
 2320228	Urugugu Skirmisher
+2320229	Training Scarecrow
 2320301	Lava Eruption
 2320302	Fire Temple Lava Glob
 2320304	Lava Spider
@@ -2612,6 +3005,7 @@
 2320471	Transcendent Bakarma
 2320500	Dratona
 2320501	Dratona Brute
+2320502	Decaying Durvati (Specimen)
 2320503	Dratona Egg
 2320504	Hatched Dratona Larva
 2320505	Dratona Tamer
@@ -2624,7 +3018,11 @@
 2320512	Thermal Vent
 2320513	Thermal Vent
 2320514	Thermal Vent
+2320515	Decaying Durvati (Specimen)
+2320516	Decaying Durvati (Specimen)
+2320517	Decaying Durvati (Specimen)
 2320518	Young Aquatic Skyray
+2320519	Durvati's Poison Fluid
 2320601	Atiel
 2320602	Deus Research Base Guard
 2320603	Deus Research Base Warrior
@@ -2679,6 +3077,7 @@
 2320916	Fafnite Enhance Totem
 2320917	Ferocious Duduka Worker
 2320918	Ferocious Duduka Slinger
+2320919	Training Scarecrow
 2320920	Abyssal Moss Crab
 2320921	Abyssal Lupyllini
 2321301	Afflicted Bakarma
@@ -2719,6 +3118,7 @@
 2321418	Specter Bomb
 2321500	Dratona
 2321501	Dratona Brute
+2321502	Decaying Durvati (Specimen)
 2321503	Dratona Egg
 2321504	Hatched Dratona Larva
 2321505	Dratona Tamer
@@ -2731,9 +3131,14 @@
 2321512	Thermal Vent
 2321513	Thermal Vent
 2321514	Thermal Vent
+2321515	Decaying Durvati (Specimen)
+2321516	Decaying Durvati (Specimen)
+2321517	Decaying Durvati (Specimen)
 2321518	Young Aquatic Skyray
+2321519	Durvati's Poison Fluid
 2322500	Dratona
 2322501	Dratona Brute
+2322502	Decaying Durvati (Specimen)
 2322503	Dratona Egg
 2322504	Hatched Dratona Larva
 2322505	Dratona Tamer
@@ -2746,9 +3151,14 @@
 2322512	Thermal Vent
 2322513	Thermal Vent
 2322514	Thermal Vent
+2322515	Decaying Durvati (Specimen)
+2322516	Decaying Durvati (Specimen)
+2322517	Decaying Durvati (Specimen)
 2322518	Young Aquatic Skyray
+2322519	Durvati's Poison Fluid
 2323500	Dratona
 2323501	Dratona Brute
+2323502	Decaying Durvati (Specimen)
 2323503	Dratona Egg
 2323504	Hatched Dratona Larva
 2323505	Dratona Tamer
@@ -2761,9 +3171,14 @@
 2323512	Thermal Vent
 2323513	Thermal Vent
 2323514	Thermal Vent
+2323515	Decaying Durvati (Specimen)
+2323516	Decaying Durvati (Specimen)
+2323517	Decaying Durvati (Specimen)
 2323518	Young Aquatic Skyray
+2323519	Durvati's Poison Fluid
 2324500	Dratona
 2324501	Dratona Brute
+2324502	Decaying Durvati (Specimen)
 2324503	Dratona Egg
 2324504	Hatched Dratona Larva
 2324505	Dratona Tamer
@@ -2776,9 +3191,14 @@
 2324512	Thermal Vent
 2324513	Thermal Vent
 2324514	Thermal Vent
+2324515	Decaying Durvati (Specimen)
+2324516	Decaying Durvati (Specimen)
+2324517	Decaying Durvati (Specimen)
 2324518	Young Aquatic Skyray
+2324519	Durvati's Poison Fluid
 2325500	Dratona
 2325501	Dratona Brute
+2325502	Decaying Durvati (Specimen)
 2325503	Dratona Egg
 2325504	Hatched Dratona Larva
 2325505	Dratona Tamer
@@ -2791,9 +3211,14 @@
 2325512	Thermal Vent
 2325513	Thermal Vent
 2325514	Thermal Vent
+2325515	Decaying Durvati (Specimen)
+2325516	Decaying Durvati (Specimen)
+2325517	Decaying Durvati (Specimen)
 2325518	Young Aquatic Skyray
+2325519	Durvati's Poison Fluid
 2326500	Dratona
 2326501	Dratona Brute
+2326502	Decaying Durvati (Specimen)
 2326503	Dratona Egg
 2326504	Hatched Dratona Larva
 2326505	Dratona Tamer
@@ -2806,9 +3231,14 @@
 2326512	Thermal Vent
 2326513	Thermal Vent
 2326514	Thermal Vent
+2326515	Decaying Durvati (Specimen)
+2326516	Decaying Durvati (Specimen)
+2326517	Decaying Durvati (Specimen)
 2326518	Young Aquatic Skyray
+2326519	Durvati's Poison Fluid
 2327500	Dratona
 2327501	Dratona Brute
+2327502	Decaying Durvati (Specimen)
 2327503	Dratona Egg
 2327504	Hatched Dratona Larva
 2327505	Dratona Tamer
@@ -2821,9 +3251,14 @@
 2327512	Thermal Vent
 2327513	Thermal Vent
 2327514	Thermal Vent
+2327515	Decaying Durvati (Specimen)
+2327516	Decaying Durvati (Specimen)
+2327517	Decaying Durvati (Specimen)
 2327518	Young Aquatic Skyray
+2327519	Durvati's Poison Fluid
 2328500	Dratona
 2328501	Dratona Brute
+2328502	Decaying Durvati (Specimen)
 2328503	Dratona Egg
 2328504	Hatched Dratona Larva
 2328505	Dratona Tamer
@@ -2836,9 +3271,14 @@
 2328512	Thermal Vent
 2328513	Thermal Vent
 2328514	Thermal Vent
+2328515	Decaying Durvati (Specimen)
+2328516	Decaying Durvati (Specimen)
+2328517	Decaying Durvati (Specimen)
 2328518	Young Aquatic Skyray
+2328519	Durvati's Poison Fluid
 2329500	Dratona
 2329501	Dratona Brute
+2329502	Decaying Durvati (Specimen)
 2329503	Dratona Egg
 2329504	Hatched Dratona Larva
 2329505	Dratona Tamer
@@ -2851,7 +3291,11 @@
 2329512	Thermal Vent
 2329513	Thermal Vent
 2329514	Thermal Vent
+2329515	Decaying Durvati (Specimen)
+2329516	Decaying Durvati (Specimen)
+2329517	Decaying Durvati (Specimen)
 2329518	Young Aquatic Skyray
+2329519	Durvati's Poison Fluid
 2330101	Krao Magic Test Subject
 2330102	Enhanced Krao Test Subject
 2330103	Sniping Croka
@@ -3021,14 +3465,18 @@
 2340211	Goldrin's Storage
 2340212	Goldrin's Storage
 2340213	Goldrin's Storage
+2340251	Daeva Wraith Tomb
 2340252	Daeva Wraith
 2340253	Daeva Superior Wraith
 2340254	Daeva Elite Wraith
 2340255	Executor of the Magical Sword
 2340256	Resentful Sword
+2340257	Daeva Wraith Tomb
+2340258	Daeva Wraith Tomb
 2340351	Jump Laser
 2340352	Jump Laser
 2340353	Jump Laser
+2340412	Time Vortex (Specimen)
 2340413	Time Vortex
 2340507	Pang
 2340508	Pang
@@ -3306,7 +3754,7 @@
 2360102	Nepenthes
 2360103	Grave Vivel
 2360104	Leafless Agrint
-2360105	Grudge Bearing Wraith
+2360105	Grudge-Bearing Wraith
 2360106	Grave Undead Knight
 2360107	Daeva Ranger's Soul
 2360108	Daeva Knight's Soul
@@ -3371,7 +3819,7 @@
 2360182	Rafflesia
 2360183	Grave Vivel
 2360184	Leafless Agrint
-2360185	Grudge Bearing Wraith
+2360185	Grudge-Bearing Wraith
 2360186	Grave Undead Knight
 2360187	Daeva Ranger's Soul
 2360188	Daeva Knight's Soul
@@ -3397,6 +3845,7 @@
 2360213	Faded Floater
 2360214	Faded Predator
 2360220	Kalgolem
+2360221	Contaminated Slime (Specimen)
 2360222	Black Spirit
 2360223	Drakan Vanguard Scout
 2360224	Drakan Vanguard Skirmisher
@@ -3406,6 +3855,7 @@
 2360228	Nagarant Elite Guardian
 2360229	Naga Elite Priest
 2360230	Klaw
+2360231	Klaw Scout (Specimen)
 2370001	High Commander Nahid
 2370002	Division Commander Radbima
 2370003	Beritra Air Raiders Captain
@@ -3906,8 +4356,10 @@
 2400020	Abandoned Daeva
 2400030	Red Moss Crab
 2400031	Shadow Spider
+2400032	Training Scarecrow
 2400033	Voldrik
 2400034	Voldrik's Minion
+2400035	Melee Training Scarecrow
 2400051	Hungry Dead
 2400053	Corrupted Karas Handmaiden
 2400054	Red Eye Agrint
@@ -3916,7 +4368,7 @@
 2400059	Lost Specter
 2400061	Condensed Specter
 2400062	Ancient Revenant Knight
-2400063	Grudge Bearing Warrior
+2400063	Grudge-Bearing Warrior
 2400064	Evil Black Soul
 2400066	Cemetery Guardian
 2400068	Daeva Ranger's Soul
@@ -3951,7 +4403,7 @@
 2400115	Executioner Oculazen
 2400116	Dratona Tinkerer
 2400117	Dratona Watcher
-2400118	Midsize Fafnium
+2400118	Medium Fafnium
 2400121	Balaur Combat Flag
 2400122	Sanctum Watchtower
 2400140	Faithful Rajit
@@ -4020,7 +4472,7 @@
 2400278	Blades Ruins Scout
 2400279	Draconute Ruins Tinkerer
 2400280	Draconute Ruins Ranger
-2400281	Midsize Fafnium
+2400281	Medium Fafnium
 2400301	Faded Stone Spirit
 2400302	Whirlwind Spirit
 2400303	Flame Spirit
@@ -4084,6 +4536,7 @@
 2400389	Drana Cultivator
 2400390	Escaped Mumu Worker
 2400391	Ferocious Lupyllini
+2400392	Training Scarecrow
 2400401	Blades Searcher
 2400402	Blades Warmage
 2400403	Blades Messenger
@@ -4104,7 +4557,7 @@
 2400418	Ferocious Cadaver Cleaner
 2400419	Special Operations Leader Linx
 2400420	Blades Searcher
-2400421	Midsize Fafnium
+2400421	Medium Fafnium
 2400422	Activated Large Balaur Totem
 2400424	Desecrator Newbold
 2400425	Specter Archon Axios
@@ -4351,6 +4804,7 @@
 2405009	Rubek Thieves Burglar
 2405010	Tamed Fossa
 2405012	Rubek Thieves Chief
+2405013	Bomb Type Gimmick (Specimen)
 2405020	Graverobber Assassin
 2405021	Graverobber Patrol
 2405022	Tamed Karnif
@@ -4511,11 +4965,11 @@
 2406013	Dratona Guardian
 2406014	Decomposed Soulless Warrior
 2406015	Consumed Patamor Villager
-2406016	Midsize Fafnium
+2406016	Medium Fafnium
 2406017	Veil Jewel
-2406018	Midsize Fafnium
+2406018	Medium Fafnium
 2406019	Icecap Tuka
-2406020	Snowfield Lagur
+2406020	Tundra Lagur
 2406021	Ice Fang Fossa
 2406022	Patamor Garrison Troopers Seeker
 2406023	Wild Lagur
@@ -4693,21 +5147,21 @@
 2407013	Cursed Seal Stone
 2407020	Decomposed Karas
 2407021	Decomposed Karas
-2407022	Grudge Bearing Wraith
+2407022	Grudge-Bearing Wraith
 2407023	Fully Mutated Steinun
-2407024	Grudge Bearing Wraith
-2407025	Grudge Bearing Wraith
-2407026	Grudge Bearing Wraith
+2407024	Grudge-Bearing Wraith
+2407025	Grudge-Bearing Wraith
+2407026	Grudge-Bearing Wraith
 2407027	Snowfield Karas Corpse
 2407028	Snowfield Karas Warrior
 2407029	Snowfield Karas Elite
 2407030	Snowfield Karas Priest
-2407031	Grudge Bearing Wraith
-2407032	Grudge Bearing Wraith
-2407033	Grudge Bearing Wraith
-2407034	Grudge Bearing Wraith
-2407035	Grudge Bearing Wraith
-2407036	Grudge Bearing Wraith
+2407031	Grudge-Bearing Wraith
+2407032	Grudge-Bearing Wraith
+2407033	Grudge-Bearing Wraith
+2407034	Grudge-Bearing Wraith
+2407035	Grudge-Bearing Wraith
+2407036	Grudge-Bearing Wraith
 2407040	Fafnium Sentry
 2407041	Fafnium Supporter
 2407042	Fafnium Overseer
@@ -4830,6 +5284,7 @@
 2500047	Blades Tracker
 2500048	Blades Bomber
 2500049	Bomb
+2500050	Dredgion
 2500051	Drakan Armed Soldier
 2500052	Drakan Scout
 2500054	Poison Blood Spider
@@ -4842,7 +5297,7 @@
 2500061	Corrupted Nornir
 2500062	Decaying Dead
 2500063	Wandering Wraith
-2500064	Grudge Bearing Dead
+2500064	Grudge-Bearing Dead
 2500065	Karas-Mutated Derk
 2500066	Role: Villager
 2500067	Role: Villager
@@ -4852,6 +5307,7 @@
 2500071	Role: Karas
 2500072	Role: Karas
 2500073	Role: Friend Turned Karas
+2500074	Petrification Trap (Specimen)
 2500075	Training Scarecrow
 2500076	Training Scarecrow
 2500077	Temple Laser
@@ -4964,7 +5420,7 @@
 2590013	Munihelle Mumu
 2590014	Munihelle Kerubar
 2590016	Shadow Spider
-2590017	Grudge Bearing Warrior
+2590017	Grudge-Bearing Warrior
 2590018	Evil Black Soul
 2590019	Blades Karnif
 2590020	Blades Tracker
@@ -5011,6 +5467,7 @@
 2590066	Lagta Brigade Sentry
 2590067	Lagta Brigade Watcher
 2590068	Black Claw Guard Troopers Warden
+2590071	Bomb Type Gimmick (Specimen)
 2590072	Shadow Spider
 2590073	Varg Chaser Warrior
 2590074	Chaser Detecting Beast
@@ -5031,6 +5488,7 @@
 2590093	Draconute Storage Manager
 2590105	Evil Black Soul
 2590106	Muqaka's Totem
+2590108	Dredgion
 2590109	Drakan Combatant
 2590110	Drakan Superior Warmage
 2590111	Servant of the Jewel
@@ -5045,7 +5503,7 @@
 2590120	Elvida
 2590122	Munihelle Kerubar
 2590123	Munihelle Mumu
-2590124	Midsize Fafnium
+2590124	Medium Fafnium
 2590125	Draconute Storage Manager
 2590126	Draconute Storage Manager
 2590127	Faded Forest Specter
@@ -5814,6 +6272,7 @@
 2670117	Twisted Deputy Commander Kaliya
 2670118	Twisted High Commander Baranath
 2680000	Odyle Shard Storm
+2680015	Shard Catalyst
 2680034	Sandstorm
 2700000	Sura Knight
 2700001	Sura Mage
@@ -5941,6 +6400,7 @@
 2700835	Corrupted Deios
 2700837	Power-Possessed Kianah
 2700840	Obsessive Lithla
+2700844	Bomb Type Gimmick (Specimen)
 2700845	Idris
 2700847	Zikel's Apparition
 2700849	Destruction Archon Gladiator Apparition
@@ -6320,6 +6780,7 @@
 2701373	Culminant Paton
 2701374	Ascended Atheron
 2701375	Laser
+2701376	Training Scarecrow (Specimen)
 2701377	Laser
 2701378	Scout Captain Ked
 2701379	Suspicious Spring Scout
@@ -6746,10 +7207,12 @@
 2701978	Void Helicoid
 2701979	Void Helicoid
 2701980	Void Helicoid
+2701981	Pass through the narrow gap
 2701982	Fates Pino
 2701983	Fates Aullaeu Ranger
 2701986	Furious Konutin
 2701987	Furious Raptor Warrior
+2701989	Escape through the window
 2701990	Menoch
 2701991	Ascended Wraith Brawler
 2701992	Ascended Undead Gladiator
@@ -7263,6 +7726,7 @@
 2702602	Lepharist Mage
 2702603	Lepharist Mage
 2702604	Lepharist Researcher
+2702605	Training Scarecrow
 2702606	Gravi
 2702607	Laser
 2702608	Laser
@@ -7379,45 +7843,677 @@
 2702723	Void Repository Ancient Totem
 2702725	Remnants of a Culled Daeva
 2702726	Remnants of a Culled Daeva
+2900208	Hugo (Specimen)
+2900209	NPC (Specimen)
+2900210	NPC (Specimen)
+2900211	NPC (Specimen)
+2900212	NPC (Specimen)
+2900213	Kromede (Specimen)
 2900214	Hadala
+2900215	Gerod (Specimen)
+2900216	Ulgorn (Specimen)
 2900217	Luteros
+2900218	Chloris (Specimen)
+2900219	Reda (Specimen)
+2900220	NPC (Specimen)
+2900221	NPC (Specimen)
+2900222	NPC (Specimen)
+2900223	NPC (Specimen)
+2900224	NPC (Specimen)
+2900225	NPC (Specimen)
+2900226	NPC (Specimen)
+2900227	NPC (Specimen)
+2900228	NPC (Specimen)
+2900229	NPC (Specimen)
+2900230	NPC (Specimen)
+2900231	NPC (Specimen)
+2900232	NPC (Specimen)
+2900233	NPC (Specimen)
+2900234	NPC (Specimen)
+2900235	NPC (Specimen)
+2900236	NPC (Specimen)
+2900237	NPC (Specimen)
+2900238	NPC (Specimen)
+2900239	NPC (Specimen)
+2900240	NPC (Specimen)
+2900241	NPC (Specimen)
+2900242	NPC (Specimen)
+2900243	NPC (Specimen)
+2900244	NPC (Specimen)
+2900245	NPC (Specimen)
+2900246	NPC (Specimen)
+2900247	NPC (Specimen)
+2900248	NPC (Specimen)
+2900249	NPC (Specimen)
+2900250	NPC (Specimen)
+2900251	NPC (Specimen)
+2900252	NPC (Specimen)
+2900253	NPC (Specimen)
+2900254	NPC (Specimen)
+2900255	NPC (Specimen)
+2900256	NPC (Specimen)
+2900257	NPC (Specimen)
+2900258	NPC (Specimen)
+2900259	NPC (Specimen)
+2900262	NPC (Specimen)
+2900265	NPC (Specimen)
+2900266	NPC (Specimen)
+2900267	NPC (Specimen)
+2900268	NPC (Specimen)
+2900269	NPC (Specimen)
+2900270	NPC (Specimen)
+2900271	NPC (Specimen)
+2900272	NPC (Specimen)
+2900273	NPC (Specimen)
+2900274	NPC (Specimen)
+2900275	NPC (Specimen)
+2900276	NPC (Specimen)
+2900277	NPC (Specimen)
+2900278	NPC (Specimen)
+2900279	NPC (Specimen)
+2900280	NPC (Specimen)
+2900281	NPC (Specimen)
+2900282	NPC (Specimen)
+2900283	NPC (Specimen)
+2900292	NPC (Specimen)
+2900293	NPC (Specimen)
+2900294	NPC (Specimen)
 2900295	Nemon
+2900296	NPC (Specimen)
+2900297	NPC (Specimen)
+2900298	NPC (Specimen)
+2900299	NPC (Specimen)
+2900300	NPC (Specimen)
+2900301	NPC (Specimen)
+2900302	NPC (Specimen)
+2900303	NPC (Specimen)
+2900304	NPC (Specimen)
+2900305	NPC (Specimen)
+2900306	NPC (Specimen)
+2900307	NPC (Specimen)
+2900308	NPC (Specimen)
+2900309	NPC (Specimen)
+2900310	NPC (Specimen)
+2900311	NPC (Specimen)
+2900312	NPC (Specimen)
+2900313	NPC (Specimen)
+2900314	NPC (Specimen)
+2900315	NPC (Specimen)
+2900316	NPC (Specimen)
+2900317	NPC (Specimen)
+2900318	NPC (Specimen)
+2900319	NPC (Specimen)
+2900320	NPC (Specimen)
+2900321	NPC (Specimen)
+2900322	NPC (Specimen)
+2900323	NPC (Specimen)
+2900324	NPC (Specimen)
+2900325	NPC (Specimen)
+2900326	NPC (Specimen)
+2900327	NPC (Specimen)
+2900328	NPC (Specimen)
+2900329	NPC (Specimen)
+2900330	NPC (Specimen)
+2900331	NPC (Specimen)
+2900332	NPC (Specimen)
+2910001	Void
+2910003	Blacksmithing Table
+2910004	Armorsmithing Table
+2910005	Handicrafting Table
+2910006	Alchemy Table
+2910007	Cooking Table
+2910008	Activated Ancient Artifact
+2910009	Deactivated Ancient Artifact
+2910010	Blacksmithing Table
+2910011	Armorsmithing Table
+2910012	Handicrafting Table
+2910013	Alchemy Table
+2910014	Cooking Table
+2910015	Dredgion
+2910017	Dredgion
+2910018	Dredgion
+2910019	Slayer Cleansing Artifact
+2910020	Asahr's Mirror
+2910021	Slayer Cleansing Artifact
+2910022	Dredgion
+2910023	Dredgion
+2910024	Dredgion
+2910025	Legion Crafting Table
+2910026	Dredgion
+2910027	Void
+2910028	Dredgion
 2910030	Asahr
+2910031	Dredgion
+2910032	Void
+2910033	Dredgion
+2910040	Dredgion
+2910041	Dredgion
+2910042	Dredgion
+2920014	Explosion Trap
 2920015	Ensnaring Trap
 2920016	Ensnaring Trap
 2920017	Ensnaring Trap
 2920018	Ensnaring Trap
+2920020	Balaur Flag
+2920021	Sharp Aulak
+2920022	Divine Aura
+2920023	Trafficker Duduri
+2920024	Ritualist Aulisa
+2920025	Divine Aura
+2920026	Contaminated Spores
+2920027	Naga Elite Priest
+2920029	Mutated Aullaeu Guardian
+2920030	Altar's Ominous Wraith
+2920032	Mutated Aullaeu Guardian
+2920033	Medium Monster
+2920035	Manager Nasium
+2920036	Oathbreaker Gartua
+2920038	Baby Odyle Spider
+2920039	Drakan Unique
+2920040	Mutated Sura Mage
+2920041	Baby Odyle Spider
+2920042	Baby Odyle Spider
+2920043	Baby Odyle Spider
+2920044	Krao Magic Test Subject
+2920045	Croka
+2920046	Krao Giant Test Subject
+2920047	Krao Giant Test Subject
+2920048	Predator Saraswati
+2920049	Draconute Elite Warden
+2920050	High Priestess's Illusion
+2920051	Baby Odyle Spider
+2920052	Baby Odyle Spider
+2920053	Baby Odyle Spider
+2920054	Aultross
+2920055	All (Spirit)
+2920056	Healing Totem
+2920057	Large Aullaeu Totem
+2920058	Blazing Totem
 2920059	Healing Totem
 2920060	Large Aullaeu Totem
 2920061	Blazing Totem
+2920062	Healing Totem
+2920063	Blazing Totem
+2920064	Draconute Elite Warden
 2920065	Divided Slime
+2920067	Fire Spirit 1
+2920068	Fire Spirit 2
+2920069	Water Spirit 1
+2920071	Primeval Spirit 1
+2920072	Trafficker Duduri
+2920083	Healing Aura
+2920084	Healing Aura
+2920085	Healing Aura
+2920086	Healing Aura
+2920087	Healing Aura
+2920088	Healing Aura
 2920089	Large Aullaeu Totem
 2920090	Large Aullaeu Totem
+2920091	Gas Rock
+2920093	Lava Glob
+2920096	Recovery Totem
+2920098	Explosion Trap
+2920101	Fire Spirit
+2920102	Fire Spirit
+2920103	Fire Spirit
+2920104	Fire Spirit
+2920105	Fire Spirit
+2920106	Fire Spirit
+2920107	Fire Spirit
+2920108	Fire Spirit
+2920109	Fire Spirit
+2920110	Fire Spirit
+2920111	Fire Spirit
+2920112	Fire Spirit
+2920113	Fire Spirit
+2920114	Fire Spirit
+2920115	Fire Spirit
+2920121	Water Spirit
+2920122	Water Spirit
+2920123	Water Spirit
+2920124	Water Spirit
+2920125	Water Spirit
+2920126	Water Spirit
+2920127	Water Spirit
+2920128	Water Spirit
+2920129	Water Spirit
+2920130	Water Spirit
+2920131	Water Spirit
+2920132	Water Spirit
+2920133	Water Spirit
+2920134	Water Spirit
+2920135	Water Spirit
+2920141	Wind Spirit
+2920142	Wind Spirit
+2920143	Wind Spirit
+2920144	Wind Spirit
+2920145	Wind Spirit
+2920146	Wind Spirit
+2920147	Wind Spirit
+2920148	Wind Spirit
+2920149	Wind Spirit
+2920150	Wind Spirit
+2920151	Wind Spirit
+2920152	Wind Spirit
+2920153	Wind Spirit
+2920154	Wind Spirit
+2920155	Wind Spirit
+2920161	Earth Spirit
+2920162	Earth Spirit
+2920163	Earth Spirit
+2920164	Earth Spirit
+2920165	Earth Spirit
+2920166	Earth Spirit
+2920167	Earth Spirit
+2920168	Earth Spirit
+2920169	Earth Spirit
+2920170	Earth Spirit
+2920171	Earth Spirit
+2920172	Earth Spirit
+2920173	Earth Spirit
+2920174	Earth Spirit
+2920175	Earth Spirit
+2920181	Ancient Spirit
+2920182	Ancient Spirit
+2920183	Ancient Spirit
+2920184	Ancient Spirit
+2920185	Ancient Spirit
+2920186	Ancient Spirit
+2920187	Ancient Spirit
+2920188	Ancient Spirit
+2920189	Ancient Spirit
+2920190	Ancient Spirit
+2920191	Ancient Spirit
+2920192	Ancient Spirit
+2920193	Ancient Spirit
+2920194	Ancient Spirit
+2920195	Ancient Spirit
+2920200	Red Spark Ignus
+2920201	Flame Zone
+2920203	Ancient Spirit
+2920204	Ancient Spirit
+2920205	Recovery Totem
+2920206	Divine Auldor (Specimen)
+2920207	Divine Auldor (Specimen)
+2920208	Divine Auldor (Specimen)
+2920209	Divine Auldor (Specimen)
+2920211	Eternal Gartua
+2920212	Eternal Gartua
 2920213	Odylium Ore
+2920215	Divine Auldor (Specimen)
+2920216	Executioner Nua
+2920218	Mutated Aullaeu Guardian
+2920222	Modified Bargott
+2920223	Wraith Giselle (Specimen)
+2920224	Wraith Giselle (Specimen)
+2920225	Odylium Ore
+2920226	Fire Spirit
+2920227	Wind Spirit
+2920228	Earth Spirit
+2920229	Water Spirit
+2920232	Kaisinel's Illusion
+2920233	Fafnir's Poison Blood Pool
 2920235	Kaisinel's Minion
+2920239	Executioner Nua
+2920240	Executioner Nua
+2920241	Executioner Nua
+2920242	Enraged Reda
+2920243	Enraged Reda
+2920245	Eternal Gartua
+2920246	Ultimate Berk
+2920247	Enraged Reda
+2920248	Ultimate Berk
 2920249	Rock
+2920250	Soulreaper Rathman
+2920251	Spirit King (Specimen)
+2920252	Fortress Guardian Notun
+2920253	Fortress Guardian Notun
+2920254	Transcendent Bakarma
+2920255	Transcendent Bakarma
+2920256	Wrapping Waterspout
+2920257	Wrapping Waterspout
+2920258	Transcendent Bakarma
+2920259	Transcendent Bakarma
+2920260	Transcendent Bakarma
+2920262	Divine Auldor (Specimen)
+2920266	Explosion Trap
 2920267	Odyle-eating Abyss Insectoid
 2920268	Odyle-eating Abyss Insectoid
+2920269	Explosion Trap
+2920270	Explosion Trap
+2920271	Explosion Trap
+2920273	Soulless Corpse Gnat
+2920274	Incarnated Warding Feather
+2920275	Aura of Protection
+2920276	Zumion's Energy
+2920277	Incarnated Warding Feather
+2920278	Incarnated Warding Feather
+2920280	Fortress Guardian Notun
+2920281	Fortress Guardian Notun
+2920282	Fortress Guardian Notun
+2920284	Fortress Guardian Notun
+2920285	Fortress Guardian Notun
+2920286	Fortress Guardian Notun
+2920287	Modified Bargott
+2920289	Enraged Reda
+2920290	Punching Bag
+2920291	Punching Bag
+2920292	Punching Bag
+2920300	Transcendent Bakarma
+2920303	Odylium Ore
 2920304	Kaisinel's Minion
+2920306	Abyss Swarm Hive (Specimen)
+2920311	Ultimate Berk
+2920313	Decaying Durvati
+2920319	Mutated Gerod
+2920320	Mutated Gerod
+2920321	Mutated Gerod
+2920322	Mutated Gerod
+2920323	Oathbreaker Gartua
+2920325	Zikel's Apparition
+2920329	Large Aullaeu Totem
+2920330	Idris
+2920331	Tamed Fossa Corpse (Specimen)
+2920332	Idris
+2920333	Baby Odyle Spider
+2920334	Baby Odyle Spider
+2920337	Ultimate Berk
+2920338	Kromede's Desire
+2920339	Kromede's Desire
+2920340	Kromede's Desire
+2920342	Kromede's Desire
+2920343	Kromede's Desire
+2920344	Kromede's Desire
+2920345	Kromede's Desire
+2920346	Kromede's Desire
+2920347	Kromede's Desire
+2920348	Kromede's Desire
+2920353	Guardian Lord Nahma (Specimen)
+2920354	Guardian Lord Nahma (Specimen)
+2920356	Decaying Durvati
+2920357	Decaying Durvati
+2920358	Decaying Durvati
+2920359	Decaying Durvati
+2920360	Vakron's Thorn Root
+2920361	Gelcos
+2920362	Detoxifying Rafflesia
+2920363	Gluttonous Tiere
+2920364	Gluttonous Tiere
+2920366	Detoxifying Rafflesia
+2920367	Vakron's Thorn Vines
+2920368	Gelcos
+2920369	Gelcos
 2920370	Drana Swarm
+2920371	Thamon
+2920372	Balanced
+2920373	Modified Krao Guardian
+2920374	Oathbreaker Gartua
+2920375	Oathbreaker Gartua
+2920376	Decaying Durvati
 2920378	Poison Blood
+2920379	Zikel's Apparition
 2920380	Dratona Egg
 2920382	Cave Dratona Larva
+2920384	Decaying Durvati
+2920387	Blazing Totem
+2920388	Attack Totem
+2920389	Aura of Darkness
+2920391	Manager Nasium
+2920396	Mutated Gerod
+2920397	Mutated Gerod
+2920405	Vakron's Thorn Vines
+2920406	Vakron's Thorn Vines
+2920411	Atiel
+2920412	Atiel
+2920413	Atiel
+2920414	Atiel
+2920415	Atiel
+2920416	Fortress Guardian Notun
+2920417	Fortress Guardian Notun
+2920418	Fortress Guardian Notun
+2920430	Ultimate Berk
+2920431	Ultimate Berk
+2920432	Kaisinel's Illusion
+2920433	Fafnir's Poison Blood
+2920434	Fafnir's Poison Blood
+2920435	Fafnir's Poison Blood
+2920436	Fafnir's Poison Blood
+2920437	Fafnir's Poison Blood
+2920438	Fafnir's Poison Blood
+2920439	Ultimate Berk
+2920440	Nazmun's Weapon
+2920441	Nazmun's Weapon
+2920444	Nazmun's Weapon
 2920445	Atiel
 2920446	Atiel
 2920449	Atiel
+2920450	Vakron's Thorn Vines
+2920451	Vakron's Thorn Vines
+2920452	Vakron's Thorn Vines
+2920453	Vakron's Thorn Vines
+2920456	Modified Bargott
+2920457	Kromede's Desire
+2920460	Modified Bargott
+2920461	Vakron's Thorn Vines
+2920462	Vakron's Thorn Vines
+2920463	Vakron's Thorn Root
+2920464	Vakron's Thorn Root
+2920465	Atiel
+2920467	Atiel
+2920469	Atiel
+2920470	Atiel
+2920471	Flame
+2920472	Judgment
+2920473	Lieutenant Hebran
+2920474	Thamon's Petrification
+2920476	Frozen Executor Erne
+2920477	Frozen Executor Erne
+2920480	Ruthilis of Pain
+2920481	Ruthilis of Pain
+2920483	Ruthilis of Pain
+2920485	Nazmun's Weapon
+2920486	Zaigolem
+2920487	Zaigolem
+2920488	Zaigolem
+2920493	Judgment
+2920494	Poison Blood
+2920495	Spinning Turren (Specimen)
+2920496	Spinning Turren (Specimen)
+2920500	Decaying Durvati
+2920501	Poison Pouch
+2920502	Guardian Lord Nahma (Specimen)
+2920504	Manager Nasium
+2920505	Nazmun
+2920506	Nazmun
+2920507	Nazmun
+2920508	Balaur Flag
+2920509	Nazmun's Weapon
+2920510	Zikel's Apparition
 2920511	Dratona Egg
 2920512	Cave Dratona Larva
+2920513	Nazmun's Weapon
+2920514	Nazmun's Weapon
+2920530	Kromede's Desire
+2920531	Kromede's Desire
+2920532	Kromede's Desire
+2920533	Kromede's Desire
+2920538	Incarnated Warding Feather
+2920539	Destruction Spear
+2920540	Destruction Spear
+2920552	Gas Rock
+2920557	Frozen Executor Erne
+2920558	Frozen Executor Erne
+2920559	Frozen Executor Erne
+2920560	Frozen Executor Erne
+2920565	Fire Spirit
+2920566	Wind Spirit
+2920567	Water Spirit
+2920568	Earth Spirit
+2920574	Monster (Specimen)
+2920583	Watchdog Kwapo
+2920584	Watchdog Kwapo
 2920586	Offspring 20/Exceed/None
 2920587	Offspring 20/None/Exceed
 2920588	Offspring 20/All/None
+2920591	Mau Sentry's Soul
 2920599	Offspring 20/Exceed/Exceed
 2920600	Offspring 20/All/Exceed
+2920602	Condensed Energy
+2920605	Condensed Energy
+2920607	Watchdog Kwapo
+2920618	Vakron's Thorn Vines
+2920619	Vakron's Thorn Root
+2920620	Explosion Trap
+2920621	Explosion Trap
+2920622	Explosion Trap
+2920623	Explosion Trap
+2920624	Explosion Trap
+2920625	Explosion Trap
+2920626	Explosion Trap
+2920627	Explosion Trap
+2920628	Explosion Trap
+2920629	Explosion Trap
+2920630	Explosion Trap
+2920637	Divine Aura
+2920638	Divine Aura
+2920639	Divine Aura
+2920640	Divine Aura
+2920641	Divine Aura
+2920642	Divine Aura
+2920643	Divine Aura
+2920644	Divine Aura
+2920645	Divine Aura
+2920646	Divine Aura
+2920647	Divine Aura
+2920648	Divine Aura
+2920649	Divine Aura
+2920650	Divine Aura
+2920651	Divine Aura
+2920652	Divine Aura
+2920663	Vakron's Thorn Root
+2920664	Divine Aura
+2920665	Ultimate Berk
+2920667	Divine Aura
+2920670	Ketu's Scythe
+2920671	Abyssal Wings Ketu
+2920672	Mortal Soul Stone
+2920674	Fearsome Evil Spirit
+2920675	Destruction Evil Spirit
+2920699	Lava Glob
+2920703	Odylium Ore
+2920704	Fire Spirit
+2920705	Wind Spirit
+2920706	Earth Spirit
+2920707	Water Spirit
 2920710	Kaisinel's Minion
+2920721	Balaur Flag
+2920727	Mau Sentry's Soul
+2920730	Watchdog Kwapo
+2920733	Abyss Predator
+2920747	Eternal Ludra
+2920748	Eternal Ludra
+2920781	Explosion Trap
+2920782	Explosion Trap
+2920783	Explosion Trap
+2920784	Explosion Trap
+2920794	Mutated Gerod
+2920795	Mutated Gerod
+2920796	Mutated Gerod
+2920797	Mutated Gerod
+2920802	Wraith Giselle (Specimen)
+2920803	Wraith Giselle (Specimen)
+2920804	Fafnir's Poison Blood Pool
+2920809	Afflicted Bakarma
+2920812	Distorted Rift Hammer
+2920815	Afflicted Bakarma
+2920843	Afflicted Bakarma
+2920844	Afflicted Bakarma
+2920849	Blazing Totem
+2920854	Black Blood Blatt
+2920855	Black Blood Blatt
+2920856	Black Blood Blatt
+2920857	Black Blood Blatt
+2920858	Black Blood Blatt
+2920859	Black Blood Blatt
+2920860	Black Blood Blatt
+2920861	Black Tentacle Lawa
+2920865	Divine Aura
+2920866	Divine Aura
+2920867	Divine Aura
+2920868	Divine Aura
+2920869	Divine Aura
+2920870	Divine Aura
+2920871	Divine Aura
+2920872	Divine Aura
+2920873	Divine Aura
+2920874	Divine Aura
+2920875	Singing Ellyde
+2920876	Singing Ellyde
+2920877	Singing Ellyde
+2920878	Singing Ellyde
+2920879	Singing Ellyde
+2920880	Singing Ellyde
+2920881	Singing Ellyde
+2920883	Deep Sea Pydeon
+2920884	Deep Sea Pydeon
+2920885	Deep Sea Pydeon
+2920886	Deep Sea Pydeon
+2920889	Explosion Trap
+2920890	Detritus
+2920891	Detritus
+2920892	Singing Ellyde
+2920893	Singing Ellyde
+2920894	Singing Ellyde
+2920895	Afflicted Bakarma
+2920897	Afflicted Bakarma
+2920898	Afflicted Bakarma
+2920902	Black Blood Blatt
+2920904	Kromede's Desire
 2920906	Rock
+2920907	Hydraulic Press
+2920908	Hydraulic Press
+2920913	Ultimate Berk
+2920915	Nazarak
+2920916	Nazarak
+2920922	Sniping Croka
+2920923	Afflicted Bakarma
 2920924	Rock
+2920925	Black Blood Blatt
+2920926	Black Blood Blatt
+2920935	Nathara's Illusion
 2920938	Dratona Egg
 2920939	Dratona Brute
+2920944	Blatt's Tentacles
+2920947	Afflicted Bakarma
+2920948	Black Tentacle Lawa
+2920949	Black Tentacle Lawa
+2920950	Black Tentacle Lawa
+2920951	Contaminated Slime
+2920953	Black Tentacle Lawa
+2920954	Black Blood Blatt
+2920955	Black Blood Blatt
+2920956	Blatt's Crimson Tentacles
+2920959	Deep Sea Pydeon
+2920960	Deep Sea Pydeon
+2920961	Deep Sea Pydeon
+2920962	Deep Sea Pydeon
+2920967	Expanding Xyrepe
+2920968	Expanding Xyrepe
+2920972	Time Bomb
+2920973	Klaw
+2920974	Terminator Bargott
+2920978	Afflicted Bakarma
+2920985	Decaying Durvati
+2920986	Devouring Klawfly
+2920987	Devouring Klawfly
+2920988	Afflicted Bakarma
+2920989	Afflicted Bakarma
+2920990	Devouring Klawfly
+2920993	Afflicted Bakarma
+2920994	Afflicted Bakarma
+2920998	Kaisinel's Illusion
+2921000	Kaisinel's Illusion
+2921003	Poison Pouch
 2921008	Dratona Egg
 2921009	Cave Dratona Larva
 2921010	Dratona Egg
@@ -7425,17 +8521,261 @@
 2921014	Fungie
 2921015	Small Mushroom-Grown Fungie
 2921016	Snail-Bearing Fungie
+2921018	Afflicted Bakarma
+2921019	Afflicted Bakarma
+2921020	Afflicted Bakarma
+2921022	Awakened Alturadon
+2921025	Turgen's Blazing Sword
+2921026	Awakened Alturadon
+2921027	Awakened Alturadon
+2921028	Awakened Alturadon
+2921029	Awakened Alturadon
+2921030	Awakened Alturadon
 2921031	Awakened Alturadon
+2921032	Orb of Vows
+2921033	Orb of Vows
+2921034	Orb of Vows
+2921035	Orb of Vows
+2921036	Orb of Vows
+2921037	Orb of Vows
+2921038	Orb of Vows
+2921039	Orb of Vows
+2921040	Orb of Vows
+2921042	Orb of Vows
+2921043	Orb of Vows
+2921044	Betrayal
+2921046	Robstino
+2921047	Robstino
+2921049	Hydraulic Press
+2921050	Deep Sea Pydeon
+2921051	Rotar
+2921053	Awakened Alturadon
+2921069	Terminator Bargott
+2921072	Time Bomb
+2921076	Tyrant Tassin
+2921077	Tyrant Tassin
+2921078	Tyrant Tassin
+2921079	Tyrant Tassin
+2921080	Tyrant Tassin
+2921081	Tyrant Tassin
+2921088	Muspel Volcanic Range Essence
+2921089	Muspel Volcanic Range Essence
+2921090	Muspel Volcanic Range Essence
+2921091	Muspel Volcanic Range Essence
+2921092	Muspel Volcanic Range Essence
+2921093	Muspel Volcanic Range Essence
+2921094	Muspel Volcanic Range Essence
+2921095	Muspel Volcanic Range Essence
+2921097	Terminator Bargott
+2921098	Terminator Bargott
+2921099	Kromede's Desolation
+2921100	Kromede's Desolation
+2921101	Kromede's Desolation
+2921102	Kromede's Desolation
+2921103	Kromede's Desolation
+2921104	Kromede's Desolation
+2921105	Kromede's Desolation
+2921106	Kromede's Desolation
+2921107	Kromede's Desolation
+2921108	Kromede's Desolation
+2921109	Kromede's Desolation
+2921110	Kromede's Desolation
+2921111	Kromede's Desolation
+2921122	Spirit King (Specimen)
+2921124	Balaur Flag
+2921130	Balaur Flag
+2921131	Drana Bomb Insectoid
+2921137	Lava Glob
+2921138	Guardian Sword Fragment
+2921139	Kromede's Desolation
+2921141	Frozen Executor Erne
+2921142	Frozen Executor Erne
+2921145	Forbidden Hexbeast Griosa
+2921146	Forbidden Hexbeast Griosa
+2921150	Watchdog Kwapo
+2921151	Magic Feather
+2921152	Petrification Trap (Specimen)
+2921153	Lingering Scent
+2921158	Tyrant Tassin
+2921160	Tyrant Tassin
+2921162	Healing Aura
+2921163	Healing Aura
+2921164	Healing Aura
+2921165	Healing Aura
+2921166	Healing Aura
 2921167	Illusion Cavaliers Priest
 2921168	Illusion Cavaliers Priest
+2921171	Iscariel
+2921172	Iscariel
+2921173	Iscariel
+2921174	Iscariel
+2921175	Iscariel
+2921176	Iscariel
+2921177	Iscariel
+2921178	Scarlet Portal
+2921179	Green Portal
+2921180	Purple Portal
+2921183	Overcharged Scarlet Orb
+2921184	Overcharged Green Orb
+2921185	Tyrant Tassin
+2921186	Awakened Alturadon
+2921187	Awakened Alturadon
+2921188	Awakened Alturadon
+2921189	Iscariel
+2921190	Tyrant Tassin
+2921191	Aultross
+2921192	Charged Scarlet Orb
+2921193	Charged Green Orb
+2921194	Charged Scarlet Orb
+2921195	Charged Green Orb
+2921199	Iscariel
+2921200	Awakened Alturadon
+2921201	Awakened Alturadon
+2921202	Awakened Alturadon
+2921205	Kromede's Desolation
+2921206	Kromede's Desolation
+2921207	Kromede's Desolation
+2921208	Kromede's Desolation
+2921209	Awakened Alturadon
+2921215	Awakened Alturadon
+2921220	Kromede's Desolation
+2921221	Iscariel's Flame
+2921222	Rooting Device
+2921223	Kromede's Desolation
+2921224	Kromede's Desolation
+2921225	Awakened Alturadon
+2921226	Awakened Alturadon
 2921228	Alluring Arrow
+2921229	Awakened Alturadon
+2921230	Iscariel
+2921231	Iscariel
+2921234	Iscariel
+2921235	Gargaum
+2921236	Condensed Energy
+2921237	Gargaum
+2921238	Gargaum
+2921239	Condensed Energy
+2921240	Gargaum
+2921241	Gargaum
+2921242	Gargaum
+2921243	Gargaum
+2921244	Gargaum
+2921245	Gargaum
+2921246	Gargaum
+2921247	Gargaum
+2921248	Basilus the False
+2921249	Basilus the False
+2921250	Basilus the False
+2921251	Basilus the False
+2921252	Basilus the False
+2921253	Basilus the False
+2921254	Basilus the False
+2921255	Basilus the False
+2921256	Shield of Corruption
+2921257	Shield of Judgment
+2921258	Iscariel
+2921259	Sacred Flame Barrier of Protection
+2921260	Basilus the False
 2921261	Balaur Mini Totem
+2921262	Muspel Guardian Statue
+2921263	Iscariel
+2921264	Basilus the False
+2921265	Basilus the False
+2921266	Basilus the False
+2921267	Basilus the False
+2921268	Basilus the False
+2921269	Basilus the False
+2921270	Robstino
+2921271	Corrupted Daeva Cleric
+2921272	Basilus the False
+2921273	Ordeal of Love
+2921274	Muspel Guardian Statue
+2921278	Sword of Judgment
+2921279	Iscariel
+2921280	Muspel Guardian Statue
+2921288	Iscariel
+2921289	Iscariel
+2921291	Scarlet Portal
+2921292	Green Portal
+2921293	Atiel
+2921294	Atiel
+2921295	Atiel
+2921296	Atiel
+2921297	Atiel
 2921298	Atiel
 2921299	Atiel
 2921300	Atiel
+2921301	Atiel
+2921302	Atiel
+2921303	Atiel
+2921304	Atiel
+2921306	Iscariel
+2921307	Iscariel
+2921308	Forbidden Hexbeast Griosa
+2921310	Forbidden Hexbeast Griosa
+2921315	Muspel Guardian Statue
+2921316	Forbidden Hexbeast Griosa
+2921317	Basilus the False
+2921318	Sword of Judgment
+2921319	Sacred Flame Barrier of Protection
+2921320	Basilus the False
+2921322	Kapu
+2921326	Mau Sentry's Soul
+2921327	Ascended Atheron
+2921328	Ascended Atheron
+2921329	Ascended Atheron
+2921330	Ascended Atheron
+2921331	Ascended Atheron
+2921332	Atheron's Crystal
+2921333	Atheron's Crystal
+2921334	Ascended Atheron
+2921335	Ascended Atheron
+2921336	Ascended Atheron
+2921337	Ascended Atheron
+2921338	Ascended Atheron
+2921339	Ascended Atheron
+2921340	Ascended Atheron
+2921341	Willful Turgen
+2921351	Basilus the False
+2921352	Electrifying Core
+2921353	Electrifying Core
 2921354	Roar
+2921355	Electrifying Core
+2921356	Vakron's Thorn Vines
+2921357	Vakron's Thorn Vines
+2921358	Vakron
+2921359	Sword of Judgment
+2921376	Willful Turgen
 2921382	Roar
+2921383	Basilus the False
+2921384	Basilus the False
+2921385	Shield of Corruption
+2921386	Shield of Judgment
+2921388	Lava Glob
+2921389	Willful Turgen
+2921390	Kapu
+2921391	Sword of Judgment
+2921392	Gargaum
+2921406	Vakron's Thorn Root
+2921407	Eternal Gartua
+2921408	Eternal Gartua
 2921409	Odylium Ore
+2921410	Eternal Gartua
+2921414	Detoxifying Rafflesia
+2921415	Gluttonous Tiere
+2921416	Gluttonous Tiere
+2921417	Detoxifying Rafflesia
+2921418	Vakron's Thorn Vines
+2921419	Vakron's Thorn Vines
+2921420	Vakron's Thorn Vines
+2921425	Vakron's Thorn Vines
+2921426	Vakron's Thorn Vines
+2921427	Vakron's Thorn Root
+2921428	Vakron's Thorn Root
+2921429	Vakron's Thorn Vines
+2921430	Vakron's Thorn Root
+2921505	Eternal Ludra
+2921506	Eternal Ludra
 2930000	Nania
 2930001	Shuron
 2930002	Hart
@@ -7498,6 +8838,7 @@
 2930098	Sorcerer's Mentor
 2930099	Cleric's Mentor
 2930102	Nania
+2930112	Quest Test
 2930117	Dundu
 2930118	Phernos
 2930119	Caelid
@@ -7512,9 +8853,12 @@
 2930131	Merchant (tentative)
 2930132	Merchant (tentative)
 2930133	Merchant (tentative)
+2930134	Skin Extractor
+2930135	Merchant (tentative)
 2930139	Luteros
 2930140	Luteros
 2930142	Skin Extractor
+2930143	Merchant (tentative)
 2930144	Hithanya
 2930146	Adventurer's Mark Merchant
 2930151	Kochi
@@ -7533,6 +8877,7 @@
 2930166	Caelid
 2930168	Phernos
 2930171	Nania
+2930174	Quest Test
 2930183	Baiel
 2930186	Pamos
 2930242	Baison
@@ -7548,6 +8893,9 @@
 2930276	Marsh Patrol
 2930277	Marsh Patrol
 2930293	Halmo
+2930299	Quest Test
+2930304	Transparent for Testing
+2930316	Quest Test
 2930330	Renes
 2930333	Luteros
 2930336	Luteros
@@ -7763,6 +9111,7 @@
 2930677	Dawn Legionnaire
 2930678	Dawn Legionnaire
 2930679	Zenith
+2930680	Quest Complete (Temporary)
 2930681	Edna
 2930683	Caelid
 2930684	Phernos
@@ -8199,6 +9548,7 @@
 2931313	Perion's Illusion
 2931314	Hithanya
 2931315	Cardin
+2931316	Abyss Portal
 2939020	Creion Researcher
 2939021	Creion Researcher
 2939022	Farmer
@@ -8431,6 +9781,8 @@
 2939436	Thunder Lightning Merchants Member
 2939437	Thunder Lightning Merchants Member
 2939438	Command Merchant
+2939439	NPC (Specimen)
+2939440	NPC (Specimen)
 2939441	Winter Snow Festival Command Merchant
 2939442	Festive Bell Trader
 2939443	Fortune Pouch Key Merchant
@@ -8457,6 +9809,7 @@
 2941016	Legion Merchant
 2941017	Western Camp Tower Manager
 2941018	Western Camp Tower Manager
+2941019	Latesran Western Root Teleport Tower
 2941020	Mercenary
 2941021	Mercenary
 2941022	Mercenary
@@ -8465,6 +9818,7 @@
 2941025	Latesran Western Root Guard
 2941026	Storage Manager
 2941027	General Goods Merchant
+2941028	Latesran Western Ridge Teleport Tower
 2941029	Mercenary
 2941030	Mercenary
 2941031	Mercenary
@@ -8497,11 +9851,13 @@
 2942019	Mercenary
 2942020	Mercenary
 2942021	Mercenary
+2942022	Latesran Eastern Root Teleport Tower
 2942023	Command Merchant
 2942024	Latesran Eastern Root Guard
 2942025	Latesran Eastern Root Guard
 2942026	Storage Manager
 2942027	General Goods Merchant
+2942028	Latesran Eastern Ridge Teleport Tower
 2942029	Mercenary
 2942030	Mercenary
 2942031	Mercenary
@@ -8540,6 +9896,8 @@
 2944014	Mercenary
 2944015	Latesran Eastern Ridge Guard
 2944016	Latesran Eastern Ridge Guard
+2944021	Latesran Western Ridge Teleport Tower
+2944022	Latesran Eastern Ridge Teleport Tower
 2944101	Storage Manager
 2944102	General Goods Merchant
 2944103	Mercenary
@@ -8852,6 +10210,8 @@
 2950482	Nemon
 2950485	Umbaba
 2950486	Arita
+2950487	Event Manager_Asmodians_1
+2950488	Event Manager_Asmodians_2
 2950490	Traska
 2950491	Popokiki
 2950492	Umbaba
@@ -9071,6 +10431,7 @@
 2950833	Tefra
 2950834	Captured Nornir
 2950835	Albert
+2950836	Explosives Manufacturing Facility
 2950837	Villager
 2950838	Villager
 2950839	Guard
@@ -9156,6 +10517,7 @@
 2950936	Lulu
 2950937	Ecco
 2950938	Steel Hammer Shulak
+2950939	Daeva Apparition (Specimen)
 2950940	Ulgorn
 2950941	Ulgorn
 2950942	Hadala
@@ -9349,6 +10711,7 @@
 2959066	Nemon Illusion
 2959067	Daeva Illusion
 2959068	Gerod Illusion
+2959069	Abyss Portal
 2959070	Nemon
 2959071	Dinoh
 2959072	Hadala
@@ -9558,6 +10921,8 @@
 2959287	Guard
 2959288	Guard
 2959289	Command Merchant
+2959290	NPC (Specimen)
+2959291	NPC (Specimen)
 2959292	Winter Snow Festival Command Merchant
 2959293	Festive Bell Trader
 2959294	Emote Merchant
@@ -9680,6 +11045,8 @@
 2959433	Herbalist
 2959434	Villager
 2959435	Villager
+2959491	Halloween Pumpkin Coin Trader
+2959492	Halloween Pumpkin Coin Trader
 2960001	Phazkhi
 2965101	Ambushed Shugo Merchant
 2965102	First Shugo
@@ -9696,6 +11063,7 @@
 2965161	Resentful Sword
 2965162	Resentful Sword
 2965163	Resentful Sword
+2965181	Shugo Festival Manager
 2965201	Shugo Festival Manager
 2965202	Shugo Festival Manager
 2965203	Flying Guide
@@ -9733,7 +11101,14 @@
 2965913	Shugo Merchant Male Default
 2965914	Shugo Alchemist Male Default
 2965915	Shugo Merchant Female Default
+2965916	Wind Breeze Shugo Male Merchant 1 (Specimen)
+2965917	Wind Breeze Shugo Male Merchant 1 (Specimen)
+2965918	Quai Shugo Merchant Male (Specimen)
+2965919	Quai Shugo Merchant Female (Specimen)
 2965920	Wind Breeze Shugo Male Worker
+2965921	Wind Breeze Shugo Male Vigilante Group (Specimen)
+2965922	Wind Breeze Shugo Female Merchant 1 (Specimen)
+2965923	Wind Breeze Shugo Male Merchant 1 (Specimen)
 2965925	Wagon Lugi
 2965926	Shugo Jump Researcher
 2965927	Shugo Jump Researcher
@@ -10542,6 +11917,7 @@
 2989551	Research Team Member
 2989552	Research Team Member
 2989553	Research Team Member
+2989661	Halloween Pumpkin Coin Trader
 2990000	Zumion Villager
 2990001	Refugee Child
 2990002	Refugee Child
@@ -10728,6 +12104,8 @@
 2990229	Netra
 2990230	Cedra
 2990231	Bradi
+2990239	Faint Voice
+2990240	Faint Voice
 2990241	Nemon
 2990242	Nemon
 2990243	Nemon
@@ -11003,6 +12381,8 @@
 2990562	Puru
 2990563	Hui
 2990564	Luka
+2990565	Mua
+2990566	Luka
 2990567	Netra's Companion
 2990568	Netra's Companion
 2990573	Miho
@@ -11140,6 +12520,7 @@
 2990747	Kabor
 2990748	Radahn
 2990749	Tsenka Merchants Guard
+2990750	Mysterious Voice
 2990752	Chamber of Grudges Apparition
 2990753	Lindino
 2990754	Martor
@@ -11174,6 +12555,8 @@
 2990804	Moru
 2990805	Highland Zirka
 2990806	Highland Zirka
+2990812	Cave Echo
+2990813	Cave Echo
 2990815	Vartus
 2990816	Vartus
 2990817	Vartus
@@ -11211,6 +12594,7 @@
 2990859	Dake
 2990860	Kion
 2990861	Disposed Test Subject
+2990866	Lepharist Laboratory Warrior
 2990867	Diel
 2990868	Lowenton
 2990869	Pokhen

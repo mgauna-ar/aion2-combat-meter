@@ -9,7 +9,7 @@ runs Python.
                variant digits of the code it is cast with name them (12350130:
                specialties 1 and 3). S: a stigma, which keeps every specialty it
                unlocked; the code's tens digit counts them (18190041: four).
-  cooldown_ms  the cooldown aion2.app lists, the same at every level.
+  cooldown_ms  the cooldown the skill's record gives, the same at every level.
   cuts         the specialties that shorten the skill's own cooldown, as
                index:ms pairs, comma separated (1:5000 for "-5s cooldown"), or -.
   uses         the specialties that let it be used again before its cooldown, as
@@ -19,16 +19,22 @@ Usage:
   python3 tools/gen_cooldown_table.py            write cooldown_table.inc from the TSV
   python3 tools/gen_cooldown_table.py --check    fail if the .inc is out of date (make test)
   python3 tools/gen_cooldown_table.py --import-pages DIR
-                                            rebuild the TSV from aion2.app's skill
-                                            pages saved in DIR (<code>.html)
+                                            rebuild the TSV from questlog.gg's skill
+                                            records saved in DIR (<code>.json), and
+                                            aion2.app's skill pages (<code>.html) for
+                                            the skills questlog.gg has no record of
 
-The import reads pages you downloaded yourself (see .claude/skills/after-game-patch):
-this script never touches the network.
+questlog.gg's record is the source: aion2.app's Brawler pages lost their names and
+specialties (2026-11), so they filed every Brawler stigma as an active skill and
+left out its cuts. aion2.app still gives the skills questlog.gg does not carry
+(Dodge, the Elementalist's spirits). The import reads pages you downloaded yourself
+(see .claude/skills/after-game-patch): this script never touches the network.
 """
 import argparse
 import datetime
 import glob
 import html
+import json
 import os
 import re
 import sys
@@ -53,6 +59,10 @@ SPECIALTY = re.compile(r'Level<!-- --> <!-- -->(\d+)</span><span class="text-sm[
 OWN_CUT = re.compile(r"^-(\d+(?:\.\d+)?)s cooldown$")
 # More uses before the cooldown: charges.
 MORE_USES = re.compile(r"^\+(\d+) consecutive uses?$")
+# A class skill's code: two class digits (11 to 19), then six. questlog.gg's records
+# also hold the tutorial's copies of a few (98xx) and the common block (Dash, 1101),
+# which aion2.app's class lists never gave.
+CLASS_CODES = range(11_000_000, 20_000_000)
 
 
 def parse_pairs(text, n):
@@ -102,6 +112,46 @@ def render_inc(rows):
     return "\n".join(lines) + "\n"
 
 
+def specialty(words, index, cuts, uses):
+    """Files one specialty's text under the skill's own cut or its extra uses."""
+    cut = OWN_CUT.match(words)
+    if cut:
+        cuts[index] = round(float(cut.group(1)) * 1000)
+    more = MORE_USES.match(words)
+    if more:
+        uses[index] = int(more.group(1))
+
+
+def record_row(path):
+    """(code, row) of one questlog.gg skill record (getSkill): row is (kind,
+    cooldown_ms, cuts, uses), or None for a skill with no cooldown. (None, None) when
+    the site has no such skill."""
+    with open(path, encoding="utf-8") as f:
+        try:
+            d = json.load(f)["result"]["data"]
+        except (ValueError, KeyError, TypeError):
+            sys.exit(f"{path}: not a questlog.gg skill record")
+    if d is None:
+        return None, None
+    if not isinstance(d, dict) or d.get("dbType") != "skill" or not str(d.get("id", "")).isdigit():
+        sys.exit(f"{path}: not a questlog.gg skill record")
+    code, ms = int(d["id"]), d.get("cooldown") or 0
+    if code not in CLASS_CODES or not isinstance(ms, int) or ms <= 0:
+        return code, None
+    # `type` says stigma where `subCategory` is missing (the skills under another's,
+    # such as Blade Dance).
+    kind = "S" if "stigma" in (d.get("type"), d.get("subCategory")) else "A"
+    cuts = {}
+    uses = {}
+    for s in d.get("specializations") or []:
+        index = s.get("slot")
+        if not isinstance(index, int) or not 1 <= index <= MAX_SPECIALTIES:
+            continue
+        words = html.unescape(" ".join(re.sub(r"<[^>]+>", "", str(s.get("specialized") or "")).split()))
+        specialty(words, index, cuts, uses)
+    return code, (kind, ms, cuts, uses)
+
+
 def page_row(text):
     """(code, kind, cooldown_ms, cuts, uses) of one saved page, or None for a skill with no cooldown."""
     canonical = CANONICAL.search(text)
@@ -124,25 +174,30 @@ def page_row(text):
             if index > MAX_SPECIALTIES:
                 break
             words = html.unescape(" ".join(re.sub(r"<[^>]+>", "", m.group(2)).split()))
-            cut = OWN_CUT.match(words)
-            if cut:
-                cuts[index] = round(float(cut.group(1)) * 1000)
-            more = MORE_USES.match(words)
-            if more:
-                uses[index] = int(more.group(1))
+            specialty(words, index, cuts, uses)
     return int(canonical.group(1)), kind, ms, cuts, uses
 
 
 def import_pages(folder):
+    records = sorted(glob.glob(os.path.join(folder, "*.json")))
+    if not records:
+        sys.exit(f"no questlog.gg skill records (*.json) in {folder}")
     rows = {}
-    pages = sorted(glob.glob(os.path.join(folder, "*.html")))
-    if not pages:
-        sys.exit(f"no *.html in {folder}")
-    for page in pages:
+    recorded = set()
+    for path in records:
+        code, row = record_row(path)
+        if code is not None:
+            recorded.add(code)
+        if row is not None:
+            rows[code] = row
+    from_questlog = len(rows)
+    for page in sorted(glob.glob(os.path.join(folder, "*.html"))):
         with open(page, encoding="utf-8") as f:
             row = page_row(f.read())
-        if row is not None:
+        # questlog.gg's record wins, even one that gives no cooldown.
+        if row is not None and row[0] not in recorded:
             rows[row[0]] = row[1:]
+    print(f"{from_questlog} cooldowns from questlog.gg, {len(rows) - from_questlog} from aion2.app's pages")
     today = datetime.date.today().isoformat()
     with open(TSV, "w", encoding="utf-8", newline="\n") as f:
         f.write(
@@ -151,10 +206,12 @@ def import_pages(folder):
             "# kind: A, an active skill whose specialties are picked (the cast code's variant\n"
             "# digits name them); S, a stigma, which keeps all it unlocked (the tens digit\n"
             "# counts them). cuts: the specialties that shorten the skill's own cooldown, as\n"
-            "# index:ms in the page's order; - for none. uses: the ones that allow more uses\n"
+            "# index:ms by specialty slot; - for none. uses: the ones that allow more uses\n"
             "# before the cooldown (\"+1 consecutive use\"), as index:count.\n"
             "#\n"
-            f"# Source: aion2.app's skill pages (aion2.app/db/skills/<code>), retrieved {today}.\n"
+            f"# Sources, retrieved {today}: questlog.gg's skill records\n"
+            "# (questlog.gg/aion-2/en/db/skill/<code>), and aion2.app's skill pages\n"
+            "# (aion2.app/db/skills/<code>) for the skills questlog.gg has no record of.\n"
             "# Regenerate with tools/gen_cooldown_table.py.\n"
         )
         for code, (kind, ms, cuts, uses) in sorted(rows.items()):

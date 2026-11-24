@@ -2,7 +2,7 @@
 """Skill names: src/game/data/skills.tsv to src/game/src/skill_table.inc.
 
 The TSV is the source of truth: one `code<TAB>name[<TAB>icon]` per line, `#` for
-comments. The icon is the skill's icon on aion2.app (ICON_AS_SKILL_001; for a
+comments. The icon is the game's name for the skill's icon (ICON_AS_SKILL_001; for a
 Theostone's hit, its item's), which tools/gen_icon_sheet.py packs for the app; the
 .inc here holds the names only. It
 is generated from the TSV and committed, so the build never runs Python.
@@ -11,10 +11,14 @@ Usage:
   python3 tools/gen_skill_table.py            write skill_table.inc from the TSV
   python3 tools/gen_skill_table.py --check    fail if the .inc is out of date (make test)
   python3 tools/gen_skill_table.py --import-pages DIR
-                                            rebuild the TSV from aion2.app's skill
-                                            list pages saved in DIR (page1.html, ...),
-                                            and questlog.gg's (*.json) for the skills
-                                            those list without a name
+                                            rebuild the TSV from questlog.gg's skill
+                                            list pages saved in DIR (*.json), and
+                                            aion2.app's (page1.html, ...) for the
+                                            skills questlog.gg does not list
+
+questlog.gg's list is the source: aion2.app's has lost names (the Brawler's, 2026-11).
+aion2.app's still gives the skills questlog.gg's leaves out: Dodge, each class's
+weapon, the Elementalist's spirits, and skills no class's tree shows.
 
 The import rewrites the rows above the TSV's "# By hand" line and keeps that line and
 everything after it. It reads pages you downloaded yourself (see
@@ -133,33 +137,34 @@ def read_questlog(folder):
 
 
 def import_pages(folder):
-    rows = {}
-    # Skills the pages list without an English name: the site dropped the Brawler's
-    # (2026-11) while still listing them. questlog.gg's list names them; failing
-    # that, a name already in the TSV stays.
+    rows = read_questlog(folder)
+    if not rows:
+        sys.exit(f"no questlog.gg skill list pages (*.json) in {folder}")
+    from_questlog = len(rows)
+    # Skills aion2.app's pages list without an English name (the Brawler's, since
+    # 2026-11): failing questlog.gg, a name already in the TSV stays.
     unnamed = {}
     pages = sorted(glob.glob(os.path.join(folder, "page*.html")))
     if not pages:
-        sys.exit(f"no page*.html in {folder}")
+        sys.exit(f"no aion2.app skill list pages (page*.html) in {folder}")
     for page in pages:
         with open(page, encoding="utf-8") as f:
             s = f.read()
         for m in re.finditer(r'href="/db/skills/(\d+)"[^>]*>(.*?)</a>', s, re.S):
+            code = int(m.group(1))
             parts = [html.unescape(" ".join(p.split())) for p in re.split(r"<[^>]+>", m.group(2))]
             parts = [p for p in parts if p]
             icon = re.search(r'/db-item-icons/(ICON_\w+)\.webp', m.group(2))
             icon = icon.group(1) if icon else ""
-            if parts and parts[0] not in PLACEHOLDERS:
-                rows[int(m.group(1))] = (parts[0], icon)
+            if code in rows:
+                # questlog.gg gives no icon for the common block's (Glide, Flight).
+                if not rows[code][1] and icon:
+                    rows[code] = (rows[code][0], icon)
+            elif parts and parts[0] not in PLACEHOLDERS:
+                rows[code] = (parts[0], icon)
             else:
-                unnamed[int(m.group(1))] = icon
-    filled = 0
-    for code, (name, icon) in read_questlog(folder).items():
-        if code not in rows:
-            rows[code] = (name, unnamed.get(code) or icon)
-            filled += 1
-    if filled:
-        print(f"took questlog.gg's name for {filled} skills aion2.app does not name")
+                unnamed[code] = icon
+    print(f"{from_questlog} skills from questlog.gg, {len(rows) - from_questlog} more from aion2.app's pages")
     hand_codes = codes_by_hand(TSV)
     for code in hand_codes & rows.keys():
         print(f"skill {code} is in the TSV's \"# By hand\" section; kept that row", file=sys.stderr)
@@ -171,7 +176,7 @@ def import_pages(folder):
                 rows[code] = (name, unnamed[code])
                 kept += 1
     if kept:
-        print(f"kept the TSV's name for {kept} skills the pages list unnamed")
+        print(f"kept the TSV's name for {kept} skills neither site names")
     today = datetime.date.today().isoformat()
     hand = hand_section(TSV)  # read before the TSV is truncated below
     with open(TSV, "w", encoding="utf-8", newline="\n") as f:
@@ -184,10 +189,11 @@ def import_pages(folder):
             "# name. The third column, when there is one, names the skill's icon, which\n"
             "# tools/gen_icon_sheet.py packs for the app.\n"
             "#\n"
-            f"# Source: aion2.app's skill database (aion2.app/db/skills), retrieved {today};\n"
-            "# the site says its data comes from NCSOFT's official AION 2 API. English\n"
-            "# names as the site lists them. A skill it lists without a name (the\n"
-            "# Brawler's) takes questlog.gg's (questlog.gg/aion-2/en/db/skills).\n"
+            f"# Sources, retrieved {today}: questlog.gg's skill database\n"
+            "# (questlog.gg/aion-2/en/db/skills), English names as it lists them; and\n"
+            "# aion2.app's (aion2.app/db/skills) for the skills questlog.gg does not list\n"
+            "# (Dodge, the weapons, the Elementalist's spirits), which the site says it\n"
+            "# reads from NCSOFT's official AION 2 API.\n"
             "# Regenerate with tools/gen_skill_table.py.\n"
         )
         for code, (name, icon) in sorted(rows.items()):

@@ -38,20 +38,22 @@ fight with known hit numbers (README, "Recording a capture"). Put it in
 
 A patch can add or rename skills. Rows the meter cannot name read "Skill 12345678".
 
-1. **Download the list.** Fetch aion2.app's skill list pages into an empty folder:
+1. **Download the lists.** questlog.gg's skill list is the source (`pageCount` in a
+   page says how many pages it has), and aion2.app's list pages give the skills it
+   leaves out, into the same empty folder. Stop at aion2.app's first page that lists
+   no skills:
    ```bash
-   mkdir -p /tmp/skills && for p in $(seq 1 12); do curl -sSL -o /tmp/skills/page$p.html "https://aion2.app/db/skills?page=$p"; sleep 1; done
-   ```
-   Stop at the first page that lists no skills. aion2.app lists some skills with no
-   English name (the Brawler's, since 2026-11); questlog.gg's list names them, so
-   take its pages into the same folder (`pageCount` in a page says how many):
-   ```bash
+   mkdir -p /tmp/skills
    for p in $(seq 1 10); do curl -sSL -G -o /tmp/skills/questlog$p.json --data-urlencode "input={\"language\":\"en\",\"page\":$p}" "https://questlog.gg/aion-2/api/trpc/database.getSkills"; sleep 1; done
+   for p in $(seq 1 12); do curl -sSL -o /tmp/skills/page$p.html "https://aion2.app/db/skills?page=$p"; sleep 1; done
    ```
 2. **Rebuild the table.** Run `python3 tools/gen_skill_table.py --import-pages /tmp/skills`.
    It rewrites `src/game/data/skills.tsv` (names, and each skill's icon) and
-   `skill_table.inc`. A skill aion2.app lists with no English name takes
-   questlog.gg's, or failing that keeps the name the TSV had. The TSV's `# By hand`
+   `skill_table.inc`. questlog.gg's name and icon win; aion2.app's list adds the
+   skills questlog.gg's does not carry (Dodge, each class's weapon, the
+   Elementalist's spirits, skills no class's tree shows), and the icon questlog.gg
+   gives none for (the common block's: Glide, Flight). A skill neither site names
+   keeps the name the TSV had. The TSV's `# By hand`
    section (the damage Theostones' hits, which neither site lists as skills) stays
    as it is. A patch that adds Theostones adds rows there by its rule
    (AGENTS.md, Skill codes), from questlog.gg's items
@@ -134,17 +136,45 @@ missing.
 
 A patch can add monsters and NPCs. Ones the meter cannot name read "NPC #2345678".
 
-1. **Download the lists.** The monster list has about 126 pages and the NPC list about
-   62, at the time of writing. The site's pager shows the count:
+1. **Download questlog.gg's list.** It is the source: every difficulty's id of a boss,
+   and the boss mechanics and summons. A query returns at most 1,000 of its 13,557
+   (2026-11), so each category is split by name prefix (`a`, then `da`, `db`, ...
+   where a prefix still holds more): about 1,300 queries, some 20 minutes:
    ```bash
-   mkdir -p /tmp/npcs
-   for p in $(seq 1 126); do curl -sSL -o /tmp/npcs/monsters-$p.html "https://aion2.app/db/monsters?page=$p"; sleep 1; done
-   for p in $(seq 1 62); do curl -sSL -o /tmp/npcs/npcs-$p.html "https://aion2.app/db/npcs?page=$p"; sleep 1; done
+   mkdir -p /tmp/npcs/questlog && cd /tmp/npcs/questlog
+   get() { curl -sSL -G -o "$1" --data-urlencode "input=$2" "https://questlog.gg/aion-2/api/trpc/database.getNpcs"; sleep 0.5; }
+   hits() { python3 -c 'import json,sys; d=json.load(open(sys.argv[1]))["result"]["data"]; print(sum(d["facetDistribution"].get("createdAt",{}).values()))' "$1"; }
+   query() { printf '{"language":"en","page":%s,"mainCategory":"%s","searchTerm":"%s"}' "$3" "$1" "$2"; }
+   crawl() {
+     local c=$1 t=$2 f="$1-$2-1.json" n p x
+     get "$f" "$(query "$c" "$t" 1)"; n=$(hits "$f")
+     if [ "$n" -gt 1000 ]; then
+       rm "$f"; for x in a b c d e f g h i j k l m n o p q r s t u v w x y z 0 1 2 3 4 5 6 7 8 9; do crawl "$c" "$t$x"; done; return
+     fi
+     for ((p = 2; p <= (n + 39) / 40; p++)); do get "$c-$t-$p.json" "$(query "$c" "$t" "$p")"; done
+   }
+   get all.json '{"language":"en","page":1}'
+   for c in monster citizen summon bot etc; do crawl "$c" ""; done
    ```
-2. **Rebuild the table.** Run `python3 tools/gen_npc_table.py --import-pages /tmp/npcs`.
-   It rewrites `src/game/data/npcs.tsv` and `npc_table.inc`, and warns when a list came
-   out shorter than the site says it is (a page missing or cut off).
-3. **Check the diff.** New ids are expected. A known id under another name is not, and
+   The page loop is bash's own, not `seq 2 N`: macOS's `seq` counts down when N is
+   under 2, which fetches pages 2, 1 and 0 of every small prefix. `all.json`'s count
+   is the whole list's; the import checks the pages hold it all.
+   Should it say they do not, look for a category this loop does not name (a
+   page's `mainCategory`).
+2. **Download aion2.app's lists,** into the folder above that one. They give the ids
+   questlog.gg does not list. The monster list has about 127 pages and the NPC list
+   about 63 (60 a page), at the time of writing. The site's pager shows the count:
+   ```bash
+   for p in $(seq 1 127); do curl -sSL -o /tmp/npcs/monsters-$p.html "https://aion2.app/db/monsters?page=$p"; sleep 1; done
+   for p in $(seq 1 63); do curl -sSL -o /tmp/npcs/npcs-$p.html "https://aion2.app/db/npcs?page=$p"; sleep 1; done
+   cp /tmp/npcs/questlog/*.json /tmp/npcs/
+   ```
+3. **Rebuild the table.** Run `python3 tools/gen_npc_table.py --import-pages /tmp/npcs`.
+   It rewrites `src/game/data/npcs.tsv` and `npc_table.inc`. It warns when a list came
+   out shorter than its site says it is (a page or a query missing), names each id
+   the two sites name apart (questlog.gg's name is taken), and counts the
+   developers' identifiers it leaves out (`Test_D1_DQ_Seal4_Buff`).
+4. **Check the diff.** New ids are expected. A known id under another name is not, and
    means the ids were renumbered.
 
 ## 6. Refresh the cooldowns
@@ -153,20 +183,26 @@ A patch can change a cooldown or a specialty. The Auras plugin's cooldowns start
 `plugins/auras/data/cooldowns.tsv`; a stale row makes them run long or short until the
 plugin learns the skill's quickest reuse again.
 
-1. **Download the pages.** Each class's list gives its skills' pages (Elementalist and
+1. **Download the records.** questlog.gg's record of each skill on its list (step 3's
+   list pages) gives the cooldown and the specialties. aion2.app's pages fill in the
+   skills it has no record of; each class's list gives them (Elementalist and
    Gladiator have a second list page at the time of writing; add one for any class
    whose list shows 60):
    ```bash
    mkdir -p /tmp/cooldowns/list /tmp/cooldowns/pages
+   python3 -c 'import json,glob; [print(r["id"]) for f in glob.glob("/tmp/skills/questlog*.json") for r in json.load(open(f))["result"]["data"]["pageData"]]' | sort -u > /tmp/cooldowns/questlog-ids.txt
+   while read -r id; do curl -sSL -G -o "/tmp/cooldowns/pages/$id.json" --data-urlencode "input={\"language\":\"en\",\"id\":\"$id\"}" "https://questlog.gg/aion-2/api/trpc/database.getSkill"; sleep 0.3; done < /tmp/cooldowns/questlog-ids.txt
    for c in Gladiator Templar Assassin Ranger Sorcerer Elementalist Cleric Chanter Fighter; do for p in 1 2; do curl -sSL -o "/tmp/cooldowns/list/$c-$p.html" "https://aion2.app/db/skills?class=$c&page=$p"; sleep 1; done; done
-   grep -oh 'href="/db/skills/[0-9]*"' /tmp/cooldowns/list/*.html | grep -oE '[0-9]{8}' | sort -u > /tmp/cooldowns/ids.txt
-   while read -r id; do curl -sSL -o "/tmp/cooldowns/pages/$id.html" "https://aion2.app/db/skills/$id"; sleep 1; done < /tmp/cooldowns/ids.txt
+   grep -oh 'href="/db/skills/[0-9]*"' /tmp/cooldowns/list/*.html | grep -oE '[0-9]{8}' | sort -u | comm -23 - /tmp/cooldowns/questlog-ids.txt > /tmp/cooldowns/aion2app-ids.txt
+   while read -r id; do curl -sSL -o "/tmp/cooldowns/pages/$id.html" "https://aion2.app/db/skills/$id"; sleep 1; done < /tmp/cooldowns/aion2app-ids.txt
    ```
 2. **Rebuild the table.** Run `python3 tools/gen_cooldown_table.py --import-pages /tmp/cooldowns/pages`.
-   It rewrites `plugins/auras/data/cooldowns.tsv` and `cooldown_table.inc`.
+   It rewrites `plugins/auras/data/cooldowns.tsv` and `cooldown_table.inc`, and says
+   how many rows each site gave.
 3. **Check the diff.** Changed cooldowns and cuts are expected. Every row turning
-   A or S, or every cut vanishing, means the page's layout moved: look at one page's
-   specialty rows and the importer's patterns.
+   A or S, or every cut vanishing, means a record's shape moved: look at one
+   record's `type` and `specializations` (`slot`, `specialized`), or for aion2.app's
+   rows one page's specialty rows, against the importer's patterns.
 
 ## 7. Check and ship
 

@@ -6,10 +6,11 @@
 # name. The third column, when there is one, names the skill's icon, which
 # tools/gen_icon_sheet.py packs for the app.
 #
-# Source: aion2.app's skill database (aion2.app/db/skills), retrieved 2026-11-12;
-# the site says its data comes from NCSOFT's official AION 2 API. English
-# names as the site lists them. A skill it lists without a name (the
-# Brawler's) takes questlog.gg's (questlog.gg/aion-2/en/db/skills).
+# Sources, retrieved 2026-11-24: questlog.gg's skill database
+# (questlog.gg/aion-2/en/db/skills), English names as it lists them; and
+# aion2.app's (aion2.app/db/skills) for the skills questlog.gg does not list
+# (Dodge, the weapons, the Elementalist's spirits), which the site says it
+# reads from NCSOFT's official AION 2 API.
 # Regenerate with tools/gen_skill_table.py.
 1001	Glide	ICON_CO_SKILL_004
 1002	Flight	ICON_CO_SKILL_011
@@ -60,7 +61,7 @@
 11210000	Ankle Smash	ICON_GL_SKILL_021
 11230000	Rush	ICON_GL_SKILL_015
 11240000	Wrath Wave	ICON_GL_SKILL_007
-11250000	Zikel's Blessing	ICON_GL_SKILL_024
+11250000	Zikel's Blessing	ICON_GL_SKILL_040
 11260000	Defiance	ICON_CO_SKILL_002
 11270000	Survival Stance	ICON_GL_SKILL_026
 11280000	Sword Aura Rampage	ICON_TE_SKILL_034
@@ -76,7 +77,7 @@
 11370000	Forced Fall	ICON_GL_SKILL_016
 11380000	Tenaciousness	ICON_GL_SKILL_038
 11390000	Rage Burst	ICON_GL_SKILL_039
-11400000	Lunge Stance	ICON_GL_SKILL_040
+11400000	Lunge Stance	ICON_GL_SKILL_024
 11410000	Wave Armor	ICON_GL_SKILL_041
 11420000	Smashing Blow	ICON_GL_SKILL_042
 11430000	Forced Restraint	ICON_GL_SKILL_043
@@ -265,7 +266,7 @@
 15270000	Summon Flame	ICON_SO_SKILL_024
 15280000	Bittercold Wind	ICON_SO_SKILL_025
 15290000	Illusion	ICON_SO_SKILL_026
-15300000	Lumiel's Space	ICON_SO_SKILL_017
+15300000	Lumiel's Space	ICON_SO_SKILL_027
 15310000	Wish of Concentration	ICON_SO_SKILL_028
 15320000	Delayed Explosion	ICON_SO_SKILL_032
 15330000	Winter's Illusion	ICON_SO_SKILL_033

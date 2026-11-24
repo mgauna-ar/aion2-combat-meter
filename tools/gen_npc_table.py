@@ -8,8 +8,18 @@ Usage:
   python3 tools/gen_npc_table.py            write npc_table.inc from the TSV
   python3 tools/gen_npc_table.py --check    fail if the .inc is out of date (make test)
   python3 tools/gen_npc_table.py --import-pages DIR
-                                          rebuild the TSV from aion2.app's monster and
-                                          NPC list pages saved in DIR (*.html)
+                                          rebuild the TSV from questlog.gg's NPC list
+                                          pages saved in DIR (*.json), and aion2.app's
+                                          monster and NPC list pages (*.html) for the
+                                          ids questlog.gg does not list
+
+questlog.gg's list is the source, the user's call (2026-11-24): it holds every
+difficulty's id of a boss, where aion2.app's lists give one, mostly the Conquest
+tier's (Ludra's Easy tier showed as "NPC #2301038"), and the boss mechanics and
+summons (2,920,xxx) aion2.app leaves out. A query returns at most 1,000 of its
+13,557, so the skill's download splits it by name; the import says when the pages
+hold fewer than the whole. Its developers' identifiers (M_Summon_Kashapa_01_V01_018)
+are no name to show, and are skipped.
 
 The import reads pages you downloaded yourself (see .claude/skills/after-game-patch):
 this script never touches the network.
@@ -51,10 +61,44 @@ def item_lists(text):
                 yield entity
 
 
+# A developer's identifier, not a name: one word of letters, digits and underscores,
+# with an underscore in it (Test_D1_DQ_Seal4_Buff, N_Invisible_Summon_DredgionB_01).
+IDENTIFIER = re.compile(r"[A-Za-z0-9]*_[A-Za-z0-9_]*")
+
+
+def read_questlog(folder):
+    """({id: name}, the whole list's count) from questlog.gg's NPC list pages (*.json).
+    The count is the largest a page gives: the unfiltered query's."""
+    rows = {}
+    total = 0
+    for path in sorted(glob.glob(os.path.join(folder, "*.json"))):
+        with open(path, encoding="utf-8") as f:
+            try:
+                data = json.load(f)["result"]["data"]
+                entries = data["pageData"]
+            except (ValueError, KeyError, TypeError):
+                sys.exit(f"{path}: not a questlog.gg NPC list page")
+        total = max(total, sum((data.get("facetDistribution") or {}).get("createdAt", {}).values()))
+        for e in entries:
+            if e.get("dbType") != "npc":
+                sys.exit(f"{path}: not a questlog.gg NPC list page")
+            npc_id = str(e.get("id", ""))
+            name = " ".join(str(e.get("name", "")).split())  # no tab or newline
+            if npc_id.isdigit() and name:
+                rows[int(npc_id)] = name
+    return rows, total
+
+
 def import_pages(folder):
+    questlog, total = read_questlog(folder)
+    if not questlog:
+        sys.exit(f"no questlog.gg NPC list pages (*.json) in {folder}")
+    if len(questlog) < total:
+        print(f"questlog.gg: {len(questlog)} of the site's {total}; a query or a page "
+              "is missing?", file=sys.stderr)
     pages = sorted(glob.glob(os.path.join(folder, "*.html")))
     if not pages:
-        sys.exit(f"no .html pages in {folder}")
+        sys.exit(f"no aion2.app list pages (*.html) in {folder}")
     found = {kind: {} for kind in KINDS}
     listed = {}
     for page in pages:
@@ -83,23 +127,42 @@ def import_pages(folder):
                   "a page is missing?", file=sys.stderr)
     if not rows:
         sys.exit(f"no monsters or NPCs found in {folder}")
+    from_aion2app = len(rows)
+    named_apart = []
+    identifiers = 0
+    for npc_id, name in questlog.items():
+        if IDENTIFIER.fullmatch(name):
+            identifiers += 1
+            continue
+        if npc_id in rows and rows[npc_id] != name:
+            named_apart.append((npc_id, rows[npc_id], name))
+        rows[npc_id] = name
+    for npc_id, theirs, ours in sorted(named_apart):
+        print(f"{npc_id}: {theirs!r} on aion2.app, {ours!r} on questlog.gg; took questlog.gg's",
+              file=sys.stderr)
+    only_aion2app = sum(1 for npc_id in rows if npc_id not in questlog)
+    print(f"{len(questlog) - identifiers} names from questlog.gg ({identifiers} identifiers "
+          f"left out), {only_aion2app} more from aion2.app's {from_aion2app}; "
+          f"{len(named_apart)} named apart")
     today = datetime.date.today().isoformat()
     with open(TSV, "w", encoding="utf-8", newline="\n") as f:
         f.write(
             "# AION 2 monster and NPC names by npc code, the u32 a spawn (41 36) carries\n"
             "# after its mask. Every mob spawn in the first capture carried one of these.\n"
             "#\n"
-            f"# Source: aion2.app's monster and NPC lists (aion2.app/db/monsters and\n"
-            f"# aion2.app/db/npcs), retrieved {today}; the site says it reads them from the\n"
-            "# game client. metabot.gg, read from the client on its own, gives the same ids\n"
-            "# for the bosses compared (2310601 Atiel, 2301014 Eternal Ludra). A name can\n"
-            "# have several ids, one per level or difficulty. Where both lists give an id,\n"
-            "# the monster's name is kept. Regenerate with tools/gen_npc_table.py.\n"
+            f"# Sources, retrieved {today}: questlog.gg's NPC database\n"
+            "# (questlog.gg/aion-2/en/db/npcs), every difficulty's id of a boss and the\n"
+            "# mechanics and summons among them; and aion2.app's monster and NPC lists\n"
+            "# (aion2.app/db/monsters, aion2.app/db/npcs) for the ids questlog.gg does not\n"
+            "# list. metabot.gg, read from the client on its own, gives the same ids for the\n"
+            "# bosses compared (2310601 Atiel, 2301014 Eternal Ludra). A name can have\n"
+            "# several ids, one per level or difficulty. A developer's identifier\n"
+            "# (Test_D1_DQ_Seal4_Buff) is no name and is left out. Regenerate with\n"
+            "# tools/gen_npc_table.py.\n"
         )
         for npc_id, name in sorted(rows.items()):
             f.write(f"{npc_id}\t{name}\n")
-    counts = ", ".join(f"{len(found[kind])} {kind}" for kind in KINDS)
-    print(f"wrote {len(rows)} names ({counts}) to {os.path.relpath(TSV, ROOT)}")
+    print(f"wrote {len(rows)} names to {os.path.relpath(TSV, ROOT)}")
 
 
 def render_inc(rows):
