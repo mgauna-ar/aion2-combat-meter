@@ -202,7 +202,9 @@ tools/screenshots/  renders docs/images from overlay_view and app_frame (softwar
 tools/check_forbidden_apis.sh, tools/embed_icon_font.py
 tools/gen_app_icon.py            the app's mark (wings around a crystal, our own drawing)
                                  → app.ico and app_mark.inc
-tools/gen_skill_table.py         skills.tsv → skill_table.inc (`make test` checks they agree);
+tools/gen_skill_table.py         questlog.gg's skill list, and aion2.app's for the skills it
+                                 leaves out → skills.tsv → skill_table.inc (`make test`
+                                 checks they agree);
                                  the TSV's third column names each skill's icon, and its
                                  `# By hand` section (the Theostones) outlives an import
 tools/gen_icon_sheet.py          aion2.app's class emblems, skill icons and item icons →
@@ -212,9 +214,11 @@ tools/gen_effect_table.py        questlog.gg's status-effect pages → effects.t
                                  (the same)
 tools/gen_map_table.py           aion2.app's dungeon pages and questlog.gg's dungeon
                                  records → maps.tsv → map_table.inc (the same)
-tools/gen_npc_table.py           aion2.app's monster and NPC pages → npcs.tsv → npc_table.inc
-tools/gen_cooldown_table.py      aion2.app's skill pages → cooldowns.tsv → cooldown_table.inc
-                                 (the same)
+tools/gen_npc_table.py           questlog.gg's NPC list, and aion2.app's monster and NPC
+                                 pages for the ids it leaves out → npcs.tsv → npc_table.inc
+tools/gen_cooldown_table.py      questlog.gg's skill records, and aion2.app's skill pages for
+                                 the skills it has none of → cooldowns.tsv →
+                                 cooldown_table.inc (the same)
 tests/           TEST_CASE framework (ported), one test_<concern>.cpp per area
 ```
 
@@ -380,10 +384,12 @@ It gave the faction (Identity, below).
     There `code / 100` is the skill (`game::skill_base`): read by the ten thousands,
     the dungeon capture's Dodge 15000101 named the Sorcerer's weapon.
   - A spirit's attacks (1699xxxx) carry its summoner's class digits and have no name.
-  - Names come from `src/game/data/skills.tsv`, taken from aion2.app's skill
-    database; the skills it lists with no English name (33 of the Brawler's,
-    2026-11) take questlog.gg's. Checked against the first capture: every Templar and Elementalist code
-    resolved to that class.
+  - Names come from `src/game/data/skills.tsv`, taken from questlog.gg's skill
+    database, the user's call (2026-11-24): aion2.app's had lost the Brawler's
+    names and specialties. The two named all 364 skills both list alike.
+    aion2.app's adds what questlog.gg's leaves out: Dodge, each class's weapon, the
+    Elementalist's spirits, skills no class's tree shows. Checked against the first
+    capture: every Templar and Elementalist code resolved to that class.
   - **7-digit codes are no class's,** and neither site lists them: monsters' skills
     (Ludra's 1801xxx), potions (2011101, whose effect 20,111,011 is the Life
     Potion) and Theostones.
@@ -523,8 +529,8 @@ It gave the faction (Identity, below).
     summon seen). 1F/5F are summons (with an owner); 1D/5D are spirits and effects;
     1C is a boss mechanic.
     - **An NPC can own a 1F:** in the Ludra capture, 37 1F spawns (npc 2,920,671
-      and 2,920,702, unlisted) named the boss as owner, each with the boss's own max
-      HP (85,640,625). An Elementalist's spirit (2,920,107) is a 1F owned by a player,
+      Abyssal Wings Ketu and 2,920,702, unnamed) named the boss as owner, each with the boss's own max
+      HP (85,640,625). An Elementalist's spirit (2,920,107, Fire Spirit) is a 1F owned by a player,
       so the kind alone does not tell. Every 5F seen had a player for owner.
       A summon an NPC owns is an enemy of its own to the plugins: the meter books
       no hit on it, nor its death, to the boss, and the Auras' target stays on the
@@ -532,21 +538,33 @@ It gave the faction (Identity, below).
   - **Aimed at a player:** bit 0 of the mask's third byte (`1C 00 01`, also on kinds
     14 and 54) puts a name before the npc code: length u8, then the name of the
     party member the mechanic is aimed at. All 57 such spawns in the second capture
-    carried one, then a valid code (2,920,360, 364, 371 or 474, none listed).
+    carried one, then a valid code (2,920,360, 364, 371 or 474: Vakron's Thorn
+    Root, Gluttonous Tiere, Thamon, Thamon's Petrification).
     - The 10-HP and 3-HP ones are traps around that player, which the others break
       1 damage a hit. The game's window counts neither those hits nor their damage.
     - Read as the code, the name's first bytes made "NPC #1818840325" and the like.
   - **Npc code:** the u32 after the mask, or after the name. Names come from `src/game/data/npcs.tsv`
-    (aion2.app's 7,545 monsters and 3,719 NPCs; metabot.gg agrees on the bosses
-    compared): seven digits, 2,000,002 to 2,990,928, one id per level or difficulty.
+    (questlog.gg's 13,557 NPCs, 12,644 of them named, and one more of aion2.app's;
+    metabot.gg agrees on the bosses compared): seven digits, 2,000,000 to 2,990,928,
+    one id per level or difficulty.
+    - **questlog.gg's list, the user's call (2026-11-24).** aion2.app's lists (11,281)
+      give one id per boss, mostly its Conquest tier's: Ludra's Easy tier (2301030
+      to 2301038) showed as "NPC #2301038". Nor did they list the boss mechanics and
+      summons (2,920,xxx) the captures carry. Where both named an id they agreed but
+      for a hyphen ("Grudge-Bearing") and one word ("Tundra Lagur").
+    - **913 of questlog.gg's are developers' identifiers**
+      (`M_Summon_Kashapa_01_V01_018`, `Test_D1_DQ_Seal4_Buff`): no name to show,
+      left out, so they read "NPC #code".
+    - A query of its list returns at most 1,000; the skill `after-game-patch` splits
+      it by name prefix.
     - Checked against the first capture: all 10 mob spawns carried a listed code
-      there (Highland Odyle Sparkie, Docile Highland Brax). The summon's code
-      (2,920,107) is not listed.
+      there (Highland Odyle Sparkie, Docile Highland Brax), and the summon's
+      (2,920,107) is the Fire Spirit.
     - It was read as the u24 a byte later until then: the code's upper bytes, 8206 for
       every 2,100,7xx mob.
     - Checked against the second capture: its bosses (Tiere, Thamon, Vakron) and its
-      trash named themselves from their spawn's code. The boss adds and mechanics
-      (2,920,xxx) are not listed.
+      trash named themselves from their spawn's code, and so do the boss adds and
+      mechanics (2,920,xxx) since questlog.gg's list.
     - A code not listed shows as "NPC #code".
   - **Position and HP:** the first `00 (00|40) 02` marker followed by a sane xyz f32
     triple, a heading f32, a u16, a byte (01; 00 for a corpse coming into view, with
@@ -718,7 +736,8 @@ capture, where all 17,182 records parse):
   specialty slots (8: one, 12: two, 20: three).
 - **Specialties are in the cast's code.** The variant digits of the code a skill is
   used with (01 38, 04 38) are the specialties picked: Warding Strike at level 13 is
-  cast as 12350130, specialties 1 and 3 (aion2.app's order on its page). On every skill
+  cast as 12350130, specialties 1 and 3 (their slots on questlog.gg, aion2.app's
+  order on its page). On every skill
   whose level the capture gave, the count of picks matched the slots.
 - **Seen, not read:** `1b 92` is a party member's HP and MP (id, cur and max HP varints,
   MP u32 twice; 21,750 / 23,170), `1c 92` their position and legion name; `4a 36` the
@@ -835,7 +854,7 @@ the three captures read as a point on their map):
   hard they hit, not stated by any source. Tier 2's (`30002xx`, the 15,000 stones)
   have not been seen. Whether a Poison or Bleed Theostone's tick (05 38) carries
   `3000T15` / `3000T16` or its effect's `3001T15` / `3001T16` is not known either;
-- what the 5-HP object (2,920,366, kind 14, no name) the party broke in the second
+- what the 5-HP object (2,920,366, kind 14, "Detoxifying Rafflesia") the party broke in the second
   capture's first boss fight is: its 1-damage hits still count, while the game's
   window for that fight was not checked;
 - `boss_min_max_hp` (1,000,000) against other dungeons: the second capture's bosses
@@ -898,7 +917,8 @@ in 2026-10.
   Unreal builds into the executable.
 - **NC's tables:** NC's own tables (`StartUpData/Table/*.dat`, `L10N/<lang>/L10NString.dat`)
   sit next to a `key_manifest.dat`, so a second layer of encryption is likely.
-- **Instead:** names come from public databases (aion2.app) and from captures.
+- **Instead:** names come from public databases (questlog.gg, aion2.app) and from
+  captures.
 
 ---
 

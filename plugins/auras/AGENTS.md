@@ -132,8 +132,8 @@ watch list and what the overlay shows are the tracker's own.
 
 ## ⏳ Cooldowns (`CooldownTracker`, the local player's only; estimates, shown with `~`)
 
-- A use (01 38) starts `listed_cooldown_ms`: `cooldowns.tsv`'s figure (aion2.app's,
-  the same at every level) less the "−Ns cooldown" specialties in play. An active
+- A use (01 38) starts `listed_cooldown_ms`: `cooldowns.tsv`'s figure (questlog.gg's,
+  aion2.app's for the skills it has no record of; the same at every level) less the "−Ns cooldown" specialties in play. An active
   skill's are the picks its cast code's variant digits name; a stigma's, the first n
   it unlocked, n its tens digit.
 - The estimate then shortens to the quickest reuse seen this session, which is where
@@ -146,8 +146,10 @@ watch list and what the overlay shows are the tracker's own.
     use left, it showed the skill cooling with a use still there. Whether the game
     cuts that use or both is unknown (AGENTS.md, Unknown or guessed).
 - Another local character starts from nothing learned, as they log in.
-- aion2.app's Brawler pages list no specialties (2026-11): Brawler cooldowns start
-  from the listed figure, and every Brawler row reads as an active skill.
+- The figures came from aion2.app's pages until 2026-11-24, whose Brawler pages had
+  lost their specialties: every Brawler stigma read as an active skill, and Phantom's,
+  Full Force's and Shoulder Tackle's cuts and three skills' second use were missing.
+  questlog.gg's records give them.
 - Checked on the second capture: over 274 uses of 12 skills, 13 came while the
   estimate still ran, by at most 0.65 s (0.2 s on average). Each was a reuse
   quicker than any before it, which the estimate then took.

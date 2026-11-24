@@ -3,16 +3,18 @@
 # kind: A, an active skill whose specialties are picked (the cast code's variant
 # digits name them); S, a stigma, which keeps all it unlocked (the tens digit
 # counts them). cuts: the specialties that shorten the skill's own cooldown, as
-# index:ms in the page's order; - for none. uses: the ones that allow more uses
+# index:ms by specialty slot; - for none. uses: the ones that allow more uses
 # before the cooldown ("+1 consecutive use"), as index:count.
 #
-# Source: aion2.app's skill pages (aion2.app/db/skills/<code>), retrieved 2026-11-06.
+# Sources, retrieved 2026-11-24: questlog.gg's skill records
+# (questlog.gg/aion-2/en/db/skill/<code>), and aion2.app's skill pages
+# (aion2.app/db/skills/<code>) for the skills questlog.gg has no record of.
 # Regenerate with tools/gen_cooldown_table.py.
 11000100	A	500	-	-
 11050000	A	20000	-	-
 11060000	A	1000	-	-
 11080000	S	20000	-	-
-11090000	A	1000	-	-
+11090000	S	1000	-	-
 11100000	A	45000	-	-
 11110000	S	20000	-	1:1
 11120000	A	40000	-	-
@@ -253,24 +255,24 @@
 18700000	S	120000	-	-
 19000100	A	500	-	-
 19070000	A	20000	-	-
-19090000	A	15000	-	-
+19090000	A	15000	-	5:1
 19130000	A	10000	-	-
 19160000	A	30000	-	-
 19170000	A	10000	-	-
 19200000	A	10000	-	-
-19230000	A	20000	-	-
-19280000	A	90000	-	-
-19290000	A	60000	-	-
-19300000	A	30000	-	-
-19310000	A	60000	-	-
-19320000	A	30000	-	-
-19330000	A	90000	-	-
-19350000	A	20000	-	-
-19360000	A	180000	-	-
-19370000	A	90000	-	-
-19380000	A	120000	-	-
-19390000	A	45000	-	-
-19400000	A	45000	-	-
+19230000	A	20000	4:10000	-
+19280000	S	90000	-	-
+19290000	S	60000	-	-
+19300000	S	30000	-	4:1
+19310000	S	60000	-	-
+19320000	S	30000	-	-
+19330000	S	90000	4:30000	-
+19350000	S	20000	-	1:1
+19360000	S	180000	-	-
+19370000	S	90000	3:30000	-
+19380000	S	120000	-	-
+19390000	S	45000	-	-
+19400000	S	45000	-	-
 19420000	A	10000	-	-
 19450000	A	60000	-	-
-19460000	A	30000	-	-
+19460000	S	30000	-	-
