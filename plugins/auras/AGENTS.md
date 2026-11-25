@@ -122,13 +122,51 @@ watch list and what the overlay shows are the tracker's own.
   bar with no time. Longer effects keep their countdown however often renewed: Fury's
   20 s says when to use it again.
 - It also carries every effect seen on the local player this session (`seen`, an
-  enemy's marked hostile), which is what the page's Watch and Hide switches offer.
+  enemy's marked hostile), which is what the page's Pin, Watch and Hide switches
+  offer.
   - One seen before its caster spawned (the plugin switched on mid-fight) is an ally's
     "Effect <id>" at first; once the caster spawns, it is marked hostile and takes
     their name, as the overlay's entry does. Never the other way: a caster a map load
     forgot says nothing new.
 - The overlay counts down between snapshots on the wall clock, at most 250 ms past the
   snapshot's own time (`aura_display_time`): drawing only, never the plugin.
+
+## 📌 Pins (per class)
+
+The answer to an overlay that lists everything: about 40 different timed effects landed
+on the local Templar in the dungeon capture (Judgment 86 times, Insulting Roar 73, Dodge
+69), and Fury, the one they wanted to see, 6 times. Each class keeps a list of effect
+keys (`auras.pinned`, the user's call, 2026-11-25): a slot each, in the order pinned,
+and once the class being played has any, nothing else on the local player but enemies'
+effects (`shown_auras`).
+- **The class** (`AuraSnapshot::local_class`) is the local player's own: a press (01 38),
+  or an effect of a class skill they put on themselves (`AuraTracker::own_class`; an
+  ally's buff on them is the ally's class). Their passives come on every map load, so
+  it is known before any press: 8 s into the dungeon capture, whose first press came at
+  79 s. Another character drops it as they log in. Until it is known no pins apply, and
+  the overlay is as it was.
+- **What lights a slot** (`pinned_slots`): a running entry of the key that no enemy put
+  there, but for a passive's always-on half, which names no skill (Fury's 127800001). A
+  toggle names its own (a Chanter's mantra, permanent on the Chanter: 181900201, skill
+  18190020, in all three captures) and lights.
+  - Replayed with Fury pinned, the dungeon capture lit its slot for its four procs
+    (146 to 178 s, 378 to 401, 428 to 448, 490 to 510), blocks renewing each, and at
+    no other time.
+  - The local player's own entry first, then the one ending last.
+  - Pins ignore `min_duration_s` and `show_permanent`: picked, they show.
+- **Off,** a slot shows the cooldown of the skill its key is (`pinned_cooldown`: a skill
+  key's `skill_base`, as `CooldownEntry::skill` is), then Ready with `show_ready`; dim
+  otherwise (an item's, an ally's, Fury between blocks). A pressed self-buff's key is
+  its skill's: Warding Strike's Warding, Defiance's Tenacity, Doom Shield, Shield of
+  Protection. That cooldown leaves the Cooldowns section (`shown_cooldowns`).
+- **A watched pin** that is off is the alert, in its slot, and not among the alerts
+  too (`missing_effects`).
+- **Pin and Hide exclude each other** on the page. A class skill's key carries its
+  class's digits, so one class's pins never light on another; an item's is shared, and
+  the page pins it for the class being played alone.
+- **One name in every state:** the seen list's, else the entry's, else the key's
+  (`game::effect_key_label`). An effect seen later this session can rename a pin once,
+  from its skill's name to the effect's own (Warding Strike to Warding).
 
 ## ⏳ Cooldowns (`CooldownTracker`, the local player's only; estimates, shown with `~`)
 
@@ -179,7 +217,8 @@ watch list and what the overlay shows are the tracker's own.
 - **The hide list** (`auras.hidden`, effect keys) leaves an effect out of the overlay,
   on the local player and on the target: `shown_auras`. It is the answer to procs that
   come and go all fight (Judgment 81 times in the second capture), which no shortest
-  duration tells from a buff worth seeing. A hidden effect can still be watched.
+  duration tells from a buff worth seeing. A hidden effect can still be watched, not
+  pinned (Pins, above).
 - **Icons** (`effect_icon`): an item's effect has the item's own (a scroll, food, a
   potion: `effects.tsv`'s fourth column, packed into the sheet), any other its
   skill's. With neither, an item's effect whose icon the site does not serve shows a
@@ -187,8 +226,8 @@ watch list and what the overlay shows are the tracker's own.
   label that is only a number (`tile_initials`).
 - **Alerts first,** in both styles: low HP (`low_hp_percent`: under the threshold of a
   known max, never at HP 0, which is a death), the watch list's missing effects, the
-  chain skills on offer. Then the effects on the local player, their cooldowns, and
-  theirs on the target.
+  chain skills on offer. Then the pins' slots, the effects on the local player, their
+  cooldowns, and theirs on the target.
 - **A watched effect not seen this session** (after a restart, a scroll not on yet)
   has only its key to go by: `game::effect_key_label` and `effect_key_icon`, which the
   page uses too. A key is a skill's when the skill table lists that very code, as
@@ -199,7 +238,12 @@ watch list and what the overlay shows are the tracker's own.
 - **Bars or icons** (`auras.icons`). The pure parts are in `aura_view` and tested
   without ImGui: `shown_cooldowns` (bars: cooling, and `just_ready` for `kReadyFlash`,
   soonest first; icons: ready ones too, by skill code, so a tile keeps its place),
-  `tile_layout`, `tile_initials` for an effect with no icon, `format_tile_time`.
+  `pinned_slots`, `tile_layout`, `tile_initials` for an effect with no icon,
+  `format_tile_time`.
+  - A slot is drawn as what it shows: an effect's bar or tile while on, a cooldown's
+    while cooling or ready (a ready one glows only as it comes back: a slot stays,
+    and would pulse for good), an empty bar or a dimmed icon while off, and the
+    missing alert's pulsing red frame for a watched one that is off.
 - **The atlas holds the icons at the size they are drawn:** a text line for bars,
   `icon_size` for icons (`OverlayWindow::set_icon_px`, rebuilt on a change). The sheet
   is 40 px; a larger tile stretches it.

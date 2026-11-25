@@ -2,7 +2,8 @@
 
 **Your buffs and debuffs, yours on the enemy you fight, and your cooldowns, as bars or
 icons in an overlay of their own, with alerts: a chain skill on offer, a cooldown back,
-your HP running low, a buff you watch for missing.** One of the meter's four plugins
+your HP running low, a buff you watch for missing. Pin the buffs you care about, and only
+those show.** One of the meter's four plugins
 (the others are the [Combat Meter](../combat_meter/README.md), [Ping](../ping/README.md) and
 [Combat Power](../combat_power/README.md)). Off until you switch it
 on, at the top right of the app window's **Auras** page; switching it on shows its
@@ -38,13 +39,15 @@ Then, as bars:
   as another character clears the last one's.
 - **Yours on your target:** under "On <enemy>": the biggest enemy you (or your summons)
   hit in the last 10 seconds, so in a boss fight with adds, the boss.
-- **Watch and Hide:** the page's *Effects seen on you* lists every effect seen on you
-  this session, each with its number. **Watch** shows a red "Missing: <name>" line
-  while a buff is not on you: a Chanter's mantra, a scroll. It knows the buff's name
-  and icon even before it has been on you this session. **Hide** leaves an effect
-  off the overlay: a proc that comes and goes all fight. An enemy's debuff that came
-  before the enemy was in view turns red there (nothing to watch) once they come into
-  view.
+- **Pin, Watch and Hide:** the page's *Effects seen on you* lists every effect seen on
+  you this session, each with its number, and a search box finds one by part of its
+  name or its number. **Pin** gives a buff a place of its own (Pinned buffs, below).
+  **Watch** shows a red "Missing: <name>" line while a buff is not on you: a Chanter's
+  mantra, a scroll. It knows the buff's name and icon even before it has been on you
+  this session. **Hide** leaves an effect off the overlay: a proc that comes and goes
+  all fight. A pinned effect is not hidden, nor a hidden one pinned. An enemy's debuff
+  that came before the enemy was in view turns red there (nothing to watch) once they
+  come into view.
 - **What it leaves out:** effects shorter than a second (a dodge's mark), and passives'
   effects, which never end. Both are settings.
 - **Hiding it:** locked, it can hide while the game is not in front, and outside
@@ -60,6 +63,27 @@ pulsing red frame, and a chain skill on offer its icon in a pulsing gold one.
 
 ![The aura overlay as icons: low HP, a missing buff and a chain skill on offer, three buffs, three cooldowns, and the player's effect on the boss](../../docs/images/overlay-auras-icons.png)
 
+### Pinned buffs
+
+**Pin** the buffs you want to see on the page's *Effects seen on you*: the Templar's
+Fury, a Chanter's mantra, a scroll. Each gets a place of its own at the top of the
+overlay, in the order you pinned them, whether it is on or not:
+- **On you:** lit, with its time left, as any effect.
+- **Off, from a skill you press:** that skill's cooldown, in amber with "~", then
+  "Ready". Warding Strike's place shows its 10 s Warding, then the time until you can
+  cast it again; the skill leaves the Cooldowns list.
+- **Off, with no cooldown to show:** dimmed. Fury is a passive: it goes off on its own
+  when you block, for 20 s, and its place lights only then.
+- **Watched too:** while it is off, its place is the red "Missing" alert.
+
+Once your class has a pin, every other effect on you is left off the overlay, but for
+enemies' debuffs (their own switch). Your cooldowns and your effects on your target
+stay. Pins are kept per class: your Templar's never hide your Chanter's buffs, and a
+class with none shows everything. The page learns your class from your skills once you
+are in game, and until then its Pin switches wait.
+
+![The aura overlay with pins, as icons: a buff with 24 s left, one off with its skill's cooldown, a watched one missing in its red frame, then the cooldowns and the player's effect on the boss](../../docs/images/overlay-auras-pinned.png)
+
 ![The Auras page: the plugin's switch, what the overlay lists, the cooldowns, the alerts and the watch list](../../docs/images/app-auras.png)
 
 ## How exact it is
@@ -70,6 +94,8 @@ pulsing red frame, and a chain skill on offer its icon in a pulsing gold one.
   of the monster that put it on you.
 - **Chain skills** and **your HP** are the game's own: it says when an offer starts and
   ends, and what your HP and max HP are.
+- **Pins** are as exact as what they show: a buff's time is the server's, its skill's
+  cooldown an estimate ("~").
 - **Cooldowns** are estimates, marked "~": the server sends none when you use a skill.
   The plugin starts from the skill's listed figure (questlog.gg's) less the specialties you picked, and
   shortens it to your quickest reuse as you play (that is where your cooldown
@@ -108,6 +134,7 @@ and saves as you go.
 | `low_hp_percent` | 30 | Of your max HP, 5 to 90. |
 | `watch` | `[]` | Effects to flag while they are not on you: the codes the page's **Watch** stores, at most 64. |
 | `hidden` | `[]` | Effects the overlay leaves out: the codes the page's **Hide** stores, at most 64. |
+| `pinned` | `{}` | Effects pinned, per class: the codes the page's **Pin** stores, at most 64 a class, as `{"Templar": [12780000]}`. The classes are Gladiator, Templar, Assassin, Ranger, Sorcerer, Elementalist, Cleric and Chanter. |
 | `hide_when_game_unfocused` | false | Hide it while neither the game nor the meter's window is in front, and while the game is not running. Applies only while locked. |
 | `show_in_dungeons_only` | false | Show it only in a dungeon (as the meter overlay's setting of that name). Applies only while locked. |
 

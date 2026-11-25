@@ -4,6 +4,7 @@
 #include "auras/cooldowns.hpp"
 #include "auras/entities.hpp"
 #include "common/micros.hpp"
+#include "game/classes.hpp"
 #include "game/effect_book.hpp"
 #include "protocol/events.hpp"
 
@@ -77,6 +78,9 @@ struct AuraSnapshot {
     /// The local player's HP and max HP (Entities::local_health); 0 for unknown.
     uint64_t hp{0};
     uint64_t max_hp{0};
+    /// The local player's class, from their own skills: what the overlay's pins are
+    /// kept by. Unknown until their passives or a press say it.
+    game::AionClass local_class{game::AionClass::Unknown};
 
     bool operator==(const AuraSnapshot&) const = default;
 };
@@ -121,6 +125,11 @@ public:
     /// to add.
     [[nodiscard]] AuraSnapshot snapshot(Micros now, const Entities& entities, EntityId target,
                                         std::string target_label) const;
+
+    /// The local player's class, from an effect of a class skill they (or their
+    /// summons) put on themselves: their passives come on every map load, before any
+    /// press. Unknown for none: an item's, a Theostone's and the system's have no class.
+    [[nodiscard]] game::AionClass own_class(const Entities& entities) const;
 
     /// Instances running on `id` at `now`, for tests.
     [[nodiscard]] size_t instances_on(EntityId id, Micros now) const;

@@ -9,6 +9,8 @@
 #include <cctype>
 #include <cmath>
 #include <cstdio>
+#include <limits>
+#include <tuple>
 
 namespace aion2::app {
 
@@ -18,6 +20,27 @@ namespace {
     return e.permanent || e.expires_at > now;
 }
 
+[[nodiscard]] bool listed(const std::vector<uint32_t>& list, uint32_t key) {
+    return std::find(list.begin(), list.end(), key) != list.end();
+}
+
+/// The skill a pin's key is, for its cooldown; 0 for an item's or a monster's key.
+[[nodiscard]] uint32_t pin_skill(uint32_t key) noexcept {
+    return game::is_skill_key(key) ? game::skill_base(key) : 0;
+}
+
+/// When an entry ends, to pick the one a slot shows: never, for a permanent one.
+[[nodiscard]] Micros ends_at(const auras::AuraEntry& e) noexcept {
+    return e.permanent ? std::numeric_limits<Micros>::max() : e.expires_at;
+}
+
+/// An entry that lights the slot of `key`: running, and no enemy's. A passive's
+/// always-on half names no skill, and lights nothing: Fury's would light its slot
+/// for good. A toggle (a Chanter's mantra) names its own.
+[[nodiscard]] bool lights(const auras::AuraEntry& e, uint32_t key, Micros now) noexcept {
+    return e.key == key && !e.hostile && running(e, now) && !(e.permanent && e.source_skill == 0);
+}
+
 } // namespace
 
 Micros aura_display_time(Micros snapshot_now, Micros since_arrival) noexcept {
@@ -25,14 +48,18 @@ Micros aura_display_time(Micros snapshot_now, Micros since_arrival) noexcept {
 }
 
 std::vector<const auras::AuraEntry*> shown_auras(const std::vector<auras::AuraEntry>& entries,
-                                                 const AuraSettings& s, Micros now, bool self) {
+                                                 const AuraSettings& s, Micros now, bool self,
+                                                 const std::vector<uint32_t>& pins) {
     std::vector<const auras::AuraEntry*> out;
     const auto min_ms = static_cast<uint64_t>(std::max(0.0f, s.min_duration_s) * 1000.0f);
     for (const auras::AuraEntry& e : entries) {
         if (!running(e, now)) continue;
         if (e.permanent ? !s.show_permanent : e.duration_ms < min_ms) continue;
         if (self && e.hostile && !s.show_debuffs) continue;
-        if (std::find(s.hidden.begin(), s.hidden.end(), e.key) != s.hidden.end()) continue;
+        // With pins, theirs are in their slots and the rest is left out; an enemy's
+        // effect keeps its own switch.
+        if (self && !pins.empty() && !e.hostile) continue;
+        if (listed(s.hidden, e.key)) continue;
         out.push_back(&e);
     }
     return out;
@@ -43,13 +70,16 @@ bool just_ready(const auras::CooldownEntry& c, Micros now) noexcept {
 }
 
 std::vector<const auras::CooldownEntry*> shown_cooldowns(const std::vector<auras::CooldownEntry>& entries,
-                                                         const AuraSettings& s, Micros now) {
+                                                         const AuraSettings& s, Micros now,
+                                                         const std::vector<uint32_t>& pins) {
     std::vector<const auras::CooldownEntry*> out;
     if (!s.show_cooldowns) return out;
     const auto min_ms = static_cast<uint64_t>(std::max(0.0f, s.min_cooldown_s) * 1000.0f);
     for (const auras::CooldownEntry& c : entries) {
         // A reset sent for a skill never seen used has no length to show.
         if (c.duration_ms == 0 || c.duration_ms < min_ms) continue;
+        // A pinned skill's slot shows its cooldown.
+        if (std::any_of(pins.begin(), pins.end(), [&](uint32_t key) { return pin_skill(key) == c.skill; })) continue;
         const bool ready_shown = s.show_ready && (s.icons || just_ready(c, now));
         if (c.ready_at > now || ready_shown) out.push_back(&c);
     }
@@ -114,9 +144,11 @@ std::string tile_initials(const std::string& label) {
 }
 
 std::vector<MissingEffect> missing_effects(const auras::AuraSnapshot& auras, const std::vector<uint32_t>& watch,
-                                           Micros now) {
+                                           Micros now, const std::vector<uint32_t>& pins) {
     std::vector<MissingEffect> out;
     for (const uint32_t key : watch) {
+        // Its slot says it.
+        if (listed(pins, key)) continue;
         const bool on = std::any_of(auras.on_self.begin(), auras.on_self.end(),
                                     [&](const auras::AuraEntry& e) { return e.key == key && running(e, now); });
         if (on) continue;
@@ -125,6 +157,56 @@ std::vector<MissingEffect> missing_effects(const auras::AuraSnapshot& auras, con
         // Not seen yet this session (a scroll after a restart): named by its key alone.
         out.push_back(MissingEffect{key, seen != auras.seen.end() ? seen->label : game::effect_key_label(key),
                                     effect_key_icon(key)});
+    }
+    return out;
+}
+
+const auras::CooldownEntry* pinned_cooldown(const std::vector<auras::CooldownEntry>& cooldowns, uint32_t key) {
+    const uint32_t skill = pin_skill(key);
+    if (skill == 0) return nullptr;
+    const auto it = std::find_if(cooldowns.begin(), cooldowns.end(),
+                                 [&](const auras::CooldownEntry& c) { return c.skill == skill; });
+    return it != cooldowns.end() ? &*it : nullptr;
+}
+
+std::vector<PinnedSlot> pinned_slots(const auras::AuraSnapshot& a, const AuraSettings& s, Micros now) {
+    std::vector<PinnedSlot> out;
+    for (const uint32_t key : pins_for(s, a.local_class)) {
+        PinnedSlot slot;
+        slot.key = key;
+        slot.icon = effect_key_icon(key);
+        for (const auras::AuraEntry& e : a.on_self) {
+            if (!lights(e, key, now)) continue;
+            // The local player's own first, then the one ending last.
+            if (slot.effect == nullptr ||
+                std::tuple(e.mine, ends_at(e)) > std::tuple(slot.effect->mine, ends_at(*slot.effect))) {
+                slot.effect = &e;
+            }
+        }
+        // One name in every state: the seen list's, as the page names it.
+        const auto seen =
+            std::find_if(a.seen.begin(), a.seen.end(), [&](const auras::SeenEffect& x) { return x.key == key; });
+        if (seen != a.seen.end()) {
+            slot.label = seen->label;
+        } else if (slot.effect != nullptr) {
+            slot.label = slot.effect->label;
+        } else {
+            slot.label = game::effect_key_label(key);
+        }
+        if (slot.effect != nullptr) {
+            slot.state = PinState::Active;
+        } else {
+            const auras::CooldownEntry* cooldown = pinned_cooldown(a.cooldowns, key);
+            if (cooldown != nullptr && cooldown->duration_ms > 0 && cooldown->ready_at > now) {
+                slot.state = PinState::Cooling;
+                slot.cooldown = cooldown;
+            } else if (cooldown != nullptr && s.show_ready) {
+                slot.state = PinState::Ready;
+                slot.cooldown = cooldown;
+            }
+            slot.missing = listed(s.watch, key);
+        }
+        out.push_back(std::move(slot));
     }
     return out;
 }
@@ -202,8 +284,13 @@ struct BarRow {
     Rgb color{colors::Accent};
     float fraction{1.0f};
     float fill_alpha{0.60f};
-    /// Above 0, a border in the bar's colour at this opacity: an alert.
+    /// Above 0, a border in the bar's colour, or in `border` when set, at this
+    /// opacity: an alert.
     float border_alpha{0.0f};
+    std::optional<Rgb> border;
+    /// Below 1, dimmed: a pinned effect that is off.
+    float icon_alpha{1.0f};
+    float text_alpha{1.0f};
     std::string tooltip;
 };
 
@@ -238,13 +325,13 @@ void draw_bar_rows(const std::vector<BarRow>& rows, float scale, bool interactiv
         const ImVec2 icon_max(row_min.x + m.icon, row_max.y);
         dl->AddRectFilled(row_min, icon_max, u32(colors::Background, 0.85f), rounding);
         if (r.icon != kNoIcon) {
-            draw_icon(dl, r.icon, row_min.x, row_min.y, m.icon, 1.0f, rounding);
+            draw_icon(dl, r.icon, row_min.x, row_min.y, m.icon, r.icon_alpha, rounding);
         } else {
-            dl->AddRectFilled(row_min, icon_max, u32(r.color, 0.30f), rounding);
+            dl->AddRectFilled(row_min, icon_max, u32(r.color, 0.30f * r.icon_alpha), rounding);
             if (r.glyph != nullptr) {
                 const ImVec2 gs = ImGui::CalcTextSize(r.glyph);
                 dl->AddText(ImVec2(row_min.x + (m.icon - gs.x) * 0.5f, row_min.y + (m.icon - gs.y) * 0.5f),
-                            u32(colors::Text), r.glyph);
+                            u32(colors::Text, r.icon_alpha), r.glyph);
             }
         }
         const ImVec2 bar_min(icon_max.x + 3.0f * scale, y);
@@ -266,16 +353,17 @@ void draw_bar_rows(const std::vector<BarRow>& rows, float scale, bool interactiv
         style.alpha = r.fill_alpha;
         chrome::draw_bar(dl, bar_min, row_max, r.fraction, r.color, scale, style, text);
         if (r.border_alpha > 0.0f) {
-            dl->AddRect(bar_min, row_max, u32(r.color, r.border_alpha), rounding, 0, 1.5f * scale);
+            dl->AddRect(bar_min, row_max, u32(r.border.value_or(r.color), r.border_alpha), rounding, 0, 1.5f * scale);
         }
 
         if (!r.value.empty()) {
             const chrome::BoldScope bold;
-            dl->AddText(ImVec2(value_x, ty), u32(colors::Text), r.value.c_str());
+            dl->AddText(ImVec2(value_x, ty), u32(colors::Text, r.text_alpha), r.value.c_str());
         }
-        dl->AddText(ImVec2(label_x, ty), u32(colors::Text), label.c_str());
+        dl->AddText(ImVec2(label_x, ty), u32(colors::Text, r.text_alpha), label.c_str());
         if (!r.note.empty()) {
-            dl->AddText(ImVec2(label_x + label_w + 5.0f * scale, ty), u32(colors::Text, 0.65f), r.note.c_str());
+            dl->AddText(ImVec2(label_x + label_w + 5.0f * scale, ty), u32(colors::Text, 0.65f * r.text_alpha),
+                        r.note.c_str());
         }
         if (interactive && !r.tooltip.empty() && ImGui::IsMouseHoveringRect(row_min, row_max)) {
             ImGui::SetTooltip("%s", r.tooltip.c_str());
@@ -340,6 +428,57 @@ BarRow chain_row(const auras::ChainEntry& c, float pulse) {
     r.fill_alpha = 0.45f + 0.40f * pulse;
     r.border_alpha = 0.6f + 0.4f * pulse;
     r.tooltip = c.label + "\non offer after " + game::skill_label(c.trigger);
+    return r;
+}
+
+/// What hovering a pinned effect that is off says: its name, and why it is dim.
+std::string pin_tooltip(const PinnedSlot& p) {
+    std::string out = p.label + "\npinned: ";
+    switch (p.state) {
+    case PinState::Active: out += "on you"; break;
+    case PinState::Cooling:
+        out += p.cooldown->exact ? "off, its skill cooling (what the server says is left)"
+                                 : "off, its skill cooling (~ an estimate)";
+        break;
+    case PinState::Ready: out += "off, its skill ready"; break;
+    case PinState::Off: out += "not on you"; break;
+    }
+    if (p.missing) out += "\nwatched: missing";
+    return out;
+}
+
+/// A flask for an item's key, as effect_glyph gives an item's effect.
+const char* key_glyph(uint32_t key) {
+    return !game::is_skill_key(key) && game::effect_kind(key) == game::EffectKind::Item ? ICON_FLASK : nullptr;
+}
+
+/// A pinned effect as a bar: its effect while it is on; while it is off, its skill's
+/// cooldown, cooling or ready, else an empty bar with a dim name. A watched one that
+/// is off is framed in the missing alert's red.
+BarRow pin_row(const PinnedSlot& p, Micros now, float glow, float pulse) {
+    BarRow r;
+    if (p.state == PinState::Active) {
+        r = effect_row(*p.effect, now);
+    } else if (p.cooldown != nullptr) {
+        // Ready glows only as it comes back: a slot stays, and would pulse on.
+        r = cooldown_row(*p.cooldown, now, just_ready(*p.cooldown, now) ? glow : 0.0f);
+        r.tooltip = pin_tooltip(p);
+    } else {
+        r.icon = p.icon;
+        r.glyph = key_glyph(p.key);
+        r.color = colors::TextDim;
+        r.fraction = 0.0f;
+        r.icon_alpha = 0.40f;
+        r.text_alpha = 0.55f;
+        r.tooltip = pin_tooltip(p);
+    }
+    r.label = p.label;
+    if (p.missing) {
+        r.border = colors::Live;
+        r.border_alpha = 0.4f + 0.6f * pulse;
+        r.text_alpha = 1.0f;
+        if (r.value.empty()) r.value = "Missing";
+    }
     return r;
 }
 
@@ -491,6 +630,35 @@ Tile chain_tile(const auras::ChainEntry& c, float pulse) {
     return t;
 }
 
+/// A pinned effect as a tile: its effect's while it is on; while it is off, its
+/// skill's cooldown's, else its icon dimmed. A watched one that is off is framed as
+/// the missing alert is.
+Tile pin_tile(const PinnedSlot& p, Micros now, float glow, float pulse) {
+    Tile t;
+    if (p.state == PinState::Active) {
+        t = effect_tile(*p.effect, now);
+    } else if (p.cooldown != nullptr) {
+        t = cooldown_tile(*p.cooldown, now, glow);
+        t.tooltip = pin_tooltip(p);
+    } else {
+        t.icon = p.icon;
+        t.glyph = key_glyph(p.key);
+        t.tint = colors::TextDim;
+        t.icon_alpha = 0.40f;
+        t.border_alpha = 0.45f;
+        t.border_px = 1.0f;
+        t.tooltip = pin_tooltip(p);
+    }
+    t.initials = tile_initials(p.label);
+    if (p.missing) {
+        t.tint = colors::Live;
+        t.icon_alpha = std::min(t.icon_alpha, 0.35f);
+        t.border_alpha = 0.4f + 0.6f * pulse;
+        t.border_px = 2.5f;
+    }
+    return t;
+}
+
 /// A watched effect that is missing: its icon dimmed, in a pulsing red border.
 Tile missing_tile(const MissingEffect& m, int icon, float pulse) {
     Tile t;
@@ -531,13 +699,16 @@ OverlayActions draw_auras(const AuraFrameInput& in) {
             const float pulse = 0.55f + 0.45f * static_cast<float>(std::sin(in.pulse_s * 4.0));
             const float glow = 0.5f + 0.5f * static_cast<float>(std::sin(in.pulse_s * 6.0));
             const float tile = static_cast<float>(s.icon_size) * scale;
+            // The class's pins: their slots, and once there are any, only enemies'
+            // effects besides.
+            const std::vector<uint32_t>& pins = pins_for(s, auras->local_class);
             if (const auto low = low_hp_percent(*auras, s)) {
                 draw_alert("Low HP " + std::to_string(*low) + "%", scale, pulse);
                 drew = true;
             }
             // Missing watched effects: in icons, a tile for each that has an icon.
             std::vector<Tile> alert_tiles;
-            for (const MissingEffect& m : missing_effects(*auras, s.watch, in.now)) {
+            for (const MissingEffect& m : missing_effects(*auras, s.watch, in.now, pins)) {
                 const int icon = s.icons ? m.icon : kNoIcon;
                 if (icon != kNoIcon) {
                     alert_tiles.push_back(missing_tile(m, icon, pulse));
@@ -558,6 +729,21 @@ OverlayActions draw_auras(const AuraFrameInput& in) {
             }
             draw_tiles(alert_tiles, tile, scale, interactive);
 
+            // The pinned effects, each in its place whatever its state.
+            const std::vector<PinnedSlot> slots = pinned_slots(*auras, s, in.now);
+            if (!slots.empty()) {
+                if (s.icons) {
+                    std::vector<Tile> tiles;
+                    for (const PinnedSlot& p : slots) tiles.push_back(pin_tile(p, in.now, glow, pulse));
+                    draw_tiles(tiles, tile, scale, interactive);
+                } else {
+                    std::vector<BarRow> rows;
+                    for (const PinnedSlot& p : slots) rows.push_back(pin_row(p, in.now, glow, pulse));
+                    draw_bar_rows(rows, scale, interactive);
+                }
+                drew = true;
+            }
+
             // One list of effects, as tiles or as bars.
             const auto draw_effects = [&](const std::vector<const auras::AuraEntry*>& entries) {
                 if (s.icons) {
@@ -570,12 +756,12 @@ OverlayActions draw_auras(const AuraFrameInput& in) {
                     draw_bar_rows(rows, scale, interactive);
                 }
             };
-            const auto self = shown_auras(auras->on_self, s, in.now, true);
+            const auto self = shown_auras(auras->on_self, s, in.now, true, pins);
             if (!self.empty()) {
                 draw_effects(self);
                 drew = true;
             }
-            const auto cooldowns = shown_cooldowns(auras->cooldowns, s, in.now);
+            const auto cooldowns = shown_cooldowns(auras->cooldowns, s, in.now, pins);
             if (!cooldowns.empty()) {
                 chrome::section_title("Cooldowns", scale);
                 if (s.icons) {

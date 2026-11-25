@@ -371,6 +371,9 @@ struct AppScene {
     pipeline::LiveSnapshot snapshot;
     std::vector<meter::HistoryEntry> history;
     app::AppViewState view;
+    /// The window's height before the scale, for a page drawn whole; 0 for the
+    /// window's default.
+    float height{0.0f};
 };
 
 /// One page of the app window, in a window-sized picture with rounded corners and a
@@ -380,7 +383,8 @@ bool render_app(AppScene& scene, app::AppSettings& settings, const std::filesyst
                 const std::optional<app::UpdateStatus>& update = std::nullopt) {
     ImGuiIO& io = ImGui::GetIO();
     const int w = static_cast<int>(std::lround(app::ui::metrics::WindowDefaultW * kScale));
-    const int h = static_cast<int>(std::lround(app::ui::metrics::WindowDefaultH * kScale));
+    const float height = scene.height > 0.0f ? scene.height : app::ui::metrics::WindowDefaultH;
+    const int h = static_cast<int>(std::lround(height * kScale));
     app::AppFrameInput input;
     input.snapshot = &scene.snapshot;
     input.history = &scene.history;
@@ -535,11 +539,19 @@ int main(int argc, char** argv) {
     ok = build_overlay_fonts(font, bold, app::kAuraBarIconPx) && ok;
     Scene auras{"overlay-auras.png", 280.0f, 286.0f, live.snapshot};
     ok = render_auras(auras, aura_settings, out_dir) && ok;
+    // Pinned, ten seconds on: Vaizel's Wisdom on, Arctic Armor run out and its skill
+    // cooling, Wish of Concentration (watched too) missing in its slot. Her class has
+    // pins, so her ally's Spirit Communion is left out.
+    app::AuraSettings pinned_settings = aura_settings;
+    pinned_settings.pinned[game::AionClass::Sorcerer] = {15'180'000, 15'230'000, 15'310'000};
+    const pipeline::LiveSnapshot pinned_snapshot = replay_until(session, 40.0, nullptr);
     if (all) {
         app::AuraSettings unlocked = aura_settings;
         unlocked.locked = false;
         Scene scene{"overlay-auras-unlocked.png", 280.0f, 320.0f, live.snapshot};
         ok = render_auras(scene, unlocked, out_dir) && ok;
+        Scene pinned_bars{"overlay-auras-pinned-bars.png", 280.0f, 200.0f, pinned_snapshot};
+        ok = render_auras(pinned_bars, pinned_settings, out_dir) && ok;
     }
     // The same as icons, the atlas holding them at that size as the overlay's does.
     app::AuraSettings icon_settings = aura_settings;
@@ -547,6 +559,9 @@ int main(int argc, char** argv) {
     ok = build_overlay_fonts(font, bold, static_cast<float>(icon_settings.icon_size)) && ok;
     Scene aura_icons{"overlay-auras-icons.png", 280.0f, 236.0f, live.snapshot};
     ok = render_auras(aura_icons, icon_settings, out_dir) && ok;
+    pinned_settings.icons = true;
+    Scene aura_pins{"overlay-auras-pinned.png", 280.0f, 170.0f, pinned_snapshot};
+    ok = render_auras(aura_pins, pinned_settings, out_dir) && ok;
     ok = build_overlay_fonts(font, bold, kBaseFontSize) && ok;
     // The ping overlay, locked: its figures, the graph and the range under it.
     app::PingSettings ping_settings;
@@ -677,7 +692,15 @@ int main(int argc, char** argv) {
     app::AppSettings auras_settings = app_settings;
     auras_settings.plugins.auras = true;
     auras_settings.auras = aura_settings;
+    auras_settings.auras.pinned[game::AionClass::Sorcerer] = {15'180'000, 15'230'000};
     ok = render_app(auras_page, auras_settings, out_dir) && ok;
+    if (all) {
+        // The whole page: the effects seen on Ariel, with their Pin, Watch and Hide.
+        AppScene whole = auras_page;
+        whole.file = "app-auras-whole.png";
+        whole.height = 1500.0f;
+        ok = render_app(whole, auras_settings, out_dir) && ok;
+    }
     // The Ping plugin's page, switched on.
     pipeline::LiveSnapshot ping_page_snapshot = done.snapshot;
     ping_page_snapshot.ping = ping_demo(ping_page_snapshot.now);
