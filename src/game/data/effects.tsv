@@ -6,7 +6,7 @@
 # tools/gen_icon_sheet.py packs for the app.
 #
 # Source: questlog.gg's status-effect database
-# (questlog.gg/aion-2/en/db/status-effects), retrieved 2026-11-12. English names as
+# (questlog.gg/aion-2/en/db/status-effects), retrieved 2026-11-25. English names as
 # the site lists them. Regenerate with tools/gen_effect_table.py.
 100	Stun	other
 101	Trigger Activation	other
@@ -1832,7 +1832,7 @@
 40024101	Kurpak Krall Supporter	other
 40024201	Kurpak Krall Scout	other
 40024301	Kurpak Krall Enforcer	other
-40024401	Snowfield Lagur	other
+40024401	Tundra Lagur	other
 40024501	Pachyron	other
 40024601	Lava Pokus	other
 40024701	Snowfield Lamphu	other
@@ -2683,7 +2683,7 @@
 192800301	Ferocity	skill
 192800401	Ferocity	skill
 192900101	Surging Cleave	skill
-192900301	Dash Chop	skill
+192900301	Surging Cleave	skill
 193100001	Pulverize	skill
 193100002	Pulverize	skill
 193100003	Pulverize	skill

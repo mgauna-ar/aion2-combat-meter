@@ -1,7 +1,7 @@
 # AION 2 monster and NPC names by npc code, the u32 a spawn (41 36) carries
 # after its mask. Every mob spawn in the first capture carried one of these.
 #
-# Sources, retrieved 2026-11-24: questlog.gg's NPC database
+# Sources, retrieved 2026-11-25: questlog.gg's NPC database
 # (questlog.gg/aion-2/en/db/npcs), every difficulty's id of a boss and the
 # mechanics and summons among them; and aion2.app's monster and NPC lists
 # (aion2.app/db/monsters, aion2.app/db/npcs) for the ids questlog.gg does not

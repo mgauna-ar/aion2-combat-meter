@@ -6,7 +6,7 @@
 # index:ms by specialty slot; - for none. uses: the ones that allow more uses
 # before the cooldown ("+1 consecutive use"), as index:count.
 #
-# Sources, retrieved 2026-11-24: questlog.gg's skill records
+# Sources, retrieved 2026-11-25: questlog.gg's skill records
 # (questlog.gg/aion-2/en/db/skill/<code>), and aion2.app's skill pages
 # (aion2.app/db/skills/<code>) for the skills questlog.gg has no record of.
 # Regenerate with tools/gen_cooldown_table.py.

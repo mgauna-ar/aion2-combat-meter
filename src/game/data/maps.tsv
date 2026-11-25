@@ -3,7 +3,7 @@
 # `dungeon` is one below it (game::is_dungeon). Every instance is marked but
 # Chaotic Reshanta's and the open world's events'.
 #
-# Sources, retrieved 2026-11-21: aion2.app's dungeon pages
+# Sources, retrieved 2026-11-25: aion2.app's dungeon pages
 # (aion2.app/db/dungeons/<name>), one row per difficulty tier with its tier's
 # name; and questlog.gg's dungeon records (questlog.gg/aion-2/en/db/dungeon/<id>),
 # which give each instance's map id and name every map aion2.app's pages do
