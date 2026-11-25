@@ -88,6 +88,16 @@ aion2::plugins::PluginSwitches read_switches(const config::JsonValue& root) {
     return on;
 }
 
+/// An overlay's opacity before 1.13 was its background's alone, under `opacity`, and
+/// the overlay itself was drawn whole. A section with that key and no
+/// `background_opacity` is such a file: its figure goes to the background, and the
+/// overlay stays whole.
+void read_legacy_opacity(const config::JsonValue& section, float& background, float& opacity) {
+    if (section["background_opacity"].is_number() || !section["opacity"].is_number()) return;
+    background = section["opacity"].as_float(background);
+    opacity = 1.0f;
+}
+
 } // namespace
 
 const std::vector<uint32_t>& pins_for(const AuraSettings& settings, game::AionClass cls) {
@@ -100,13 +110,15 @@ const std::vector<uint32_t>& pins_for(const AuraSettings& settings, game::AionCl
 void sanitize(AppSettings& s) {
     s.capture.server_port = std::clamp(s.capture.server_port, 1, 65535);
     if (!plausible_exe_name(s.capture.game_process)) s.capture.game_process = CaptureSettings{}.game_process;
-    s.overlay.opacity = std::clamp(s.overlay.opacity, 0.0f, 1.0f);
+    s.overlay.background_opacity = std::clamp(s.overlay.background_opacity, 0.0f, 1.0f);
+    s.overlay.opacity = std::clamp(s.overlay.opacity, kMinOverlayOpacity, 1.0f);
     s.overlay.scale = std::clamp(s.overlay.scale, 0.6f, 2.5f);
     s.overlay.width = std::clamp(s.overlay.width, 200, 4000);
     s.overlay.height = std::clamp(s.overlay.height, 90, 4000);
     s.overlay.max_rows = std::clamp(s.overlay.max_rows, 1, 24);
     s.overlay.hide_after_combat_s = std::clamp(s.overlay.hide_after_combat_s, 0.0f, 600.0f);
-    s.auras.opacity = std::clamp(s.auras.opacity, 0.0f, 1.0f);
+    s.auras.background_opacity = std::clamp(s.auras.background_opacity, 0.0f, 1.0f);
+    s.auras.opacity = std::clamp(s.auras.opacity, kMinOverlayOpacity, 1.0f);
     s.auras.scale = std::clamp(s.auras.scale, 0.6f, 2.5f);
     s.auras.width = std::clamp(s.auras.width, 160, 4000);
     s.auras.height = std::clamp(s.auras.height, 90, 4000);
@@ -124,13 +136,15 @@ void sanitize(AppSettings& s) {
         if (it->second.size() > kMaxWatchedEffects) it->second.resize(kMaxWatchedEffects);
         ++it;
     }
-    s.ping.opacity = std::clamp(s.ping.opacity, 0.0f, 1.0f);
+    s.ping.background_opacity = std::clamp(s.ping.background_opacity, 0.0f, 1.0f);
+    s.ping.opacity = std::clamp(s.ping.opacity, kMinOverlayOpacity, 1.0f);
     s.ping.scale = std::clamp(s.ping.scale, 0.6f, 2.5f);
     s.ping.width = std::clamp(s.ping.width, 160, 4000);
     s.ping.height = std::clamp(s.ping.height, 90, 4000);
     s.ping.warn_ms = std::clamp(s.ping.warn_ms, kMinPingThreshold, kMaxPingThreshold);
     s.ping.bad_ms = std::clamp(s.ping.bad_ms, s.ping.warn_ms, kMaxPingThreshold);
-    s.power.opacity = std::clamp(s.power.opacity, 0.0f, 1.0f);
+    s.power.background_opacity = std::clamp(s.power.background_opacity, 0.0f, 1.0f);
+    s.power.opacity = std::clamp(s.power.opacity, kMinOverlayOpacity, 1.0f);
     s.power.scale = std::clamp(s.power.scale, 0.6f, 2.5f);
     s.power.width = std::clamp(s.power.width, 160, 4000);
     s.power.height = std::clamp(s.power.height, 90, 4000);
@@ -194,12 +208,16 @@ AppSettings settings_from_json(const config::JsonValue& json) {
     config::read_keys<CaptureSettings>(kCaptureKeys, json[kCapture], s.capture);
     if (json[kCapture]["game_process"].is_string()) s.capture.game_process = json[kCapture]["game_process"].as_string();
     config::read_keys<OverlaySettings>(kOverlayKeys, json[kOverlay], s.overlay);
+    read_legacy_opacity(json[kOverlay], s.overlay.background_opacity, s.overlay.opacity);
     config::read_keys<AuraSettings>(kAuraKeys, json[kAuras], s.auras);
+    read_legacy_opacity(json[kAuras], s.auras.background_opacity, s.auras.opacity);
     s.auras.watch = read_watch(json[kAuras]["watch"]);
     s.auras.hidden = read_watch(json[kAuras]["hidden"]);
     s.auras.pinned = read_pins(json[kAuras]["pinned"]);
     config::read_keys<PingSettings>(kPingKeys, json[kPing], s.ping);
+    read_legacy_opacity(json[kPing], s.ping.background_opacity, s.ping.opacity);
     config::read_keys<PowerSettings>(kPowerKeys, json[kPower], s.power);
+    read_legacy_opacity(json[kPower], s.power.background_opacity, s.power.opacity);
     config::read_keys<meter::MeterSettings>(meter::kMeterSettingKeys, json[kMeter], s.meter);
     config::read_keys<HistorySettings>(kHistoryKeys, json[kHistory], s.history);
     sanitize(s);

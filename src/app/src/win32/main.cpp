@@ -507,10 +507,11 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
             input.source_status = runtime.source_status();
             input.recording = runtime.recording();
             input.settings = &settings.overlay;
-            const app::OverlayActions actions = window.render(settings.overlay.scale, [&](float scale) {
-                input.scale = scale;
-                return app::draw_overlay(input);
-            });
+            const app::OverlayActions actions =
+                window.render(settings.overlay.scale, settings.overlay.opacity, [&](float scale) {
+                    input.scale = scale;
+                    return app::draw_overlay(input);
+                });
 
             if (actions.lock) {
                 settings.overlay.locked = true;
@@ -540,10 +541,11 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
                 input.pulse_s = std::chrono::duration<double>(Clock::now() - started).count();
                 aura_window.set_icon_px(settings.auras.icons ? static_cast<float>(settings.auras.icon_size)
                                                              : app::kAuraBarIconPx);
-                const app::OverlayActions actions = aura_window.render(settings.auras.scale, [&](float scale) {
-                    input.scale = scale;
-                    return app::draw_auras(input);
-                });
+                const app::OverlayActions actions =
+                    aura_window.render(settings.auras.scale, settings.auras.opacity, [&](float scale) {
+                        input.scale = scale;
+                        return app::draw_auras(input);
+                    });
                 if (actions.lock) {
                     settings.auras.locked = true;
                     aura_window.set_locked(true);
@@ -561,10 +563,11 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
                 app::PingFrameInput input;
                 input.snapshot = snapshot.get();
                 input.settings = &settings.ping;
-                const app::OverlayActions actions = ping_window.render(settings.ping.scale, [&](float scale) {
-                    input.scale = scale;
-                    return app::draw_ping(input);
-                });
+                const app::OverlayActions actions =
+                    ping_window.render(settings.ping.scale, settings.ping.opacity, [&](float scale) {
+                        input.scale = scale;
+                        return app::draw_ping(input);
+                    });
                 if (actions.lock) {
                     settings.ping.locked = true;
                     ping_window.set_locked(true);
@@ -582,10 +585,11 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
                 app::PowerFrameInput input;
                 input.snapshot = snapshot.get();
                 input.settings = &settings.power;
-                const app::OverlayActions actions = power_window.render(settings.power.scale, [&](float scale) {
-                    input.scale = scale;
-                    return app::draw_power(input);
-                });
+                const app::OverlayActions actions =
+                    power_window.render(settings.power.scale, settings.power.opacity, [&](float scale) {
+                        input.scale = scale;
+                        return app::draw_power(input);
+                    });
                 if (actions.lock) {
                     settings.power.locked = true;
                     power_window.set_locked(true);

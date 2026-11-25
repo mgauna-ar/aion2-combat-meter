@@ -25,12 +25,18 @@ struct CaptureSettings {
     bool detect_relays{true};
 };
 
+/// The least a whole overlay's opacity goes to: under it, an unlocked overlay is too
+/// faint to be found and dragged back.
+inline constexpr float kMinOverlayOpacity = 0.2f;
+
 struct OverlaySettings {
     bool visible{true};
     /// Locked: click-through, and cannot be moved or resized.
     bool locked{false};
-    /// Of the background only; text stays opaque.
-    float opacity{0.80f};
+    /// The panel behind the text and bars.
+    float background_opacity{0.80f};
+    /// The whole overlay, its text, bars and icons too: kMinOverlayOpacity to 1.
+    float opacity{1.0f};
     float scale{1.0f};
     /// Screen position and size; x and y of -1 place it near the top-left.
     int x{-1};
@@ -71,8 +77,10 @@ struct OverlaySettings {
 struct AuraSettings {
     /// Locked: click-through, and cannot be moved or resized.
     bool locked{false};
-    /// Of the background only; text and bars stay opaque.
-    float opacity{0.55f};
+    /// The panel behind the text and bars.
+    float background_opacity{0.55f};
+    /// The whole overlay, its bars, icons and text too: kMinOverlayOpacity to 1.
+    float opacity{1.0f};
     float scale{1.0f};
     /// Screen position and size; x and y of -1 place it under the meter's default spot.
     int x{-1};
@@ -125,8 +133,10 @@ struct AuraSettings {
 struct PingSettings {
     /// Locked: click-through, and cannot be moved or resized.
     bool locked{false};
-    /// Of the background only; the figures and the graph stay opaque.
-    float opacity{0.55f};
+    /// The panel behind the figures and the graph.
+    float background_opacity{0.55f};
+    /// The whole overlay, its figures and graph too: kMinOverlayOpacity to 1.
+    float opacity{1.0f};
     float scale{1.0f};
     /// Screen position and size; x and y of -1 place it right of the meter's default spot.
     int x{-1};
@@ -155,8 +165,10 @@ struct PingSettings {
 struct PowerSettings {
     /// Locked: click-through, and cannot be moved or resized.
     bool locked{false};
-    /// Of the background only; the names and figures stay opaque.
-    float opacity{0.55f};
+    /// The panel behind the names and figures.
+    float background_opacity{0.55f};
+    /// The whole overlay, its names and figures too: kMinOverlayOpacity to 1.
+    float opacity{1.0f};
     float scale{1.0f};
     /// Screen position and size; x and y of -1 place it right of the ping's default spot.
     int x{-1};
@@ -241,9 +253,10 @@ inline constexpr std::array<config::ConfigKey<CaptureSettings>, 2> kCaptureKeys{
     config::field<CaptureSettings, &CaptureSettings::detect_relays>("detect_relays"),
 }};
 
-inline constexpr std::array<config::ConfigKey<OverlaySettings>, 26> kOverlayKeys{{
+inline constexpr std::array<config::ConfigKey<OverlaySettings>, 27> kOverlayKeys{{
     config::field<OverlaySettings, &OverlaySettings::visible>("visible"),
     config::field<OverlaySettings, &OverlaySettings::locked>("locked"),
+    config::field<OverlaySettings, &OverlaySettings::background_opacity>("background_opacity"),
     config::field<OverlaySettings, &OverlaySettings::opacity>("opacity"),
     config::field<OverlaySettings, &OverlaySettings::scale>("scale"),
     config::field<OverlaySettings, &OverlaySettings::x>("x"),
@@ -270,8 +283,9 @@ inline constexpr std::array<config::ConfigKey<OverlaySettings>, 26> kOverlayKeys
     config::field<OverlaySettings, &OverlaySettings::show_in_dungeons_only>("show_in_dungeons_only"),
 }};
 
-inline constexpr std::array<config::ConfigKey<AuraSettings>, 21> kAuraKeys{{
+inline constexpr std::array<config::ConfigKey<AuraSettings>, 22> kAuraKeys{{
     config::field<AuraSettings, &AuraSettings::locked>("locked"),
+    config::field<AuraSettings, &AuraSettings::background_opacity>("background_opacity"),
     config::field<AuraSettings, &AuraSettings::opacity>("opacity"),
     config::field<AuraSettings, &AuraSettings::scale>("scale"),
     config::field<AuraSettings, &AuraSettings::x>("x"),
@@ -294,8 +308,9 @@ inline constexpr std::array<config::ConfigKey<AuraSettings>, 21> kAuraKeys{{
     config::field<AuraSettings, &AuraSettings::hide_when_game_unfocused>("hide_when_game_unfocused"),
 }};
 
-inline constexpr std::array<config::ConfigKey<PingSettings>, 13> kPingKeys{{
+inline constexpr std::array<config::ConfigKey<PingSettings>, 14> kPingKeys{{
     config::field<PingSettings, &PingSettings::locked>("locked"),
+    config::field<PingSettings, &PingSettings::background_opacity>("background_opacity"),
     config::field<PingSettings, &PingSettings::opacity>("opacity"),
     config::field<PingSettings, &PingSettings::scale>("scale"),
     config::field<PingSettings, &PingSettings::x>("x"),
@@ -310,8 +325,9 @@ inline constexpr std::array<config::ConfigKey<PingSettings>, 13> kPingKeys{{
     config::field<PingSettings, &PingSettings::hide_when_game_unfocused>("hide_when_game_unfocused"),
 }};
 
-inline constexpr std::array<config::ConfigKey<PowerSettings>, 15> kPowerKeys{{
+inline constexpr std::array<config::ConfigKey<PowerSettings>, 16> kPowerKeys{{
     config::field<PowerSettings, &PowerSettings::locked>("locked"),
+    config::field<PowerSettings, &PowerSettings::background_opacity>("background_opacity"),
     config::field<PowerSettings, &PowerSettings::opacity>("opacity"),
     config::field<PowerSettings, &PowerSettings::scale>("scale"),
     config::field<PowerSettings, &PowerSettings::x>("x"),

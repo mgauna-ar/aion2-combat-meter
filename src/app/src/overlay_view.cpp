@@ -304,9 +304,9 @@ OverlayActions draw_overlay(const OverlayFrameInput& in) {
     const float scale = in.scale;
     const bool interactive = !s.locked;
 
-    // The frame keeps the opacity's own border, locked or not: this overlay is never
+    // The frame keeps the background's own border, locked or not: this overlay is never
     // empty, so it needs no brighter one to be found by.
-    if (chrome::begin("##aion2meter", s.opacity, scale, false)) {
+    if (chrome::begin("##aion2meter", s.background_opacity, scale, false)) {
         const meter::FightSummary* fight =
             in.snapshot != nullptr && in.snapshot->fight.id != 0 ? &in.snapshot->fight : nullptr;
 

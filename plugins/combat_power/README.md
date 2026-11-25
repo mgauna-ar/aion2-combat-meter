@@ -125,7 +125,8 @@ and saves as you go.
 |---|---|---|
 | `plugin_enabled` | false | The plugin's switch, which shows and hides its overlay. |
 | `locked` | false | Click-through and fixed in place. |
-| `opacity` | 0.55 | Background opacity, 0 to 1. The names and figures stay opaque. |
+| `opacity` | 1.0 | The whole overlay's opacity, 0.2 to 1: its panel, names and figures fade together. |
+| `background_opacity` | 0.55 | The panel's alone, 0 to 1, behind the names and figures. A file from before 1.13, with `opacity` and no `background_opacity`, has its `opacity` read as this. |
 | `scale` | 1.0 | Size, 0.6 to 2.5, on top of the monitor's DPI scaling. |
 | `x`, `y`, `width`, `height` | -1, -1, 260, 190 | Position and size in screen pixels. -1, -1 places it right of the ping overlay's default spot. |
 | `show_list` | true | List the map's players, strongest first. Off, only your target shows. |

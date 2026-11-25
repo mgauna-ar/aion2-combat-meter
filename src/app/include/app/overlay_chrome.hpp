@@ -51,13 +51,14 @@ void shadowed_text(ImDrawList* dl, ImVec2 at, const std::string& text, float sca
 [[nodiscard]] std::string fit(const std::string& s, float width);
 
 /// Begins an overlay's one window, filling the display: rounded, bordered, its
-/// background at `opacity`. The border is full while the overlay can be moved
-/// (`interactive`), so an empty one can still be found. Always pair with end().
-bool begin(const char* id, float opacity, float scale, bool interactive);
+/// background at `background_opacity`. The border is full while the overlay can be
+/// moved (`interactive`), so an empty one can still be found. Always pair with end().
+/// The whole overlay's own opacity is not here: its window fades the finished frame.
+bool begin(const char* id, float background_opacity, float scale, bool interactive);
 /// The same over part of the display, from `pos`, `size` large. What it leaves
 /// uncovered stays see-through: an overlay window is transparent where nothing is
 /// drawn, and click-through all over while locked.
-bool begin(const char* id, float opacity, float scale, bool interactive, ImVec2 pos, ImVec2 size);
+bool begin(const char* id, float background_opacity, float scale, bool interactive, ImVec2 pos, ImVec2 size);
 void end();
 
 /// The window's padding and its items' spacing, as begin() sets them.

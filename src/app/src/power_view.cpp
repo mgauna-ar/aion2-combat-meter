@@ -201,7 +201,7 @@ OverlayActions draw_power(const PowerFrameInput& in) {
     const float scale = in.scale;
     const bool interactive = !s.locked;
 
-    if (chrome::begin("##aion2power", s.opacity, scale, interactive)) {
+    if (chrome::begin("##aion2power", s.background_opacity, scale, interactive)) {
         // Header, while it can be moved: a title and the buttons. Locked, the window
         // is only its rows.
         if (interactive) {

@@ -17,6 +17,8 @@
 #include <string>
 
 struct ImGuiContext;
+struct ImDrawList;
+struct ImDrawCmd;
 
 namespace aion2::app::win32 {
 
@@ -101,8 +103,9 @@ public:
     void set_icon_px(float px) noexcept { m_icon_px = px; }
 
     /// Draws one frame with `draw` (draw_overlay, draw_auras, draw_ping or draw_power),
-    /// which gets the settings' `scale` times the monitor's DPI scale.
-    OverlayActions render(float scale, const std::function<OverlayActions(float scale)>& draw);
+    /// which gets the settings' `scale` times the monitor's DPI scale, then fades the
+    /// finished frame to `opacity` (the settings' whole-overlay opacity).
+    OverlayActions render(float scale, float opacity, const std::function<OverlayActions(float scale)>& draw);
 
     std::function<void(Hotkey)> on_hotkey;
     /// The user finished moving or resizing the window.
@@ -114,6 +117,8 @@ public:
 private:
     bool create_device();
     void create_render_target();
+    /// ImGui's draw callback that sets m_fade_blend at m_fade, for the rectangle after it.
+    static void fade_callback(const ImDrawList* list, const ImDrawCmd* cmd);
     void rebuild_fonts(float scale);
     void register_hotkeys();
 
@@ -123,6 +128,10 @@ private:
     Microsoft::WRL::ComPtr<ID3D11DeviceContext> m_context;
     Microsoft::WRL::ComPtr<IDXGISwapChain> m_swap_chain;
     Microsoft::WRL::ComPtr<ID3D11RenderTargetView> m_render_target;
+    /// Scales what the back buffer holds by the blend factor: dst * k, colour and alpha.
+    Microsoft::WRL::ComPtr<ID3D11BlendState> m_fade_blend;
+    /// The frame being drawn's opacity, for fade_callback.
+    float m_fade{1.0f};
     bool m_locked{false};
     bool m_visible{true};
     bool m_hotkeys{false};

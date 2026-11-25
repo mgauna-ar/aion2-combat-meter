@@ -175,7 +175,8 @@ and saves as you go.
 |---|---|---|
 | `visible` | true | Shown at start. |
 | `locked` | false | Click-through and fixed in place. |
-| `opacity` | 0.80 | Background opacity, 0 to 1. Text stays opaque. |
+| `opacity` | 1.0 | The whole overlay's opacity, 0.2 to 1: its panel, bars, text and icons fade together. |
+| `background_opacity` | 0.80 | The panel's alone, 0 to 1, behind the text and bars. A file from before 1.13, with `opacity` and no `background_opacity`, has its `opacity` read as this. |
 | `scale` | 1.0 | Size, 0.6 to 2.5, on top of the monitor's DPI scaling. |
 | `x`, `y`, `width`, `height` | -1, -1, 430, 250 | Position and size in screen pixels. -1, -1 places it near the top-left; other negative values are on a monitor left of or above the main one. |
 | `show_share`, `show_crit`, `show_back`, `show_max_hit` | true, true, true, false | Optional columns: share of the damage, crit, back-attack rate, biggest hit (their own, direct). |

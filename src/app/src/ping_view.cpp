@@ -226,8 +226,8 @@ OverlayActions draw_ping(const PingFrameInput& in) {
                               static_cast<float>(row.rows) * line + static_cast<float>(row.rows - 1) * spacing.y + 2.0f * pad.y);
     const float inner_w = std::max(0.0f, body_size.x - 2.0f * pad.x);
 
-    const bool open = interactive ? chrome::begin("##aion2ping", s.opacity, scale, true)
-                                  : chrome::begin("##aion2ping", s.opacity, scale, false, body_pos, body_size);
+    const bool open = interactive ? chrome::begin("##aion2ping", s.background_opacity, scale, true)
+                                  : chrome::begin("##aion2ping", s.background_opacity, scale, false, body_pos, body_size);
     if (open) {
         if (interactive) {
             ImGui::TextColored(rgba(colors::TextDim), "PING");
