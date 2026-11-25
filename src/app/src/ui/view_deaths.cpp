@@ -87,7 +87,15 @@ void render_log(const meter::FightDetail& detail, AppViewState& state, float hei
 }
 
 void render_recap(const meter::DeathRecord& death) {
-    begin_card("##DeathRecap", ImVec2(0.0f, fill_h(0.0f)));
+    // As tall as its hits, the "Died" row among them; with none, an empty state that
+    // fills the pane's rest.
+    const size_t rows = death.recap.empty() ? 0 : death.recap.size() + 1;
+    float room = 0.0f;
+    if (rows > 0) {
+        room = begin_fit_card("##DeathRecap");
+    } else {
+        begin_card("##DeathRecap", ImVec2(0.0f, fill_h(0.0f)));
+    }
     const std::string heading = "LAST HITS - " + death.name;
     section_header(ICON_SKULL, heading.c_str(), colors::Danger);
     if (death.recap.empty()) {
@@ -102,7 +110,7 @@ void render_recap(const meter::DeathRecord& death) {
         {"Source", 150.0f, "The enemy that hit them, or the player who healed them.", 4},
         {"Amount", 90.0f, "\"!\" marks a critical hit.", 2},
     };
-    if (begin_table("##DeathRecapTable", cols, static_cast<int>(std::size(cols)), fill_h(0.0f))) {
+    if (begin_table("##DeathRecapTable", cols, static_cast<int>(std::size(cols)), fit_card_table_h(rows, room))) {
         const meter::RecapEvent* blow = death.killing_blow();
         for (const meter::RecapEvent& e : death.recap) {
             const bool heal = !e.damage();
@@ -147,12 +155,14 @@ void deaths_tab(const meter::FightSummary& f, AppViewState& state) {
         state.death_player = 0;
         state.death_time_s = -1.0;
     }
+    // The log as tall as its deaths, sharing the pane with the recap once one is picked.
     const float row_h = ImGui::GetTextLineHeight() + m(10.0f);
-    const float log_h = selected != nullptr
-                            ? std::min(fill_h(0.0f) * 0.45f, (static_cast<float>(detail.deaths.size()) + 1.5f) * row_h)
-                            : fill_h(0.0f);
-    render_log(detail, state, log_h);
-    if (selected == nullptr) return;
+    const float fit = (static_cast<float>(detail.deaths.size()) + 1.5f) * row_h;
+    render_log(detail, state, std::min(selected != nullptr ? fill_h(0.0f) * 0.45f : fill_h(0.0f), fit));
+    if (selected == nullptr) {
+        select_hint("Click a death above for the hits and heals before it.");
+        return;
+    }
     ImGui::Dummy(ImVec2(0.0f, m(4.0f)));
     render_recap(*selected);
 }

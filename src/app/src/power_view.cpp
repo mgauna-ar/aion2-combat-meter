@@ -131,42 +131,64 @@ void draw_row(const combat_power::PowerRow& row, const PowerLayout& layout, bool
     const ImVec2 row_max(origin.x + bar_width, origin.y + row_h);
     const float fraction =
         top != 0 ? std::clamp(static_cast<float>(row.combat_power) / static_cast<float>(top), 0.0f, 1.0f) : 0.0f;
-    chrome::draw_bar(dl, row_min, row_max, fraction, class_color(row.cls), scale);
+    // The text, laid out before the bar: its edge keeps clear of it.
+    const float ty = origin.y + (row_h - line) * 0.5f - 0.5f * scale;
+    const int icon = class_icon(row.cls);
+    const float emblem_x = origin.x + pad;
+    const float name_x = icon != kNoIcon ? emblem_x + emblem + pad : emblem_x;
+    // A class with no emblem (the Brawler) keeps its letters.
+    std::string label = row.name;
+    if (icon == kNoIcon && row.cls != game::AionClass::Unknown) {
+        label = std::string(game::class_short(row.cls)) + " " + label;
+    }
+    const std::string power = format_power_short(row.combat_power);
+    float power_w = 0.0f;
+    {
+        const chrome::BoldScope bold;
+        power_w = ImGui::CalcTextSize(power.c_str()).x;
+    }
+    // The target's name in bold, cut to fit in the font it is drawn in.
+    const float name_w = row_max.x - pad - power_w - pad - name_x;
+    std::string name;
+    float name_text_w = 0.0f;
+    if (name_w > 0.0f) {
+        const auto measure = [&] {
+            name = chrome::fit(label, name_w);
+            name_text_w = ImGui::CalcTextSize(name.c_str()).x;
+        };
+        if (target) {
+            const chrome::BoldScope bold;
+            measure();
+        } else {
+            measure();
+        }
+    }
+    const chrome::BarText text[] = {
+        {emblem_x, icon != kNoIcon ? emblem_x + emblem : emblem_x},
+        {name_x, name_x + name_text_w},
+        {row_max.x - pad - power_w, row_max.x - pad},
+    };
+
+    chrome::draw_bar(dl, row_min, row_max, fraction, class_color(row.cls), scale, {}, text);
     // The target's row: a stripe down its left edge.
     if (target) {
         dl->AddRectFilled(row_min, ImVec2(row_min.x + 3.0f * scale, row_max.y), u32(colors::Live), 3.0f * scale,
                           ImDrawFlags_RoundCornersLeft);
     }
 
-    const float ty = origin.y + (row_h - line) * 0.5f - 0.5f * scale;
-    const int icon = class_icon(row.cls);
-    float name_x = origin.x + pad;
-    if (icon != kNoIcon) {
-        draw_icon(dl, icon, name_x, origin.y + (row_h - emblem) * 0.5f, emblem);
-        name_x += emblem + pad;
-    }
-    // A class with no emblem (the Brawler) keeps its letters.
-    std::string label = row.name;
-    if (icon == kNoIcon && row.cls != game::AionClass::Unknown) {
-        label = std::string(game::class_short(row.cls)) + " " + label;
-    }
-
-    const std::string power = format_power_short(row.combat_power);
-    float power_w = 0.0f;
+    if (icon != kNoIcon) draw_icon(dl, icon, emblem_x, origin.y + (row_h - emblem) * 0.5f, emblem);
     {
         const chrome::BoldScope bold;
-        power_w = ImGui::CalcTextSize(power.c_str()).x;
         chrome::text_right(dl, row_max.x - pad, ty, u32(row.combat_power != 0 ? colors::Text : colors::TextDim, fade), power);
     }
-    const float name_w = row_max.x - pad - power_w - pad - name_x;
-    if (name_w <= 0.0f) return;
+    if (name.empty()) return;
     // An enemy's name is red, lightened to read over a class's bar.
     const Rgb name_color = row.hostile ? chrome::lighten(colors::Live, 0.25f) : colors::Text;
     if (target) {
         const chrome::BoldScope bold;
-        dl->AddText(ImVec2(name_x, ty), u32(name_color, fade), chrome::fit(label, name_w).c_str());
+        dl->AddText(ImVec2(name_x, ty), u32(name_color, fade), name.c_str());
     } else {
-        dl->AddText(ImVec2(name_x, ty), u32(name_color, (row.hostile ? 1.0f : 0.90f) * fade), chrome::fit(label, name_w).c_str());
+        dl->AddText(ImVec2(name_x, ty), u32(name_color, (row.hostile ? 1.0f : 0.90f) * fade), name.c_str());
     }
 }
 

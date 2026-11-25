@@ -75,65 +75,104 @@ void draw_rows(const meter::FightSummary& f, const OverlaySettings& s, float sca
     y += line + 4.0f * scale;
 
     const double top = f.combatants.empty() ? 1.0 : std::max(f.combatants.front().dps, 1.0);
+    // A row's figures, one a column, and the stretches of its bar its text covers;
+    // reused from row to row.
+    std::vector<std::string> figures;
+    std::vector<float> figure_w;
+    std::vector<chrome::BarText> covered;
     for (const ShownRow& shown : shown_rows(f.combatants, s.max_rows, s.show_heal)) {
         const meter::CombatantTotals& row = f.combatants[shown.index];
         const ImVec2 row_min(origin.x, y);
         const ImVec2 row_max(origin.x + width, y + row_h - gap);
         const float fraction = static_cast<float>(std::clamp(row.dps / top, 0.0, 1.0));
-        chrome::draw_bar(dl, row_min, row_max, fraction, s.class_bars ? row_color(row) : colors::Accent, scale);
+        const float ty = y + (row_h - gap - line) * 0.5f - 0.5f * scale;
+        const auto rate = [&](uint64_t meter::HitCounts::*count) { return format_percent(row.hits.rate(count)); };
+
+        // The text, laid out before the bar: its edge keeps clear of it.
+        char rank_buf[8];
+        std::snprintf(rank_buf, sizeof(rank_buf), "%d", shown.rank);
+        const int icon = class_icon(row.cls);
+        // A class with no emblem (the Brawler) keeps its letters.
+        std::string label = row.name;
+        if (icon == kNoIcon && row.cls != game::AionClass::Unknown) {
+            label = std::string(game::class_short(row.cls)) + " " + label;
+        }
+        // The local player's name in bold, cut to fit in the font it is drawn in.
+        std::string name;
+        float name_text_w = 0.0f;
+        {
+            const float label_w = origin.x + rank_w + name_w - name_x - pad;
+            const auto measure = [&] {
+                name = fit(label, label_w);
+                name_text_w = ImGui::CalcTextSize(name.c_str()).x;
+            };
+            if (row.is_local) {
+                const chrome::BoldScope bold;
+                measure();
+            } else {
+                measure();
+            }
+        }
+        // In the columns' order. The first, DPS, is the figure the rows are ranked by,
+        // in bold.
+        figures.clear();
+        figures.push_back(format_rate(row.dps));
+        figures.push_back(format_amount(row.damage));
+        if (s.show_share) figures.push_back(format_percent(row.share));
+        if (s.show_hits) figures.push_back(std::to_string(row.hits.hits));
+        if (s.show_crit) figures.push_back(rate(&meter::HitCounts::crits));
+        if (s.show_perfect) figures.push_back(rate(&meter::HitCounts::perfect));
+        if (s.show_double) figures.push_back(rate(&meter::HitCounts::doubles));
+        if (s.show_back) figures.push_back(rate(&meter::HitCounts::back));
+        if (s.show_front) figures.push_back(rate(&meter::HitCounts::front));
+        if (s.show_multi) figures.push_back(rate(&meter::HitCounts::multi));
+        if (s.show_block) figures.push_back(rate(&meter::HitCounts::blocks));
+        if (s.show_max_hit) figures.push_back(format_amount(row.max_hit));
+        if (s.show_heal) figures.push_back(format_amount(row.healing));
+        const size_t shown_cols = std::min(figures.size(), cols.size());
+        figure_w.assign(shown_cols, 0.0f);
+        covered.clear();
+        covered.push_back({origin.x + pad, origin.x + pad + ImGui::CalcTextSize(rank_buf).x});
+        if (icon != kNoIcon) covered.push_back({origin.x + rank_w, origin.x + rank_w + emblem});
+        covered.push_back({name_x, name_x + name_text_w});
+        x = origin.x + rank_w + name_w;
+        for (size_t i = 0; i < shown_cols; ++i) {
+            x += cols[i].width;
+            if (i == 0) {
+                const chrome::BoldScope bold;
+                figure_w[i] = ImGui::CalcTextSize(figures[i].c_str()).x;
+            } else {
+                figure_w[i] = ImGui::CalcTextSize(figures[i].c_str()).x;
+            }
+            covered.push_back({x - pad - figure_w[i], x - pad});
+        }
+
+        chrome::draw_bar(dl, row_min, row_max, fraction, s.class_bars ? row_color(row) : colors::Accent, scale, {},
+                         covered);
         // The local player's row: a stripe down its left edge.
         if (row.is_local) {
             dl->AddRectFilled(row_min, ImVec2(row_min.x + 3.0f * scale, row_max.y), u32(colors::Accent),
                               3.0f * scale, ImDrawFlags_RoundCornersLeft);
         }
 
-        const float ty = y + (row_h - gap - line) * 0.5f - 0.5f * scale;
-        char rank_buf[8];
-        std::snprintf(rank_buf, sizeof(rank_buf), "%d", shown.rank);
         dl->AddText(ImVec2(origin.x + pad, ty), u32(colors::Text, 0.60f), rank_buf);
-
-        const int icon = class_icon(row.cls);
         draw_icon(dl, icon, origin.x + rank_w, y + (row_h - gap - emblem) * 0.5f, emblem);
-        // A class with no emblem (the Brawler) keeps its letters.
-        std::string label = row.name;
-        if (icon == kNoIcon && row.cls != game::AionClass::Unknown) {
-            label = std::string(game::class_short(row.cls)) + " " + label;
-        }
-        const float label_w = origin.x + rank_w + name_w - name_x - pad;
         if (row.is_local) {
             const chrome::BoldScope bold;
-            dl->AddText(ImVec2(name_x, ty), u32(colors::Text), fit(label, label_w).c_str());
+            dl->AddText(ImVec2(name_x, ty), u32(colors::Text), name.c_str());
         } else {
-            dl->AddText(ImVec2(name_x, ty), u32(colors::Text), fit(label, label_w).c_str());
+            dl->AddText(ImVec2(name_x, ty), u32(colors::Text), name.c_str());
         }
-
         x = origin.x + rank_w + name_w;
-        const ImU32 text = u32(colors::Text, 0.86f);
-        size_t ci = 0;
-        // The next column's value, right-aligned in it.
-        const auto put = [&](const std::string& v) {
-            x += cols[ci++].width;
-            text_right(dl, x - pad, ty, text, v);
-        };
-        const auto rate = [&](uint64_t meter::HitCounts::*count) { return format_percent(row.hits.rate(count)); };
-        {
-            // The figure the rows are ranked by.
-            const chrome::BoldScope bold;
-            x += cols[ci++].width;
-            text_right(dl, x - pad, ty, u32(colors::Text), format_rate(row.dps));
+        for (size_t i = 0; i < shown_cols; ++i) {
+            x += cols[i].width;
+            if (i == 0) {
+                const chrome::BoldScope bold;
+                dl->AddText(ImVec2(x - pad - figure_w[i], ty), u32(colors::Text), figures[i].c_str());
+            } else {
+                dl->AddText(ImVec2(x - pad - figure_w[i], ty), u32(colors::Text, 0.86f), figures[i].c_str());
+            }
         }
-        put(format_amount(row.damage));
-        if (s.show_share) put(format_percent(row.share));
-        if (s.show_hits) put(std::to_string(row.hits.hits));
-        if (s.show_crit) put(rate(&meter::HitCounts::crits));
-        if (s.show_perfect) put(rate(&meter::HitCounts::perfect));
-        if (s.show_double) put(rate(&meter::HitCounts::doubles));
-        if (s.show_back) put(rate(&meter::HitCounts::back));
-        if (s.show_front) put(rate(&meter::HitCounts::front));
-        if (s.show_multi) put(rate(&meter::HitCounts::multi));
-        if (s.show_block) put(rate(&meter::HitCounts::blocks));
-        if (s.show_max_hit) put(format_amount(row.max_hit));
-        if (s.show_heal) put(format_amount(row.healing));
 
         if (interactive && ImGui::IsMouseHoveringRect(row_min, row_max)) {
             ImGui::SetTooltip("%s\n%llu damage (%llu from DoTs), %llu healing\n%llu hits: %s crit, %s perfect, "
@@ -179,16 +218,25 @@ void draw_boss(const meter::FightSummary& f, float scale, bool interactive) {
         const bool hovered = interactive && ImGui::IsItemHovered();
         ImDrawList* dl = ImGui::GetWindowDrawList();
         const auto fraction = static_cast<float>(b.hp_fraction());
-        chrome::draw_bar(dl, min, max, fraction, colors::BossHp, scale, chrome::BarStyle{3.0f, 0.90f, true});
+        // The text, laid out before the bar: its edge keeps clear of it.
         const float ty = min.y + (max.y - min.y - line) * 0.5f - 0.5f * scale;
         const std::string left =
             std::string(estimate ? "~" : "") + format_amount(b.hp) + " / " + format_amount(b.max_hp);
-        chrome::shadowed_text(dl, ImVec2(min.x + 7.0f * scale, ty), left, scale);
+        const std::string share = format_percent(static_cast<double>(fraction));
+        const float left_x = min.x + 7.0f * scale;
+        float share_w = 0.0f;
         {
             const chrome::BoldScope bold;
-            const std::string share = format_percent(static_cast<double>(fraction));
-            chrome::shadowed_text(dl, ImVec2(max.x - 7.0f * scale - ImGui::CalcTextSize(share.c_str()).x, ty), share,
-                                  scale);
+            share_w = ImGui::CalcTextSize(share.c_str()).x;
+        }
+        const float share_x = max.x - 7.0f * scale - share_w;
+        const chrome::BarText covered[] = {{left_x, left_x + ImGui::CalcTextSize(left.c_str()).x},
+                                           {share_x, share_x + share_w}};
+        chrome::draw_bar(dl, min, max, fraction, colors::BossHp, scale, chrome::BarStyle{3.0f, 0.90f, true}, covered);
+        chrome::shadowed_text(dl, ImVec2(left_x, ty), left, scale);
+        {
+            const chrome::BoldScope bold;
+            chrome::shadowed_text(dl, ImVec2(share_x, ty), share, scale);
         }
         if (estimate && hovered) {
             ImGui::SetTooltip("An estimate (~): spawn HP less the damage the meter saw, until\n"

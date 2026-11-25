@@ -101,6 +101,19 @@ std::string day_label(const common::LocalDay& day, const std::optional<common::L
     return label;
 }
 
+RunTitle run_title(const std::string& map_label, size_t fights) {
+    RunTitle title{map_label, std::to_string(fights) + (fights == 1 ? " fight" : " fights")};
+    // The tier: the last " (...)", closing the name. A label that is nothing else
+    // keeps it as its name.
+    if (map_label.empty() || map_label.back() != ')') return title;
+    const size_t open = map_label.rfind(" (");
+    if (open == std::string::npos || open == 0 || open + 3 >= map_label.size()) return title;
+    title.name = map_label.substr(0, open);
+    // " · ", as the list's rows put it between two facts. Escaped: the source stays ASCII.
+    title.detail = map_label.substr(open + 2, map_label.size() - open - 3) + " \xC2\xB7 " + title.detail;
+    return title;
+}
+
 DeletePrompt delete_picked(const std::vector<meter::HistoryEntry>& history, const std::set<std::string>& files) {
     DeletePrompt p;
     size_t kept = 0;

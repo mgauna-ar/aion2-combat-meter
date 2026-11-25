@@ -204,6 +204,9 @@ struct WindowSettings {
     int y{-1};
     int width{1280};
     int height{760};
+    /// The saved-fights list's width on the Combat Meter page, as its edge was last
+    /// dragged, in pixels at 100% scaling; 0 fits it to the window.
+    int fight_list_width{0};
 };
 
 struct AppSettings {
@@ -330,7 +333,7 @@ inline constexpr std::array<config::ConfigKey<HistorySettings>, 1> kHistoryKeys{
     config::field<HistorySettings, &HistorySettings::max_fights>("max_fights"),
 }};
 
-inline constexpr std::array<config::ConfigKey<WindowSettings>, 8> kWindowKeys{{
+inline constexpr std::array<config::ConfigKey<WindowSettings>, 9> kWindowKeys{{
     config::field<WindowSettings, &WindowSettings::open_at_start>("open_window_at_start"),
     config::field<WindowSettings, &WindowSettings::close_to_tray>("close_to_tray"),
     config::field<WindowSettings, &WindowSettings::notifications>("notifications"),
@@ -339,6 +342,7 @@ inline constexpr std::array<config::ConfigKey<WindowSettings>, 8> kWindowKeys{{
     config::field<WindowSettings, &WindowSettings::y>("window_y"),
     config::field<WindowSettings, &WindowSettings::width>("window_width"),
     config::field<WindowSettings, &WindowSettings::height>("window_height"),
+    config::field<WindowSettings, &WindowSettings::fight_list_width>("fight_list_width"),
 }};
 
 /// Clamps every value a hand-edited file could put out of range.

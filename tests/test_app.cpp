@@ -86,11 +86,15 @@ TEST_CASE(AppSettings, RoundTripAndSanitize) {
     s.window.check_for_updates = false;
     s.window.x = -1200;
     s.window.width = 1280;
+    s.window.fight_list_width = 320;
     const AppSettings back = settings_from_json(settings_to_json(s));
     TEST_ASSERT_FALSE(back.window.close_to_tray);
     TEST_ASSERT_FALSE(back.window.check_for_updates);
     TEST_ASSERT_EQ(back.window.x, -1200);
     TEST_ASSERT_EQ(back.window.width, 1280);
+    TEST_ASSERT_EQ(back.window.fight_list_width, 320);
+    // Unset, the saved-fights list fits the window.
+    TEST_ASSERT_EQ(AppSettings{}.window.fight_list_width, 0);
     TEST_ASSERT_EQ(back.capture.game_process, std::string("Aion2Test.exe"));
     TEST_ASSERT_NEAR(back.overlay.opacity, 0.5f, 1e-6f);
     TEST_ASSERT_EQ(back.overlay.x, 120);
@@ -101,10 +105,14 @@ TEST_CASE(AppSettings, RoundTripAndSanitize) {
     bad["capture"]["game_process"] = "..\\..\\evil.exe";
     bad["overlay"]["scale"] = 99.0;
     bad["capture"]["server_port"] = 70000;
+    bad["app"]["fight_list_width"] = 99999;
     const AppSettings clean = settings_from_json(bad);
     TEST_ASSERT_EQ(clean.capture.game_process, std::string("Aion2.exe"));
     TEST_ASSERT_NEAR(clean.overlay.scale, 2.5f, 1e-6f);
     TEST_ASSERT_EQ(clean.capture.server_port, 65535);
+    TEST_ASSERT_EQ(clean.window.fight_list_width, 2000);
+    bad["app"]["fight_list_width"] = -5;
+    TEST_ASSERT_EQ(settings_from_json(bad).window.fight_list_width, 0);
 }
 
 TEST_CASE(AppSettings, AurasRoundTripWithTheirWatchList) {
@@ -1384,6 +1392,26 @@ TEST_CASE(HistoryList, DayLabels) {
     TEST_ASSERT_EQ(day_label(common::civil_day(2025, 12, 30), new_year), std::string("Tue 30 Dec 2025"));
     // No clock: every day by its date.
     TEST_ASSERT_EQ(day_label(today, std::nullopt), std::string("Tue 24 Nov"));
+}
+
+TEST_CASE(HistoryList, RunTitlesPutTheTierUnderTheName) {
+    RunTitle t = run_title("Krao Cave (Conquest)", 3);
+    TEST_ASSERT_EQ(t.name, std::string("Krao Cave"));
+    TEST_ASSERT_EQ(t.detail, std::string("Conquest \xC2\xB7 3 fights"));
+    t = run_title("Abyssal Forge: Ludra (Conquest [Hard])", 1);
+    TEST_ASSERT_EQ(t.name, std::string("Abyssal Forge: Ludra"));
+    TEST_ASSERT_EQ(t.detail, std::string("Conquest [Hard] \xC2\xB7 1 fight"));
+    // No tier: the count alone.
+    t = run_title("Map 1010", 2);
+    TEST_ASSERT_EQ(t.name, std::string("Map 1010"));
+    TEST_ASSERT_EQ(t.detail, std::string("2 fights"));
+    t = run_title("Impetusium Arena", 1);
+    TEST_ASSERT_EQ(t.name, std::string("Impetusium Arena"));
+    TEST_ASSERT_EQ(t.detail, std::string("1 fight"));
+    // A label that is all parentheses, or an empty tier, keeps its name whole.
+    TEST_ASSERT_EQ(run_title("(Conquest)", 1).name, std::string("(Conquest)"));
+    TEST_ASSERT_EQ(run_title("Krao Cave ()", 1).name, std::string("Krao Cave ()"));
+    TEST_ASSERT_EQ(run_title("Krao Cave ()", 1).detail, std::string("1 fight"));
 }
 
 TEST_CASE(HistoryList, DeletePromptsSayWhatGoesAndWhatStays) {
