@@ -30,6 +30,8 @@ inline constexpr Rgb Good{0.25f, 0.80f, 0.45f};
 inline constexpr Rgb BossHp{0.80f, 0.20f, 0.25f};
 inline constexpr Rgb Unknown{0.42f, 0.48f, 0.60f};
 inline constexpr Rgb Local{0.30f, 0.58f, 1.00f};
+/// A death's skull: the app window's DangerLight.
+inline constexpr Rgb Death{0.97f, 0.44f, 0.44f};
 } // namespace colors
 
 /// The class's colour for bars and labels.
@@ -59,5 +61,19 @@ struct ShownRow {
 /// crowd, they take the last place, with their own rank.
 [[nodiscard]] std::vector<ShownRow> shown_rows(const std::vector<meter::CombatantTotals>& rows, int max_rows,
                                                bool with_healers);
+
+/// A row's deaths in a fight, for the skull after its name.
+struct RowDeaths {
+    int count{0};
+    /// Their latest death has no getting up after it: down now, or when the fight ended.
+    bool down{false};
+
+    bool operator==(const RowDeaths&) const = default;
+};
+
+/// The deaths of the row whose CombatantTotals::id is `row_id`, by DeathRecord::player,
+/// which the engine sets to it. A death with no row has none to show on; a fight with
+/// no detail (saved before the meter kept it) has no deaths.
+[[nodiscard]] RowDeaths row_deaths(const meter::FightSummary& fight, meter::EntityId row_id);
 
 } // namespace aion2::app

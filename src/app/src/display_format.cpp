@@ -1,6 +1,7 @@
 #include "app/display_format.hpp"
 
 #include "common/time_format.hpp"
+#include "meter/fight_detail.hpp"
 
 #include <cmath>
 #include <cstdio>
@@ -99,6 +100,18 @@ std::vector<ShownRow> shown_rows(const std::vector<meter::CombatantTotals>& rows
             out.back() = {i, rank};
             break;
         }
+    }
+    return out;
+}
+
+RowDeaths row_deaths(const meter::FightSummary& fight, meter::EntityId row_id) {
+    RowDeaths out;
+    if (fight.detail == nullptr || row_id == 0) return out;
+    // Oldest first, so the last one seen says whether they are down.
+    for (const meter::DeathRecord& death : fight.detail->deaths) {
+        if (death.player != row_id) continue;
+        ++out.count;
+        out.down = !death.up();
     }
     return out;
 }

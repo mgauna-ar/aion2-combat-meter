@@ -46,6 +46,8 @@ struct OverlaySettings {
     bool show_multi{false};
     bool show_block{false};
     bool show_heal{false};
+    /// A skull after the name of each player who died in the fight.
+    bool show_deaths{true};
     /// Bars in each player's class colour; off, all in one colour.
     bool class_bars{true};
     /// Rows drawn, best first.
@@ -232,7 +234,7 @@ inline constexpr std::array<config::ConfigKey<CaptureSettings>, 2> kCaptureKeys{
     config::field<CaptureSettings, &CaptureSettings::detect_relays>("detect_relays"),
 }};
 
-inline constexpr std::array<config::ConfigKey<OverlaySettings>, 25> kOverlayKeys{{
+inline constexpr std::array<config::ConfigKey<OverlaySettings>, 26> kOverlayKeys{{
     config::field<OverlaySettings, &OverlaySettings::visible>("visible"),
     config::field<OverlaySettings, &OverlaySettings::locked>("locked"),
     config::field<OverlaySettings, &OverlaySettings::opacity>("opacity"),
@@ -252,6 +254,7 @@ inline constexpr std::array<config::ConfigKey<OverlaySettings>, 25> kOverlayKeys
     config::field<OverlaySettings, &OverlaySettings::show_multi>("show_multi"),
     config::field<OverlaySettings, &OverlaySettings::show_block>("show_block"),
     config::field<OverlaySettings, &OverlaySettings::show_heal>("show_heal"),
+    config::field<OverlaySettings, &OverlaySettings::show_deaths>("show_deaths"),
     config::field<OverlaySettings, &OverlaySettings::class_bars>("class_bars"),
     config::field<OverlaySettings, &OverlaySettings::max_rows>("max_rows"),
     config::field<OverlaySettings, &OverlaySettings::show_in_combat_only>("show_in_combat_only"),

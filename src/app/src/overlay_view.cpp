@@ -4,6 +4,7 @@
 #include "app/game_icons.hpp"
 #include "app/imgui_guard.hpp"
 #include "app/overlay_chrome.hpp"
+#include "app/ui/icons.hpp"
 #include "common/time_format.hpp"
 #include "game/map_names.hpp"
 
@@ -97,11 +98,21 @@ void draw_rows(const meter::FightSummary& f, const OverlaySettings& s, float sca
         if (icon == kNoIcon && row.cls != game::AionClass::Unknown) {
             label = std::string(game::class_short(row.cls)) + " " + label;
         }
-        // The local player's name in bold, cut to fit in the font it is drawn in.
+        // A skull after the name for each death: bright while they are down, the count
+        // from the second.
+        const RowDeaths deaths = s.show_deaths ? row_deaths(f, row.id) : RowDeaths{};
+        const std::string death_count = deaths.count > 1 ? std::to_string(deaths.count) : std::string();
+        const float skull_w = deaths.count > 0 ? ImGui::CalcTextSize(ICON_SKULL).x : 0.0f;
+        const float count_gap = 1.0f * scale;
+        const float death_w =
+            skull_w + (death_count.empty() ? 0.0f : count_gap + ImGui::CalcTextSize(death_count.c_str()).x);
+        const float death_gap = deaths.count > 0 ? 4.0f * scale : 0.0f;
+        // The local player's name in bold, cut to fit in the font it is drawn in, with
+        // room left for the skull.
         std::string name;
         float name_text_w = 0.0f;
         {
-            const float label_w = origin.x + rank_w + name_w - name_x - pad;
+            const float label_w = origin.x + rank_w + name_w - name_x - pad - death_gap - death_w;
             const auto measure = [&] {
                 name = fit(label, label_w);
                 name_text_w = ImGui::CalcTextSize(name.c_str()).x;
@@ -135,6 +146,8 @@ void draw_rows(const meter::FightSummary& f, const OverlaySettings& s, float sca
         covered.push_back({origin.x + pad, origin.x + pad + ImGui::CalcTextSize(rank_buf).x});
         if (icon != kNoIcon) covered.push_back({origin.x + rank_w, origin.x + rank_w + emblem});
         covered.push_back({name_x, name_x + name_text_w});
+        const float skull_x = name_x + name_text_w + death_gap;
+        if (deaths.count > 0) covered.push_back({skull_x, skull_x + death_w});
         x = origin.x + rank_w + name_w;
         for (size_t i = 0; i < shown_cols; ++i) {
             x += cols[i].width;
@@ -163,6 +176,13 @@ void draw_rows(const meter::FightSummary& f, const OverlaySettings& s, float sca
         } else {
             dl->AddText(ImVec2(name_x, ty), u32(colors::Text), name.c_str());
         }
+        if (deaths.count > 0) {
+            const ImU32 death_col = u32(colors::Death, deaths.down ? 1.0f : 0.55f);
+            dl->AddText(ImVec2(skull_x, ty), death_col, ICON_SKULL);
+            if (!death_count.empty()) {
+                dl->AddText(ImVec2(skull_x + skull_w + count_gap, ty), death_col, death_count.c_str());
+            }
+        }
         x = origin.x + rank_w + name_w;
         for (size_t i = 0; i < shown_cols; ++i) {
             x += cols[i].width;
@@ -175,16 +195,23 @@ void draw_rows(const meter::FightSummary& f, const OverlaySettings& s, float sca
         }
 
         if (interactive && ImGui::IsMouseHoveringRect(row_min, row_max)) {
-            ImGui::SetTooltip("%s\n%llu damage (%llu from DoTs), %llu healing\n%llu hits: %s crit, %s perfect, "
-                              "%s double, %s multi, %s blocked\n%s back, %s front; max hit %llu",
-                              row.name.c_str(), static_cast<unsigned long long>(row.damage),
-                              static_cast<unsigned long long>(row.dot_damage),
-                              static_cast<unsigned long long>(row.healing),
-                              static_cast<unsigned long long>(row.hits.hits), rate(&meter::HitCounts::crits).c_str(),
-                              rate(&meter::HitCounts::perfect).c_str(), rate(&meter::HitCounts::doubles).c_str(),
-                              rate(&meter::HitCounts::multi).c_str(), rate(&meter::HitCounts::blocks).c_str(),
-                              rate(&meter::HitCounts::back).c_str(), rate(&meter::HitCounts::front).c_str(),
-                              static_cast<unsigned long long>(row.max_hit));
+            char tip[512];
+            std::snprintf(tip, sizeof(tip),
+                          "%s\n%llu damage (%llu from DoTs), %llu healing\n%llu hits: %s crit, %s perfect, "
+                          "%s double, %s multi, %s blocked\n%s back, %s front; max hit %llu",
+                          row.name.c_str(), static_cast<unsigned long long>(row.damage),
+                          static_cast<unsigned long long>(row.dot_damage),
+                          static_cast<unsigned long long>(row.healing), static_cast<unsigned long long>(row.hits.hits),
+                          rate(&meter::HitCounts::crits).c_str(), rate(&meter::HitCounts::perfect).c_str(),
+                          rate(&meter::HitCounts::doubles).c_str(), rate(&meter::HitCounts::multi).c_str(),
+                          rate(&meter::HitCounts::blocks).c_str(), rate(&meter::HitCounts::back).c_str(),
+                          rate(&meter::HitCounts::front).c_str(), static_cast<unsigned long long>(row.max_hit));
+            std::string text = tip;
+            if (deaths.count > 0) {
+                text += deaths.count == 1 ? "\nDied once" : "\nDied " + std::to_string(deaths.count) + " times";
+                if (deaths.down) text += ", down now";
+            }
+            ImGui::SetTooltip("%s", text.c_str());
         }
         y += row_h;
     }
