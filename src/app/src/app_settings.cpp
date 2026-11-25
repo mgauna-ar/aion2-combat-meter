@@ -106,6 +106,7 @@ void sanitize(AppSettings& s) {
     s.history.max_fights = std::clamp(s.history.max_fights, 1, 100000);
     s.window.width = std::clamp(s.window.width, 640, 8000);
     s.window.height = std::clamp(s.window.height, 400, 8000);
+    s.window.fight_list_width = std::clamp(s.window.fight_list_width, 0, 2000);
 }
 
 config::JsonValue settings_to_json(const AppSettings& s) {

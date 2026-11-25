@@ -43,7 +43,8 @@ uint64_t hits_of(const meter::CombatantTotals& c, uint32_t code) {
 }
 
 void casts_breakdown(const meter::FightSummary& f, const meter::CombatantTotals& c, meter::EntityId& selected) {
-    if (!begin_breakdown("##CastsBreakdown", "CASTS", c, selected)) return;
+    const float table_h = begin_breakdown("##CastsBreakdown", "CASTS", c, selected, c.cast_skills.size());
+    if (table_h <= 0.0f) return;
     if (c.cast_skills.empty()) {
         empty_state(ICON_BOLT, "No casts recorded", "This player has not pressed a skill in this fight.");
         end_card();
@@ -59,7 +60,7 @@ void casts_breakdown(const meter::FightSummary& f, const meter::CombatantTotals&
         {"HIT/cast", 64.0f, "Direct hits a press: above 1 for a skill that strikes several times or several targets.",
          6},
     };
-    if (begin_table("##CastSkillTable", cols, static_cast<int>(std::size(cols)), fill_h(0.0f))) {
+    if (begin_table("##CastSkillTable", cols, static_cast<int>(std::size(cols)), table_h)) {
         const uint64_t top = std::max<uint64_t>(c.cast_skills.front().casts, 1);
         for (const auto& s : c.cast_skills) {
             ImGui::TableNextRow();

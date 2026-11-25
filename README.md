@@ -183,6 +183,7 @@ Settings are stored in `%APPDATA%\aion2-combat-meter\config.json` and generated 
 | `check_for_updates` | `true` | Automatically check GitHub for newer releases on startup. **Check now** in Settings works either way. |
 | `window_x`, `window_y` | `-1`, `-1` | App window position in pixels (`-1, -1` centers on screen). |
 | `window_width`, `window_height` | `1280`, `760` | App window dimensions in pixels (clamped to at most 90% screen size). |
+| `fight_list_width` | `0` | Width of the saved-fights list on the Combat Meter page, in pixels at 100% scaling, as you last dragged its edge; `0` fits it to the window. |
 
 *(Note: "Start with Windows" is managed directly through Windows' User Run registry key rather than `config.json`)*.
 

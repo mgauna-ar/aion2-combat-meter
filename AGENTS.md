@@ -185,8 +185,8 @@ src/app/         aion2::app
     each window's font atlas at the size it draws them, and the app's mark from
     app_mark.inc at the sidebar chip's), timeline_chart (the Timeline tab's
     lines as numbers, no ImGui), history_list (the Combat Meter page's list of
-    saved fights as data: what is selected, the day headers, what a delete asks;
-    no ImGui)
+    saved fights as data: what is selected, the day headers, the runs' titles, what
+    a delete asks; no ImGui)
     src/ui/      the app window's pages (a page per plugin, opened by plugin_page's
                  header and master switch), theme, widgets, table (the meter's tables)
                  and Lucide icons (ported from ffxiv-hub; ImGui, behind HAVE_IMGUI);

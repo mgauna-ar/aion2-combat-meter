@@ -4,6 +4,7 @@
 #include "app/imgui_guard.hpp"
 #include "app/overlay_view.hpp"
 
+#include <span>
 #include <string>
 
 // What the meter, aura, ping and combat power overlays share, so they stay one look:
@@ -93,15 +94,22 @@ void finish_header(const HeaderButtons& buttons, OverlayActions& out);
 [[nodiscard]] ClientRect resize_grip(float scale);
 
 /// A bar from `min` to `max`, `fraction` of it filled in `color`: a faint track, a
-/// fill that brightens toward its end, and a bright edge where it ends.
+/// fill that brightens toward its end, and a bright edge where it ends. The edge is
+/// left out where it would run through `text`, what is written on the bar (a name, a
+/// figure, an emblem); the fill's colour still shows where it ends.
 struct BarStyle {
     float rounding{3.0f};
     /// The fill's opacity over the track.
     float alpha{0.60f};
     bool track{true};
 };
+/// A stretch of a bar that text covers, from `x0` to `x1` in screen pixels.
+struct BarText {
+    float x0{0.0f};
+    float x1{0.0f};
+};
 void draw_bar(ImDrawList* dl, ImVec2 min, ImVec2 max, float fraction, Rgb color, float scale,
-              const BarStyle& style = {});
+              const BarStyle& style = {}, std::span<const BarText> text = {});
 
 } // namespace aion2::app::chrome
 

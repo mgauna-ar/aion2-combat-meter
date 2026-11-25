@@ -40,9 +40,19 @@ void name_cell(int column, const meter::CombatantTotals& c, meter::EntityId& sel
 void select_hint(const char* what);
 /// The fight's row for `id`; null for 0 or a player not in it.
 [[nodiscard]] const meter::CombatantTotals* find_row(const meter::FightSummary& f, meter::EntityId id);
-/// The card a breakdown sits in, titled with the player, with a Close button. False
-/// (the card already ended) when it was closed.
-bool begin_breakdown(const char* id, const char* title, const meter::CombatantTotals& c, meter::EntityId& selected);
+/// Begins a card that ends under its content rather than at the pane's bottom, so a
+/// table of a few rows leaves no empty card under it. Returns the room it has, the
+/// rest of the pane, for fit_card_table_h(). Pair with end_card().
+[[nodiscard]] float begin_fit_card(const char* id);
+/// The height of a table of `rows` in a fit card, under what the card holds already:
+/// the rows whole, up to the card's `room`, where they scroll instead.
+[[nodiscard]] float fit_card_table_h(size_t rows, float room);
+/// The card a breakdown sits in, titled with the player, with a Close button, and
+/// sized to its table's `rows` as a fit card is. Returns the table's height, or 0
+/// (the card already ended) when it was closed. With no rows the card fills the
+/// pane, for an empty state.
+[[nodiscard]] float begin_breakdown(const char* id, const char* title, const meter::CombatantTotals& c,
+                                    meter::EntityId& selected, size_t rows);
 
 #endif // HAVE_IMGUI
 

@@ -200,7 +200,8 @@ ClientRect resize_grip(float scale) {
     return ClientRect{display.x - g - 3.0f * scale, display.y - g - 3.0f * scale, display.x, display.y};
 }
 
-void draw_bar(ImDrawList* dl, ImVec2 min, ImVec2 max, float fraction, Rgb color, float scale, const BarStyle& style) {
+void draw_bar(ImDrawList* dl, ImVec2 min, ImVec2 max, float fraction, Rgb color, float scale, const BarStyle& style,
+              std::span<const BarText> text) {
     const float rounding = style.rounding * scale;
     if (style.track) dl->AddRectFilled(min, max, u32(colors::Text, 0.06f), rounding);
     const float x1 = min.x + (max.x - min.x) * std::clamp(fraction, 0.0f, 1.0f);
@@ -212,9 +213,14 @@ void draw_bar(ImDrawList* dl, ImVec2 min, ImVec2 max, float fraction, Rgb color,
     ImGui::ShadeVertsLinearColorGradientKeepAlpha(dl, first, dl->VtxBuffer.Size, min, ImVec2(x1, min.y),
                                                   u32(Rgb{color.r * 0.55f, color.g * 0.55f, color.b * 0.55f}),
                                                   u32(color));
-    // The edge the eye follows as the bar moves; a full bar has none.
+    // The edge the eye follows as the bar moves; a full bar has none, and neither has
+    // one whose edge would cross its text, a hair clear of the letters.
     const float edge = 2.0f * scale;
-    if (fraction < 0.995f && x1 - min.x > rounding + edge) {
+    const float clear = 2.0f * scale;
+    const bool on_text = std::any_of(text.begin(), text.end(), [&](const BarText& t) {
+        return t.x1 > t.x0 && x1 - edge < t.x1 + clear && x1 > t.x0 - clear;
+    });
+    if (fraction < 0.995f && x1 - min.x > rounding + edge && !on_text) {
         dl->AddRectFilled(ImVec2(x1 - edge, min.y), ImVec2(x1, max.y), u32(lighten(color, 0.45f), 0.90f), rounding,
                           ImDrawFlags_RoundCornersRight);
     }

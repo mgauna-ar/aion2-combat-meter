@@ -248,27 +248,34 @@ void draw_bar_rows(const std::vector<BarRow>& rows, float scale, bool interactiv
             }
         }
         const ImVec2 bar_min(icon_max.x + 3.0f * scale, y);
-        chrome::BarStyle style;
-        style.alpha = r.fill_alpha;
-        chrome::draw_bar(dl, bar_min, row_max, r.fraction, r.color, scale, style);
-        if (r.border_alpha > 0.0f) {
-            dl->AddRect(bar_min, row_max, u32(r.color, r.border_alpha), rounding, 0, 1.5f * scale);
-        }
-
+        // The text, laid out before the bar: its edge keeps clear of it.
         const float ty = y + (m.icon - line) * 0.5f - 0.5f * scale;
         float value_w = 0.0f;
         if (!r.value.empty()) {
             const chrome::BoldScope bold;
             value_w = ImGui::CalcTextSize(r.value.c_str()).x;
-            dl->AddText(ImVec2(row_max.x - pad - value_w, ty), u32(colors::Text), r.value.c_str());
         }
+        const float value_x = row_max.x - pad - value_w;
         const float note_w = r.note.empty() ? 0.0f : ImGui::CalcTextSize(r.note.c_str()).x + 5.0f * scale;
         const float label_x = bar_min.x + pad;
         const std::string label = fit(r.label, row_max.x - pad - value_w - pad - note_w - label_x);
+        const float label_w = ImGui::CalcTextSize(label.c_str()).x;
+        const chrome::BarText text[] = {{label_x, label_x + label_w + note_w}, {value_x, value_x + value_w}};
+
+        chrome::BarStyle style;
+        style.alpha = r.fill_alpha;
+        chrome::draw_bar(dl, bar_min, row_max, r.fraction, r.color, scale, style, text);
+        if (r.border_alpha > 0.0f) {
+            dl->AddRect(bar_min, row_max, u32(r.color, r.border_alpha), rounding, 0, 1.5f * scale);
+        }
+
+        if (!r.value.empty()) {
+            const chrome::BoldScope bold;
+            dl->AddText(ImVec2(value_x, ty), u32(colors::Text), r.value.c_str());
+        }
         dl->AddText(ImVec2(label_x, ty), u32(colors::Text), label.c_str());
         if (!r.note.empty()) {
-            dl->AddText(ImVec2(label_x + ImGui::CalcTextSize(label.c_str()).x + 5.0f * scale, ty),
-                        u32(colors::Text, 0.65f), r.note.c_str());
+            dl->AddText(ImVec2(label_x + label_w + 5.0f * scale, ty), u32(colors::Text, 0.65f), r.note.c_str());
         }
         if (interactive && !r.tooltip.empty() && ImGui::IsMouseHoveringRect(row_min, row_max)) {
             ImGui::SetTooltip("%s", r.tooltip.c_str());

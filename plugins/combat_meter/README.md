@@ -76,7 +76,10 @@ always be found and dragged back. Switching the plugin off hides it too.
 
 The page lists every saved fight, newest first: under the day its run began (Today,
 Yesterday, then the date), by map visit, each run's fights numbered in the order they
-came. Click one to see it.
+came. A run's header names the map, then its tier, how many fights it holds and when
+it began. Click a fight to see it. Drag the list's edge to widen or narrow it
+(`fight_list_width`, [README, Configuration](../../README.md#%EF%B8%8F-configuration));
+double-click the edge to fit it to the window again.
 
 - **Keep** a fight to hold on to it: right-click it, or press **Keep** over the fight.
   A lock shows on its row. Pruning (`max_fights`, below) never deletes a kept fight,

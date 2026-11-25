@@ -16,9 +16,11 @@
 #include "meter/pull_grouping.hpp"
 
 #ifdef HAVE_IMGUI
+#include "imgui_internal.h"
 #include <algorithm>
 #include <cctype>
 #include <cinttypes>
+#include <cmath>
 #include <cstdio>
 #include <iterator>
 #include <optional>
@@ -108,11 +110,33 @@ const char* const kTipBlock = "BLOC: hits the target blocked, of the direct hits
 
 } // namespace
 
-float table_height(size_t rows, bool breakdown_open) {
-    // The header and the rows, with a little slack so a table that fits never scrolls.
+namespace {
+
+/// A table of `rows` whole: the header and the rows, with a little slack so a table
+/// that fits never scrolls.
+float fit_table_h(size_t rows) {
     const float row_h = ImGui::GetTextLineHeight() + ImGui::GetStyle().CellPadding.y * 2.0f;
-    const float fit = static_cast<float>(rows + 1) * row_h + m(6.0f);
-    return std::min(fit, breakdown_open ? fill_h(0.0f) * 0.5f : fill_h(0.0f));
+    return static_cast<float>(rows + 1) * row_h + m(6.0f);
+}
+
+} // namespace
+
+float table_height(size_t rows, bool breakdown_open) {
+    return std::min(fit_table_h(rows), breakdown_open ? fill_h(0.0f) * 0.5f : fill_h(0.0f));
+}
+
+float begin_fit_card(const char* id) {
+    const float room = fill_h(0.0f);
+    CardOptions opts{};
+    opts.auto_height = true;
+    begin_card(id, ImVec2(0.0f, 0.0f), opts);
+    return room;
+}
+
+float fit_card_table_h(size_t rows, float room) {
+    // What the card has left under what it holds already, less its bottom padding.
+    const float left = room - ImGui::GetCursorPosY() - m(metrics::CardPad);
+    return std::min(fit_table_h(rows), std::max(left, fit_table_h(2)));
 }
 
 void select_hint(const char* what) {
@@ -129,9 +153,16 @@ const meter::CombatantTotals* find_row(const meter::FightSummary& f, meter::Enti
 }
 
 /// The card a breakdown sits in, titled with the player, with a Close button.
-bool begin_breakdown(const char* id, const char* title, const meter::CombatantTotals& c, meter::EntityId& selected) {
+float begin_breakdown(const char* id, const char* title, const meter::CombatantTotals& c, meter::EntityId& selected,
+                      size_t rows) {
     ImGui::Dummy(ImVec2(0.0f, m(4.0f)));
-    begin_card(id, ImVec2(0.0f, fill_h(0.0f)));
+    // With no rows it holds an empty state, centred in the pane's rest.
+    float room = 0.0f;
+    if (rows > 0) {
+        room = begin_fit_card(id);
+    } else {
+        begin_card(id, ImVec2(0.0f, fill_h(0.0f)));
+    }
     char header[160];
     std::snprintf(header, sizeof(header), "%s - %s", title, c.name.c_str());
     const char* close_label = ICON_CIRCLE_X "  Close";
@@ -141,9 +172,9 @@ bool begin_breakdown(const char* id, const char* title, const meter::CombatantTo
     if (close) {
         selected = 0;
         end_card();
-        return false;
+        return 0.0f;
     }
-    return true;
+    return rows > 0 ? fit_card_table_h(rows, room) : fill_h(0.0f);
 }
 
 namespace {
@@ -151,7 +182,8 @@ namespace {
 // ------------------------------------------------------------------ damage ---
 
 void damage_breakdown(const meter::CombatantTotals& c, meter::EntityId& selected) {
-    if (!begin_breakdown("##DamageBreakdown", "SKILLS", c, selected)) return;
+    const float table_h = begin_breakdown("##DamageBreakdown", "SKILLS", c, selected, c.skills.size());
+    if (table_h <= 0.0f) return;
     if (c.skills.empty()) {
         empty_state(ICON_CROSSHAIR, "No skills recorded", "This player has not landed anything yet.");
         end_card();
@@ -174,7 +206,7 @@ void damage_breakdown(const meter::CombatantTotals& c, meter::EntityId& selected
         {"BLOC", 50.0f, kTipBlock, 14},
         {"DoT", 80.0f, "Damage from the skill's ticks, and how many.", 12},
     };
-    if (begin_table("##SkillTable", cols, static_cast<int>(std::size(cols)), fill_h(0.0f))) {
+    if (begin_table("##SkillTable", cols, static_cast<int>(std::size(cols)), table_h)) {
         const uint64_t top = std::max<uint64_t>(c.skills.front().damage, 1);
         for (const auto& s : c.skills) {
             ImGui::TableNextRow();
@@ -327,7 +359,9 @@ void healing_tab(const meter::FightSummary& f, AppViewState& state) {
         select_hint("Click a row above for that player's heals, skill by skill.");
         return;
     }
-    if (!begin_breakdown("##HealBreakdown", "HEALS", *open, state.heal_player)) return;
+    const float table_h =
+        begin_breakdown("##HealBreakdown", "HEALS", *open, state.heal_player, open->heal_skills.size());
+    if (table_h <= 0.0f) return;
     const Column skill_cols[] = {
         {"Skill", 0.0f, nullptr, 0},
         {"Healing", 64.0f, nullptr, 1},
@@ -335,7 +369,7 @@ void healing_tab(const meter::FightSummary& f, AppViewState& state) {
         {"Heals", 50.0f, nullptr, 3},
         {"Max", 58.0f, "The biggest heal.", 4},
     };
-    if (begin_table("##HealSkills", skill_cols, static_cast<int>(std::size(skill_cols)), fill_h(0.0f))) {
+    if (begin_table("##HealSkills", skill_cols, static_cast<int>(std::size(skill_cols)), table_h)) {
         const uint64_t top = open->heal_skills.empty() ? 1 : std::max<uint64_t>(open->heal_skills.front().amount, 1);
         for (const auto& s : open->heal_skills) {
             ImGui::TableNextRow();
@@ -399,7 +433,9 @@ void taken_tab(const meter::FightSummary& f, AppViewState& state) {
         select_hint("Click a row above for what hit that player.");
         return;
     }
-    if (!begin_breakdown("##TakenBreakdown", "HIT BY", *open, state.taken_player)) return;
+    const float table_h =
+        begin_breakdown("##TakenBreakdown", "HIT BY", *open, state.taken_player, open->taken_by.size());
+    if (table_h <= 0.0f) return;
     const Column skill_cols[] = {
         {"Skill", 0.0f, "The enemy's skill. Enemy skills have no names in the table: their codes show.", 0},
         {"Source", 100.0f, nullptr, 3},
@@ -408,7 +444,7 @@ void taken_tab(const meter::FightSummary& f, AppViewState& state) {
         {"Hits", 40.0f, nullptr, 4},
         {"Max", 58.0f, "The biggest hit.", 5},
     };
-    if (begin_table("##TakenSkills", skill_cols, static_cast<int>(std::size(skill_cols)), fill_h(0.0f))) {
+    if (begin_table("##TakenSkills", skill_cols, static_cast<int>(std::size(skill_cols)), table_h)) {
         const uint64_t top = open->taken_by.empty() ? 1 : std::max<uint64_t>(open->taken_by.front().amount, 1);
         for (const auto& s : open->taken_by) {
             ImGui::TableNextRow();
@@ -548,33 +584,39 @@ bool pull_row(const meter::HistoryEntry& e, int number_in_visit, bool selected, 
     return clicked;
 }
 
-/// A map visit's folding row. The tree node draws only its arrow. The visit's time keeps
-/// the right edge, as the fights' times do below it: runs of one dungeon share a name,
-/// and the time tells them apart. A name too long for the rest is cut; the tooltip
-/// holds both.
-bool visit_header(const std::string& map, const std::string& clock, size_t fights) {
+/// A map visit's folding row, two lines tall as its fights' rows are: the map's name
+/// across the row, then its tier and how many fights it holds, with the time the visit
+/// began at the right edge, where the fights show theirs below it (runs of one dungeon
+/// share a name, and the time tells them apart). The tree node draws only its arrow,
+/// between the two lines. A name too long for the row is cut; the tooltip holds it.
+bool visit_header(const RunTitle& title, const std::string& clock) {
     const ImVec2 pos = ImGui::GetCursorScreenPos();
     const float right = pos.x + ImGui::GetContentRegionAvail().x;
+    // The node's frame padding makes it the fights' rows' height.
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(ImGui::GetStyle().FramePadding.x,
+                                                           (pull_row_height() - ImGui::GetFontSize()) * 0.5f));
     ImGui::PushStyleColor(ImGuiCol_Text, v4(colors::TextMuted));
-    const bool open = ImGui::TreeNodeEx("##visit", ImGuiTreeNodeFlags_SpanAvailWidth);
+    const bool open =
+        ImGui::TreeNodeEx("##visit", ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_FramePadding);
     ImGui::PopStyleColor();
+    ImGui::PopStyleVar();
     if (!ImGui::IsItemVisible()) return open;
 
+    // Laid out as a fight's row is (pull_row).
     ImDrawList* dl = ImGui::GetWindowDrawList();
     const float line_h = ImGui::GetTextLineHeight();
     const float text_x = pos.x + ImGui::GetTreeNodeToLabelSpacing();
-    const float text_y = ImGui::GetItemRectMin().y + (ImGui::GetItemRectSize().y - line_h) * 0.5f;
+    const float top_y = ImGui::GetItemRectMin().y + m(4.0f);
+    const float bottom_y = top_y + line_h + m(2.0f);
+    if (right - text_x > 0.0f) {
+        dl->AddText(ImVec2(text_x, top_y), colors::TextMuted, fit_text(title.name, right - text_x).c_str());
+    }
+    // Line two: the time keeps the right edge, the tier and the count take the rest.
     const float clock_w = ImGui::CalcTextSize(clock.c_str()).x;
-    const float name_w = right - clock_w - m(8.0f) - text_x;
-    dl->AddText(ImVec2(right - clock_w, text_y), colors::TextDim, clock.c_str());
-    if (name_w <= 0.0f) return open;
-    const std::string name = fit_text(map, name_w);
-    dl->AddText(ImVec2(text_x, text_y), colors::TextMuted, name.c_str());
-    // How many fights it holds, while the whole name left room for it.
-    const std::string count = std::to_string(fights);
-    const float used = ImGui::CalcTextSize(name.c_str()).x + m(8.0f);
-    if (name == map && used + ImGui::CalcTextSize(count.c_str()).x <= name_w) {
-        dl->AddText(ImVec2(text_x + used, text_y), colors::TextFaint, count.c_str());
+    dl->AddText(ImVec2(right - clock_w, bottom_y), colors::TextDim, clock.c_str());
+    const float detail_w = right - clock_w - m(8.0f) - text_x;
+    if (detail_w > 0.0f) {
+        dl->AddText(ImVec2(text_x, bottom_y), colors::TextFaint, fit_text(title.detail, detail_w).c_str());
     }
     return open;
 }
@@ -865,7 +907,7 @@ void rail(const AppFrameInput& in, AppViewState& state, AppActions& out, const s
             ImGui::SetNextItemOpen(gi == 0 || holds_selection, ImGuiCond_Once);
             const std::string map = game::map_label(g.map_id);
             const std::string clock = common::local_clock(started);
-            const bool open = visit_header(map, clock, g.pulls.size());
+            const bool open = visit_header(run_title(map, g.pulls.size()), clock);
             if (ImGui::IsItemHovered()) {
                 const size_t n = g.pulls.size();
                 const size_t kept = static_cast<size_t>(std::count_if(
@@ -1171,14 +1213,75 @@ void settings_tab(const AppFrameInput& in, AppActions& out) {
 
 // -------------------------------------------------------------------- page ---
 
+/// The narrowest the saved-fights list can be dragged to, and the room the fight
+/// beside it keeps, unscaled.
+constexpr float kListMinW = 190.0f;
+constexpr float kFightMinW = 420.0f;
+
+/// The gap between the list and the fight, as a handle. Dragged, it sets the list's
+/// width, saved unscaled so it holds through a change of DPI; double-clicked, the list
+/// goes back to fitting the window. `list_w` is the list's width now.
+void list_edge(const AppFrameInput& in, AppActions& out, float list_w, float min_w, float max_w) {
+    const ImVec2 pos = ImGui::GetCursorScreenPos();
+    const float w = m(metrics::Gutter);
+    const float h = fill_h(0.0f);
+    ImGui::InvisibleButton("##ListEdge", ImVec2(w, h));
+    if (in.settings == nullptr) return;
+    int& saved = in.settings->window.fight_list_width;
+    const bool hovered = ImGui::IsItemHovered();
+    const bool active = ImGui::IsItemActive();
+    // The width a drag starts from, kept by ImGui under the handle's id: the edge then
+    // moves with the pointer from wherever on it the pointer took hold.
+    ImGuiStorage* storage = ImGui::GetStateStorage();
+    const ImGuiID id = ImGui::GetItemID();
+    if (ImGui::IsItemActivated()) storage->SetFloat(id, list_w);
+    if (hovered || active) {
+        ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+        const float x = std::floor(pos.x + (w - m(2.0f)) * 0.5f);
+        ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(x, pos.y), ImVec2(x + m(2.0f), pos.y + h),
+                                                  colors::with_alpha(colors::Accent, active ? 0.90f : 0.45f), m(1.0f));
+    }
+    if (hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
+        if (saved != 0) {
+            saved = 0;
+            out.settings_changed = true;
+            out.save_settings = true;
+        }
+        return;
+    }
+    // Past the drag threshold only, so a click (or the second of a double-click)
+    // that wobbles leaves the width alone.
+    if (active && ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
+        const float from = storage->GetFloat(id, list_w);
+        const float want = std::clamp(from + ImGui::GetMouseDragDelta(ImGuiMouseButton_Left).x, min_w, max_w);
+        const int px = static_cast<int>(std::lround(want / ui_scale()));
+        if (px != saved) {
+            saved = px;
+            out.settings_changed = true;
+            ImGui::MarkItemEdited(id);
+        }
+    }
+    if (ImGui::IsItemDeactivatedAfterEdit()) out.save_settings = true;
+    if (hovered && !active) ImGui::SetTooltip("Drag to resize the list. Double-click: fit it to the window.");
+}
+
 /// The rail on the left, the fight's top bar and a tab's table on the right.
 template <typename Body>
 void pull_view(const AppFrameInput& in, AppViewState& state, AppActions& out, const std::vector<meter::PullGroup>& groups,
                const Shown& shown, const char* id, Body body) {
     const float avail = ImGui::GetContentRegionAvail().x;
-    const float rail_w = avail < m(900.0f) ? m(210.0f) : std::clamp(avail * 0.22f, m(230.0f), m(metrics::RailW));
+    // The list as its edge was last dragged, the fight keeping its room; else fitted
+    // to the window.
+    const float min_w = m(kListMinW);
+    const float max_w = std::max(min_w, avail - m(metrics::Gutter) - m(kFightMinW));
+    const int saved = in.settings != nullptr ? in.settings->window.fight_list_width : 0;
+    const float rail_w = saved > 0         ? std::clamp(m(static_cast<float>(saved)), min_w, max_w)
+                         : avail < m(900.0f) ? m(210.0f)
+                                             : std::clamp(avail * 0.22f, m(230.0f), m(metrics::RailW));
     rail(in, state, out, groups, rail_w);
-    ImGui::SameLine(0.0f, m(metrics::Gutter));
+    ImGui::SameLine(0.0f, 0.0f);
+    list_edge(in, out, rail_w, min_w, max_w);
+    ImGui::SameLine(0.0f, 0.0f);
     ImGui::BeginChild(id, ImVec2(0.0f, fill_h(0.0f)), ImGuiChildFlags_None,
                       ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoBackground);
     if (shown.fight == nullptr) {

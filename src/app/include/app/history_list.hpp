@@ -52,6 +52,16 @@ void select_all(HistorySelection& selection, const std::vector<meter::HistoryEnt
 /// names every day by its date.
 [[nodiscard]] std::string day_label(const common::LocalDay& day, const std::optional<common::LocalDay>& today);
 
+/// A run's header in the list, on two lines: the map's name, then its tier and how
+/// many fights the run holds. maps.tsv names a dungeon's tier in parentheses at the
+/// end, so "Krao Cave (Conquest)" with 3 fights is "Krao Cave" over "Conquest · 3
+/// fights"; a name with none ("Map 1010") gives the count alone.
+struct RunTitle {
+    std::string name;
+    std::string detail;
+};
+[[nodiscard]] RunTitle run_title(const std::string& map_label, size_t fights);
+
 /// A delete the list asks about before it is sent.
 struct DeletePrompt {
     std::string title;
