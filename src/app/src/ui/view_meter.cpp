@@ -1097,7 +1097,7 @@ void columns_card(const AppFrameInput& in, AppActions& out) {
     begin_settings_card("##set_columns", ICON_SLIDERS, "OVERLAY COLUMNS", colors::Accent);
     OverlaySettings& o = in.settings->overlay;
     ImGui::PushTextWrapPos(0.0f);
-    text_dim("What each player's row shows, after their DPS and damage.");
+    text_dim("What each player's row shows, after their DPS and damage, and a skull for each death.");
     ImGui::PopTextWrapPos();
     ImGui::Dummy(ImVec2(0.0f, m(2.0f)));
     struct Chip {
@@ -1117,6 +1117,7 @@ void columns_card(const AppFrameInput& in, AppActions& out) {
         {"Block", "BLOC: hits the target blocked.", &o.show_block},
         {"Max hit", "The player's biggest hit.", &o.show_max_hit},
         {"Healing", "Each player's healing.", &o.show_heal},
+        {"Deaths", "A skull after the name of each player who died, bright while they are down.", &o.show_deaths},
     };
     bool first = true;
     for (const Chip& chip : chips) {

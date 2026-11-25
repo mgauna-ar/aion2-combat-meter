@@ -14,6 +14,7 @@
 #include "capture/os/npcap_source.hpp"
 #include "capture/tcp_reassembler.hpp"
 #include "common/time_format.hpp"
+#include "meter/fight_detail.hpp"
 #include "meter/history_store.hpp"
 #include "meter/pull_grouping.hpp"
 #include "protocol/entity_id.hpp"
@@ -23,6 +24,7 @@
 #include <chrono>
 #include <cmath>
 #include <fstream>
+#include <memory>
 #include <optional>
 #include <set>
 #include <string>
@@ -80,6 +82,7 @@ TEST_CASE(AppSettings, RoundTripAndSanitize) {
     s.capture.game_process = "Aion2Test.exe";
     s.overlay.opacity = 0.5f;
     s.overlay.x = 120;
+    s.overlay.show_deaths = false;
     s.meter.boss_min_max_hp = 2'500'000;
     s.history.max_fights = 42;
     s.window.close_to_tray = false;
@@ -98,6 +101,8 @@ TEST_CASE(AppSettings, RoundTripAndSanitize) {
     TEST_ASSERT_EQ(back.capture.game_process, std::string("Aion2Test.exe"));
     TEST_ASSERT_NEAR(back.overlay.opacity, 0.5f, 1e-6f);
     TEST_ASSERT_EQ(back.overlay.x, 120);
+    TEST_ASSERT_FALSE(back.overlay.show_deaths);
+    TEST_ASSERT(AppSettings{}.overlay.show_deaths);
     TEST_ASSERT_EQ(back.meter.boss_min_max_hp, uint64_t{2'500'000});
     TEST_ASSERT_EQ(back.history.max_fights, 42);
 
@@ -876,6 +881,37 @@ TEST_CASE(DisplayFormat, ALocalPlayerWhoOnlyHealedShows) {
     TEST_ASSERT_EQ(shown.size(), size_t{2});
     TEST_ASSERT_EQ(shown[1].index, size_t{1});
     TEST_ASSERT_EQ(shown[1].rank, 2);
+}
+
+// The overlay's skull: a row's deaths by DeathRecord::player, bright while the
+// latest has no getting up after it.
+TEST_CASE(DisplayFormat, DeathsGoToTheirRowAndSayWhoIsDown) {
+    meter::FightSummary f;
+    // A fight saved before the meter kept its detail has no deaths to show.
+    TEST_ASSERT(row_deaths(f, 1) == RowDeaths{});
+
+    auto detail = std::make_shared<meter::FightDetail>();
+    const auto death = [](meter::EntityId player, double time_s, double up_after_s) {
+        meter::DeathRecord d;
+        d.player = player;
+        d.time_s = time_s;
+        d.up_after_s = up_after_s;
+        return d;
+    };
+    // Row 1 died twice and got up both times; row 2 died and is down; 9 has no row.
+    detail->deaths.push_back(death(1, 10.0, 4.0));
+    detail->deaths.push_back(death(2, 20.0, -1.0));
+    detail->deaths.push_back(death(9, 25.0, 2.0));
+    detail->deaths.push_back(death(1, 30.0, 5.5));
+    f.detail = detail;
+    TEST_ASSERT(row_deaths(f, 1) == (RowDeaths{2, false}));
+    TEST_ASSERT(row_deaths(f, 2) == (RowDeaths{1, true}));
+    TEST_ASSERT(row_deaths(f, 3) == RowDeaths{});
+    TEST_ASSERT(row_deaths(f, 0) == RowDeaths{});
+
+    // Down again: the latest death decides, not the first.
+    detail->deaths.push_back(death(1, 40.0, -1.0));
+    TEST_ASSERT(row_deaths(f, 1) == (RowDeaths{3, true}));
 }
 
 TEST_CASE(AppRuntime, MissingCaptureFileFailsToStart) {

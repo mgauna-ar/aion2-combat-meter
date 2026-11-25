@@ -225,6 +225,11 @@ app, or restarting it into an update, ends the live fight the same way and saves
     died: what landed on the id's last owner is left out. The killing blow is the
     last damage in it;
   - a death adds no row: it keeps its own name and class;
+  - the overlay marks a row's deaths with a skull after its name (`app::row_deaths`),
+    by `DeathRecord::player`, which is the row's id when the player has a row: a
+    death with no row shows nowhere there. Bright while the row's latest death has
+    no getting up after it (`!up()`: down now, or when the fight ended), the count
+    from the second; `overlay.show_deaths` turns it off;
   - checked on the second capture: 19 deaths in the last boss fight, every one up again
     by its HP, 3 to 17 s later. The local player's killing record carried 0 damage, which
     books nothing, so that death shows no killing blow.

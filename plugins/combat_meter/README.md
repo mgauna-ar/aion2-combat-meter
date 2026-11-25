@@ -20,6 +20,8 @@ pressed.
 The overlay shows the live fight only: the party ranked, the boss's HP and the timer.
 Each player's row starts with their class's emblem, as the game's party list shows it,
 and their bar is in that class's colour (green for an Assassin, orange for a Chanter).
+A skull after a player's name means they died in the fight, with the count from the
+second death; it is bright while they are down and dims once they are back up.
 Saved fights and every setting are on the app window's **Combat Meter** page, where
 each skill is listed with its icon.
 
@@ -27,8 +29,8 @@ each skill is listed with its icon.
 - Drag the empty part of the header to move the overlay.
 - Drag the corner grip to resize it.
 - Use the header buttons: the gear (open the app window) and the padlock (lock it).
-- Hover a row for that player's hit rates, healing and max hit (their own biggest direct
-  hit: not a DoT tick, nor their summon's).
+- Hover a row for that player's hit rates, healing, max hit (their own biggest direct
+  hit: not a DoT tick, nor their summon's) and deaths.
 
 **Hotkeys:** Ctrl+Alt+H hides or shows it; Ctrl+Alt+R ends the current fight now.
 
@@ -178,6 +180,7 @@ and saves as you go.
 | `x`, `y`, `width`, `height` | -1, -1, 430, 250 | Position and size in screen pixels. -1, -1 places it near the top-left; other negative values are on a monitor left of or above the main one. |
 | `show_share`, `show_crit`, `show_back`, `show_max_hit` | true, true, true, false | Optional columns: share of the damage, crit, back-attack rate, biggest hit (their own, direct). |
 | `show_hits`, `show_perfect`, `show_double`, `show_front`, `show_multi`, `show_block`, `show_heal` | false | More optional columns: hits, perfect and double rates, front-attack rate, multi-hit and blocked rates, healing. |
+| `show_deaths` | true | A skull after the name of each player who died in the fight, with the count from the second; bright while they are down. |
 | `class_bars` | true | Bars in each player's class colour, the game's own (its party emblems'); off, all in one colour. |
 | `max_rows` | 8 | Players shown, best first, 1 to 24. Your own row is always one of them. |
 | `show_in_combat_only` | false | Show the overlay only during a fight, and for `hide_after_combat_s` after it. Applies only while locked. |

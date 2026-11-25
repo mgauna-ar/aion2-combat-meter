@@ -17,7 +17,7 @@ The meter listens to incoming game network traffic on your PC (who hit what, wit
 | [📶 **Ping**](plugins/ping/README.md) | Displays real-time server latency, jitter (RFC 3550), and a rolling 2-minute latency graph. Measured passively off server responses—the meter sends no network pings of its own. | Disabled |
 | [🎯 **Combat Power**](plugins/combat_power/README.md) | Shows the combat power of the player you are fighting, and of the strongest players in view: all of an arena's opponents or a dungeon's party. Players leave the list as they leave your view or die. Can list the nearest players instead, with their distance. Players of the other faction are listed first, in red. Read from what the game already sends as players come into view—nothing is looked up online. | Disabled |
 
-![The overlay through a whole boss fight, at twice the speed: three players trading places by DPS as the boss's HP bar falls, until the kill](docs/images/overlay-fight.gif)
+![The overlay through a whole boss fight, at twice the speed: three players trading places by DPS as the boss's HP bar falls, one dying and getting back up, until the kill](docs/images/overlay-fight.gif)
 
 [Screenshots](#-screenshots) · [Quick start](#-quick-start) · [Account safety](#%EF%B8%8F-account-safety) · [Controls](#-controls) · [Troubleshooting](#-troubleshooting) · [Configuration](#%EF%B8%8F-configuration) · [Building](#-building-from-source)
 
