@@ -42,6 +42,20 @@ void AuraTracker::prune(Micros now, const Entities& entities) {
     }
 }
 
+game::AionClass AuraTracker::own_class(const Entities& entities) const {
+    const EntityId local = entities.local();
+    if (local == 0) return game::AionClass::Unknown;
+    const game::EffectBook::Instances* on = m_book.on(local);
+    if (on == nullptr) return game::AionClass::Unknown;
+    for (const auto& [instance, i] : *on) {
+        // Theirs alone: an ally's buff on them is the ally's class.
+        if (!entities.mine(i.caster)) continue;
+        const game::AionClass c = game::class_of_skill(game::effect_skill(i.buff_id, i.source_skill));
+        if (c != game::AionClass::Unknown) return c;
+    }
+    return game::AionClass::Unknown;
+}
+
 size_t AuraTracker::instances_on(EntityId id, Micros now) const { return m_book.instances_on(id, now); }
 
 std::vector<AuraEntry> AuraTracker::entries(EntityId id, Micros now, const Entities& entities,

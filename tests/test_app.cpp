@@ -173,6 +173,44 @@ TEST_CASE(AppSettings, AurasRoundTripWithTheirWatchList) {
     TEST_ASSERT_FALSE(AppSettings{}.plugins.auras);
 }
 
+TEST_CASE(AppSettings, AuraPinsAreKeptPerClass) {
+    AppSettings s;
+    s.auras.pinned[game::AionClass::Templar] = {12'780'000, 22'101'031};
+    s.auras.pinned[game::AionClass::Spiritmaster] = {16'770'000};
+    s.auras.pinned[game::AionClass::Chanter] = {};  // its last pin taken off: not written
+    const config::JsonValue json = settings_to_json(s);
+    TEST_ASSERT(json["auras"]["pinned"]["Templar"].is_array());
+    TEST_ASSERT(json["auras"]["pinned"].contains("Elementalist"));
+    TEST_ASSERT_FALSE(json["auras"]["pinned"].contains("Chanter"));
+    const AppSettings back = settings_from_json(json);
+    TEST_ASSERT_EQ(back.auras.pinned.size(), size_t{2});
+    TEST_ASSERT(pins_for(back.auras, game::AionClass::Templar) == (std::vector<uint32_t>{12'780'000, 22'101'031}));
+    TEST_ASSERT(pins_for(back.auras, game::AionClass::Spiritmaster) == std::vector<uint32_t>{16'770'000});
+    TEST_ASSERT(pins_for(back.auras, game::AionClass::Chanter).empty());
+    TEST_ASSERT(pins_for(back.auras, game::AionClass::Unknown).empty());
+
+    // A hand-edited file: the Elementalist by its older name, a class there is not,
+    // codes twice or not codes at all, and too many.
+    config::JsonValue bad = settings_to_json(s);
+    config::JsonValue::ObjectType pinned;
+    pinned["Chanter"] = config::JsonValue(config::JsonValue::ArrayType{
+        config::JsonValue(18'190'000), config::JsonValue(18'190'000), config::JsonValue(-3), config::JsonValue("x")});
+    pinned["Spiritmaster"] = config::JsonValue(config::JsonValue::ArrayType{config::JsonValue(16'770'000)});
+    pinned["Bard"] = config::JsonValue(config::JsonValue::ArrayType{config::JsonValue(1)});
+    config::JsonValue::ArrayType many;
+    for (size_t i = 1; i <= kMaxWatchedEffects + 5; ++i) many.emplace_back(static_cast<double>(i));
+    pinned["Templar"] = config::JsonValue(std::move(many));
+    bad["auras"]["pinned"] = config::JsonValue(std::move(pinned));
+    const AppSettings clean = settings_from_json(bad);
+    TEST_ASSERT_EQ(clean.auras.pinned.size(), size_t{3});
+    TEST_ASSERT(pins_for(clean.auras, game::AionClass::Chanter) == std::vector<uint32_t>{18'190'000});
+    TEST_ASSERT(pins_for(clean.auras, game::AionClass::Spiritmaster) == std::vector<uint32_t>{16'770'000});
+    TEST_ASSERT_EQ(pins_for(clean.auras, game::AionClass::Templar).size(), kMaxWatchedEffects);
+    // Not an object at all: no pins.
+    bad["auras"]["pinned"] = config::JsonValue(config::JsonValue::ArrayType{config::JsonValue(1)});
+    TEST_ASSERT(settings_from_json(bad).auras.pinned.empty());
+}
+
 TEST_CASE(AppSettings, EachPluginsSwitchLivesInItsSection) {
     AppSettings s;
     TEST_ASSERT(s.plugins.combat_meter);
@@ -370,6 +408,164 @@ TEST_CASE(AuraView, TilesWrapAcrossTheWindow) {
     TEST_ASSERT_EQ(format_tile_time(82 * kMicrosPerSecond), std::string("1m"));
     TEST_ASSERT_EQ(format_tile_time(17'400'000), std::string("17"));
     TEST_ASSERT_EQ(format_tile_time(3'850'000), std::string("3.8"));
+}
+
+TEST_CASE(AuraView, APinLightsOnlyWhileItsEffectRuns) {
+    const Micros now = 1'792'152'000'000'000ULL;
+    auras::AuraSnapshot a;
+    a.local_class = game::AionClass::Templar;
+    // Fury between blocks: its passive's always-on half, which names no skill.
+    auras::AuraEntry fury;
+    fury.key = 12'780'000;
+    fury.buff_id = 127'800'001;
+    fury.label = "Fury";
+    fury.permanent = true;
+    fury.mine = true;
+    a.on_self = {fury};
+    a.seen = {auras::SeenEffect{12'780'000, "Fury"}};
+    AuraSettings s;
+    s.pinned[game::AionClass::Templar] = {12'780'000};
+
+    auto slots = pinned_slots(a, s, now);
+    TEST_ASSERT_EQ(slots.size(), size_t{1});
+    TEST_ASSERT(slots[0].state == PinState::Off);
+    TEST_ASSERT(slots[0].effect == nullptr && slots[0].cooldown == nullptr);
+    TEST_ASSERT_EQ(slots[0].label, std::string("Fury"));
+    TEST_ASSERT(slots[0].icon != kNoIcon);
+    TEST_ASSERT_FALSE(slots[0].missing);
+
+    // A block: the entry is the 20 s proc's, which lights the slot.
+    a.on_self[0].permanent = false;
+    a.on_self[0].buff_id = 127'800'011;
+    a.on_self[0].source_skill = 12'780'001;
+    a.on_self[0].duration_ms = 20'000;
+    a.on_self[0].expires_at = now + 12'000'000;
+    slots = pinned_slots(a, s, now);
+    TEST_ASSERT(slots[0].state == PinState::Active);
+    TEST_ASSERT(slots[0].effect == &a.on_self[0]);
+    // Run out between snapshots: off again.
+    TEST_ASSERT(pinned_slots(a, s, now + 13'000'000)[0].state == PinState::Off);
+
+    // Another Templar's Fury on them too, ending later: the local player's own comes
+    // first, the ally's once that has run out.
+    auras::AuraEntry ally = a.on_self[0];
+    ally.mine = false;
+    ally.caster = 300;
+    ally.expires_at = now + 19'000'000;
+    a.on_self.push_back(ally);
+    TEST_ASSERT(pinned_slots(a, s, now)[0].effect == &a.on_self[0]);
+    slots = pinned_slots(a, s, now + 15'000'000);
+    TEST_ASSERT(slots[0].state == PinState::Active && slots[0].effect == &a.on_self[1]);
+
+    // An enemy's effect under the key lights nothing.
+    a.on_self = {ally};
+    a.on_self[0].hostile = true;
+    TEST_ASSERT(pinned_slots(a, s, now)[0].state == PinState::Off);
+
+    // A Chanter's mantra is a toggle: permanent, and naming its skill. On, it lights.
+    a.local_class = game::AionClass::Chanter;
+    s.pinned[game::AionClass::Chanter] = {18'190'000};
+    auras::AuraEntry mantra;
+    mantra.key = 18'190'000;
+    mantra.buff_id = 181'900'201;
+    mantra.source_skill = 18'190'020;
+    mantra.label = "Undefeated Mantra";
+    mantra.permanent = true;
+    mantra.mine = true;
+    a.on_self = {mantra};
+    slots = pinned_slots(a, s, now);
+    TEST_ASSERT_EQ(slots.size(), size_t{1});  // the Templar's pins are not the Chanter's
+    TEST_ASSERT(slots[0].state == PinState::Active);
+    TEST_ASSERT_EQ(slots[0].label, std::string("Undefeated Mantra"));
+
+    // Before the class is known, no pins apply.
+    a.local_class = game::AionClass::Unknown;
+    TEST_ASSERT(pinned_slots(a, s, now).empty());
+}
+
+TEST_CASE(AuraView, APinnedSkillsSlotShowsItsCooldownWhileItsBuffIsOff) {
+    // Arctic Armor (15230000): its buff ran out, and its 90 s cooldown runs on.
+    const Micros now = 1'792'152'000'000'000ULL;
+    auras::AuraSnapshot a;
+    a.local_class = game::AionClass::Sorcerer;
+    a.cooldowns.resize(2);
+    a.cooldowns[0].skill = 15'230'000;
+    a.cooldowns[0].label = "Arctic Armor";
+    a.cooldowns[0].duration_ms = 90'000;
+    a.cooldowns[0].ready_at = now + 72'000'000;
+    a.cooldowns[1].skill = 15'060'000;  // Hellfire, not pinned
+    a.cooldowns[1].label = "Hellfire";
+    a.cooldowns[1].duration_ms = 45'000;
+    a.cooldowns[1].ready_at = now + 7'000'000;
+    AuraSettings s;
+    s.pinned[game::AionClass::Sorcerer] = {15'230'000, 22'101'031};  // and a Speed Scroll
+
+    auto slots = pinned_slots(a, s, now);
+    TEST_ASSERT_EQ(slots.size(), size_t{2});
+    TEST_ASSERT(slots[0].state == PinState::Cooling);
+    TEST_ASSERT(slots[0].cooldown == &a.cooldowns[0]);
+    TEST_ASSERT_EQ(slots[0].label, std::string("Arctic Armor"));  // by its key: not seen this session
+    // An item's has no cooldown to show.
+    TEST_ASSERT(slots[1].state == PinState::Off);
+    TEST_ASSERT_EQ(slots[1].label, std::string("Speed Scroll"));
+    TEST_ASSERT_EQ(slots[1].icon, effect_icon(22'101'031));
+    // Its cooldown is in its slot, not in the Cooldowns list.
+    const auto shown = shown_cooldowns(a.cooldowns, s, now, pins_for(s, a.local_class));
+    TEST_ASSERT_EQ(shown.size(), size_t{1});
+    TEST_ASSERT(shown[0] == &a.cooldowns[1]);
+
+    // Back: Ready, or only off without show_ready.
+    const Micros later = now + 80'000'000;
+    TEST_ASSERT(pinned_slots(a, s, later)[0].state == PinState::Ready);
+    s.show_ready = false;
+    slots = pinned_slots(a, s, later);
+    TEST_ASSERT(slots[0].state == PinState::Off && slots[0].cooldown == nullptr);
+}
+
+TEST_CASE(AuraView, OnceTheClassHasPinsOnlyPinsAndDebuffsShow) {
+    const Micros now = 1'792'152'000'000'000ULL;
+    auras::AuraSnapshot a;
+    a.local_class = game::AionClass::Templar;
+    auras::AuraEntry roar;  // Insulting Roar: not pinned
+    roar.key = 12'770'000;
+    roar.label = "Insulting Roar";
+    roar.duration_ms = 5'000;
+    roar.expires_at = now + 3'000'000;
+    roar.mine = true;
+    auras::AuraEntry burn = roar;  // a monster's
+    burn.key = 12'000'121;
+    burn.label = "Burn";
+    burn.mine = false;
+    burn.hostile = true;
+    a.on_self = {roar, burn};
+    AuraSettings s;
+    s.watch = {12'780'000, 22'101'031};  // Fury and a Speed Scroll, neither on
+
+    // No pins yet: everything, as before.
+    TEST_ASSERT_EQ(shown_auras(a.on_self, s, now, true, pins_for(s, a.local_class)).size(), size_t{2});
+    TEST_ASSERT_EQ(missing_effects(a, s.watch, now, pins_for(s, a.local_class)).size(), size_t{2});
+
+    s.pinned[game::AionClass::Templar] = {12'780'000};
+    const std::vector<uint32_t>& pins = pins_for(s, a.local_class);
+    auto shown = shown_auras(a.on_self, s, now, true, pins);
+    TEST_ASSERT_EQ(shown.size(), size_t{1});
+    TEST_ASSERT_EQ(shown[0]->label, std::string("Burn"));
+    s.show_debuffs = false;
+    TEST_ASSERT(shown_auras(a.on_self, s, now, true, pins).empty());
+    // The target's side is not the local player's to pin.
+    TEST_ASSERT_EQ(shown_auras(a.on_self, s, now, false, pins).size(), size_t{2});
+    // The watched pin is missing in its slot, not among the alerts.
+    const auto missing = missing_effects(a, s.watch, now, pins);
+    TEST_ASSERT_EQ(missing.size(), size_t{1});
+    TEST_ASSERT_EQ(missing[0].key, uint32_t{22'101'031});
+    const auto slots = pinned_slots(a, s, now);
+    TEST_ASSERT(slots[0].state == PinState::Off && slots[0].missing);
+
+    // Another class, with no pins of its own: as before.
+    a.local_class = game::AionClass::Chanter;
+    s.show_debuffs = true;
+    TEST_ASSERT_EQ(shown_auras(a.on_self, s, now, true, pins_for(s, a.local_class)).size(), size_t{2});
+    TEST_ASSERT(pinned_slots(a, s, now).empty());
 }
 
 TEST_CASE(OverlayVisibility, AurasFollowTheirPluginAndTheirOwnConditions) {

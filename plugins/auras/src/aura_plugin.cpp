@@ -1,5 +1,7 @@
 #include "auras/aura_plugin.hpp"
 
+#include "game/skill_names.hpp"
+
 #include <type_traits>
 #include <utility>
 #include <variant>
@@ -19,6 +21,8 @@ void AuraPlugin::on_event(const proto::ParsedEvent& event) {
                 m_tracker.on_removed(e);
             } else if constexpr (std::is_same_v<T, proto::SkillUsed>) {
                 m_cooldowns.on_used(e.skill, ts);
+                // 01 38 is the local player's own press.
+                if (const game::AionClass c = game::class_of_skill(e.skill); c != game::AionClass::Unknown) m_class = c;
             } else if constexpr (std::is_same_v<T, proto::CooldownSet>) {
                 m_cooldowns.on_set(e.skill, e.remaining_ms, ts);
             } else if constexpr (std::is_same_v<T, proto::ChainOffered>) {
@@ -65,6 +69,8 @@ void AuraPlugin::on_map(const proto::MapLoad& m, uint32_t connection, Micros ts)
 void AuraPlugin::tick(Micros now) {
     m_tracker.prune(now, m_entities);
     m_chains.prune(now);
+    // Their passives come on each map load, so the class is known before any press.
+    if (const game::AionClass c = m_tracker.own_class(m_entities); c != game::AionClass::Unknown) m_class = c;
 }
 
 void AuraPlugin::clear() { *this = AuraPlugin{}; }
@@ -72,7 +78,10 @@ void AuraPlugin::clear() { *this = AuraPlugin{}; }
 void AuraPlugin::follow_character() {
     const std::string& who = m_entities.local_character();
     if (who.empty() || who == m_cooldown_character) return;
-    if (!m_cooldown_character.empty()) m_cooldowns.clear();
+    if (!m_cooldown_character.empty()) {
+        m_cooldowns.clear();
+        m_class = game::AionClass::Unknown;
+    }
     m_cooldown_character = who;
 }
 
@@ -84,6 +93,7 @@ AuraSnapshot AuraPlugin::snapshot(Micros now) const {
     const Health health = m_entities.local_health();
     s.hp = health.hp;
     s.max_hp = health.max_hp;
+    s.local_class = m_class;
     return s;
 }
 

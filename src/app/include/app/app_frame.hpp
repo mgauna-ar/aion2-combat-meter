@@ -64,6 +64,9 @@ struct AppViewState {
     /// Draw the Timeline tab as if the mouse were this far across its plot, 0..1;
     /// below 0 for the real mouse. The screenshots show the hover readout with it.
     float timeline_hover_at{-1.0f};
+    /// The Auras page's search over the effects seen on the local player: part of a
+    /// name, or of a number.
+    std::string aura_search;
 };
 
 /// One frame's inputs. Pointers may be null before the first snapshot.

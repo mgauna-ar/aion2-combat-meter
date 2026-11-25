@@ -314,6 +314,34 @@ TEST_CASE(Auras, TheSeenListLearnsAnEffectsCasterOnceTheySpawn) {
     TEST_ASSERT_EQ(a.seen[0].label, std::string("NPC #777"));
 }
 
+TEST_CASE(Auras, TheLocalPlayersClassFromTheirOwnPassivesOrPresses) {
+    // The overlay's pins are kept per class. A map sends the local player's passives
+    // first thing (Fury's always-on half, 127800001): the class before any press.
+    AuraPlugin e = setup();
+    e.tick(at_s(0.5));
+    TEST_ASSERT(e.snapshot(at_s(0.5)).local_class == game::AionClass::Unknown);
+    // An ally's buff on them says the ally's class, not theirs.
+    e.on_event(ev(at_s(1), buff(kMe, kChanter, 1, kMantra, 2400, 0, kMantraSkill)));
+    e.tick(at_s(1));
+    TEST_ASSERT(e.snapshot(at_s(1)).local_class == game::AionClass::Unknown);
+    e.on_event(ev(at_s(1), permanent_buff(kMe, 2, 127'800'001)));
+    e.tick(at_s(1.1));
+    TEST_ASSERT(e.snapshot(at_s(1.1)).local_class == game::AionClass::Templar);
+
+    // Another character logs in: nothing known until theirs come, or a press says it.
+    e.on_event(ev(at_s(20), proto::MapLoad{3, 1010}));
+    e.on_event(ev(at_s(20), player(kMe + 1, "Zikel", true)));
+    e.tick(at_s(20.1));
+    TEST_ASSERT(e.snapshot(at_s(20.1)).local_class == game::AionClass::Unknown);
+    e.on_event(ev(at_s(21), proto::SkillUsed{18'190'040}));  // Undefeated Mantra: a Chanter's
+    TEST_ASSERT(e.snapshot(at_s(21)).local_class == game::AionClass::Chanter);
+    // The same character again, as a new map names them: kept.
+    e.on_event(ev(at_s(30), proto::MapLoad{4, 1010}));
+    e.on_event(ev(at_s(30), player(kMe + 1, "Zikel", true)));
+    e.tick(at_s(30.1));
+    TEST_ASSERT(e.snapshot(at_s(30.1)).local_class == game::AionClass::Chanter);
+}
+
 // --- Cooldowns (01 38, 47 38, plugins/auras/data/cooldowns.tsv) ---
 
 namespace {

@@ -41,8 +41,8 @@ public:
 private:
     void on_map(const proto::MapLoad& m, uint32_t connection, Micros ts);
     /// After an identity: another character than the one the cooldowns are of drops
-    /// them, as it logs in, not at its first skill. Cooldowns seen before any own
-    /// identity are the first character's.
+    /// them and their class, as it logs in, not at its first skill. Cooldowns seen
+    /// before any own identity are the first character's.
     void follow_character();
 
     Entities m_entities;
@@ -51,6 +51,9 @@ private:
     ChainTracker m_chains;
     /// The character m_cooldowns learned from; another one starts afresh.
     std::string m_cooldown_character;
+    /// That character's class (AuraSnapshot::local_class), from their own presses and
+    /// their own skills' effects on them.
+    game::AionClass m_class{game::AionClass::Unknown};
     uint32_t m_map_id{0};
     /// The connection the current map loaded on (Frame::connection); 0 for none.
     uint32_t m_map_connection{0};

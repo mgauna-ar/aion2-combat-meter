@@ -3,11 +3,13 @@
 #include "aion2/plugin_registry.hpp"
 #include "common/config/json.hpp"
 #include "common/config/key_table.hpp"
+#include "game/classes.hpp"
 #include "meter/meter_settings.hpp"
 
 #include <array>
 #include <cstdint>
 #include <filesystem>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -106,6 +108,11 @@ struct AuraSettings {
     /// Effects (game::effect_key) the overlay leaves out, on the local player and on
     /// their target: a proc that comes and goes all fight. A list, as watch is.
     std::vector<uint32_t> hidden;
+    /// Effects (game::effect_key) pinned, per class, in the order pinned: each has a
+    /// slot of its own on the overlay (pinned_slots), and once the class being played
+    /// has any, the other effects on the local player leave it, all but enemies'.
+    /// Lists, as watch is, keyed by class; none under Unknown.
+    std::map<game::AionClass, std::vector<uint32_t>> pinned;
     /// As the meter overlay's: while locked, only in a dungeon, and hidden while
     /// neither the game nor one of the meter's windows is in front.
     bool show_in_dungeons_only{false};
@@ -325,8 +332,11 @@ inline constexpr std::array<config::ConfigKey<PowerSettings>, 15> kPowerKeys{{
 inline constexpr int kMinPingThreshold = 10;
 inline constexpr int kMaxPingThreshold = 1000;
 
-/// Most effects a watch list holds.
+/// Most effects a watch list holds, and a hide list, and one class's pins.
 inline constexpr size_t kMaxWatchedEffects = 64;
+
+/// The effects pinned for `cls`: none for Unknown, or for a class with none.
+[[nodiscard]] const std::vector<uint32_t>& pins_for(const AuraSettings& settings, game::AionClass cls);
 /// An aura icon's side, in pixels before the scale. The sheet's icons are 40 px, so
 /// a larger one is drawn stretched.
 inline constexpr int kMinAuraIcon = 20;

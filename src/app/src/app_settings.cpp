@@ -3,6 +3,8 @@
 #include "common/config/json_file.hpp"
 
 #include <algorithm>
+#include <string>
+#include <utility>
 
 namespace aion2::app {
 
@@ -43,6 +45,28 @@ std::vector<uint32_t> read_watch(const config::JsonValue& json) {
     return out;
 }
 
+/// A list of codes, as the watch list is written.
+config::JsonValue write_codes(const std::vector<uint32_t>& codes) {
+    config::JsonValue::ArrayType out;
+    for (const uint32_t code : codes) out.emplace_back(static_cast<double>(code));
+    return config::JsonValue(std::move(out));
+}
+
+/// The pins, by class name ({"Templar": [12780000]}): a name game::class_from_name
+/// does not know is dropped, and each list is read as the watch list is.
+std::map<game::AionClass, std::vector<uint32_t>> read_pins(const config::JsonValue& json) {
+    std::map<game::AionClass, std::vector<uint32_t>> out;
+    if (!json.is_object()) return out;
+    for (const auto& [name, list] : json.as_object()) {
+        const game::AionClass cls = game::class_from_name(name);
+        if (cls == game::AionClass::Unknown) continue;
+        std::vector<uint32_t> codes = read_watch(list);
+        // "Elementalist" and the older "Spiritmaster" are one class: the first wins.
+        if (!codes.empty()) out.try_emplace(cls, std::move(codes));
+    }
+    return out;
+}
+
 /// The Auras plugin's switch before it was a plugin: `auras.visible`, the overlay's
 /// own switch in 0.2.0. A file written since has `plugin_enabled` instead.
 constexpr const char* kLegacyAurasVisible = "visible";
@@ -66,6 +90,13 @@ aion2::plugins::PluginSwitches read_switches(const config::JsonValue& root) {
 
 } // namespace
 
+const std::vector<uint32_t>& pins_for(const AuraSettings& settings, game::AionClass cls) {
+    static const std::vector<uint32_t> kNone;
+    if (cls == game::AionClass::Unknown) return kNone;
+    const auto it = settings.pinned.find(cls);
+    return it != settings.pinned.end() ? it->second : kNone;
+}
+
 void sanitize(AppSettings& s) {
     s.capture.server_port = std::clamp(s.capture.server_port, 1, 65535);
     if (!plausible_exe_name(s.capture.game_process)) s.capture.game_process = CaptureSettings{}.game_process;
@@ -85,6 +116,14 @@ void sanitize(AppSettings& s) {
     s.auras.low_hp_percent = std::clamp(s.auras.low_hp_percent, 5, 90);
     if (s.auras.watch.size() > kMaxWatchedEffects) s.auras.watch.resize(kMaxWatchedEffects);
     if (s.auras.hidden.size() > kMaxWatchedEffects) s.auras.hidden.resize(kMaxWatchedEffects);
+    for (auto it = s.auras.pinned.begin(); it != s.auras.pinned.end();) {
+        if (it->first == game::AionClass::Unknown || it->second.empty()) {
+            it = s.auras.pinned.erase(it);
+            continue;
+        }
+        if (it->second.size() > kMaxWatchedEffects) it->second.resize(kMaxWatchedEffects);
+        ++it;
+    }
     s.ping.opacity = std::clamp(s.ping.opacity, 0.0f, 1.0f);
     s.ping.scale = std::clamp(s.ping.scale, 0.6f, 2.5f);
     s.ping.width = std::clamp(s.ping.width, 160, 4000);
@@ -123,12 +162,14 @@ config::JsonValue settings_to_json(const AppSettings& s) {
     root[kOverlay] = std::move(overlay);
     config::JsonValue auras;
     config::write_keys<AuraSettings>(kAuraKeys, s.auras, auras);
-    config::JsonValue::ArrayType watch;
-    for (const uint32_t code : s.auras.watch) watch.emplace_back(static_cast<double>(code));
-    auras["watch"] = config::JsonValue(std::move(watch));
-    config::JsonValue::ArrayType hidden;
-    for (const uint32_t code : s.auras.hidden) hidden.emplace_back(static_cast<double>(code));
-    auras["hidden"] = config::JsonValue(std::move(hidden));
+    auras["watch"] = write_codes(s.auras.watch);
+    auras["hidden"] = write_codes(s.auras.hidden);
+    config::JsonValue::ObjectType pinned;
+    for (const auto& [cls, codes] : s.auras.pinned) {
+        if (cls == game::AionClass::Unknown || codes.empty()) continue;
+        pinned[std::string(game::class_name(cls))] = write_codes(codes);
+    }
+    auras["pinned"] = config::JsonValue(std::move(pinned));
     root[kAuras] = std::move(auras);
     config::JsonValue ping;
     config::write_keys<PingSettings>(kPingKeys, s.ping, ping);
@@ -156,6 +197,7 @@ AppSettings settings_from_json(const config::JsonValue& json) {
     config::read_keys<AuraSettings>(kAuraKeys, json[kAuras], s.auras);
     s.auras.watch = read_watch(json[kAuras]["watch"]);
     s.auras.hidden = read_watch(json[kAuras]["hidden"]);
+    s.auras.pinned = read_pins(json[kAuras]["pinned"]);
     config::read_keys<PingSettings>(kPingKeys, json[kPing], s.ping);
     config::read_keys<PowerSettings>(kPowerKeys, json[kPower], s.power);
     config::read_keys<meter::MeterSettings>(meter::kMeterSettingKeys, json[kMeter], s.meter);
