@@ -80,7 +80,8 @@ size_t count_packets(const std::filesystem::path& file) {
 TEST_CASE(AppSettings, RoundTripAndSanitize) {
     AppSettings s;
     s.capture.game_process = "Aion2Test.exe";
-    s.overlay.opacity = 0.5f;
+    s.overlay.background_opacity = 0.5f;
+    s.overlay.opacity = 0.6f;
     s.overlay.x = 120;
     s.overlay.show_deaths = false;
     s.meter.boss_min_max_hp = 2'500'000;
@@ -99,7 +100,8 @@ TEST_CASE(AppSettings, RoundTripAndSanitize) {
     // Unset, the saved-fights list fits the window.
     TEST_ASSERT_EQ(AppSettings{}.window.fight_list_width, 0);
     TEST_ASSERT_EQ(back.capture.game_process, std::string("Aion2Test.exe"));
-    TEST_ASSERT_NEAR(back.overlay.opacity, 0.5f, 1e-6f);
+    TEST_ASSERT_NEAR(back.overlay.background_opacity, 0.5f, 1e-6f);
+    TEST_ASSERT_NEAR(back.overlay.opacity, 0.6f, 1e-6f);
     TEST_ASSERT_EQ(back.overlay.x, 120);
     TEST_ASSERT_FALSE(back.overlay.show_deaths);
     TEST_ASSERT(AppSettings{}.overlay.show_deaths);
@@ -224,6 +226,37 @@ TEST_CASE(AppSettings, EachPluginsSwitchLivesInItsSection) {
     const AppSettings back = settings_from_json(json);
     TEST_ASSERT_FALSE(back.plugins.combat_meter);
     TEST_ASSERT(back.plugins.auras);
+}
+
+TEST_CASE(AppSettings, OpacityInAnOlderFileIsTheBackgrounds) {
+    // Before 1.13 `opacity` was the background's alone, and the overlay was drawn whole.
+    config::JsonValue old_file;
+    old_file["overlay"]["opacity"] = 0.4;
+    old_file["auras"]["opacity"] = 0.3;
+    old_file["ping"]["opacity"] = 0.2;
+    old_file["combat_power"]["opacity"] = 0.1;
+    const AppSettings old = settings_from_json(old_file);
+    TEST_ASSERT_NEAR(old.overlay.background_opacity, 0.4f, 1e-6f);
+    TEST_ASSERT_NEAR(old.overlay.opacity, 1.0f, 1e-6f);
+    TEST_ASSERT_NEAR(old.auras.background_opacity, 0.3f, 1e-6f);
+    TEST_ASSERT_NEAR(old.auras.opacity, 1.0f, 1e-6f);
+    TEST_ASSERT_NEAR(old.ping.background_opacity, 0.2f, 1e-6f);
+    TEST_ASSERT_NEAR(old.ping.opacity, 1.0f, 1e-6f);
+    TEST_ASSERT_NEAR(old.power.background_opacity, 0.1f, 1e-6f);
+    TEST_ASSERT_NEAR(old.power.opacity, 1.0f, 1e-6f);
+    // Written again, it reads the same: both keys are there now.
+    const AppSettings again = settings_from_json(settings_to_json(old));
+    TEST_ASSERT_NEAR(again.overlay.background_opacity, 0.4f, 1e-6f);
+    TEST_ASSERT_NEAR(again.overlay.opacity, 1.0f, 1e-6f);
+    // A file with both keys keeps both as written.
+    old_file["overlay"]["background_opacity"] = 0.7;
+    const AppSettings both = settings_from_json(old_file);
+    TEST_ASSERT_NEAR(both.overlay.background_opacity, 0.7f, 1e-6f);
+    TEST_ASSERT_NEAR(both.overlay.opacity, 0.4f, 1e-6f);
+    // Nothing at all: the defaults, the overlay whole.
+    const AppSettings fresh = settings_from_json(config::JsonValue{});
+    TEST_ASSERT_NEAR(fresh.overlay.background_opacity, OverlaySettings{}.background_opacity, 1e-6f);
+    TEST_ASSERT_NEAR(fresh.overlay.opacity, 1.0f, 1e-6f);
 }
 
 TEST_CASE(AppSettings, AuraOverlayOnInAnOlderFileTurnsThePluginOn) {
@@ -715,10 +748,15 @@ TEST_CASE(AppSettings, CombatPowerSettingsRoundTripAndAreSanitized) {
     bad["combat_power"]["list_max_players"] = 500.0;
     bad["combat_power"]["width"] = 5.0;
     bad["combat_power"]["opacity"] = 7.0;
+    bad["combat_power"]["background_opacity"] = -2.0;
     const AppSettings clean = settings_from_json(bad);
     TEST_ASSERT_EQ(clean.power.list_max_players, kMaxPowerList);
     TEST_ASSERT_EQ(clean.power.width, 160);
     TEST_ASSERT_NEAR(clean.power.opacity, 1.0f, 1e-6f);
+    TEST_ASSERT_NEAR(clean.power.background_opacity, 0.0f, 1e-6f);
+    // Faded to nothing, an unlocked overlay could not be found again.
+    bad["combat_power"]["opacity"] = 0.05;
+    TEST_ASSERT_NEAR(settings_from_json(bad).power.opacity, kMinOverlayOpacity, 1e-6f);
     bad["combat_power"]["list_max_players"] = 0.0;
     TEST_ASSERT_EQ(settings_from_json(bad).power.list_max_players, kMinPowerList);
 }

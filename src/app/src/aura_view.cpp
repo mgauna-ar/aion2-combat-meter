@@ -680,7 +680,7 @@ OverlayActions draw_auras(const AuraFrameInput& in) {
     const float scale = in.scale;
     const bool interactive = !s.locked;
 
-    if (chrome::begin("##aion2auras", s.opacity, scale, interactive)) {
+    if (chrome::begin("##aion2auras", s.background_opacity, scale, interactive)) {
         // Header, while it can be moved: a title and the buttons. Locked, the window
         // is only its bars.
         if (interactive) {

@@ -73,7 +73,8 @@ and saves as you go.
 |---|---|---|
 | `plugin_enabled` | false | The plugin's switch, which shows and hides its overlay. |
 | `locked` | false | Click-through and fixed in place. |
-| `opacity` | 0.55 | Background opacity, 0 to 1. The figures and the graph stay opaque. |
+| `opacity` | 1.0 | The whole overlay's opacity, 0.2 to 1: its panel, figures and graph fade together. |
+| `background_opacity` | 0.55 | The panel's alone, 0 to 1, behind the figures and the graph. A file from before 1.13, with `opacity` and no `background_opacity`, has its `opacity` read as this. |
 | `scale` | 1.0 | Size, 0.6 to 2.5, on top of the monitor's DPI scaling. |
 | `x`, `y`, `width`, `height` | -1, -1, 210, 156 | Position and size in screen pixels, the header shown while unlocked included: locked, the panel is that much shorter. -1, -1 places it right of the meter overlay's default spot. |
 | `show_jitter` | true | The jitter, beside the ping. |

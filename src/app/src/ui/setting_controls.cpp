@@ -1,5 +1,6 @@
 #include "app/ui/views.hpp"
 
+#include "app/app_settings.hpp"
 #include "app/ui/icons.hpp"
 #include "app/ui/page.hpp"
 #include "app/ui/widgets.hpp"
@@ -196,11 +197,17 @@ void overlay_settings_card(const OverlayControls& c, AppActions& out) {
     setting_switch("Lock", "Click-through and fixed in place. Ctrl+Alt+L locks or unlocks every overlay.", c.locked,
                    out, Applies::Overlay);
     if (c.look) c.look();
-    // Stored as 0..1; shown as the percentage it is.
-    int opacity = static_cast<int>(std::lround(*c.opacity * 100.0f));
-    if (setting_slider("Opacity", "Of its background; the text stays solid.", &opacity, 0, 100,
-                       static_cast<int>(std::lround(c.default_opacity * 100.0f)), "%d%%", out, Applies::Overlay)) {
+    // Stored as 0..1; shown as the percentages they are.
+    const auto percent = [](float v) { return static_cast<int>(std::lround(v * 100.0f)); };
+    int opacity = percent(*c.opacity);
+    if (setting_slider("Opacity", "The whole overlay: its panel, bars, text and icons together.", &opacity,
+                       percent(kMinOverlayOpacity), 100, percent(c.default_opacity), "%d%%", out, Applies::Overlay)) {
         *c.opacity = static_cast<float>(opacity) / 100.0f;
+    }
+    int background = percent(*c.background_opacity);
+    if (setting_slider("Background", "The panel behind the text and bars.", &background, 0, 100,
+                       percent(c.default_background_opacity), "%d%%", out, Applies::Overlay)) {
+        *c.background_opacity = static_cast<float>(background) / 100.0f;
     }
     setting_slider("Scale", "On top of the monitor's own scaling.", c.scale, 0.6f, 2.5f, 1.0f, "%.2fx", out,
                    Applies::Overlay);

@@ -188,6 +188,7 @@ void OverlayWindow::destroy() {
         m_imgui = nullptr;
     }
     m_render_target.Reset();
+    m_fade_blend.Reset();
     m_swap_chain.Reset();
     m_context.Reset();
     m_device.Reset();
@@ -233,6 +234,20 @@ bool OverlayWindow::create_device() {
                                            m_context.ReleaseAndGetAddressOf());
     }
     if (FAILED(hr)) return false;
+    // The fade: the source counts for nothing, the back buffer for the blend factor.
+    D3D11_BLEND_DESC fade{};
+    fade.RenderTarget[0].BlendEnable = TRUE;
+    fade.RenderTarget[0].SrcBlend = D3D11_BLEND_ZERO;
+    fade.RenderTarget[0].DestBlend = D3D11_BLEND_BLEND_FACTOR;
+    fade.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+    fade.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ZERO;
+    fade.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_BLEND_FACTOR;
+    fade.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+    fade.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+    // Without it the overlay is drawn whole, whatever its opacity: no reason to fail.
+    if (FAILED(m_device->CreateBlendState(&fade, m_fade_blend.ReleaseAndGetAddressOf()))) {
+        os::Logger::warn("cannot create the overlay's fade blend state; its opacity stays at 100%");
+    }
     // The overlay never goes fullscreen; keep DXGI's Alt+Enter away from it.
     Microsoft::WRL::ComPtr<IDXGIFactory> factory;
     if (SUCCEEDED(m_swap_chain->GetParent(IID_PPV_ARGS(factory.GetAddressOf())))) {
@@ -326,7 +341,14 @@ float OverlayWindow::dpi_scale() const {
     return dpi == 0 ? 1.0f : static_cast<float>(dpi) / 96.0f;
 }
 
-OverlayActions OverlayWindow::render(float scale_setting, const std::function<OverlayActions(float)>& draw) {
+void OverlayWindow::fade_callback(const ImDrawList*, const ImDrawCmd* cmd) {
+    const auto* self = static_cast<const OverlayWindow*>(cmd->UserCallbackData);
+    const float factor[4] = {self->m_fade, self->m_fade, self->m_fade, self->m_fade};
+    self->m_context->OMSetBlendState(self->m_fade_blend.Get(), factor, 0xFFFFFFFFu);
+}
+
+OverlayActions OverlayWindow::render(float scale_setting, float opacity,
+                                     const std::function<OverlayActions(float)>& draw) {
     if (m_imgui == nullptr) return {};
     ImGui::SetCurrentContext(m_imgui);
     if (m_resize_width != 0 && m_resize_height != 0) {
@@ -349,6 +371,19 @@ OverlayActions OverlayWindow::render(float scale_setting, const std::function<Ov
     const OverlayActions actions = draw(scale);
     m_drag_area = actions.drag_area;
     m_resize_grip = actions.resize_grip;
+    m_fade = std::clamp(opacity, 0.0f, 1.0f);
+    if (m_fade < 0.999f && m_fade_blend) {
+        // The whole overlay fades as one: the finished frame is scaled, after every
+        // window and tooltip. Fading each shape on its own (ImGui's style alpha) would
+        // let a text's shadow, or the bar under it, show through the letters. The back
+        // buffer holds premultiplied colour, as DWM composes it, so scaling colour and
+        // alpha alike is exactly that opacity. The rectangle is drawn by ImGui's own
+        // shaders under fade_callback's blend; its colour does not count.
+        ImDrawList* fg = ImGui::GetForegroundDrawList();
+        fg->AddCallback(&OverlayWindow::fade_callback, this);
+        fg->AddRectFilled(ImVec2(0.0f, 0.0f), ImGui::GetIO().DisplaySize, IM_COL32_WHITE);
+        fg->AddCallback(ImDrawCallback_ResetRenderState, nullptr);
+    }
     ImGui::Render();
 
     const float clear[4] = {0.0f, 0.0f, 0.0f, 0.0f};

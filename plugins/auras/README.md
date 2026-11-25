@@ -117,7 +117,8 @@ and saves as you go.
 |---|---|---|
 | `plugin_enabled` | false | The plugin's switch, which shows and hides its overlay. A file from 0.2.0, which has none, takes its `visible` instead. |
 | `locked` | false | Click-through and fixed in place. |
-| `opacity` | 0.55 | Background opacity, 0 to 1. Bars and text stay opaque. |
+| `opacity` | 1.0 | The whole overlay's opacity, 0.2 to 1: its panel, bars, icons and text fade together. |
+| `background_opacity` | 0.55 | The panel's alone, 0 to 1, behind the bars and text. A file from before 1.13, with `opacity` and no `background_opacity`, has its `opacity` read as this. |
 | `scale` | 1.0 | Size, 0.6 to 2.5, on top of the monitor's DPI scaling. |
 | `x`, `y`, `width`, `height` | -1, -1, 280, 300 | Position and size in screen pixels. -1, -1 places it under the meter overlay's default spot. |
 | `show_debuffs` | true | Enemies' effects on you. |

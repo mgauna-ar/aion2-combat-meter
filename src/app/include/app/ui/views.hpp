@@ -69,8 +69,11 @@ struct OverlayControls {
     /// The card's "##" id, which also keeps one page's rows apart from another's.
     const char* id{nullptr};
     bool* locked{nullptr};
+    /// The whole overlay's, and its background's alone.
     float* opacity{nullptr};
     float default_opacity{0.0f};
+    float* background_opacity{nullptr};
+    float default_background_opacity{0.0f};
     float* scale{nullptr};
     bool* hide_when_game_unfocused{nullptr};
     bool* show_in_dungeons_only{nullptr};

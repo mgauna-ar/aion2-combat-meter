@@ -108,11 +108,11 @@ float header_height(float scale) {
 
 float dot_width(float scale) noexcept { return 8.0f * scale; }
 
-bool begin(const char* id, float opacity, float scale, bool interactive) {
-    return begin(id, opacity, scale, interactive, ImVec2(0.0f, 0.0f), ImGui::GetIO().DisplaySize);
+bool begin(const char* id, float background_opacity, float scale, bool interactive) {
+    return begin(id, background_opacity, scale, interactive, ImVec2(0.0f, 0.0f), ImGui::GetIO().DisplaySize);
 }
 
-bool begin(const char* id, float opacity, float scale, bool interactive, ImVec2 pos, ImVec2 size) {
+bool begin(const char* id, float background_opacity, float scale, bool interactive, ImVec2 pos, ImVec2 size) {
     ImGui::SetNextWindowPos(pos);
     ImGui::SetNextWindowSize(size);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 8.0f * scale);
@@ -122,8 +122,9 @@ bool begin(const char* id, float opacity, float scale, bool interactive, ImVec2 
     ImGui::PushStyleVar(ImGuiStyleVar_WindowMinSize, ImVec2(1.0f, 1.0f));
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, item_spacing(scale));
     ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f * scale);
-    ImGui::PushStyleColor(ImGuiCol_WindowBg, rgba(colors::Background, opacity));
-    ImGui::PushStyleColor(ImGuiCol_Border, rgba(colors::Border, interactive ? 1.0f : std::min(1.0f, opacity + 0.2f)));
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, rgba(colors::Background, background_opacity));
+    ImGui::PushStyleColor(ImGuiCol_Border,
+                          rgba(colors::Border, interactive ? 1.0f : std::min(1.0f, background_opacity + 0.2f)));
     ImGui::PushStyleColor(ImGuiCol_Text, rgba(colors::Text));
     const ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
                                    ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse |

@@ -1075,6 +1075,8 @@ void overlay_card(const AppFrameInput& in, AppActions& out) {
     c.locked = &o.locked;
     c.opacity = &o.opacity;
     c.default_opacity = def.opacity;
+    c.background_opacity = &o.background_opacity;
+    c.default_background_opacity = def.background_opacity;
     c.scale = &o.scale;
     c.hide_when_game_unfocused = &o.hide_when_game_unfocused;
     c.show_in_dungeons_only = &o.show_in_dungeons_only;
