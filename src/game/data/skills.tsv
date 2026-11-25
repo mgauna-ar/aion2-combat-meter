@@ -6,7 +6,7 @@
 # name. The third column, when there is one, names the skill's icon, which
 # tools/gen_icon_sheet.py packs for the app.
 #
-# Sources, retrieved 2026-11-24: questlog.gg's skill database
+# Sources, retrieved 2026-11-25: questlog.gg's skill database
 # (questlog.gg/aion-2/en/db/skills), English names as it lists them; and
 # aion2.app's (aion2.app/db/skills) for the skills questlog.gg does not list
 # (Dodge, the weapons, the Elementalist's spirits), which the site says it
