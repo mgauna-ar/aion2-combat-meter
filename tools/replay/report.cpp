@@ -151,7 +151,8 @@ void Report::note_enemies(const proto::ParsedEvent& pe) {
         const auto before = m_enemies.find(id);
         if (before != m_enemies.end() && before->second.enemy_by == row.enemy_by) continue;
         const auto known = m_side_faction.find(id);
-        const auto [side, faction] = known != m_side_faction.end() ? known->second : std::pair<uint8_t, uint8_t>{0, 0};
+        // {} rather than {0, 0}: MSVC takes two int literals for a narrowing (C4244).
+        const auto [side, faction] = known != m_side_faction.end() ? known->second : std::pair<uint8_t, uint8_t>{};
         std::string why;
         switch (row.enemy_by) {
             case combat_power::EnemyBy::Fight: why = "fought"; break;
