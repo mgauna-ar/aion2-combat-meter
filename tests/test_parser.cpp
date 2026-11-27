@@ -182,7 +182,7 @@ TEST_CASE(Parser, APlayersRecordAndAnEffectCarryAPosition) {
     TEST_ASSERT_FALSE(only<Identity>(parse_one(p, opcode::OtherPlayer, identity_body(502, "Israphel", kServer, 3)))
                           .has_position);
 
-    // The fourth capture's map: one byte more before the flags, in both records.
+    // The Abyss: one byte more before the flags, the side, in both records.
     const Identity zoned = only<Identity>(parse_one(
         p, opcode::OtherPlayer,
         player_body(228, "Zikel", kServer, 204'221, PlayerTrailer::Plain, 58'224.0f, 18'775.0f, 36'512.0f, 2, true)));
@@ -256,9 +256,9 @@ TEST_CASE(Parser, AFlagsLookAlikeBeforeTheFlagsDoesNotMoveThePoint) {
 TEST_CASE(Parser, APlayersRecordSaysTheirFaction) {
     PacketParser p;
     const auto faction_of = [&](uint16_t op, const Bytes& body) { return only<Identity>(parse_one(p, op, body)).faction; };
-    const auto other = [&](uint8_t faction, bool zone_byte) {
+    const auto other = [&](uint8_t faction, bool abyss) {
         return player_body(227, "Nezekan", kServer, 134'667, PlayerTrailer::Plain, kTownX, kTownY, kTownZ, faction,
-                           zone_byte);
+                           abyss);
     };
     TEST_ASSERT_EQ(faction_of(opcode::OtherPlayer, other(1, false)), uint8_t{1});
     TEST_ASSERT_EQ(faction_of(opcode::OtherPlayer, other(2, false)), uint8_t{2});
@@ -271,6 +271,76 @@ TEST_CASE(Parser, APlayersRecordSaysTheirFaction) {
     // Neither of the two: not known, rather than a third side.
     TEST_ASSERT_EQ(faction_of(opcode::OtherPlayer, other(7, false)), uint8_t{0});
     TEST_ASSERT_EQ(faction_of(opcode::OtherPlayer, identity_body(502, "Israphel", kServer, 3)), uint8_t{0});
+}
+
+TEST_CASE(Parser, APlayersRecordSaysTheirAbyssSide) {
+    PacketParser p;
+    const auto read = [&](uint16_t op, const Bytes& body) { return only<Identity>(parse_one(p, op, body)); };
+
+    // The same-faction Abyss capture: everyone of faction 1, the enemy on side 1.
+    const Identity foe = read(opcode::OtherPlayer, player_body(228, "Zikel", kServer, 215'000, PlayerTrailer::Plain,
+                                                                58'224.0f, 18'775.0f, 36'512.0f, 1, true, {}, 1));
+    TEST_ASSERT_EQ(foe.faction, uint8_t{1});
+    TEST_ASSERT_EQ(foe.side, uint8_t{1});
+    TEST_ASSERT_EQ(foe.flags, uint8_t{0x17});
+    TEST_ASSERT(foe.has_position);
+    TEST_ASSERT_NEAR(foe.position.x, 58'224.0f, 1e-2f);
+    TEST_ASSERT_EQ(foe.combat_power, 215'000u);
+    // Where the two factions meet, the side is the faction.
+    TEST_ASSERT_EQ(read(opcode::OtherPlayer, player_body(229, "Vaizel", kServer, 90'000, PlayerTrailer::Plain, kTownX,
+                                                         kTownY, kTownZ, 2, true))
+                       .side,
+                   uint8_t{2});
+    // Off the Abyss, none: the flags (07) say no side follows.
+    const Identity town = read(opcode::OtherPlayer, player_body(227, "Nezekan", kServer, 134'667));
+    TEST_ASSERT_EQ(town.side, uint8_t{0});
+    TEST_ASSERT_EQ(town.flags, uint8_t{0x07});
+    // The mask as sent: what its bits say is not known.
+    TEST_ASSERT_EQ(town.mask, 0x00000101u);
+
+    // The local player's own, in the list 133 bytes after the class, when their
+    // flags (3f) say so.
+    const Identity me = read(opcode::OwnCharacter, own_player_body(501, "Ariel", kServer, -47'736.0f, 49'824.0f,
+                                                                    20'335.0f, 1, true, {}, 2));
+    TEST_ASSERT_EQ(me.faction, uint8_t{1});
+    TEST_ASSERT_EQ(me.side, uint8_t{2});
+    TEST_ASSERT_EQ(me.flags, uint8_t{0x3F});
+    TEST_ASSERT(me.has_position);
+    TEST_ASSERT_NEAR(me.position.y, 49'824.0f, 1e-2f);
+    TEST_ASSERT_EQ(read(opcode::OwnCharacter, own_player_body(501, "Ariel", kServer)).side, uint8_t{0});
+    // The list not where every real one had it: no side, rather than a guess.
+    const size_t own_class_end = own_identity_body(501, "Ariel", kServer, 0).size() - 4;
+    Bytes moved = own_player_body(501, "Ariel", kServer, kTownX, kTownY, kTownZ, 1, true, {}, 2);
+    TEST_ASSERT_EQ(moved[own_class_end + 133], uint8_t{0x05});
+    moved[own_class_end + 133] = 0x64;
+    TEST_ASSERT_EQ(read(opcode::OwnCharacter, moved).side, uint8_t{0});
+    // Nor a byte that is no side.
+    Bytes odd = player_body(230, "Triniel", kServer, 90'000, PlayerTrailer::Plain, kTownX, kTownY, kTownZ, 1, true,
+                            {}, 7);
+    TEST_ASSERT_EQ(read(opcode::OtherPlayer, odd).side, uint8_t{0});
+    TEST_ASSERT_EQ(p.stats().failed, uint64_t{0});
+}
+
+TEST_CASE(Parser, WarModeSaysWhoseAndWhichWay) {
+    PacketParser p;
+    const auto body = [](uint64_t id, uint8_t state) {
+        Bytes b;
+        put_varint(b, id);
+        b.push_back(state);
+        return b;
+    };
+    // The pvp-mode-switch capture: the local player's id, then 01.
+    const WarMode on = only<WarMode>(parse_one(p, opcode::WarMode, body(2604, 0x01)));
+    TEST_ASSERT_EQ(on.id, EntityId{2604});
+    TEST_ASSERT(on.on);
+    TEST_ASSERT_FALSE(only<WarMode>(parse_one(p, opcode::WarMode, body(2604, 0x00))).on);
+    TEST_ASSERT_EQ(p.stats().failed, uint64_t{0});
+    // Any other shape is a failure to look at, not a guess.
+    TEST_ASSERT(parse_one(p, opcode::WarMode, body(2604, 0x02)).empty());
+    Bytes longer = body(2604, 0x01);
+    longer.push_back(0x00);
+    TEST_ASSERT(parse_one(p, opcode::WarMode, longer).empty());
+    TEST_ASSERT_EQ(p.stats().failed, uint64_t{2});
 }
 
 TEST_CASE(Parser, ARecordThatDoesNotEndThatWayCarriesNoCombatPower) {

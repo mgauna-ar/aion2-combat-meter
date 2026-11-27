@@ -10,8 +10,21 @@ namespace aion2::proto {
 namespace {
 
 constexpr uint8_t kHasName = 0x01;
+/// In another player's record (45 36): their side follows the class. Set in every
+/// record of the two Abyss captures (22 and 67), in none of the 278 of a town, the
+/// arena or a dungeon.
+constexpr uint8_t kSideFollows = 0x10;
+/// In the local player's own record (33 36): their side is in the list at
+/// kOwnSideListAt. 0x3F in the Abyss's five, 0x37 in the ten of other maps.
+constexpr uint8_t kOwnSideListed = 0x08;
+/// Where that list starts after the class, in every own record of the captures:
+/// `05 <side> 03 01 7f` with a side, `05 03 01 7f` (7e in Ludra's) without.
+constexpr size_t kOwnSideListAt = 133;
+constexpr uint8_t kOwnSideListTag = 0x05;
 /// 16 code points of up to 3 UTF-8 bytes each.
 constexpr size_t kMaxNameBytes = kMaxNameChars * 3;
+
+[[nodiscard]] bool is_side(uint8_t b) noexcept { return b == 1 || b == 2; }
 
 [[nodiscard]] bool is_ascii_letter(uint8_t c) noexcept { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'); }
 [[nodiscard]] bool is_ascii_digit(uint8_t c) noexcept { return c >= '0' && c <= '9'; }
@@ -68,10 +81,11 @@ bool is_character_name(std::string_view utf8) noexcept { return character_name_c
 std::optional<Identity> read_identity_record(ByteReader& r, bool own) {
     Identity id;
     const uint64_t raw_id = r.varint();
-    r.skip(4);  // mask
+    id.mask = r.u32le();
     const uint8_t flags = r.u8();
     if (!r.ok() || raw_id == 0) return std::nullopt;
     id.id = normalize_entity_id(raw_id);
+    id.flags = flags;
     if ((flags & kHasName) == 0) return id;
 
     const uint8_t len = r.u8();
@@ -85,6 +99,14 @@ std::optional<Identity> read_identity_record(ByteReader& r, bool own) {
     if (!r.ok()) return std::nullopt;
     const auto faction = static_cast<uint8_t>((id.class_code >> 16) & 0xFF);
     if (faction == 1 || faction == 2) id.faction = faction;
+    // The side is looked at, not read past: the position after it is found where
+    // the side may or may not be (read_identity_position).
+    const std::span<const uint8_t> after = r.rest();
+    if (!own && (flags & kSideFollows) != 0 && !after.empty() && is_side(after[0])) id.side = after[0];
+    if (own && (flags & kOwnSideListed) != 0 && after.size() > kOwnSideListAt + 1 &&
+        after[kOwnSideListAt] == kOwnSideListTag && is_side(after[kOwnSideListAt + 1])) {
+        id.side = after[kOwnSideListAt + 1];
+    }
     return id;
 }
 
@@ -155,6 +177,9 @@ std::vector<Identity> scan_identities(std::span<const uint8_t> bytes, std::span<
         if (id && !id->name.empty() && character_name_chars(id->name) >= kMinFoundNameChars &&
             std::find(known_servers.begin(), known_servers.end(), id->server) != known_servers.end()) {
             id->scanned = true;
+            // What follows a look-alike's name is no record's.
+            id->faction = 0;
+            id->side = 0;
             found.push_back(std::move(*id));
             start += r.pos();
         } else {

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "combat_power/power_plugin.hpp"
 #include "common/micros.hpp"
 #include "meter/combatant_registry.hpp"
 #include "meter/types.hpp"
@@ -38,6 +39,9 @@ struct ReportOptions {
     bool casts{false};
     /// Each pong, and per connection how its echo and the heartbeats spread.
     bool ping{false};
+    /// Each player the Combat Power plugin takes for an enemy, as they become one and
+    /// stop being one, and why: their side, a fight, their faction.
+    bool enemies{false};
     /// The effects and skills no table names, counted.
     bool unnamed{false};
     bool unknown{false};
@@ -113,6 +117,9 @@ private:
     };
 
     void note_ping(const proto::ParsedEvent& event);
+    /// Feeds the Combat Power plugin and prints who became or stopped being an
+    /// enemy (--enemies).
+    void note_enemies(const proto::ParsedEvent& event);
     void note_unnamed(const proto::ParsedEvent& event, const meter::CombatantRegistry& registry);
     [[nodiscard]] double rel(Micros ts) const;
     [[nodiscard]] std::string who(uint32_t id, const meter::CombatantRegistry& registry) const;
@@ -133,6 +140,11 @@ private:
     ping::PingTracker m_ping;
     std::map<uint32_t, PingFlow> m_ping_flows;
     std::map<uint32_t, UnnamedEffect> m_unnamed_effects;
+    /// --enemies: the plugin as the app runs it, who it took for an enemy after the
+    /// last event, and each player's side and faction as their last record said.
+    combat_power::PowerPlugin m_power;
+    std::map<uint32_t, combat_power::PowerRow> m_enemies;
+    std::map<uint32_t, std::pair<uint8_t, uint8_t>> m_side_faction;
     /// Skill codes with no name, and how often they were used, hit or cast.
     std::map<uint32_t, uint64_t> m_unnamed_skills;
 };

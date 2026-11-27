@@ -14,6 +14,18 @@ namespace aion2::combat_power {
 
 using EntityId = proto::EntityId;
 
+/// Why a player is an enemy (PowerTracker, An enemy), in the order it is asked.
+enum class EnemyBy : uint8_t {
+    None,
+    /// A skill was pressed between them and the local player or their party on
+    /// this map, either way.
+    Fight,
+    /// Their Abyss side is not the local player's (proto::Identity::side).
+    Side,
+    /// Their faction is not the local player's, outside a dungeon.
+    Faction,
+};
+
 /// One player and their combat power.
 struct PowerRow {
     EntityId id{0};
@@ -28,8 +40,10 @@ struct PowerRow {
     /// no distance at all once PowerSnapshot::local_position_stale.
     float distance_m{-1.0f};
 
-    /// An enemy (PowerTracker, An enemy): of the other faction, outside a dungeon and
-    /// not in the local player's party. False while either's faction is not known.
+    /// An enemy (PowerTracker, An enemy): never a member of the local player's
+    /// party; else one who fought them or their party on this map, one on the other
+    /// Abyss side, or, where no side is known, one of the other faction outside a
+    /// dungeon. What the view reads; `enemy_by` says which.
     bool hostile{false};
     /// Hostile, alive and within PowerTracker::kEnemyRange, or at no distance that
     /// can be measured: one who leads the lists. Their place, not their colour.
@@ -37,6 +51,9 @@ struct PowerRow {
     /// Their HP reached 0 (00 8D) and has not risen since: no threat, whoever they
     /// are. They leave view (47 36) a second or two later.
     bool dead{false};
+    /// Why they are `hostile`; None when they are not. Last, so a row written out
+    /// in order needs no change.
+    EnemyBy enemy_by{EnemyBy::None};
 
     [[nodiscard]] bool has_distance() const noexcept { return distance_m >= 0.0f; }
 
@@ -113,13 +130,21 @@ struct PowerSnapshot {
  *   their record does not end with it.
  * - **The target** is the last other player a skill the local player pressed named
  *   (02 38, mode 2), or one they hit (04 38), for kTargetMemory. A skill pressed on
- *   anything else, a monster, lets go of it. An ally they heal is a target too.
- * - **An enemy** is a player of the other faction than the local player's
- *   (Identity::faction, sent with their record as they come into view, so before
- *   they do anything), but for two cases where the factions play together: no one
- *   is an enemy in a dungeon (game::is_party_instance), whose parties mix both, and a
- *   member of the local player's party (02 97) never is. A player of the local
- *   player's own faction is never one, an arena's opponent included.
+ *   anything else, a monster, lets go of it. A press on another player marks them
+ *   as fought (below), so a target is an enemy but for a party member.
+ * - **An enemy**, asked in this order:
+ *   - a member of the local player's party (02 97) never is;
+ *   - one who fought the local player or their party on this map is: a skill
+ *     pressed (02 38, mode 2) by either on the other. In every capture a press
+ *     from one player that named another was an attack (heals come back aimed at
+ *     their caster), the arena's opponent of the local player's own faction
+ *     included. Remembered by character until another map, so leaving view and
+ *     coming back keeps it;
+ *   - where both Abyss sides are known (Identity::side, sent with the record, so
+ *     before they do anything), one on the other side is, whatever their faction:
+ *     the Abyss can pair a faction against itself;
+ *   - else one of the other faction (Identity::faction) is, but in a dungeon
+ *     (game::is_party_instance), whose parties mix both.
  * - **An enemy leads the lists while within kEnemyRange,** or at no known
  *   distance, and alive. The range stays although players now leave the list: the
  *   local player's position can be stale, and an enemy at the edge of view is no
@@ -176,9 +201,10 @@ public:
     /// 00 8D: the local player's own values name them when 33 36 was missed; anyone
     /// else's HP says whether they are dead.
     void on_values(const proto::RemainingHp& values, uint32_t connection);
-    /// A skill going off (02 38): it says the caster's class, and the local player's
-    /// press names the target. Over another connection than the one followed, the
-    /// ids are another map's, and it says nothing.
+    /// A skill going off (02 38): it says the caster's class, a press between the
+    /// local player or their party and another player marks that player as fought,
+    /// and the local player's press names the target. Over another connection than
+    /// the one followed, the ids are another map's, and it says nothing.
     void on_cast(const proto::SkillCast& cast, uint32_t connection, Micros ts);
     /// A hit (04 38): the actor's class, and the local player's hit on an enemy names
     /// the target. Over another connection, nothing.
@@ -198,6 +224,10 @@ public:
     [[nodiscard]] EntityId local() const noexcept { return m_local; }
     [[nodiscard]] size_t players() const noexcept { return m_players.size(); }
     [[nodiscard]] PowerSnapshot snapshot(Micros now) const;
+    /// Every listed player who is an enemy, with why (`enemy_by`): uncut, unordered,
+    /// and with no distance, for aion2meter-replay --enemies. The snapshot's lists
+    /// are cut to what the view can show.
+    [[nodiscard]] std::vector<PowerRow> all_enemies() const;
 
 private:
     struct Player {
@@ -208,6 +238,10 @@ private:
         proto::Point at;
         /// Identity::faction; 0 for unknown.
         uint8_t faction{0};
+        /// Identity::side, as their last record gave it: 0 off the Abyss.
+        uint8_t side{0};
+        /// Whether m_fought holds their character.
+        bool fought{false};
     };
 
     /// A newer connection forgets the map before; false for an event from an older
@@ -215,7 +249,16 @@ private:
     [[nodiscard]] bool follow(uint32_t connection);
     void learn_class(EntityId id, uint32_t skill);
     void aim(EntityId target, Micros ts);
-    [[nodiscard]] bool hostile(const Player& player) const;
+    /// The local player, or a listed member of their party.
+    [[nodiscard]] bool ours(EntityId id) const;
+    /// A skill pressed from `caster` on `target`: one of them ours, the other a
+    /// listed player who is not, and that one has fought.
+    void note_fight(EntityId caster, EntityId target);
+    void mark_fought(EntityId id);
+    /// Forgets who fought: another map.
+    void forget_fights();
+    [[nodiscard]] EnemyBy enemy_by(const Player& player) const;
+    [[nodiscard]] bool hostile(const Player& player) const { return enemy_by(player) != EnemyBy::None; }
     /// A hostile player near enough to lead the lists; at any distance while the
     /// local player's position cannot be measured from (`measurable` false).
     [[nodiscard]] bool threat(const Player& player, bool measurable) const;
@@ -241,6 +284,14 @@ private:
     /// The local player's faction, from their own record. It is the character's, so
     /// it outlasts the map; 0 until a record of theirs is seen.
     uint8_t m_local_faction{0};
+    /// Their Abyss side, from their last own record, and when that came: the map's,
+    /// so it goes with the map (0 off the Abyss, and until their record comes).
+    uint8_t m_local_side{0};
+    Micros m_local_record_ts{0};
+    /// The characters (name@server) who fought the local player or their party on
+    /// this map, so one who leaves view and comes back is still marked. At most
+    /// kMaxPlayers.
+    std::unordered_set<std::string> m_fought;
     /// The local player's position on this map, and when it was last said.
     bool m_has_local_position{false};
     proto::Point m_local_at;

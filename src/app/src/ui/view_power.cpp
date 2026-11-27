@@ -75,12 +75,12 @@ void display_card(const AppFrameInput& in, AppActions& out) {
                    &p.list_max_players, kMinPowerList, kMaxPowerList, def.list_max_players, "%d players", out,
                    Applies::Overlay);
     setting_switch("Enemies first",
-                   "Players of the other faction lead the list, so one coming into view is not lost among your "
-                   "own. Their names are red either way.",
+                   "Enemies lead the list, so one coming into view is not lost among your own: the other faction, "
+                   "the other side in the Abyss, and anyone who fights you or your party. Their names are red "
+                   "either way.",
                    &p.enemies_first, out, Applies::Overlay);
     setting_switch("Only enemies",
-                   "List players of the other faction alone, near or far. Your target still shows, whoever they "
-                   "are: an arena opponent of your own faction is not an enemy by faction.",
+                   "List enemies alone, near or far. Your target still shows, whoever they are.",
                    &p.only_enemies, out, Applies::Overlay);
     setting_switch("Sort by distance",
                    "The nearest players first, each with how far they are. The game does not send you your own "

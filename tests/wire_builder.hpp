@@ -281,23 +281,25 @@ enum class PlayerTrailer : uint8_t {
     NoTag,
 };
 
-/// 45 36 as the game sends it: the identity (its class's third byte the faction), a
-/// byte, a flags byte, where the player stands, some 1,200 bytes of gear and looks
-/// (filler here), then the tag's u32, a title and a rank (u32 each), the combat
-/// power and five zeros, as `trailer` varies them. `zone_byte` puts one byte more
-/// (the faction again) after the class, as the fourth capture's map does.
+/// 45 36 as the game sends it: the identity (flags 07; its class's third byte the
+/// faction), a byte, a flags byte, where the player stands, some 1,200 bytes of gear
+/// and looks (filler here), then the tag's u32, a title and a rank (u32 each), the
+/// combat power and five zeros, as `trailer` varies them. `abyss` makes it a record
+/// from the Abyss: flags 17 and the player's side after the class, `side` or, as
+/// where the two factions meet, the faction.
 inline Bytes player_body(uint64_t id, std::string_view name, uint16_t server, uint32_t combat_power,
                          PlayerTrailer trailer = PlayerTrailer::Plain, float x = kTownX, float y = kTownY,
-                         float z = kTownZ, uint8_t faction = 1, bool zone_byte = false, const Bytes& effects = {}) {
+                         float z = kTownZ, uint8_t faction = 1, bool abyss = false, const Bytes& effects = {},
+                         uint8_t side = 0) {
     Bytes b;
     put_varint(b, id);
     put_le32(b, 0x00000101);
-    b.push_back(0x01);
+    b.push_back(abyss ? 0x17 : 0x07);
     b.push_back(static_cast<uint8_t>(name.size()));
     put_bytes(b, bytes_of(name));
     put_le16(b, server);
     put_le32(b, 0x02000000u | (uint32_t{faction} << 16));
-    if (zone_byte) b.push_back(faction);
+    if (abyss) b.push_back(side != 0 ? side : faction);
     put_le16(b, 0xD288);
     put_f32(b, x);
     put_f32(b, y);
@@ -321,12 +323,14 @@ inline Bytes player_body(uint64_t id, std::string_view name, uint16_t server, ui
 }
 
 /// 33 36: the same record, with the u16 the real ones carry between the name and
-/// the server (1406 in all of the second capture's).
-inline Bytes own_identity_body(uint64_t id, std::string_view name, uint16_t server, uint32_t class_code) {
+/// the server (1406 in all of the second capture's). Its flags are 37, 3f in the
+/// Abyss.
+inline Bytes own_identity_body(uint64_t id, std::string_view name, uint16_t server, uint32_t class_code,
+                               uint8_t flags = 0x37) {
     Bytes b;
     put_varint(b, id);
     put_le32(b, 0x00000101);
-    b.push_back(0x01);
+    b.push_back(flags);
     b.push_back(static_cast<uint8_t>(name.size()));
     put_bytes(b, bytes_of(name));
     put_le16(b, 1406);
@@ -337,18 +341,22 @@ inline Bytes own_identity_body(uint64_t id, std::string_view name, uint16_t serv
 }
 
 /// 33 36 as the game sends it, as far as it is read: the identity (its class's
-/// third byte the faction), 154 bytes of filler ending 00 00, a byte (80), a flags
-/// byte and where the local player stands, then the rest of the record (filler).
-/// `zone_byte` puts one byte more (01) before the 00 00, as the fourth capture's
-/// map does: there it came in a list some 20 bytes before the position, and the
-/// byte before the flags was 80 still.
+/// third byte the faction), 154 bytes ending 00 00, a byte (80), a flags byte and
+/// where the local player stands, then the rest of the record (filler). Of the 154,
+/// a list 133 bytes after the class, `05 03 01 7f` as in every real one. `abyss`
+/// makes it a record from the Abyss, as the real ones there: flags 3f, and the
+/// side in that list (`05 <side> 03 01 7f`), `side` or the faction, which pushes
+/// what follows a byte on.
 inline Bytes own_player_body(uint64_t id, std::string_view name, uint16_t server, float x = kTownX,
-                             float y = kTownY, float z = kTownZ, uint8_t faction = 1, bool zone_byte = false,
-                             const Bytes& effects = {}) {
-    Bytes b = own_identity_body(id, name, server, 0x2D000000u | (uint32_t{faction} << 16));
-    // own_identity_body's level is the first four of the 155.
-    b.resize(b.size() + 148, 0x64);
-    if (zone_byte) b.push_back(0x01);
+                             float y = kTownY, float z = kTownZ, uint8_t faction = 1, bool abyss = false,
+                             const Bytes& effects = {}, uint8_t side = 0) {
+    Bytes b = own_identity_body(id, name, server, 0x2D000000u | (uint32_t{faction} << 16), abyss ? 0x3F : 0x37);
+    // own_identity_body's level is the first four of the 133 before the list.
+    b.resize(b.size() + 129, 0x64);
+    b.push_back(0x05);
+    if (abyss) b.push_back(side != 0 ? side : faction);
+    put_bytes(b, Bytes{0x03, 0x01, 0x7F});
+    b.resize(b.size() + 15, 0x64);
     b.push_back(0x00);
     b.push_back(0x00);
     b.push_back(0x80);

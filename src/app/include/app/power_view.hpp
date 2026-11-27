@@ -59,8 +59,7 @@ struct PowerLayout {
 /// `sort_by_distance`), the enemies among them first (with `enemies_first`), or the
 /// enemies alone (with `only_enemies`), the target marked among them or on a line
 /// above them; without it, the target alone. The target shows with `only_enemies`
-/// too: an arena's opponent of the local player's own faction is no enemy by
-/// faction, and is shown that way.
+/// too, enemy or not: a party member aimed at is none.
 [[nodiscard]] PowerLayout power_layout(const combat_power::PowerSnapshot& power, const PowerSettings& settings);
 
 /// Draws the combat power overlay into the frame the caller has begun: a header to

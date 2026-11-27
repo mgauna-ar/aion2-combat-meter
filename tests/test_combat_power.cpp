@@ -159,7 +159,10 @@ TEST_CASE(CombatPower, OnlyTheLocalPlayersPressesAim) {
 TEST_CASE(CombatPower, AHitNamesAnEnemyAndAHealOnAnAllyNoOne) {
     PowerTracker t = open_world();
     t.on_identity(placed(227, "Nezekan", 134'667, 2, 10.0f), 2, at(2));  // an enemy
-    t.on_identity(placed(300, "Lumiel", 90'000, 1, 5.0f), 2, at(2));     // an ally
+    t.on_identity(placed(300, "Lumiel", 90'000, 1, 5.0f), 2, at(2));     // an ally, of the party
+    proto::PartyRoster roster;
+    roster.members = {proto::PartyMember{"Ariel"}, proto::PartyMember{"Lumiel"}};
+    t.on_party(roster);
     t.on_cast(press(kMe, 227), 2, at(3));
     // 04 38 carries heals: a passive's or a spirit's on the ally, no press behind
     // it, keeps the enemy being fought.
@@ -171,10 +174,13 @@ TEST_CASE(CombatPower, AHitNamesAnEnemyAndAHealOnAnAllyNoOne) {
     t.on_identity(placed(228, "Zikel", 120'000, 2, 12.0f), 2, at(5));
     t.on_damage(hit(kMe, 228), 2, at(6));
     TEST_ASSERT_EQ(t.snapshot(at(7)).target.id, EntityId{228});
-    // A heal pressed on the ally names them, and a heal on them renews it.
+    // A skill pressed on a party member names them, and a heal on them renews it.
+    // On anyone else it would be a fight: the captures never aimed a heal at one.
     t.on_cast(press(kMe, 300), 2, at(8));
     t.on_damage(heal, 2, at(30));
-    TEST_ASSERT_EQ(t.snapshot(at(8) + PowerTracker::kTargetMemory + from_seconds(1.0)).target.id, EntityId{300});
+    const PowerSnapshot later = t.snapshot(at(8) + PowerTracker::kTargetMemory + from_seconds(1.0));
+    TEST_ASSERT_EQ(later.target.id, EntityId{300});
+    TEST_ASSERT_FALSE(later.target.hostile);
 }
 
 TEST_CASE(CombatPower, PlayersAreListedStrongestFirstAndOfACrowdTheStrongest) {
@@ -191,6 +197,10 @@ TEST_CASE(CombatPower, PlayersAreListedStrongestFirstAndOfACrowdTheStrongest) {
     for (EntityId id = 1000; id < 1000 + PowerTracker::kMaxListed; ++id) {
         t.on_identity(player(id, ("Crowd" + std::to_string(id)).c_str(), 50'000 + id), 2, at(4));
     }
+    // A party member: anyone else pressed on has fought, and leads as an enemy.
+    proto::PartyRoster roster;
+    roster.members = {proto::PartyMember{"Ariel"}, proto::PartyMember{"Vaizel"}};
+    t.on_party(roster);
     t.on_cast(press(kMe, 301), 2, at(5));
     s = t.snapshot(at(6));
     TEST_ASSERT_EQ(s.players.size(), PowerTracker::kMaxListed);
@@ -605,6 +615,158 @@ TEST_CASE(CombatPower, APlayerOfTheOtherFactionIsHostile) {
     TEST_ASSERT_FALSE(t.snapshot(at(63)).players[0].hostile);
 }
 
+namespace {
+
+/// A player of `faction` on Abyss side `side` (0: none, off the Abyss).
+proto::Identity sided(EntityId id, const char* name, uint8_t faction, uint8_t side) {
+    proto::Identity i = placed(id, name, 100'000, faction, 30.0f);
+    i.side = side;
+    return i;
+}
+
+/// The row of `name` in the snapshot's list; a row with id 0 if it is not there.
+PowerRow row_named(const PowerSnapshot& s, const char* name) {
+    for (const PowerRow& row : s.players) {
+        if (row.name == name) return row;
+    }
+    return PowerRow{};
+}
+
+} // namespace
+
+TEST_CASE(CombatPower, ASideOtherThanTheLocalPlayersIsAnEnemyWhateverTheirFaction) {
+    // The same-faction Abyss capture: every record of faction 1, the local player
+    // on side 2, the one who fought them on side 1.
+    PowerTracker t;
+    t.on_map_load(proto::MapLoad{1, 1010}, 2, at(0));
+    t.on_identity(own(kMe), 2, at(0.1));
+    t.on_map_load(proto::MapLoad{2, 20}, 2, at(0.4));
+    // On the map before the local player's record says their side, the faction
+    // decides, as with the meter started mid-map.
+    t.on_identity(sided(303, "Vaizel", 2, 2), 2, at(0.5));
+    TEST_ASSERT(row_named(t.snapshot(at(0.6)), "Vaizel").enemy_by == EnemyBy::Faction);
+    proto::Identity me = own(kMe);
+    me.side = 2;
+    t.on_identity(me, 2, at(1));
+    t.on_identity(sided(300, "Zikel", 1, 1), 2, at(2));
+    t.on_identity(sided(301, "Lumiel", 1, 2), 2, at(2));
+    t.on_identity(placed(302, "Triniel", 90'000, 2, 30.0f), 2, at(2));  // no side said: the faction
+    const PowerSnapshot s = t.snapshot(at(3));
+    TEST_ASSERT(row_named(s, "Zikel").hostile);
+    TEST_ASSERT(row_named(s, "Zikel").enemy_by == EnemyBy::Side);
+    TEST_ASSERT(row_named(s, "Zikel").threat);
+    TEST_ASSERT_FALSE(row_named(s, "Lumiel").hostile);
+    // Of the other faction, on the local player's side: no enemy.
+    TEST_ASSERT_FALSE(row_named(s, "Vaizel").hostile);
+    TEST_ASSERT(row_named(s, "Triniel").enemy_by == EnemyBy::Faction);
+    TEST_ASSERT_EQ(s.enemies_in_view, 2u);
+    // On sight, and a fight after it says so instead.
+    t.on_cast(press(300, kMe), 2, at(4));
+    TEST_ASSERT(row_named(t.snapshot(at(5)), "Zikel").enemy_by == EnemyBy::Fight);
+
+    // The side is the map's: in town, neither the local player's nor theirs.
+    t.on_map_load(proto::MapLoad{2, 1010}, 2, at(10));
+    t.on_identity(own(kMe), 2, at(11));
+    t.on_identity(sided(310, "Hadis", 1, 0), 2, at(12));
+    t.on_identity(sided(311, "Marchutan", 2, 0), 2, at(12));
+    const PowerSnapshot town = t.snapshot(at(13));
+    TEST_ASSERT_FALSE(row_named(town, "Hadis").hostile);
+    TEST_ASSERT(row_named(town, "Marchutan").enemy_by == EnemyBy::Faction);
+    // A party member is none, whatever their side.
+    PowerTracker grouped;
+    grouped.on_map_load(proto::MapLoad{1, 20}, 2, at(0));
+    grouped.on_identity(me, 2, at(1));
+    grouped.on_identity(sided(300, "Zikel", 1, 1), 2, at(2));
+    proto::PartyRoster roster;
+    roster.members = {proto::PartyMember{"Ariel"}, proto::PartyMember{"Zikel"}};
+    grouped.on_party(roster);
+    TEST_ASSERT_FALSE(row_named(grouped.snapshot(at(3)), "Zikel").hostile);
+}
+
+TEST_CASE(CombatPower, WhoeverFightsIsAnEnemyWhateverTheirFaction) {
+    // The arena capture: an opponent of the local player's own faction, and no side.
+    const auto arena = [] {
+        PowerTracker t;
+        t.on_map_load(proto::MapLoad{1, 61}, 2, at(0));
+        t.on_identity(own(kMe), 2, at(1));
+        t.on_identity(placed(227, "Nezekan", 134'667, 1, 20.0f), 2, at(1.4));
+        return t;
+    };
+    PowerTracker t = arena();
+    TEST_ASSERT_FALSE(t.snapshot(at(2)).players[0].hostile);
+    // Their first skill on the local player marks them...
+    t.on_cast(press(227, kMe), 2, at(30));
+    PowerSnapshot s = t.snapshot(at(31));
+    TEST_ASSERT(s.players[0].hostile);
+    TEST_ASSERT(s.players[0].enemy_by == EnemyBy::Fight);
+    TEST_ASSERT(s.players[0].threat);
+    TEST_ASSERT_EQ(s.enemies_in_view, 1u);
+    TEST_ASSERT_EQ(s.hostile_in_view, 1u);
+    // ...and so does the local player's on them.
+    PowerTracker first = arena();
+    first.on_cast(press(kMe, 227), 2, at(30));
+    TEST_ASSERT(first.snapshot(at(31)).players[0].enemy_by == EnemyBy::Fight);
+
+    // Out of view and back under a new id, the character is still marked.
+    t.on_left_view(proto::LeftView{227, 1}, 2);
+    TEST_ASSERT_EQ(t.snapshot(at(39)).enemies_in_view, 0u);
+    t.on_identity(placed(228, "Nezekan", 134'667, 1, 20.0f), 2, at(40));
+    TEST_ASSERT(t.snapshot(at(41)).players[0].hostile);
+    // Someone else on their old id is not.
+    t.on_identity(placed(227, "Lumiel", 90'000, 1, 5.0f), 2, at(42));
+    TEST_ASSERT_FALSE(row_named(t.snapshot(at(43)), "Lumiel").hostile);
+    // A reload of the map keeps it; another map forgets it.
+    t.on_map_load(proto::MapLoad{2, 61}, 2, at(50));
+    TEST_ASSERT(row_named(t.snapshot(at(51)), "Nezekan").hostile);
+    t.on_map_load(proto::MapLoad{3, 1010}, 2, at(60));
+    t.on_identity(placed(229, "Nezekan", 134'667, 1, 20.0f), 2, at(61));
+    TEST_ASSERT_FALSE(row_named(t.snapshot(at(62)), "Nezekan").hostile);
+    // So does a newer connection: back in town, say.
+    PowerTracker after = arena();
+    after.on_cast(press(227, kMe), 2, at(30));
+    after.on_identity(own(kMe + 1), 3, at(70));
+    after.on_identity(placed(229, "Nezekan", 134'667, 1, 20.0f), 3, at(71));
+    TEST_ASSERT_FALSE(after.snapshot(at(72)).players[0].hostile);
+}
+
+TEST_CASE(CombatPower, OnlyAPressBetweenThePartyAndAnotherPlayerMarksThem) {
+    PowerTracker t = open_world();
+    // A party member and six strangers, all of the local player's faction.
+    t.on_identity(placed(301, "Lumiel", 90'000, 1, 5.0f), 2, at(2));
+    const char* const strangers[] = {"Zikel", "Triniel", "Vaizel", "Hadis", "Marchutan", "Kaisinel"};
+    for (EntityId i = 0; i < 6; ++i) t.on_identity(placed(400 + i, strangers[i], 90'000, 1, 10.0f), 2, at(2));
+    proto::PartyRoster roster;
+    roster.members = {proto::PartyMember{"Ariel"}, proto::PartyMember{"Lumiel"}};
+    t.on_party(roster);
+
+    // A party member's press on a stranger, and a stranger's on a party member.
+    t.on_cast(press(301, 400), 2, at(3));
+    t.on_cast(press(401, 301), 2, at(3));
+    // None of these: a press between two strangers; a passive going off; a
+    // self-cast; the party on the local player and back; a press on a corpse; a
+    // press over an older connection.
+    t.on_cast(press(402, 403), 2, at(3));
+    proto::SkillCast proc = press(kMe, 404);
+    proc.pressed = false;
+    t.on_cast(proc, 2, at(3));
+    t.on_cast(press(404, 404), 2, at(3));
+    t.on_cast(press(301, kMe), 2, at(3));
+    t.on_cast(press(kMe, 301), 2, at(3));
+    t.on_values(proto::RemainingHp{405, false, true, 0, false, 0}, 2);
+    t.on_cast(press(kMe, 405), 2, at(4));
+    t.on_cast(press(kMe, 402), 1, at(4));
+
+    const PowerSnapshot s = t.snapshot(at(5));
+    TEST_ASSERT(row_named(s, "Zikel").enemy_by == EnemyBy::Fight);
+    TEST_ASSERT(row_named(s, "Triniel").enemy_by == EnemyBy::Fight);
+    for (const char* name : {"Lumiel", "Vaizel", "Hadis", "Marchutan", "Kaisinel"}) {
+        TEST_ASSERT_FALSE(row_named(s, name).hostile);
+    }
+    TEST_ASSERT_EQ(s.enemies_in_view, 2u);
+    // all_enemies, what aion2meter-replay --enemies follows, is the same two.
+    TEST_ASSERT_EQ(t.all_enemies().size(), size_t{2});
+}
+
 TEST_CASE(CombatPower, EnemiesLeadBothListsAndNoCrowdHidesOne) {
     PowerTracker t;
     t.on_map_load(proto::MapLoad{1, 20}, 2, at(0));
@@ -742,7 +904,10 @@ TEST_CASE(PowerView, OnlyEnemiesListsEveryEnemyAndKeepsTheTarget) {
     t.on_identity(placed(301, "Triniel", 80'000, 2, PowerTracker::kEnemyRange + 50.0f), 2, at(3));
     t.on_identity(placed(302, "Hadis", 70'000, 2, 30.0f), 2, at(3));
     t.on_values(proto::RemainingHp{302, false, true, 0, false, 0}, 2);
-    // A heal pressed on an ally: the target, though no enemy.
+    // A skill pressed on a party member: the target, though no enemy.
+    proto::PartyRoster roster;
+    roster.members = {proto::PartyMember{"Ariel"}, proto::PartyMember{"Ally0"}};
+    t.on_party(roster);
     t.on_cast(press(kMe, 1000), 2, at(4));
     const PowerSnapshot s = t.snapshot(at(4));
 
@@ -924,9 +1089,17 @@ TEST_CASE(PowerView, TheListMarksTheTargetOrShowsItAboveTheStrongest) {
 
     TEST_ASSERT_EQ(layout.more, 0u);
 
+    // The opponent pressed on has fought: an enemy, who leads with enemies first.
+    settings.list_max_players = 1;
+    layout = app::power_layout(s, settings);
+    TEST_ASSERT_EQ(layout.rows.size(), size_t{1});
+    TEST_ASSERT_EQ(layout.rows[0].name, std::string("Nezekan"));
+    TEST_ASSERT(layout.rows[0].hostile);
+    TEST_ASSERT_EQ(layout.target, EntityId{227});
+
     // More players than the setting lists: the strongest, a count of the rest, and
     // the target on a line of their own when they are not among them.
-    settings.list_max_players = 1;
+    settings.enemies_first = false;
     layout = app::power_layout(s, settings);
     TEST_ASSERT_EQ(layout.rows.size(), size_t{1});
     TEST_ASSERT_EQ(layout.rows[0].name, std::string("Zikel"));

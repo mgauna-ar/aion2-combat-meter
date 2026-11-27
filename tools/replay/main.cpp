@@ -56,6 +56,8 @@ void usage() {
                  "                    import of names should fill in\n"
                  "  --ping            each pong, and per connection how its echo and the\n"
                  "                    heartbeats spread: a capture has no ping, only its spread\n"
+                 "  --enemies         each player the Combat Power plugin takes for an enemy, as\n"
+                 "                    they become one and stop: by side, fought or faction\n"
                  "  --opcodes         count, body sizes and parse failures per opcode\n"
                  "  --unknown         hex dump frames the parser does not read or failed on\n"
                  "  --dump OPS        hex dump frames of these opcodes: hex, comma separated\n"
@@ -119,6 +121,8 @@ bool parse_args(int argc, char** argv, Options& opt) {
             opt.report.unnamed = true;
         } else if (arg == "--ping") {
             opt.report.ping = true;
+        } else if (arg == "--enemies") {
+            opt.report.enemies = true;
         } else if (arg == "--opcodes") {
             opt.report.opcodes = true;
         } else if (arg == "--unknown") {

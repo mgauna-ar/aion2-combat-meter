@@ -131,6 +131,44 @@ void Report::note_ping(const proto::ParsedEvent& pe) {
     }
 }
 
+void Report::note_enemies(const proto::ParsedEvent& pe) {
+    if (const auto* id = std::get_if<proto::Identity>(&pe.event); id != nullptr && !id->scanned) {
+        m_side_faction[id->id] = {id->side, id->faction};
+    }
+    m_power.on_event(pe);
+    // Only these change who is an enemy: who is who and where, a press, the party.
+    const bool may_change = std::holds_alternative<proto::Identity>(pe.event) ||
+                            std::holds_alternative<proto::SkillCast>(pe.event) ||
+                            std::holds_alternative<proto::PartyRoster>(pe.event) ||
+                            std::holds_alternative<proto::MapLoad>(pe.event) ||
+                            std::holds_alternative<proto::LeftView>(pe.event) ||
+                            std::holds_alternative<proto::RemainingHp>(pe.event);
+    if (!may_change) return;
+    std::map<uint32_t, combat_power::PowerRow> now;
+    for (combat_power::PowerRow& row : m_power.tracker().all_enemies()) now.emplace(row.id, std::move(row));
+    const double t = rel(pe.ts);
+    for (const auto& [id, row] : now) {
+        const auto before = m_enemies.find(id);
+        if (before != m_enemies.end() && before->second.enemy_by == row.enemy_by) continue;
+        const auto known = m_side_faction.find(id);
+        // {} rather than {0, 0}: MSVC takes two int literals for a narrowing (C4244).
+        const auto [side, faction] = known != m_side_faction.end() ? known->second : std::pair<uint8_t, uint8_t>{};
+        std::string why;
+        switch (row.enemy_by) {
+            case combat_power::EnemyBy::Fight: why = "fought"; break;
+            case combat_power::EnemyBy::Side: why = "side " + std::to_string(side); break;
+            case combat_power::EnemyBy::Faction: why = "faction " + std::to_string(faction); break;
+            case combat_power::EnemyBy::None: break;
+        }
+        std::printf("%+.3f  %s %u \"%s\" (%s)\n", t, before == m_enemies.end() ? "enemy+   " : "enemy~   ", id,
+                    name(row.name, id).c_str(), why.c_str());
+    }
+    for (const auto& [id, row] : m_enemies) {
+        if (!now.contains(id)) std::printf("%+.3f  enemy-    %u \"%s\"\n", t, id, name(row.name, id).c_str());
+    }
+    m_enemies = std::move(now);
+}
+
 void Report::print_ping() const {
     for (const auto& [connection, flow] : m_ping_flows) {
         std::printf("ping, connection %u: %zu pongs", connection, flow.echo_ms.size());
@@ -218,6 +256,7 @@ void Report::on_event(const proto::ParsedEvent& pe, const meter::CombatantRegist
     }
     if (m_opt.ping) note_ping(pe);
     if (m_opt.unnamed) note_unnamed(pe, reg);
+    if (m_opt.enemies) note_enemies(pe);
     if (!m_opt.events && !m_opt.auras) return;
     const double t = rel(pe.ts);
     const bool aura = std::holds_alternative<proto::BuffApplied>(pe.event) ||
@@ -279,6 +318,10 @@ void Report::on_event(const proto::ParsedEvent& pe, const meter::CombatantRegist
                             e.scanned ? "scanned" : "", e.id, name(e.name, e.id).c_str(), unsigned{e.server},
                             e.class_code);
                 if (e.faction != 0) std::printf(" faction %u", unsigned{e.faction});
+                if (e.side != 0) std::printf(" side %u", unsigned{e.side});
+                // The mask as its bytes come on the wire, byte 0 first.
+                std::printf(" mask %02x%02x%02x%02x flags %02x", e.mask & 0xFFu, (e.mask >> 8) & 0xFFu,
+                            (e.mask >> 16) & 0xFFu, (e.mask >> 24) & 0xFFu, unsigned{e.flags});
                 if (e.combat_power != 0) std::printf(" cp %u", e.combat_power);
                 if (e.has_position) {
                     std::printf(" at %.0f %.0f %.0f", static_cast<double>(e.position.x),
@@ -298,6 +341,8 @@ void Report::on_event(const proto::ParsedEvent& pe, const meter::CombatantRegist
                 std::printf("%+.3f  death     %s\n", t, who(e.id, reg).c_str());
             } else if constexpr (std::is_same_v<T, proto::LeftView>) {
                 std::printf("%+.3f  left view %s reason %u\n", t, who(e.id, reg).c_str(), unsigned{e.reason});
+            } else if constexpr (std::is_same_v<T, proto::WarMode>) {
+                std::printf("%+.3f  war_mode  %s %s\n", t, who(e.id, reg).c_str(), e.on ? "on" : "off");
             } else if constexpr (std::is_same_v<T, proto::MapLoad>) {
                 std::printf("%+.3f  map       %u%s (load %u)%s connection %u\n", t, e.map_id,
                             map_suffix(e.map_id).c_str(), e.load_count, game::is_dungeon(e.map_id) ? " instance" : "",

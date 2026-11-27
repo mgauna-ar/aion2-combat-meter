@@ -18,8 +18,8 @@ A fourth window you place like the meter's (unlock with Ctrl+Alt+L, drag, resize
   the strongest.
 - **Your target** is the player you last used a skill on, for half a minute after it.
   In the list, their row carries a red stripe and a bold name. Hitting an enemy makes
-  them your target too; a heal that lands on an ally on its own (a passive's, a
-  spirit's) does not move it, and one you cast on them does.
+  them your target too; a heal that lands on an ally (a passive's, a spirit's) does
+  not move it.
 - **In a crowd** (a town, the open world) the list is the strongest players in your
   view, as many as **List up to** (8 unless you change it), with
   "+N more" under them. A target who is not among them shows on a line of their own
@@ -29,20 +29,22 @@ A fourth window you place like the meter's (unlock with Ctrl+Alt+L, drag, resize
   come back.
 - **A player who dies** fades in the list until they are gone, and an enemy stops
   leading it.
-- **Enemies come first, in red.** A player of the other faction has a red name and
-  leads the list, ahead of your own faction's, from the moment they come into
-  view: before they have done anything. See below for who counts as an enemy.
+- **Enemies come first, in red.** An enemy has a red name and leads the list, ahead
+  of everyone else. One of the other faction, or of the other side in the Abyss, is
+  marked from the moment they come into view, before they have done anything;
+  anyone else from the first skill between you. See below for who counts as an
+  enemy.
 - **Sorted by distance** (a switch on the page, off unless you turn it on) the list
   is the nearest players instead, each with how far they are in metres, in a yellow
   badge right of the bars; it fades when it is more than 5 s old (see below). The bars
   still compare combat power. See below for what the distance is measured from.
 
 ![The combat power overlay sorted by distance: an enemy 38 metres away in red at the top, then the two nearest players of your own faction, and nine more counted](../../docs/images/overlay-combat-power-distance.png)
-- **Only enemies** (a switch on the page, off unless you turn it on) lists players
-  of the other faction alone: every one in view, near or far, the ones within 200 m
-  first, a dead one dimmed until they leave. Your target still shows, whoever they
-  are, on a line of their own when they are not an enemy: that is how an arena
-  opponent of your own faction shows (see below). "+N more" then counts enemies.
+- **Only enemies** (a switch on the page, off unless you turn it on) lists enemies
+  alone: every one in view, near or far, the ones within 200 m first, a dead one
+  dimmed until they leave. Your target still shows, whoever they are, on a line of
+  their own when they are not an enemy (a member of your party). "+N more" then
+  counts enemies.
 - **Hide when empty** (with the overlay's other conditions) hides it, while locked,
   when it has no one to show: no target, and no one in the list. With "Only
   enemies", it stays out of the way until an enemy comes into view.
@@ -77,18 +79,31 @@ A fourth window you place like the meter's (unlock with Ctrl+Alt+L, drag, resize
 
 - **The other faction.** Every player's record says which of the two factions they
   are, and so does yours. A player whose faction is not yours is an enemy.
-- **Not in a dungeon, and never your party.** Dungeon parties mix both factions, so
-  no one is marked there, and a member of your party is never marked anywhere. An
-  arena or a battlefield is no such dungeon: the other faction there is marked.
-- **Not an arena opponent of your own faction.** Only the faction is read: someone
-  you duel from your own side shows like anyone else. With "Only enemies" on, they
-  show as your target once you use a skill on them, for half a minute after it.
+- **In the Abyss, the other side, whatever the faction.** The Abyss can pair your
+  faction against itself (Elyos against Elyos). There every player's record also
+  says which side they fight on, and so does yours: one on the other side is an
+  enemy from the moment they come into view, and one on yours is not, whatever
+  their faction. In one such match the only player of the other side turned red two
+  seconds before their first skill landed on you.
+- **Anyone who fights you or your party.** A skill they use on you or a member of
+  your party, or you or a member on them, marks them, whatever their faction, until
+  you change map: an arena opponent of your own faction, for one. The game sends
+  heals and buffs as cast on the healer, never aimed at another player, so a skill
+  aimed at a player is taken for an attack. A passive going off, or a skill between
+  two others, marks no one.
+- **Never your party, and not by faction in a dungeon.** A member of your party is
+  never marked, whatever their faction or side. Dungeon parties mix both factions,
+  so the faction marks no one there. An arena or a battlefield is no such dungeon:
+  the other faction there is marked.
+- **Rifts: War Mode is not read yet.** In a rift, a player of the other faction with
+  War Mode off cannot attack you or be attacked, but is marked all the same: how the
+  game says another player's War Mode has not been found yet.
 - **Out of reach, they lose their place, not their colour.** An enemy more than
   200 m from where you last used a skill stops leading the list, as does one who is
   dead. Their name stays red.
 - **Until the game has sent your own record** (the meter started while you were
-  already on a map) your faction is not known, and no one is marked. It comes with
-  the next map.
+  already on a map) your faction and your side are not known, and no one is marked
+  by them: only by a fight. They come with the next map.
 - "Enemies first" on the page turns the ordering off; the red names stay.
 
 ## How distance is measured, and where it falls short
@@ -130,8 +145,8 @@ and saves as you go.
 | `scale` | 1.0 | Size, 0.6 to 2.5, on top of the monitor's DPI scaling. |
 | `x`, `y`, `width`, `height` | -1, -1, 260, 190 | Position and size in screen pixels. -1, -1 places it right of the ping overlay's default spot. |
 | `show_list` | true | List the map's players, strongest first. Off, only your target shows. |
-| `enemies_first` | true | Players of the other faction lead the list while within 200 m. Off, the list is the strongest (or the nearest) of everyone. Their names are red either way. |
-| `only_enemies` | false | List only players of the other faction, near or far, alive or dead. Your target shows whoever they are. |
+| `enemies_first` | true | Enemies (Who counts as an enemy, above) lead the list while within 200 m. Off, the list is the strongest (or the nearest) of everyone. Their names are red either way. |
+| `only_enemies` | false | List only enemies, near or far, alive or dead. Your target shows whoever they are. |
 | `sort_by_distance` | false | List the nearest players first, each with its distance, instead of the strongest. |
 | `list_max_players` | 8 | The most players listed, 1 to 12. With more on the map, these are the strongest (the nearest, with `sort_by_distance`), and a count of the rest follows. |
 | `hide_when_game_unfocused` | false | Hide it while neither the game nor the meter's window is in front, and while the game is not running. Applies only while locked. |

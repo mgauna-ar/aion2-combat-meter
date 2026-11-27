@@ -183,12 +183,13 @@ struct PowerSettings {
     /// Distances are from where the local player last acted
     /// (combat_power::PowerTracker, Distance).
     bool sort_by_distance{false};
-    /// Players of the other faction lead the list, whatever its order. Their names
+    /// Enemies (combat_power::PowerTracker, An enemy: the other faction, the other
+    /// Abyss side, whoever fought) lead the list, whatever its order. Their names
     /// are red either way.
     bool enemies_first{true};
-    /// The list holds players of the other faction alone, near or far, alive or
-    /// dead, in the list's own order. The target still shows, whoever they are: an
-    /// arena's opponent of the local player's own faction is no enemy by faction.
+    /// The list holds enemies alone, near or far, alive or dead, in the list's own
+    /// order. The target still shows, whoever they are: a party member aimed at is
+    /// no enemy.
     bool only_enemies{false};
     /// As the meter overlay's: while locked, only in a dungeon, and hidden while
     /// neither the game nor one of the meter's windows is in front.
