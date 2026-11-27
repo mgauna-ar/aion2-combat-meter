@@ -10,7 +10,7 @@ self-update. What a user sees and sets is in this plugin's [`README.md`](README.
 on the engine thread and the capture clock: identities (`33 36`, `45 36`), casts
 (`02 38`), damage (`04 38`), own values (`00 8D`), map loads (`21 36`), the party's roster (`02 97`), and for
 distance the movement packets and effects (`2a 38`, `2b 38`). It keeps its own record
-of who is on the map: no fight, no side, no NPC.
+of who is on the map, and who fought whom there: no fight of the meter's, no NPC.
 
 The app draws it: the combat power overlay (`src/app/src/power_view.cpp`) and the
 Combat Power page (`src/app/src/ui/view_power.cpp`).
@@ -78,12 +78,14 @@ carried no figure shows "-".
 - **A hit on anyone else only renews the target it lands on.** `04 38` carries heals
   too (the repository's Protocol, Damage), and a passive's or a spirit's heal on an
   ally, with no press behind it, took the target off the enemy being fought. A
-  same-faction arena opponent is named by the presses on them, and kept by the hits.
+  same-faction arena opponent is an enemy from the first press between them (Enemies,
+  below), so their hits aim too.
 - **A press on anything else lets go:** a monster, an object. A hit on a monster
   does not, since an area skill hits whatever stands beside a player.
 - **Not a press:** someone else's skill, a self-cast, a passive going off (mode 0).
-- **An ally is a target too:** a heal pressed on a party member names them. The
-  target is whoever was aimed at, enemy or not.
+- **A party member is a target too, and the one target that is no enemy:** a press
+  on anyone else marks them as fought (Enemies, below). No capture has shown a heal
+  aimed at another player: the game sends heals aimed at their caster.
 
 ## 📋 The list
 
@@ -115,10 +117,10 @@ carried no figure shows "-".
 - **Only enemies** (`only_enemies`): the view lists `enemies` instead, the
   snapshot's hostile players, near or far, alive or dead, in the same orders (by
   distance: the threats first, then nearest). "+N more" counts
-  `enemies_in_view`. **The target stays, whoever they are.** The plugin reads only
-  the faction, so an arena's opponent of the local player's own is no enemy to it
-  (Only the faction, below), and being the target is the one way they show. A
-  healed ally shows too; the user chose that over losing the opponent.
+  `enemies_in_view`. **The target stays, whoever they are:** a party member aimed
+  at shows on a line of their own. It was how an arena's opponent of the local
+  player's own faction showed, before a fight marked them (Enemies, below); the
+  user chose it over losing the opponent.
 - **Hide when empty** (`hide_when_empty`): while locked, `power_shown` hides the
   overlay when `power_layout(...).empty()` (no target, no rows), which the UI thread
   works out each frame into `OverlayConditions::power_empty`.
@@ -130,17 +132,56 @@ carried no figure shows "-".
 
 ## ⚔️ Enemies (`enemies_first`)
 
-- **Hostile** (`PowerRow::hostile`) is a player whose faction (`Identity::faction`)
-  is known and is not the local player's, outside a dungeon (`game::is_party_instance`:
-  600000 and up, so not an arena or a battlefield, whose other side is inside)
-  and outside the local player's party (the last `02 97`, by name).
-  - The dungeon rule is not caution: two of the dungeon capture's party were of the
-    other faction. The roster rule covers a mixed party anywhere else.
-  - The local player's faction is their own record's, kept across maps and ids: it
-    is the character's. Unknown until one is seen, and then no one is hostile.
-- **Known on sight.** The faction comes with the record that brings a player into
-  view, so they are marked before they act. That is the feature: do not make it
-  wait on a hit or a cast.
+- **Hostile** (`PowerRow::hostile`; why in `PowerRow::enemy_by`) is asked in this
+  order (`PowerTracker::enemy_by`):
+  1. **A member of the local player's party** (the last `02 97`, by name) never is,
+     whatever else is said of them.
+  2. **Fought** (`EnemyBy::Fight`): a skill pressed (`02 38`, mode 2) by the local
+     player or a party member on them, or by them on one of those, on this map.
+     Whatever their faction or side, in a dungeon too.
+  3. **Side** (`EnemyBy::Side`): where both the local player's Abyss side and theirs
+     are known (`Identity::side`, the repository's Protocol, Identity), one on the
+     other side, whatever their faction.
+  4. **Faction** (`EnemyBy::Faction`): else one whose faction (`Identity::faction`)
+     is known and is not the local player's, outside a dungeon
+     (`game::is_party_instance`: 600000 and up, so not an arena or a battlefield,
+     whose other side is inside).
+- **Why the side:** the Abyss pairs servers, and can pair a faction against itself.
+  The user was matched Elyos against Elyos (2026-11-27), and the faction marked no
+  one. In that capture all 22 records read faction 1; 21 read side 2, the local
+  player's, and 1 read side 1: the one player who fought them, 2.2 s after their
+  record came. In the Nov 13 Abyss capture, both factions meeting, the side was the
+  faction in all 67 records.
+- **Why a press:** in every capture, a press of one player's that named another
+  player was an attack: the arena's opponent of the local player's own faction 122
+  on them and 160 back, map 20's 42 and 22 across the factions and 33 between others,
+  the same-faction Abyss's side-1 player 19 on them and 9 back. Heals and buffs come
+  back aimed at their caster: the Ludra capture's Cleric and two Chanters named no
+  other player in 7,676 casts, while 978 of their heal records (`04 38`) landed on
+  the party, and the dungeon capture's party named none either. A `04 38` proves
+  nothing: it carries heals. The user's call (2026-11-27): a fight marks them until
+  the map changes.
+  - **Not a press:** a passive going off (mode 0), a self-cast, a press between two
+    others, a press on a dead player (a corpse would be raised, not hurt, should the
+    game ever aim one), a press over an older connection.
+  - **By character** (`m_fought`, name@server): one who fought, left view and came
+    back under a new id is still marked; another character on their old id is not.
+  - **The map's:** forgotten with another map or a newer connection; a reload of the
+    same map keeps it (the same as the players, Who is on the map).
+- **The sides are the map's too.** The local player's comes with each own record (0
+  off the Abyss), and goes with another map, but for a record said in the
+  `kEarlyArrival` before its `21 36`; a player's with each of their records. Until the
+  local player's own record says theirs on a map (the meter started mid-map), the
+  faction decides there.
+- The dungeon rule is not caution: two of the dungeon capture's party were of the
+  other faction. The roster rule covers a mixed party anywhere else.
+- The local player's faction is their own record's, kept across maps and ids: it is
+  the character's. Unknown until one is seen, and then no one is marked but by a
+  fight.
+- **Known on sight.** The faction and the side come with the record that brings a
+  player into view, so they are marked before they act. That is the feature: do not
+  make them wait on a hit or a cast. A fight is the one mark that waits, for those
+  neither says: an arena's opponent of the local player's own faction.
 - **A threat** (`PowerRow::threat`) is a hostile player within `kEnemyRange`
   (200 m), or at no known distance. Threats lead the orders with `enemies_first`,
   ahead of the cut at `kMaxListed`, so a crowd of stronger or nearer allies never
@@ -159,9 +200,12 @@ carried no figure shows "-".
   - It leans on the local player's position, stale as that can be (below): an
     enemy may keep or lose the lead a little late. The red name does not depend
     on it.
-- **Only the faction.** An arena's opponent of the local player's own faction is
-  not hostile, nor a battlefield's team: no rule for them yet (the repository's
-  Unknowns).
+- **Not yet: War Mode.** In a rift, a player of the other faction with War Mode
+  off can neither attack nor be attacked, and is marked all the same. The game's
+  word for another player's War Mode has not been found (the repository's Unknowns);
+  the user's call (2026-11-27) is to keep them marked until it is.
+- **A battlefield's teams** are told apart by the faction, and by a fight: whether a
+  battlefield sends a side is not known.
 - **The view** (`power_layout`) lists the threats first, or with `enemies_first`
   off everyone in one order: the strongest or the nearest of all, whatever their
   faction. The red name is drawn either way.
@@ -216,5 +260,7 @@ carried no figure shows "-".
 ## 🧪 Tests
 
 `tests/test_combat_power.cpp` (the tracker, the layout) and `tests/test_parser.cpp`
-(the record's end, built by `wire::player_body` in each shape the capture showed). To check a
-real capture: `aion2meter-replay <capture> --events` prints `cp N` per player.
+(the record's end, built by `wire::player_body` in each shape the capture showed, and
+the side). To check a real capture: `aion2meter-replay <capture> --events` prints
+`cp N`, `faction`, `side`, `mask` and `flags` per player, and `--enemies` who the
+plugin takes for an enemy, when, and why (side, fought, faction).

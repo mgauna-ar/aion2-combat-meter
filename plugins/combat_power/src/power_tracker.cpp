@@ -7,6 +7,7 @@
 #include <cmath>
 #include <cstddef>
 #include <iterator>
+#include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -49,6 +50,11 @@ struct ListKey {
     return a.id < b.id;
 }
 
+/// A character, as the server tells them apart: ids are the map's and handed on.
+[[nodiscard]] std::string character_key(const PowerRow& row) {
+    return row.name + '@' + std::to_string(row.server);
+}
+
 /// Every order the view can list in, the first the snapshot's own.
 constexpr ListOrder kOrders[] = {{false, true}, {false, false}, {true, true}, {true, false}};
 
@@ -84,6 +90,8 @@ bool PowerTracker::follow(uint32_t connection) {
         m_local = 0;
         m_map_id = 0;
         m_has_local_position = false;
+        m_local_side = 0;
+        m_fought.clear();
     }
     return true;
 }
@@ -97,6 +105,9 @@ void PowerTracker::on_identity(const proto::Identity& identity, uint32_t connect
         if (m_local != identity.id) m_has_local_position = false;
         m_local = identity.id;
         if (identity.faction != 0) m_local_faction = identity.faction;
+        // The map's: none off the Abyss, so every own record says it.
+        m_local_side = identity.side;
+        m_local_record_ts = ts;
         // The id was someone else's on the map before.
         if (m_players.erase(identity.id) != 0 && m_target == identity.id) m_target = 0;
         if (identity.has_position) place(identity.id, identity.position, ts);
@@ -144,17 +155,62 @@ void PowerTracker::on_identity(const proto::Identity& identity, uint32_t connect
         player.faction = 0;
     }
     if (identity.faction != 0) player.faction = identity.faction;
+    // Each record says the side, or that there is none (off the Abyss).
+    player.side = identity.side;
+    // Fights are the character's: one who fought, left view and came back is
+    // still marked, and a new holder of the id is not.
+    player.fought = m_fought.contains(character_key(player.row));
     if (identity.has_position) {
         player.has_position = true;
         player.at = identity.position;
     }
 }
 
-bool PowerTracker::hostile(const Player& player) const {
-    if (m_local_faction == 0 || player.faction == 0 || player.faction == m_local_faction) return false;
+EnemyBy PowerTracker::enemy_by(const Player& player) const {
+    // The party fights alongside, whatever else is said of them.
+    if (m_party.contains(player.row.name)) return EnemyBy::None;
+    // A press between players was an attack in every capture, a dungeon's too
+    // (none was seen there), whatever the faction or the side.
+    if (player.fought) return EnemyBy::Fight;
+    // The Abyss: each record says the side, and a pairing can put a faction
+    // against itself, which the faction would not tell.
+    if (m_local_side != 0 && player.side != 0) return player.side != m_local_side ? EnemyBy::Side : EnemyBy::None;
+    if (m_local_faction == 0 || player.faction == 0 || player.faction == m_local_faction) return EnemyBy::None;
     // A dungeon's party mixes both factions, and no one else is in there.
-    if (game::is_party_instance(m_map_id)) return false;
-    return !m_party.contains(player.row.name);
+    if (game::is_party_instance(m_map_id)) return EnemyBy::None;
+    return EnemyBy::Faction;
+}
+
+bool PowerTracker::ours(EntityId id) const {
+    if (id == 0) return false;
+    if (id == m_local) return true;
+    const auto player = m_players.find(id);
+    return player != m_players.end() && m_party.contains(player->second.row.name);
+}
+
+void PowerTracker::note_fight(EntityId caster, EntityId target) {
+    if (ours(caster)) {
+        mark_fought(target);
+    } else if (ours(target)) {
+        mark_fought(caster);
+    }
+}
+
+void PowerTracker::mark_fought(EntityId id) {
+    const auto found = m_players.find(id);
+    if (found == m_players.end()) return;
+    Player& player = found->second;
+    // The party fights alongside; and a press on a corpse would raise it, not hurt
+    // it, should the game ever aim one.
+    if (player.fought || player.row.dead || m_party.contains(player.row.name)) return;
+    if (m_fought.size() >= kMaxPlayers) return;
+    m_fought.insert(character_key(player.row));
+    player.fought = true;
+}
+
+void PowerTracker::forget_fights() {
+    m_fought.clear();
+    for (auto& entry : m_players) entry.second.fought = false;
 }
 
 bool PowerTracker::threat(const Player& player, bool measurable) const {
@@ -246,6 +302,8 @@ void PowerTracker::on_cast(const proto::SkillCast& cast, uint32_t connection, Mi
     // Another connection's ids are another map's: its caster is someone else here.
     if (!current(connection)) return;
     learn_class(cast.caster, cast.skill);
+    // Not a passive going off (mode 0) nor a self-cast: a press aimed at someone.
+    if (cast.pressed && cast.target != cast.caster) note_fight(cast.caster, cast.target);
     if (m_local == 0 || cast.caster != m_local || !cast.pressed) return;
     // A self-cast says nothing of the target.
     if (cast.target == 0 || cast.target == m_local) return;
@@ -272,11 +330,27 @@ void PowerTracker::on_map_load(const proto::MapLoad& map, uint32_t connection, M
         if (!m_players.contains(m_target)) m_target = 0;
         // Theirs too can come ahead of the load: their own record does.
         if (m_local_at_ts + kEarlyArrival < ts) m_has_local_position = false;
+        if (m_local_record_ts + kEarlyArrival < ts) m_local_side = 0;
+        // A fight is the map's: on the next, they may be on the same side.
+        forget_fights();
     }
     m_map_id = map.map_id;
 }
 
 void PowerTracker::clear() { *this = PowerTracker{}; }
+
+std::vector<PowerRow> PowerTracker::all_enemies() const {
+    std::vector<PowerRow> out;
+    for (const auto& entry : m_players) {
+        const EnemyBy by = enemy_by(entry.second);
+        if (by == EnemyBy::None) continue;
+        PowerRow row = entry.second.row;
+        row.enemy_by = by;
+        row.hostile = true;
+        out.push_back(std::move(row));
+    }
+    return out;
+}
 
 PowerSnapshot PowerTracker::snapshot(Micros now) const {
     PowerSnapshot s;
@@ -291,7 +365,8 @@ PowerSnapshot PowerTracker::snapshot(Micros now) const {
     // A row with its distance worked out: only for the few a snapshot carries.
     const auto row_of = [&](const Player& player) {
         PowerRow row = player.row;
-        row.hostile = hostile(player);
+        row.enemy_by = enemy_by(player);
+        row.hostile = row.enemy_by != EnemyBy::None;
         row.threat = threat(player, measurable);
         if (measurable && player.has_position) row.distance_m = metres_between(player.at, m_local_at);
         return row;
@@ -305,7 +380,7 @@ PowerSnapshot PowerTracker::snapshot(Micros now) const {
     struct Ranked {
         const Player* player;
         ListKey key;
-        bool hostile;
+        EnemyBy by;
     };
     std::vector<Ranked> everyone;
     everyone.reserve(m_players.size());
@@ -315,7 +390,7 @@ PowerSnapshot PowerTracker::snapshot(Micros now) const {
         everyone.push_back(Ranked{&player,
                                   ListKey{threat(player, measurable), player.row.combat_power, distance,
                                           player.row.name, player.row.id},
-                                  hostile(player)});
+                                  enemy_by(player)});
     }
     s.hostile_in_view = static_cast<uint32_t>(
         std::count_if(everyone.begin(), everyone.end(), [](const Ranked& r) { return r.key.threat; }));
@@ -342,7 +417,8 @@ PowerSnapshot PowerTracker::snapshot(Micros now) const {
         out.reserve(kept.size());
         for (const Ranked& r : kept) {
             PowerRow row = r.player->row;
-            row.hostile = r.hostile;
+            row.enemy_by = r.by;
+            row.hostile = r.by != EnemyBy::None;
             row.threat = r.key.threat;
             row.distance_m = r.key.distance_m;
             out.push_back(std::move(row));
@@ -354,7 +430,8 @@ PowerSnapshot PowerTracker::snapshot(Micros now) const {
     // The enemies on their own: a crowd's cut keeps those that lead, not those out
     // of range or dead, who still have their red name.
     std::vector<Ranked> enemies;
-    std::copy_if(everyone.begin(), everyone.end(), std::back_inserter(enemies), [](const Ranked& r) { return r.hostile; });
+    std::copy_if(everyone.begin(), everyone.end(), std::back_inserter(enemies),
+                 [](const Ranked& r) { return r.by != EnemyBy::None; });
     s.enemies_in_view = static_cast<uint32_t>(enemies.size());
     s.enemies = listable(enemies);
     return s;

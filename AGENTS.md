@@ -247,7 +247,7 @@ threads with a FileSource.
 
 ---
 
-## 📡 Protocol (Global client; from the community's notes, checked against four captures)
+## 📡 Protocol (Global client; from the community's notes, checked against six captures)
 
 All of it lives in `src/protocol`. `opcodes.hpp` is the one place opcodes are spelled.
 
@@ -265,6 +265,12 @@ A fourth, the PvP capture: five minutes on map 20 (Chaotic Lower Reshanta, in th
 Abyss) with both factions in view, 71
 player records, and a fight between the local player and one of the other faction.
 It gave the faction (Identity, below).
+
+A fifth and a sixth (2026-11-27), of 100 s each: a login in town, a teleport and
+War Mode switched on (`pvp-mode-switch`); and maps 23 and 20 of the Abyss in a
+match the Abyss made of Elyos against Elyos, the local player's faction against
+itself (`abyss-same-faction`). They gave War Mode's `54 36` and the Abyss side
+(Identity, below).
 
 **Transport**
 - TCP, server port 13328.
@@ -438,8 +444,20 @@ It gave the faction (Identity, below).
     by skill, for 97.2% of them.
   - **NPCs' too:** 11,868 records carried 7-digit codes, 10,355 in mode 2. Nothing
     reads them yet.
+  - **Between two players, only attacks.** In every capture, a press (mode 2) whose
+    target was another player was an attack: the arena's opponent, of the local
+    player's own faction, 122 on them and 160 back; map 20's 42 and 22 across the
+    factions and 33 between others; the same-faction Abyss's one foe 19 on them and
+    9 back. Heals and buffs come back aimed at their caster: the Ludra capture's
+    Cleric and two Chanters named no other player in 7,676 casts, while 978 of
+    their heal records (04 38) landed on the party; nor did the dungeon capture's
+    party. The Combat Power plugin takes such a press for a fight
+    (plugins/combat_power/AGENTS.md, Enemies).
 - **Identity `33 36` (own) / `45 36` (other):** id varint, mask u32, flags u8 (bit 0:
   has a name), name length u8, name, server u16, a u32 read as the class.
+  - **The flags** (`Identity::flags`): 0x07 in every 45 36 of a town, the arena and
+    the dungeons (278), 0x17 in every one in the Abyss (89); the local player's own
+    0x37, and 0x3F in the Abyss. The added bit says the side follows (below).
   - 33 36 has a u16 of unknown meaning between the name and the server: 1406 in
     all three of the second capture's, whose server was 9 where the same name turned
     up in other packets. Read as the server, it made the local player a character of
@@ -460,7 +478,27 @@ It gave the faction (Identity, below).
       (16 records). The faction alone makes no one an enemy there.
     - The fourth byte of 45 36's (1 or 2, either with either faction) is their
       gender, most likely; unconfirmed.
-    - Which of 1 and 2 is the Elyos is not settled by one page; nothing needs it.
+    - **1 is the Elyos:** the user, who plays one (2026-11-27), reads 1 in every
+      capture.
+  - **The Abyss side** (`Identity::side`: 1 or 2): the side a player fights on in
+    the Abyss. In 45 36 the byte after the class, there when the flags have 0x10;
+    in 33 36 in a list 133 bytes after the class, `05 <side> 03 01 7f` (`05 03 01
+    7f` without it, `7e` in Ludra's), there when the flags have 0x08. Read nowhere
+    else in the captures.
+    - **It is not the faction.** Where the two factions meet (the PvP capture) the
+      side was the faction in all 67 records, the local player's 1. In the
+      same-faction Abyss capture all 22 records read faction 1; 21 read side 2, the
+      local player's, and 1 read side 1: the one player who fought them (Cast,
+      above), whose record came 2.2 s before their first skill.
+    - The Combat Power plugin takes the other side for an enemy, whatever the
+      faction (plugins/combat_power/AGENTS.md, Enemies).
+  - **The mask** (`Identity::mask`, kept as sent; its bits are not known). Byte 0 of
+    the local player's own was 0x5f in their 9 records from Oct 17 to Nov 18 and
+    0x5e in the same-faction Abyss capture's 3, War Mode on (the user), and 0xde in
+    the pvp-mode-switch capture's 2, before they turned it on: bit 0x80 set with it
+    off, clear with it on. No other player's record seen (~570) has 0x80 set (War
+    Mode, below). Bit 0x01 went from set to clear between Nov 18 and Nov 27, War
+    Mode or not: the Nov 25 patch, perhaps.
   - `scan_identities` finds record look-alikes in packets the parser does not read.
     The meter names no one by them: in the second capture 16 of its 38 carried a real
     character's name, none with that character's id. They came in bursts with the
@@ -589,6 +627,14 @@ It gave the faction (Identity, below).
       fight 19 deaths came that way, each back up 3 to 17 s later, at full HP.
     - A killing hit can carry 0: the local player's did there (a heavy hit by the boss),
       though the same skill hit others for 77,635 and more.
+  - **War Mode `54 36`** (`WarMode`): id varint, then a u8, 01 for on. A player's
+    War Mode (the game's switch for fighting the other faction outside the Abyss;
+    NCSOFT's notes have it switched in a faction's own lands, 70 minutes apart at
+    most) switched: in the pvp-mode-switch capture the local player's id and 01, as they
+    turned it on. `53 36` came in the same instant, to them alone: `01 00 00 01`,
+    then the server's Unix ms, equal to the heartbeat's to the millisecond (the
+    switch's time, for its cooldown, perhaps); not decoded. Neither appears in
+    another capture.
   - **Left view `47 36`:** id varint, a byte, a byte (00 in most; 4F or 46 in a
     few). Someone left the local player's view; whoever comes back is sent again.
     - In the PvP capture 62 of its 68 named players (53 of the 58 there). Of the 15
@@ -779,13 +825,14 @@ the three captures read as a point on their map):
   flags byte whose low four bits are 2 or 6 (D2, 52, 92, 12, D6), then x, y, z. In
   `45 36` that is straight after the class; in `33 36`, 154 bytes on. So the local
   player's position is known on entering each map.
-  - **On map 20 one byte more comes before the flags byte,** in both records. In
-    45 36 it is the faction again, straight after the class. In 33 36 it is in a
-    list that ends some 20 bytes before the position (`05 01 03 01 7f ...` where
-    other maps had `05 03 01 7f ...`), the byte before the flags 80 still. The
-    reader finds the flags byte in either place (`read_identity_position`); read two
-    bytes after the class as on other maps, that capture's records put their
-    players at or near the origin.
+  - **In the Abyss one byte more comes before the flags byte,** in both records:
+    the side (Identity, above), which the record's own flags announce. In 45 36 it
+    is straight after the class. In 33 36 it is in a list that ends some 20 bytes
+    before the position (`05 01 03 01 7f ...` where other maps had `05 03 01 7f
+    ...`), the byte before the flags 80 still. The reader finds the flags byte in
+    either place (`read_identity_position`); read two bytes after the class as on
+    other maps, the PvP capture's records put their players at or near the
+    origin.
   - **The byte before the flags never passed as one:** 00, 80, 88 or C0 in every
     record of the captures. Should one, the point decides: read a byte early, a
     point's floats are cut across, and an axis comes out under a unit (-47,736 read
@@ -898,17 +945,29 @@ the three captures read as a point on their map):
   the shard needs a capture with it switched on and off;
 - **the byte some listed effects carry before their position** (Identity, above), and
   what decides it;
-- **what the faction does not say.** A player of the other faction is told apart
-  (Identity, above), and the Combat Power plugin marks them. Still open: who is an
-  enemy where the faction is not the line (an arena's opponent of the local
-  player's own, a battlefield's teams), and whether any map but a dungeon mixes
-  the factions as allies. The Combat Meter does not use the faction yet: to it
-  they are players like the party, so a PvP fight starts nothing and a hit on them
-  counts for nothing (plugins/combat_meter/AGENTS.md, Party and Healing);
-- what the extra byte in a player's record on map 20 marks: map 20 is Chaotic
-  Lower Reshanta, the Abyss, where both factions meet;
+- **who is an enemy where neither the faction nor the side says.** The Combat Power
+  plugin marks the other faction, the other Abyss side, and whoever fights the
+  local player or their party (plugins/combat_power/AGENTS.md, Enemies). Still
+  open: a battlefield's teams before they fight (an arena's record carries no
+  side), whether a rift sends a side, and whether any map but a dungeon mixes the
+  factions as allies. The Combat Meter uses none of these yet: to it they are
+  players like the party, so a PvP fight starts nothing and a hit on them counts
+  for nothing (plugins/combat_meter/AGENTS.md, Party and Healing);
+- **other players' War Mode.** In a rift, a player of the other faction with War
+  Mode off can neither attack nor be attacked (the user). The local player's own is
+  in their record's mask, bit 0x80 of byte 0 (Identity, above), but no other
+  player's seen has that bit set, so it is not known whether theirs is there, nor
+  whether `54 36` comes for another player who switches in view. A rift capture with players known to be in
+  and out of War Mode would settle it (`--events` prints each record's `mask`,
+  `flags` and `side`). Until then the Combat Power plugin marks the other faction
+  whatever their War Mode, the user's call (2026-11-27);
+- **the block in the local player's own record that says where they are:** `0e`, a
+  byte, the map id (u16, twice, apart), two sub-zone ids (u16 each, 2103 and 2103
+  before a teleport within map 1010, 2082 and 2103 after), then their position.
+  The byte went 00 to 02 with that teleport, War Mode still off. Other players'
+  records have no such block;
 - **whether the local player's position always sits 154 bytes on in 33 36.** The
-  bytes before it end in a list, a byte longer on map 20. A faction-2 character's,
+  bytes before it end in a list, a byte longer in the Abyss (the side). A faction-2 character's,
   or one with more in that list, may run longer still, and the reader looks in two
   places only. Every own record of the captures is one faction-1 character's;
 
@@ -934,7 +993,7 @@ capture, one tray and one updater, around them.
 | Combat Meter | `plugins/combat_meter` | fights: damage, healing, damage taken, the boss, the history; the meter overlay | on |
 | Auras | `plugins/auras` | effects on the local player and theirs on their target, their cooldowns; the aura overlay | off |
 | Ping | `plugins/ping` | the latency to the game server off the game's own pong, the heartbeats' jitter, a graph; the ping overlay | off |
-| Combat Power | `plugins/combat_power` | other players' combat power as the game sends it: the target's, and the strongest in view (all of an arena's or a dungeon's), or the nearest, the other faction's first and in red; the combat power overlay | off |
+| Combat Power | `plugins/combat_power` | other players' combat power as the game sends it: the target's, and the strongest in view (all of an arena's or a dungeon's), or the nearest, enemies first and in red (the other faction, the other Abyss side, whoever fights the local player or their party); the combat power overlay | off |
 
 - **One table names them.** `include/aion2/plugin_registry.hpp` holds each plugin's id,
   name, description, config section and default switch; the sidebar, the dashboard,
@@ -1046,6 +1105,7 @@ public: GitHub's API shows a private repository's releases to no anonymous calle
 | `make fixtures` | anywhere | Your own captures against their `.expected.txt`. |
 | `aion2meter-replay --deaths --active --effects` | anywhere | A capture's fight detail, to check against what happened in game. |
 | `aion2meter-replay --ping` | anywhere | A capture's pongs, and per connection how their echo and the heartbeats spread. |
+| `aion2meter-replay --enemies` | anywhere | Who the Combat Power plugin takes for an enemy, when, and why: their side, a fight, their faction. |
 | CI `build-windows` | GitHub | The only MSVC build: the app, ctest, the replay smoke test, the zip. |
 | CI `installer` | GitHub (windows-2022, which has NSIS) | The installer around that exe, installed and uninstalled on the runner (`try-installer.ps1`). The release job takes the SHA-256 of every asset. |
 

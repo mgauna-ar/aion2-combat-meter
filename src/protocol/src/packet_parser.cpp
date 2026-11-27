@@ -229,9 +229,10 @@ std::optional<Position> read_position(ByteReader& r, uint16_t op) {
 /// Where a player's record (33 36, 45 36) says they stand, read after its class.
 /// - A byte, a flags byte (position_flags), then x, y, z: straight after the class
 ///   in another player's record, 154 bytes on in the local player's own.
-/// - On the fourth capture's map (20, both factions in view) one byte more comes
-///   before them, in both records: read as the position there, it put everyone at
-///   the origin. So the flags byte is the first or the second looked at.
+/// - In the Abyss one byte more comes before them, in both records: the side
+///   (Identity::side, which the record's own flags announce). Read as the position
+///   there, it put everyone at the origin. So the flags byte is the first or the
+///   second looked at.
 /// - The byte before the flags (00, 80, 88 or C0 in every record of the captures)
 ///   never passed as one. Should a byte that does come first, the point decides:
 ///   the reading whose every axis is a unit or more (whole_units), the first when
@@ -451,6 +452,7 @@ void PacketParser::parse(const Frame& frame, std::vector<ParsedEvent>& out) {
         case opcode::Spawn:
         case opcode::Death:
         case opcode::LeftView:
+        case opcode::WarMode:
         case opcode::MapLoad:
         case opcode::Damage:
         case opcode::Tick:
@@ -551,6 +553,15 @@ bool PacketParser::parse_known(const Frame& frame, std::vector<ParsedEvent>& out
             const uint8_t reason = r.u8();
             if (!r.ok() || id == 0) return false;
             emit(LeftView{id, reason});
+            return true;
+        }
+        case opcode::WarMode: {
+            // The id, then 01 for on: the one seen. Any other shape is counted as a
+            // failure, to be looked at, rather than guessed at.
+            const EntityId id = normalize_entity_id(r.varint());
+            const uint8_t state = r.u8();
+            if (!r.ok() || !r.at_end() || id == 0 || state > 1) return false;
+            emit(WarMode{id, state == 1});
             return true;
         }
         case opcode::MapLoad: {

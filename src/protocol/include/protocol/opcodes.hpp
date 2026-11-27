@@ -56,6 +56,11 @@ inline constexpr uint16_t MoveFlight = 0x2837;
 inline constexpr uint16_t MoveOther = 0x1E37;
 /// A skill moved someone: a charge, a pull. The local player's own are sent too.
 inline constexpr uint16_t MoveBySkill = 0x3C37;
+/// A player's War Mode switched on or off: their id and 01 for on.
+inline constexpr uint16_t WarMode = 0x5436;
+/// Sent with 54 36 to the local player alone as they switched: 01 00 00 01, then
+/// the server's Unix ms of the switch. Not decoded: seen once.
+inline constexpr uint16_t OwnWarMode = 0x5336;
 /// Layout not known yet: kept raw for the replay tool's --unknown dump.
 inline constexpr uint16_t RemainingHp = 0x008D;
 inline constexpr uint16_t PartyRoster = 0x0297;
@@ -93,6 +98,8 @@ inline constexpr uint16_t Bundle = 0xFFFF;
         case opcode::BuffAdd: return "buff_add";
         case opcode::BuffRenew: return "buff_renew";
         case opcode::BuffRemove: return "buff_remove";
+        case opcode::WarMode: return "war_mode";
+        case opcode::OwnWarMode: return "own_war_mode";
         case opcode::RemainingHp: return "remaining_hp";
         case opcode::PartyRoster: return "party_roster";
         case opcode::Bundle: return "bundle";

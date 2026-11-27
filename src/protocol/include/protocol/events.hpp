@@ -58,6 +58,22 @@ struct Identity {
     /// for a scanned record. Every fight between players in the fourth capture was
     /// between a 1 and a 2 (AGENTS.md, Identity).
     uint8_t faction{0};
+    /// The side they fight on in the Abyss: 1 or 2, 0 where the record carries none
+    /// (every map but the Abyss's in the captures) and for a scanned record.
+    /// Another player's is the byte after the class, there when `flags` has 0x10;
+    /// the local player's own sits 133 bytes after it, as `05 <side> 03 01 7f`,
+    /// when theirs has 0x08. It is the faction where the two factions meet, and
+    /// not where the Abyss pairs a faction against itself: there it is all that
+    /// tells the two sides apart (AGENTS.md, Identity).
+    uint8_t side{0};
+    /// The u32 after the id, as sent. What its bits say is not known: bit 0x80 of
+    /// byte 0 of the local player's own followed their War Mode (clear in the 12
+    /// records with it on, set in the 2 with it off), and no other player's seen so
+    /// far has it set (AGENTS.md, Identity).
+    uint32_t mask{0};
+    /// The u8 after the mask, as sent: bit 0 says a name follows; 0x10 in another
+    /// player's record and 0x08 in the local player's own that a side does.
+    uint8_t flags{0};
     bool own{false};
     /// Found by scanning an unknown packet rather than read from 33 36 / 45 36. The
     /// meter does not name anyone by it: in the second capture none of 38 had the
@@ -309,9 +325,19 @@ struct ChainWithdrawn {
     uint32_t skill{0};
 };
 
+/// 54 36: a player's War Mode, the game's switch for fighting the other faction
+/// outside the Abyss, turned on or off. Seen once, for the local player as they
+/// switched it on: their id, then 01. A 53 36 came with it, to them alone
+/// (AGENTS.md, War Mode). Whether the game tells others when someone switches is
+/// not known.
+struct WarMode {
+    EntityId id{0};
+    bool on{false};
+};
+
 using Event = std::variant<Heartbeat, Identity, Position, Spawn, Death, LeftView, MapLoad, Damage, Tick, PartyRoster, RemainingHp,
                            BuffApplied, BuffRemoved, SkillUsed, CooldownSet, SkillCast, ChainOffered, ChainWithdrawn,
-                           Pong>;
+                           Pong, WarMode>;
 
 struct ParsedEvent {
     Micros ts{0};
